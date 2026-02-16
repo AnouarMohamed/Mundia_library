@@ -58,6 +58,12 @@ The project is implemented with Next.js App Router and combines Server Component
 
 ## UI Preview
 
+### Auth Pages
+
+| Sign In Experience | Sign Up Experience |
+| --- | --- |
+| ![Sign in page](<screenshots/Screenshot 2026-02-16 150350.png>) | ![Sign up page](<screenshots/Screenshot 2026-02-16 150448.png>) |
+
 ### Student Portal
 
 | Library Home + Featured Book | Book Collection + Filters |
