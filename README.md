@@ -1,4 +1,4 @@
-# Mundiapolis Library Management System
+﻿# Mundiapolis Library Management System
 
 <p align="center">
   <strong>Full-stack university library platform with student and admin portals</strong><br/>
