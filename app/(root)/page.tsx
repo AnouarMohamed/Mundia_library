@@ -1,6 +1,3 @@
-import { db } from "@/database/drizzle";
-import { users } from "@/database/schema";
-import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 
@@ -11,6 +8,9 @@ const Home = async () => {
     redirect("/sign-in");
   }
 
+  redirect(`/library`);
+}
+  /*
   const roleFromSession = (session.user as { role?: string }).role;
   if (roleFromSession === "ADMIN") {
     redirect("/library");
@@ -36,4 +36,5 @@ const Home = async () => {
   redirect("/library");
 };
 
+   */
 export default Home;
