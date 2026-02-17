@@ -1,114 +1,233 @@
-# Mundiapolis Library Management System
+﻿# Mundiapolis Library Management System
 
-Full-stack university library platform built with Next.js 15, TypeScript, Drizzle ORM, and PostgreSQL.
+<p align="center">
+  <strong>Full-stack university library platform with student and admin portals</strong><br/>
+  Next.js 15 - React 19 - TypeScript - Drizzle ORM - PostgreSQL - NextAuth - Upstash
+</p>
 
-It includes:
-- Student portal (discover books, request borrows, return books, write reviews)
-- Admin portal (catalog, users, approvals, fines, reminders, exports, recommendations)
-- Background workflow and email integrations (Upstash + Brevo/Resend)
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" />
+  <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Database-336791?logo=postgresql&logoColor=white" />
+  <img alt="Drizzle" src="https://img.shields.io/badge/Drizzle-ORM-C5F74F" />
+  <img alt="Auth" src="https://img.shields.io/badge/Auth-NextAuth_v5-4B5563" />
+</p>
+
+![Student Library Landing](<screenshots/Screenshot 2026-02-16 134555.png>)
 
 ## Table of Contents
-- [Features](#features)
-- [Tech Stack](#tech-stack)
+
+- [Project Overview](#project-overview)
+- [Key Capabilities](#key-capabilities)
+- [UI Preview](#ui-preview)
 - [Architecture](#architecture)
+- [Route Map](#route-map)
+- [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Environment Variables](#environment-variables)
 - [Scripts](#scripts)
-- [API Overview](#api-overview)
-- [Security Notes](#security-notes)
+- [API Surface](#api-surface)
+- [Security and Reliability Notes](#security-and-reliability-notes)
 - [Troubleshooting](#troubleshooting)
 
-## Features
-- Credential-based auth with NextAuth (JWT session strategy)
-- Role-aware access (`USER`, `ADMIN`) with admin route protection
-- Book catalog with search, filtering, sorting, pagination
-- Borrow request lifecycle: `PENDING -> BORROWED -> RETURNED`
-- Fine handling for overdue borrows
-- Review system with eligibility checks (must have returned the book)
-- Admin automation:
-  - due-soon and overdue reminder emails
-  - fine configuration
-  - recommendation generation
-  - trending update and cache refresh
-  - data export (CSV/JSON)
-- Image uploads via ImageKit auth endpoint
-- Rate limiting via Upstash Redis (bypassed in development mode)
+## Project Overview
 
-## Tech Stack
-| Layer | Stack |
+Mundiapolis Library Management System is a modern full-stack library application designed for university use cases. It includes:
+
+- Student workflows: discover books, borrow, return, review, and track borrowing history
+- Admin workflows: user approvals, borrow approvals, catalog control, analytics, reminders, fines, recommendations, and exports
+- Operational automation: overdue processing, email reminders, recommendation refresh, and workflow triggers
+
+The project is implemented with Next.js App Router and combines Server Components, Server Actions, and API Route Handlers.
+
+## Key Capabilities
+
+| Domain | Implemented Capabilities |
 | --- | --- |
-| Frontend | Next.js 15 (App Router), React 19, Tailwind CSS, Radix UI |
-| State/Data | TanStack Query |
-| Backend | Next.js Route Handlers + Server Actions (Node.js runtime) |
-| Database | PostgreSQL + Drizzle ORM |
-| Auth | NextAuth v5 (Credentials provider) |
-| Caching/Queue | Upstash Redis + Upstash Workflow/QStash |
-| Media | ImageKit |
-| Email | Brevo (primary), Resend (fallback) |
+| Authentication | NextAuth credentials login, JWT sessions, role-aware access (`USER`, `ADMIN`) |
+| Student Experience | Featured library page, full catalog filters/sorting/pagination, book details, borrow requests, profile tabs |
+| Borrow Flow | Request (`PENDING`) -> admin approval (`BORROWED`) -> return (`RETURNED`) with due dates and fine calculation |
+| Reviews | Eligibility checks (borrow history), create/edit/delete review APIs |
+| Admin Dashboard | KPI cards, circulation trends, borrow mix, genre performance, top-rated books, activity feeds |
+| Admin Operations | Borrow request approvals, account/admin requests, user management, catalog management |
+| Automation | Fine config, due-soon and overdue reminders, overdue fine updates, recommendation generation + cache refresh |
+| Integrations | PostgreSQL + Drizzle, Upstash Redis/QStash, ImageKit, Brevo + Resend fallback |
+| Reliability | DB retry helper for transient failures, API rate limits (dev bypass), admin route guards |
+
+## UI Preview
+
+### Auth Pages
+
+| Sign In Experience | Sign Up Experience |
+| --- | --- |
+| ![Sign in page](<screenshots/Screenshot 2026-02-16 150350.png>) | ![Sign up page](<screenshots/Screenshot 2026-02-16 150448.png>) |
+
+### Student Portal
+
+| Library Home + Featured Book | Book Collection + Filters |
+| --- | --- |
+| ![Library home](<screenshots/Screenshot 2026-02-16 134555.png>) | ![Book collection filters](<screenshots/Screenshot 2026-02-16 134743.png>) |
+
+| Featured Book Detail | Recommendations Shelf |
+| --- | --- |
+| ![Featured book detail](<screenshots/Screenshot 2026-02-16 134704.png>) | ![Recommendations shelf](<screenshots/Screenshot 2026-02-16 134638.png>) |
+
+| Borrow Insights and Actions |
+| --- |
+| ![Borrow insights panel](<screenshots/Screenshot 2026-02-16 134623.png>) |
+
+| Borrowing History / Profile |
+| --- |
+| ![My profile borrowing tabs](<screenshots/Screenshot 2026-02-16 134941.png>) |
+
+### Admin Portal
+
+| Admin Dashboard Overview | Admin Analytics Panels |
+| --- | --- |
+| ![Admin dashboard overview](<screenshots/Screenshot 2026-02-16 100006.png>) | ![Admin charts](<screenshots/Screenshot 2026-02-16 100025.png>) |
+
+| Genre and Top Rated Insights | Recent Borrow/User Activity |
+| --- | --- |
+| ![Genre and top rated](<screenshots/Screenshot 2026-02-16 100103.png>) | ![Recent activity](<screenshots/Screenshot 2026-02-16 100147.png>) |
+
+| Automation Controls | Recommendation + Export Actions |
+| --- | --- |
+| ![Automation page](<screenshots/Screenshot 2026-02-16 100417.png>) | ![Recommendation and export actions](<screenshots/Screenshot 2026-02-16 100433.png>) |
+
+| User Management and Admin Requests |
+| --- |
+| ![All users page](<screenshots/Screenshot 2026-02-16 100640.png>) |
 
 ## Architecture
 
-### High-Level System
+### 1. System Diagram
+
 ```mermaid
-flowchart LR
-  U[Student User] --> WEB[Next.js Web App]
-  A[Admin User] --> WEB
+flowchart TB
+  subgraph Clients
+    STUDENT[Student User]
+    ADMIN[Admin User]
+  end
 
-  WEB --> AUTH[NextAuth Credentials]
-  WEB --> SA[Server Actions]
-  WEB --> API[API Route Handlers]
-  WEB --> RQ[TanStack Query Cache]
-  WEB --> MW[Middleware /admin/*]
+  subgraph Web[Next.js 15 App Router]
+    UI[Pages and Layouts]
+    SA[Server Actions]
+    API[API Route Handlers]
+    AUTH[NextAuth Credentials]
+    MW[Middleware /admin/*]
+  end
 
-  AUTH --> DB[(PostgreSQL)]
+  DB[(PostgreSQL + Drizzle)]
+  REDIS[(Upstash Redis)]
+  QSTASH[(Upstash QStash and Workflow)]
+  IMG[ImageKit]
+  MAIL[Brevo and Resend]
+
+  STUDENT --> UI
+  ADMIN --> UI
+
+  UI --> AUTH
+  UI --> SA
+  UI --> API
+  ADMIN --> MW
+  MW --> AUTH
+
   SA --> DB
   API --> DB
-
-  API --> IK[ImageKit]
-  API --> RL[Upstash Redis Rate Limit]
-  API --> WF[Upstash Workflow / QStash]
-  WF --> EMAIL[Brevo or Resend]
+  API --> REDIS
+  API --> IMG
+  SA --> QSTASH
+  API --> QSTASH
+  QSTASH --> MAIL
+  API --> MAIL
 ```
 
-### Borrow Request Sequence
+### 2. Auth and Access Control
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant UI as Next.js UI
+  participant NA as NextAuth
+  participant DB as PostgreSQL
+  participant MW as Middleware
+
+  U->>UI: Sign in with email/password
+  UI->>NA: Credentials auth
+  NA->>DB: Lookup user + verify salted hash
+  DB-->>NA: User with role
+  NA-->>UI: JWT session
+
+  U->>UI: Request /admin/*
+  UI->>MW: Middleware check
+  MW->>NA: auth()
+  NA-->>MW: Session
+  MW-->>UI: Allow admin or redirect
+```
+
+### 3. Borrow Lifecycle
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING: Student requests borrow
+  PENDING --> BORROWED: Admin approves and sets dueDate
+  PENDING --> CANCELLED: Admin rejects request
+  BORROWED --> RETURNED: Return processed and fine calculated
+  RETURNED --> [*]
+  CANCELLED --> [*]
+```
+
+### 4. Borrow Processing Sequence
+
 ```mermaid
 sequenceDiagram
   participant S as Student
-  participant UI as App UI
-  participant SA as borrowBook Server Action
+  participant SA as borrowBook action
   participant DB as PostgreSQL
-  participant AD as Admin
-  participant ASA as Admin Borrow Actions
+  participant A as Admin
+  participant ASA as Admin borrow actions
 
-  S->>UI: Request borrow
-  UI->>SA: borrowBook(userId, bookId)
-  SA->>DB: Insert borrow record (PENDING)
-  DB-->>UI: Pending request created
+  S->>SA: borrowBook(userId, bookId)
+  SA->>DB: Insert borrow record status=PENDING
+  DB-->>S: Request created
 
-  AD->>UI: Approve request
-  UI->>ASA: approveBorrowRequest(recordId)
-  ASA->>DB: Set BORROWED + dueDate and decrement availableCopies
+  A->>ASA: approveBorrowRequest(recordId)
+  ASA->>DB: status=BORROWED, set dueDate, decrement availableCopies
 
-  S->>UI: Return book
-  UI->>ASA: returnBook(recordId)
-  ASA->>DB: Set RETURNED + fine and increment availableCopies
+  A->>ASA: returnBook(recordId)
+  ASA->>DB: status=RETURNED, set returnDate, compute fine, increment availableCopies
 ```
 
-### Borrow Lifecycle
+### 5. Admin Automation Flow
+
 ```mermaid
-stateDiagram-v2
-  [*] --> PENDING
-  PENDING --> BORROWED: Admin approves
-  PENDING --> [*]: Admin rejects request
-  BORROWED --> RETURNED: Book returned
+sequenceDiagram
+  participant A as Admin
+  participant UI as Automation UI
+  participant API as Admin API Routes
+  participant DB as PostgreSQL
+  participant M as Email Provider
+
+  A->>UI: Trigger due/overdue reminder action
+  UI->>API: POST /api/admin/send-due-reminders or send-overdue-reminders
+  API->>DB: Query overdue or due-soon borrow records
+  API->>M: Send reminder emails
+  API-->>UI: Success and result summary
+
+  A->>UI: Trigger overdue fine update
+  UI->>API: POST /api/admin/update-overdue-fines
+  API->>DB: Compute and persist fineAmount
+  API-->>UI: Updated fine records
 ```
 
-### Database ERD
+### 6. Database ERD (Core Tables)
+
 ```mermaid
 erDiagram
   USERS ||--o{ BORROW_RECORDS : creates
-  BOOKS ||--o{ BORROW_RECORDS : referenced_by
+  BOOKS ||--o{ BORROW_RECORDS : requested_for
   USERS ||--o{ BOOK_REVIEWS : writes
   BOOKS ||--o{ BOOK_REVIEWS : receives
   USERS ||--o{ ADMIN_REQUESTS : submits
@@ -116,18 +235,21 @@ erDiagram
 
   USERS {
     uuid id PK
-    text email UK
+    string full_name
+    string email UK
     int university_id UK
-    text password
+    string password
     enum role
     enum status
+    timestamp last_login
   }
 
   BOOKS {
     uuid id PK
-    varchar title
-    varchar author
-    text genre
+    string title
+    string author
+    string genre
+    int rating
     int total_copies
     int available_copies
     bool is_active
@@ -141,6 +263,7 @@ erDiagram
     date due_date
     date return_date
     decimal fine_amount
+    int renewal_count
   }
 
   BOOK_REVIEWS {
@@ -148,98 +271,160 @@ erDiagram
     uuid user_id FK
     uuid book_id FK
     int rating
-    text comment
+    string comment
   }
 
   ADMIN_REQUESTS {
     uuid id PK
     uuid user_id FK
     enum status
-    text request_reason
+    string request_reason
+    uuid reviewed_by FK
   }
 
   SYSTEM_CONFIG {
     uuid id PK
-    varchar key UK
-    text value
+    string key UK
+    string value
+    string description
   }
 ```
 
+## Route Map
+
+### App Routes
+
+| Route | Access | Purpose |
+| --- | --- | --- |
+| `/sign-in` | Public | Credential login |
+| `/sign-up` | Public | Student registration |
+| `/library` | Authenticated | Featured book + recommendations |
+| `/all-books` | Authenticated | Filtered catalog view |
+| `/books/[id]` | Authenticated | Book details + reviews + borrow actions |
+| `/my-profile` | Authenticated | Active borrows, pending requests, history |
+| `/admin` | Admin | Dashboard and analytics |
+| `/admin/users` | Admin | User list + role/status actions |
+| `/admin/books` | Admin | Catalog management |
+| `/admin/book-requests` | Admin | Borrow request operations |
+| `/admin/account-requests` | Admin | Admin access request review |
+| `/admin/automation` | Admin | Reminders, fines, exports, recommendation jobs |
+
+### API Categories
+
+| Category | Representative Endpoints |
+| --- | --- |
+| Books | `/api/books`, `/api/books/[id]`, `/api/books/genres`, `/api/books/recommendations`, `/api/books/[id]/borrow-stats` |
+| Borrows | `/api/borrow-records`, `/api/admin/borrow-requests` |
+| Reviews | `/api/reviews/[bookId]`, `/api/reviews/edit/[reviewId]`, `/api/reviews/delete/[reviewId]`, `/api/reviews/eligibility/[bookId]` |
+| Admin Ops | `/api/admin/stats`, `/api/admin/fine-config`, `/api/admin/reminder-stats`, `/api/admin/admin-requests` |
+| Admin Automation | `/api/admin/send-due-reminders`, `/api/admin/send-overdue-reminders`, `/api/admin/update-overdue-fines`, `/api/admin/generate-recommendations`, `/api/admin/update-trending-books`, `/api/admin/refresh-recommendation-cache`, `/api/admin/export-stats`, `/api/admin/export/[type]` |
+| Auth + Upload | `/api/auth/[...nextauth]`, `/api/auth/imagekit` |
+| Workflow | `/api/workflows/onboarding` |
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 15 App Router, React 19, Tailwind CSS, Radix UI |
+| Data Fetching | TanStack Query |
+| Backend | Next.js Route Handlers + Server Actions |
+| Auth | NextAuth v5 (Credentials provider, JWT sessions) |
+| Database | PostgreSQL + Drizzle ORM |
+| Caching and Rate Limits | Upstash Redis + `@upstash/ratelimit` |
+| Background Jobs | Upstash Workflow / QStash |
+| Media | ImageKit |
+| Email | Brevo (primary) + Resend (fallback) |
+
 ## Project Structure
+
 ```text
 app/
-  (auth)/                 # Sign in / Sign up routes
-  (root)/                 # User-facing authenticated pages
-  admin/                  # Admin dashboard pages
-  api/                    # Route handlers (books, borrows, admin, reviews, auth)
+  (auth)/                 # Sign in / sign up
+  (root)/                 # Student portal pages
+  admin/                  # Admin portal pages
+  api/                    # Route handlers
 components/               # UI and feature components
+constants/                # App constants
 database/
-  drizzle.ts              # DB connection
+  drizzle.ts              # Database connection
   schema.ts               # Drizzle schema
   seed.ts                 # Seed script
-hooks/                    # React Query hooks
+hooks/                    # Query/mutation hooks
 lib/
-  actions/                # User server actions
+  actions/                # Student-facing server actions
   admin/actions/          # Admin server actions
-  services/               # API wrapper services
-migrations/               # SQL migrations
-scripts/                  # Diagnostics and maintenance scripts
+  services/               # API service wrappers
+  db/retry.ts             # DB retry helper
+migrations/               # Drizzle migrations
+scripts/                  # Maintenance and diagnostics scripts
+screenshots/              # Project UI screenshots used in this README
 ```
 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 20+
 - npm
 - PostgreSQL database
-- Upstash (Redis + QStash), ImageKit, and email provider credentials
+- Upstash Redis + QStash credentials
+- ImageKit credentials
+- Brevo and/or Resend email credentials
 
 ### 1. Install dependencies
+
 ```bash
 npm install
 ```
 
 ### 2. Configure environment
+
 Create `.env.local` in the project root:
 
 ```env
 DATABASE_URL=postgresql://user:password@host:5432/dbname
-NEXTAUTH_SECRET=replace_me
+NEXTAUTH_SECRET=replace_with_secure_secret
 NEXTAUTH_URL=http://localhost:3000
 
 NEXT_PUBLIC_API_ENDPOINT=http://localhost:3000
 NEXT_PUBLIC_PROD_API_ENDPOINT=http://localhost:3000
 
 NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/your_id
-NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=public_key
-IMAGEKIT_PRIVATE_KEY=private_key
+NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=your_public_key
+IMAGEKIT_PRIVATE_KEY=your_private_key
 
 UPSTASH_REDIS_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_TOKEN=your_redis_token
 QSTASH_URL=https://qstash.upstash.io
 QSTASH_TOKEN=your_qstash_token
 
-BREVO_API_KEY=your_brevo_key
+BREVO_API_KEY=your_brevo_api_key
 BREVO_SENDER_EMAIL=noreply@example.com
 BREVO_SENDER_NAME=Mundiapolis Library
-RESEND_TOKEN=your_resend_key
+RESEND_TOKEN=your_resend_token
 
 ENABLE_WORKFLOWS=false
 ```
 
-Note: Some standalone scripts read from `.env` (not `.env.local`). If you use those scripts, duplicate the required keys into `.env`.
+Important:
+
+- Some standalone scripts load `.env` directly (not `.env.local`).
+- If you run CLI scripts like `npm run seed`, mirror required keys in `.env`.
 
 ### 3. Apply database schema
+
 ```bash
 npm run db:migrate
 ```
 
-### 4. (Optional) Seed sample books
+### 4. Optional seed
+
 ```bash
 npm run seed
 ```
 
 ### 5. Start development server
+
 ```bash
 npm run dev
 ```
@@ -247,93 +432,108 @@ npm run dev
 Open `http://localhost:3000`.
 
 ## Environment Variables
+
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `NEXTAUTH_SECRET` | Yes | NextAuth JWT/cookie secret |
-| `NEXTAUTH_URL` | Yes | Base app URL for auth callbacks |
+| `NEXTAUTH_SECRET` | Yes | NextAuth secret for JWT/cookies |
+| `NEXTAUTH_URL` | Yes | Base URL for auth callbacks |
 | `NEXT_PUBLIC_API_ENDPOINT` | Yes | Public API base URL |
-| `NEXT_PUBLIC_PROD_API_ENDPOINT` | Yes | Metadata/workflow endpoint base URL |
+| `NEXT_PUBLIC_PROD_API_ENDPOINT` | Yes | Production-style endpoint used by workflows |
 | `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Yes | ImageKit URL endpoint |
 | `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY` | Yes | ImageKit public key |
-| `IMAGEKIT_PRIVATE_KEY` | Yes | ImageKit private key |
+| `IMAGEKIT_PRIVATE_KEY` | Yes | ImageKit private key (server-side) |
 | `UPSTASH_REDIS_URL` | Yes | Upstash Redis URL |
 | `UPSTASH_REDIS_TOKEN` | Yes | Upstash Redis token |
 | `QSTASH_URL` | Yes | Upstash QStash URL |
 | `QSTASH_TOKEN` | Yes | Upstash QStash token |
 | `BREVO_API_KEY` | Yes | Brevo API key |
-| `BREVO_SENDER_EMAIL` | Yes | Brevo sender email |
-| `BREVO_SENDER_NAME` | No | Brevo sender name |
+| `BREVO_SENDER_EMAIL` | Yes | Sender email for Brevo |
+| `BREVO_SENDER_NAME` | No | Sender display name |
 | `RESEND_TOKEN` | Yes | Resend API token fallback |
 | `ENABLE_WORKFLOWS` | No | Force-enable onboarding workflow outside production |
 
 ## Scripts
+
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start local dev server |
+| `npm run dev` | Start local development server |
 | `npm run dev:turbo` | Start dev server with Turbopack |
-| `npm run build` | Production build |
+| `npm run build` | Create production build |
 | `npm run start` | Start production server |
 | `npm run lint` | Run Next.js lint |
 | `npm run db:generate` | Generate Drizzle migration files |
-| `npm run db:migrate` | Push schema to database |
+| `npm run db:migrate` | Push schema to PostgreSQL |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run seed` | Seed books from `dummybooks.json` |
-| `npm run db:migrate-csv` | Import data from CSV migration script |
+| `npm run db:migrate-csv` | Run CSV migration helper |
 | `npm run db:perf-indexes` | Add performance indexes |
-| `npm run verify-stats` | Verify admin stats consistency |
-| `npm run verify-borrow` | Verify borrow detail consistency |
+| `npm run verify-stats` | Validate admin stats consistency |
+| `npm run verify-borrow` | Validate borrow details consistency |
 | `npm run fix-borrow-sync` | Repair borrow synchronization issues |
 | `npm run fix-overcorrection` | Correct over-updated records |
 | `npm run find-missing-borrow` | Find missing borrow relationships |
 | `npm run check-all-books` | Validate book records |
-| `npm run fix-coding-interview` | Specialized maintenance script |
+| `npm run fix-coding-interview` | Specialized maintenance fix script |
 
-## API Overview
+## API Surface
 
-Core endpoints:
-- `GET /api/books` - list books (search/filter/sort/pagination)
-- `GET /api/books/[id]` - single book details
-- `GET /api/books/genres` - distinct genres
-- `GET /api/books/recommendations` - personalized or fallback recommendations
-- `GET /api/books/[id]/borrow-stats` - per-book borrow metrics
-- `GET /api/borrow-records` - user/admin borrow records
-- `GET|POST /api/reviews/[bookId]` - list/create reviews
-- `GET /api/reviews/eligibility/[bookId]` - review eligibility
-- `PUT /api/reviews/edit/[reviewId]` - update own review
-- `DELETE /api/reviews/delete/[reviewId]` - delete own review
-- `GET /api/auth/imagekit` - ImageKit upload auth params
+### Core Endpoints
 
-Admin endpoints:
-- `GET /api/admin/stats`
-- `GET /api/users` (admin-only user listing)
-- `GET /api/admin/borrow-requests`
-- `GET /api/admin/admin-requests`
-- `GET|POST /api/admin/fine-config`
-- `POST /api/admin/send-due-reminders`
-- `POST /api/admin/send-overdue-reminders`
-- `POST /api/admin/update-overdue-fines`
-- `POST /api/admin/generate-recommendations`
-- `POST /api/admin/update-trending-books`
-- `POST /api/admin/refresh-recommendation-cache`
-- `GET /api/admin/export-stats`
-- `POST /api/admin/export/[type]`
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/books` | List books with search/filter/sort/pagination |
+| `GET` | `/api/books/[id]` | Get one book by ID |
+| `GET` | `/api/books/genres` | Get distinct genres |
+| `GET` | `/api/books/recommendations` | Get personalized/fallback recommendations |
+| `GET` | `/api/books/[id]/borrow-stats` | Get borrow metrics for a book |
+| `GET` | `/api/borrow-records` | Get borrow records with filters |
+| `GET` | `/api/reviews/[bookId]` | List reviews for a book |
+| `POST` | `/api/reviews/[bookId]` | Create review |
+| `GET` | `/api/reviews/eligibility/[bookId]` | Check if current user can review |
+| `PUT` | `/api/reviews/edit/[reviewId]` | Update review |
+| `DELETE` | `/api/reviews/edit/[reviewId]` | Delete review (alternate route implementation) |
+| `DELETE` | `/api/reviews/delete/[reviewId]` | Delete review |
+| `GET` | `/api/auth/imagekit` | Get ImageKit upload auth params |
 
-## Security Notes
-- Auth is NextAuth credentials-based with salted SHA-256 password hashing.
-- `/admin/*` is protected by middleware and role checks.
-- Admin APIs use `requireAdminRouteAccess()` guard.
-- Most API routes are rate-limited by IP using Upstash.
-- In development, rate-limit checks are bypassed for speed.
+### Admin Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/admin/stats` | Dashboard metrics |
+| `GET` | `/api/users` | User listing for admin |
+| `GET` | `/api/admin/borrow-requests` | Borrow request list |
+| `GET` | `/api/admin/admin-requests` | Admin access requests |
+| `GET` | `/api/admin/fine-config` | Get daily fine amount |
+| `POST` | `/api/admin/fine-config` | Update daily fine amount |
+| `GET` | `/api/admin/reminder-stats` | Reminder summary metrics |
+| `POST` | `/api/admin/send-due-reminders` | Send due-soon reminders |
+| `POST` | `/api/admin/send-overdue-reminders` | Send overdue reminders |
+| `POST` | `/api/admin/update-overdue-fines` | Calculate and persist overdue fines |
+| `POST` | `/api/admin/generate-recommendations` | Generate recommendation data |
+| `POST` | `/api/admin/update-trending-books` | Refresh trending books |
+| `POST` | `/api/admin/refresh-recommendation-cache` | Invalidate/rebuild recommendation cache |
+| `GET` | `/api/admin/export-stats` | Export counters |
+| `POST` | `/api/admin/export/[type]` | Export books/users/borrows/analytics |
+
+## Security and Reliability Notes
+
+- Auth uses NextAuth credentials with salted SHA-256 verification.
+- `/admin/*` routes are protected by middleware and role checks.
+- Admin APIs enforce server-side access guards (`requireAdminRouteAccess`).
+- API rate limiting uses Upstash Redis; local development bypass is enabled for speed.
+- Database operations include retry logic for transient timeout/network failures.
+- `next.config.ts` currently sets `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds` to `true`. Tighten this before strict production CI.
 
 ## Troubleshooting
-- `No database connection string was provided`:
-  - Ensure `DATABASE_URL` is set correctly.
-- Auth issues in local:
-  - Set both `NEXTAUTH_SECRET` and `NEXTAUTH_URL`.
-- Upload/email/automation failures:
-  - Verify ImageKit, Upstash, Brevo, and Resend credentials.
-- Script works in app but fails in CLI:
-  - Some scripts load `.env` explicitly; mirror values from `.env.local`.
-- Build passes despite type/lint issues:
-  - `next.config.ts` currently ignores TypeScript and ESLint errors during build.
+
+- `No database connection string was provided`
+  - Check `DATABASE_URL` in `.env.local` (and `.env` for CLI scripts).
+- Login fails or redirects unexpectedly
+  - Verify `NEXTAUTH_SECRET` and `NEXTAUTH_URL`.
+- Upload auth errors
+  - Validate ImageKit keys and URL endpoint variables.
+- Reminder/export/recommendation automation fails
+  - Validate Upstash, Brevo, and Resend environment variables.
+- CLI script works differently from app runtime
+  - Some scripts explicitly load `.env`; ensure values are mirrored from `.env.local`.
