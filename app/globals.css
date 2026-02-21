@@ -4,16 +4,32 @@
 
 @layer base {
   :root {
+    --background: #F8FAFC; /* Fond très clair (slate-50) */
+    --foreground: #0F172A; /* Texte foncé (slate-900) */
+    
+    --card: #FFFFFF;
+    --card-foreground: #0F172A;
+    
+    --popover: #FFFFFF;
+    --popover-foreground: #0F172A;
+    
+    --primary: #25388C; /* Votre couleur admin devient la principale */
+    --primary-foreground: #FFFFFF;
+    
+    --secondary: #E2E8F0;
+    --secondary-foreground: #0F172A;
+    
+    --muted: #F1F5F9;
+    --muted-foreground: #64748B;
+    
+    --accent: #F1F5F9;
+    --accent-foreground: #0F172A;
+    
+    --border: #E2E8F0;
+    --input: #E2E8F0;
+    --ring: #25388C;
+    
     --radius: 0.85rem;
-    --surface-0: #07161f;
-    --surface-1: #103142;
-    --surface-2: #1f5467;
-    --surface-card: rgba(8, 27, 38, 0.8);
-    --surface-card-strong: rgba(7, 21, 30, 0.9);
-    --text-main: #e7f2f6;
-    --text-muted: #9ab3be;
-    --accent-gold: #86bccb;
-    --accent-gold-strong: #2f6f82;
   }
 
   html,
