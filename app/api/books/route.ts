@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
-import { desc, asc, eq, ilike, and, or, sql } from "drizzle-orm";
+import { desc, asc, eq, like, and, or, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
@@ -65,11 +65,11 @@ export async function GET(request: NextRequest) {
     // Build where conditions
     const whereConditions = [];
 
-    // Search condition - case-insensitive using ILIKE
+    // Search condition
     if (search) {
       const searchPattern = `%${search}%`;
       whereConditions.push(
-        or(ilike(books.title, searchPattern), ilike(books.author, searchPattern))
+        or(like(books.title, searchPattern), like(books.author, searchPattern))
       );
     }
 

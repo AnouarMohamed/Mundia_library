@@ -6,8 +6,8 @@
  */
 
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { books, borrowRecords } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -17,11 +17,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  connectionLimit: 10,
 });
 
-const db = drizzle(pool, { casing: "snake_case" });
+const db = drizzle({ client: pool, casing: "snake_case" });
 
 async function fixCodingInterview() {
   console.log("🔧 Fixing 'Cracking the Coding Interview' Data Issue\n");
@@ -113,4 +114,3 @@ async function fixCodingInterview() {
 }
 
 fixCodingInterview();
-

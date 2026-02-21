@@ -12,8 +12,8 @@
  * - Without NEXT_PUBLIC_: Server-side only (secure, not exposed to browser)
  * 
  * Database:
- * - DATABASE_URL: PostgreSQL connection string (Hetzner VPS)
- *   Format: postgresql://user:password@host:port/database
+ * - DATABASE_URL: MySQL connection string
+ *   Format: mysql://user:password@host:port/database
  * 
  * Email Services:
  * - Brevo: Primary email service (supports all email providers)
@@ -37,7 +37,7 @@ const config = {
       privateKey: process.env.IMAGEKIT_PRIVATE_KEY!, // Server-side only (secure)
     },
     
-    // Database connection string (Hetzner VPS PostgreSQL)
+    // Database connection string (MySQL)
     // Server-side only (never exposed to browser)
     databaseUrl: process.env.DATABASE_URL || "",
     

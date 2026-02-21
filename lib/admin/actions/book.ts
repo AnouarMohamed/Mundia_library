@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { eq } from "drizzle-orm";
@@ -8,15 +9,23 @@ export const createBook = async (
   params: BookParams & { updatedBy?: string }
 ) => {
   try {
-    const newBook = await db
+    const bookId = randomUUID();
+
+    await db
       .insert(books)
       .values({
+        id: bookId,
         ...params,
         availableCopies: params.totalCopies, // Initially all copies are available
         updatedBy: params.updatedBy || undefined,
         isActive: params.isActive ?? true, // Default to true if not provided
-      })
-      .returning();
+      });
+
+    const newBook = await db
+      .select()
+      .from(books)
+      .where(eq(books.id, bookId))
+      .limit(1);
 
     return {
       success: true,
@@ -64,7 +73,7 @@ export const updateBook = async (
         params.totalCopies - borrowedCopies
       );
 
-      const updatedBook = await db
+      await db
         .update(books)
         .set({
           ...params,
@@ -72,8 +81,20 @@ export const updateBook = async (
           updatedBy: params.updatedBy || undefined,
           updatedAt: new Date(), // CRITICAL: Update timestamp on every update
         })
+        .where(eq(books.id, bookId));
+
+      const updatedBook = await db
+        .select()
+        .from(books)
         .where(eq(books.id, bookId))
-        .returning();
+        .limit(1);
+
+      if (updatedBook.length === 0) {
+        return {
+          success: false,
+          message: "Book not found after update",
+        };
+      }
 
       return {
         success: true,
@@ -81,15 +102,27 @@ export const updateBook = async (
       };
     } else {
       // Simple update without totalCopies change
-      const updatedBook = await db
+      await db
         .update(books)
         .set({
           ...params,
           updatedBy: params.updatedBy || undefined,
           updatedAt: new Date(), // CRITICAL: Update timestamp on every update
         })
+        .where(eq(books.id, bookId));
+
+      const updatedBook = await db
+        .select()
+        .from(books)
         .where(eq(books.id, bookId))
-        .returning();
+        .limit(1);
+
+      if (updatedBook.length === 0) {
+        return {
+          success: false,
+          message: "Book not found after update",
+        };
+      }
 
       return {
         success: true,

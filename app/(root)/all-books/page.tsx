@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, or, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
@@ -55,7 +55,7 @@ const Page = async ({
   if (search) {
     const searchPattern = `%${search}%`;
     whereConditions.push(
-      or(ilike(books.title, searchPattern), ilike(books.author, searchPattern))
+      or(like(books.title, searchPattern), like(books.author, searchPattern))
     );
   }
 

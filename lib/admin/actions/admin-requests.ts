@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { adminRequests, users } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -83,14 +84,16 @@ export async function createAdminRequest(
     }
 
     // Create the admin request
-    const newRequest = await db
+    const requestId = randomUUID();
+
+    await db
       .insert(adminRequests)
       .values({
+        id: requestId,
         userId,
         requestReason,
         status: "PENDING",
-      })
-      .returning();
+      });
 
     // Get the full request with user details
     const fullRequest = await db
@@ -109,7 +112,7 @@ export async function createAdminRequest(
       })
       .from(adminRequests)
       .innerJoin(users, eq(adminRequests.userId, users.id))
-      .where(eq(adminRequests.id, newRequest[0].id))
+      .where(eq(adminRequests.id, requestId))
       .limit(1);
 
     return {
@@ -228,16 +231,14 @@ export async function approveAdminRequest(
       .where(eq(users.id, request[0].userId));
 
     // Update the admin request status
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _updatedRequest = await db
+    await db
       .update(adminRequests)
       .set({
         status: "APPROVED",
         reviewedBy,
         reviewedAt: new Date(),
       })
-      .where(eq(adminRequests.id, requestId))
-      .returning();
+      .where(eq(adminRequests.id, requestId));
 
     // Get the full updated request with user details
     const fullRequest = await db
@@ -301,8 +302,7 @@ export async function rejectAdminRequest(
     }
 
     // Update the admin request status
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _updatedRequest = await db
+    await db
       .update(adminRequests)
       .set({
         status: "REJECTED",
@@ -310,8 +310,7 @@ export async function rejectAdminRequest(
         reviewedAt: new Date(),
         rejectionReason,
       })
-      .where(eq(adminRequests.id, requestId))
-      .returning();
+      .where(eq(adminRequests.id, requestId));
 
     // Get the full updated request with user details
     const fullRequest = await db

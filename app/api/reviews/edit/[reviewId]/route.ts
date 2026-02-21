@@ -96,21 +96,25 @@ export async function PUT(
       );
     }
 
-    // Update the review
-    const [updatedReview] = await db
+    await db
       .update(bookReviews)
       .set({
         rating,
         comment: comment.trim(),
         updatedAt: new Date(),
       })
-      .where(eq(bookReviews.id, reviewId))
-      .returning({
+      .where(eq(bookReviews.id, reviewId));
+
+    const [updatedReview] = await db
+      .select({
         id: bookReviews.id,
         rating: bookReviews.rating,
         comment: bookReviews.comment,
         updatedAt: bookReviews.updatedAt,
-      });
+      })
+      .from(bookReviews)
+      .where(eq(bookReviews.id, reviewId))
+      .limit(1);
 
     return NextResponse.json({
       success: true,

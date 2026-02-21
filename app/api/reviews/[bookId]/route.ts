@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { bookReviews, users, borrowRecords } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -182,21 +183,28 @@ export async function POST(
       );
     }
 
-    // Create the review
-    const [newReview] = await db
+    const reviewId = randomUUID();
+
+    await db
       .insert(bookReviews)
       .values({
+        id: reviewId,
         bookId,
         userId: session.user.id,
         rating,
         comment: comment.trim(),
-      })
-      .returning({
+      });
+
+    const [newReview] = await db
+      .select({
         id: bookReviews.id,
         rating: bookReviews.rating,
         comment: bookReviews.comment,
         createdAt: bookReviews.createdAt,
-      });
+      })
+      .from(bookReviews)
+      .where(eq(bookReviews.id, reviewId))
+      .limit(1);
 
     return NextResponse.json({
       success: true,

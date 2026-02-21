@@ -4,8 +4,8 @@ config({ path: ".env.local" });
 
 const drizzleConfig = {
   schema: "./database/schema.ts",
-  out: "./migrations",
-  dialect: "postgresql",
+  out: "./migrations/mysql",
+  dialect: "mysql",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
   },

@@ -1,18 +1,20 @@
 import dummyBooks from "../dummybooks.json";
 import ImageKit from "imagekit";
 import { books } from "@/database/schema";
-import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { config } from "dotenv";
 import fs from "fs";
 import path from "path";
 
+config({ path: ".env.local" });
 config({ path: ".env" });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL!,
+  connectionLimit: 10,
 });
-export const db = drizzle(pool);
+export const db = drizzle({ client: pool, casing: "snake_case" });
 
 const imagekit = new ImageKit({
   publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
@@ -65,4 +67,11 @@ const seed = async () => {
   }
 };
 
-seed();
+seed()
+  .catch((error) => {
+    console.error("Seeding failed:", error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await pool.end();
+  });

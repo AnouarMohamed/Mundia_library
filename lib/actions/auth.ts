@@ -19,6 +19,7 @@ import ratelimit from "@/lib/ratelimit";
 import { redirect } from "next/navigation";
 import { workflowClient } from "@/lib/workflow";
 import config from "@/lib/config";
+import { isTransientDbError, withDbRetry } from "@/lib/db/retry";
 
 export const signInWithCredentials = async (
   params: Pick<AuthCredentials, "email" | "password">
@@ -98,35 +99,6 @@ export const signUp = async (params: AuthCredentials) => {
     };
   }
 
-  const existingUser = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-
-  if (existingUser.length > 0) {
-    return {
-      success: false,
-      error: "email",
-      fieldError: "This email is already registered. Please use a different email or sign in.",
-    };
-  }
-
-  // Check for duplicate university ID
-  const existingUniversityId = await db
-    .select()
-    .from(users)
-    .where(eq(users.universityId, universityId))
-    .limit(1);
-
-  if (existingUniversityId.length > 0) {
-    return {
-      success: false,
-      error: "universityId",
-      fieldError: "This University ID is already registered. Please use a different ID or contact support if this is your ID.",
-    };
-  }
-
   // Generate a random salt
   const salt = randomBytes(16);
   // Hash the password with the salt
@@ -136,13 +108,48 @@ export const signUp = async (params: AuthCredentials) => {
   const hashedPassword = `${Buffer.from(salt).toString("base64")}:${Buffer.from(hashBuffer).toString("base64")}`;
 
   try {
-    await db.insert(users).values({
-      fullName,
-      email,
-      universityId,
-      password: hashedPassword,
-      universityCard,
-    });
+    const [existingUser, existingUniversityId] = await withDbRetry(
+      () =>
+        Promise.all([
+          db.select().from(users).where(eq(users.email, email)).limit(1),
+          db
+            .select()
+            .from(users)
+            .where(eq(users.universityId, universityId))
+            .limit(1),
+        ]),
+      { retries: 2, delayMs: 300 }
+    );
+
+    if (existingUser.length > 0) {
+      return {
+        success: false,
+        error: "email",
+        fieldError:
+          "This email is already registered. Please use a different email or sign in.",
+      };
+    }
+
+    if (existingUniversityId.length > 0) {
+      return {
+        success: false,
+        error: "universityId",
+        fieldError:
+          "This University ID is already registered. Please use a different ID or contact support if this is your ID.",
+      };
+    }
+
+    await withDbRetry(
+      () =>
+        db.insert(users).values({
+          fullName,
+          email,
+          universityId,
+          password: hashedPassword,
+          universityCard,
+        }),
+      { retries: 2, delayMs: 300 }
+    );
 
     // Only trigger workflow in production or if explicitly enabled
     if (
@@ -175,6 +182,14 @@ export const signUp = async (params: AuthCredentials) => {
         success: false,
         error: "universityId",
         fieldError: "University ID is too large. Maximum allowed 8-digit number.",
+      };
+    }
+
+    if (isTransientDbError(error)) {
+      return {
+        success: false,
+        error:
+          "Signup service is temporarily unavailable. Please try again in a moment.",
       };
     }
 

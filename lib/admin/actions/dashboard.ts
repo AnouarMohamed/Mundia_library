@@ -133,15 +133,15 @@ const getCachedAdminDashboardStats = unstable_cache(
         .limit(6),
       db
         .select({
-          date: sql<string>`date(${borrowRecords.createdAt})::text`,
+          date: sql<string>`DATE(${borrowRecords.createdAt})`,
           borrows: sql<number>`count(*)`,
           returns:
             sql<number>`coalesce(sum(case when ${borrowRecords.status} = 'RETURNED' then 1 else 0 end), 0)`,
         })
         .from(borrowRecords)
         .where(gte(borrowRecords.createdAt, fourteenDaysAgo))
-        .groupBy(sql`date(${borrowRecords.createdAt})`)
-        .orderBy(sql`date(${borrowRecords.createdAt}) asc`),
+        .groupBy(sql`DATE(${borrowRecords.createdAt})`)
+        .orderBy(sql`DATE(${borrowRecords.createdAt}) asc`),
     ]);
 
     const userStats = userStatsResult[0];

@@ -6,8 +6,8 @@
 
 // Load environment variables FIRST before importing anything that uses them
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { borrowRecords, users } from "@/database/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -19,11 +19,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  connectionLimit: 10,
 });
 
-const db = drizzle(pool, { casing: "snake_case" });
+const db = drizzle({ client: pool, casing: "snake_case" });
 
 async function checkTestUserBorrows() {
   try {
@@ -50,7 +51,7 @@ async function checkTestUserBorrows() {
     const statusCounts = await db
       .select({
         status: borrowRecords.status,
-        count: sql<number>`count(*)::int`,
+        count: sql<number>`count(*)`,
       })
       .from(borrowRecords)
       .where(eq(borrowRecords.userId, userId))
@@ -59,15 +60,22 @@ async function checkTestUserBorrows() {
     console.log("=== Borrow Records by Status ===");
     let totalRecords = 0;
     statusCounts.forEach(({ status, count }) => {
-      console.log(`${status}: ${count} records`);
-      totalRecords += count;
+      const numericCount = Number(count || 0);
+      console.log(`${status}: ${numericCount} records`);
+      totalRecords += numericCount;
     });
     console.log(`Total: ${totalRecords} records\n`);
 
     // Get detailed counts
-    const pendingCount = statusCounts.find((s) => s.status === "PENDING")?.count || 0;
-    const borrowedCount = statusCounts.find((s) => s.status === "BORROWED")?.count || 0;
-    const returnedCount = statusCounts.find((s) => s.status === "RETURNED")?.count || 0;
+    const pendingCount = Number(
+      statusCounts.find((s) => s.status === "PENDING")?.count || 0
+    );
+    const borrowedCount = Number(
+      statusCounts.find((s) => s.status === "BORROWED")?.count || 0
+    );
+    const returnedCount = Number(
+      statusCounts.find((s) => s.status === "RETURNED")?.count || 0
+    );
 
     console.log("=== Summary ===");
     console.log(`Pending Requests: ${pendingCount}`);
@@ -79,12 +87,12 @@ async function checkTestUserBorrows() {
     console.log("=== API Query Check ===");
     const apiQueryResult = await db
       .select({
-        count: sql<number>`count(*)::int`,
+        count: sql<number>`count(*)`,
       })
       .from(borrowRecords)
       .where(eq(borrowRecords.userId, userId));
 
-    const apiTotalCount = apiQueryResult[0]?.count || 0;
+    const apiTotalCount = Number(apiQueryResult[0]?.count || 0);
     console.log(`API would return: ${apiTotalCount} records (with limit=10000)`);
     console.log(`Expected in UI:`);
     console.log(`  - Active Borrows: ${borrowedCount}`);
@@ -105,4 +113,3 @@ async function checkTestUserBorrows() {
 }
 
 checkTestUserBorrows();
-

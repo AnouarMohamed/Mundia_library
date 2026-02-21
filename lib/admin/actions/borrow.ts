@@ -347,11 +347,7 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
           updatedAt: new Date(),
           updatedBy: record.userId,
         })
-        .where(eq(borrowRecords.id, record.id))
-        .returning({
-          id: borrowRecords.id,
-          fineAmount: borrowRecords.fineAmount,
-        });
+        .where(eq(borrowRecords.id, record.id));
 
       console.log(`Update result for ${record.id}:`, updateResult);
 

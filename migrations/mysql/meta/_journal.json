@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771425932370,
+      "tag": "0000_dazzling_molly_hayes",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771427629173,
+      "tag": "0001_sweet_fantastic_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771427680975,
+      "tag": "0002_brief_psylocke",
+      "breakpoints": true
+    }
+  ]
+}

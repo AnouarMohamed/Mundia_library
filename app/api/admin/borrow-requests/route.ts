@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { borrowRecords, books, users } from "@/database/schema";
-import { eq, desc, and, or, ilike, sql } from "drizzle-orm";
+import { eq, desc, and, or, like, sql } from "drizzle-orm";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
 export const runtime = "nodejs";
@@ -50,16 +50,16 @@ export async function GET(request: NextRequest) {
       whereConditions.push(eq(borrowRecords.status, status));
     }
 
-    // Search condition - case-insensitive using ILIKE
+    // Search condition
     if (search) {
       const searchPattern = `%${search}%`;
       whereConditions.push(
         or(
-          ilike(books.title, searchPattern),
-          ilike(books.author, searchPattern),
-          ilike(users.fullName, searchPattern),
-          ilike(users.email, searchPattern),
-          sql`CAST(${users.universityId} AS TEXT) ILIKE ${searchPattern}`
+          like(books.title, searchPattern),
+          like(books.author, searchPattern),
+          like(users.fullName, searchPattern),
+          like(users.email, searchPattern),
+          sql`CAST(${users.universityId} AS CHAR) LIKE ${searchPattern}`
         )
       );
     }

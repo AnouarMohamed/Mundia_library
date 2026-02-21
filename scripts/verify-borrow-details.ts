@@ -9,8 +9,8 @@
 
 // Load environment variables FIRST
 import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { users, books, borrowRecords } from "@/database/schema";
 import { eq, sql, and, gte, lte } from "drizzle-orm";
 
@@ -21,11 +21,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+const pool = mysql.createPool({
+  uri: process.env.DATABASE_URL,
+  connectionLimit: 10,
 });
 
-const db = drizzle(pool, { casing: "snake_case" });
+const db = drizzle({ client: pool, casing: "snake_case" });
 
 async function verifyBorrowDetails() {
   console.log("🔍 Detailed Borrow Records Investigation\n");
@@ -105,14 +106,14 @@ async function verifyBorrowDetails() {
       // Check if borrowed copies match borrow records
       const activeBorrowRecords = byStatus.BORROWED.length;
       if (borrowedCount !== activeBorrowRecords) {
-        console.log(`   ⚠️  MISMATCH: ${borrowedCount} borrowed copies but ${activeBorrowRecords} BORROWED records`);
+        console.log(`     MISMATCH: ${borrowedCount} borrowed copies but ${activeBorrowRecords} BORROWED records`);
       } else {
         console.log(`   ✓ Match: ${borrowedCount} borrowed copies = ${activeBorrowRecords} BORROWED records`);
       }
     }
 
     // 3. Check all BORROWED status records
-    console.log("\n\n📋 ALL BORROWED STATUS RECORDS");
+    console.log("\n\n ALL BORROWED STATUS RECORDS");
     console.log("-".repeat(80));
     
     const allBorrowedRecords = await db
@@ -158,7 +159,7 @@ async function verifyBorrowDetails() {
         overdueCount++;
       }
 
-      console.log(`📖 ${bookTitle}`);
+      console.log(` ${bookTitle}`);
       console.log(`   User: ${userName}`);
       console.log(`   Borrow Date: ${record.borrowDate}`);
       console.log(`   Due Date: ${record.dueDate || "Not set"}`);
@@ -169,7 +170,7 @@ async function verifyBorrowDetails() {
 
     // 4. Summary
     console.log("\n" + "=".repeat(80));
-    console.log("📊 SUMMARY");
+    console.log("SUMMARY");
     console.log("=".repeat(80));
     
     const totalBorrowedCopies = allBooks.reduce(
@@ -236,4 +237,3 @@ async function verifyBorrowDetails() {
 
 // Run the verification
 verifyBorrowDetails();
-

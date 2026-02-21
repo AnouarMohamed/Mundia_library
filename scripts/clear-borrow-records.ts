@@ -15,7 +15,7 @@ async function clearBorrowRecords() {
     const result = await db.delete(borrowRecords);
 
     console.log("✅ Successfully cleared all borrow_records!");
-    console.log("📊 Records deleted:", result.rowCount || "Unknown");
+    console.log("Delete result:", result);
     console.log("🎯 Ready for clean testing!");
 
     process.exit(0);
@@ -26,4 +26,5 @@ async function clearBorrowRecords() {
 }
 
 clearBorrowRecords();
+
 
