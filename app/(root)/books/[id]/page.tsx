@@ -19,6 +19,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   if (!session?.user?.id) {
     redirect("/sign-in");
   }
+  const userId = session.user.id;
+  const userEmail = session.user.email || undefined;
 
   const { id } = await params;
 
@@ -69,7 +71,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
       .from(borrowRecords)
       .where(
         and(
-          eq(borrowRecords.userId, session.user.id),
+          eq(borrowRecords.userId, userId),
           eq(borrowRecords.bookId, id)
         )
       )
@@ -99,8 +101,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     createdAt: record.createdAt,
   }));
 
-  const hasExistingReview = reviewRows.some(
-    (review) => review.userEmail === session.user.email
+  const hasExistingReview = reviewRows.some((review) =>
+    userEmail ? review.userEmail === userEmail : false
   );
   const hasReturnedBorrow = rawUserBorrows.some(
     (record) => record.status === "RETURNED"
@@ -126,7 +128,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     <section className="space-y-8 sm:space-y-10">
       <BookOverview
         {...(book as Book)}
-        userId={session.user.id}
+        userId={userId}
         isDetailPage={true}
         initialUserBorrows={initialUserBorrows}
         initialReviewEligibility={initialReviewEligibility}
@@ -134,8 +136,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
       <BookDetailContent
         bookId={id}
-        userId={session.user.id}
-        userEmail={session.user.email || undefined}
+        userId={userId}
+        userEmail={userEmail}
         initialBook={book as Book}
         initialReviews={reviewRows}
       />

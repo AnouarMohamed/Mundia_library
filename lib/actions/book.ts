@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { books, borrowRecords } from "@/database/schema";
 import { eq } from "drizzle-orm";
@@ -68,17 +69,30 @@ export const borrowBook = async (
       };
     }
 
-    // CRITICAL: Use .returning() to get the inserted record
-    // Without this, db.insert() doesn't return the actual record data
-    const [record] = await db
+    const recordId = randomUUID();
+
+    await db
       .insert(borrowRecords)
       .values({
+        id: recordId,
         userId,
         bookId,
         dueDate: null, // Will be set when admin approves
         status: "PENDING",
-      })
-      .returning();
+      });
+
+    const [record] = await db
+      .select()
+      .from(borrowRecords)
+      .where(eq(borrowRecords.id, recordId))
+      .limit(1);
+
+    if (!record) {
+      return {
+        success: false,
+        error: "Failed to create borrow request",
+      };
+    }
 
     // Don't decrement available copies until admin approves
 

@@ -38,6 +38,7 @@ const Page = async () => {
   if (!session?.user?.id) {
     redirect("/sign-in");
   }
+  const userId = session.user.id;
 
   let topBooks: Book[] = [];
   try {
@@ -105,7 +106,7 @@ const Page = async () => {
         .from(borrowRecords)
         .where(
           and(
-            eq(borrowRecords.userId, session.user.id),
+            eq(borrowRecords.userId, userId),
             eq(borrowRecords.bookId, featuredBook.id)
           )
         )
@@ -155,13 +156,13 @@ const Page = async () => {
 
       <BookOverview
         {...(featuredBook as Book)}
-        userId={session.user.id}
+        userId={userId}
         initialUserBorrows={initialUserBorrows}
       />
 
       <HomeRecommendations
         initialRecommendations={recommendations as Book[]}
-        userId={session.user.id}
+        userId={userId}
         limit={6}
       />
     </section>
