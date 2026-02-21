@@ -307,44 +307,44 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#c5d9e4] bg-gradient-to-br from-[#f8fbfe] via-[#eff7fc] to-[#e7f2f9] p-6 text-slate-900 shadow-[0_24px_70px_rgba(15,23,42,0.12)] sm:p-8">
-        <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#5ea4bb]/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-20 right-8 h-52 w-52 rounded-full bg-[#94c973]/20 blur-3xl" />
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2b4658] bg-gradient-to-br from-[#0f172a] via-[#102538] to-[#16364b] p-6 text-slate-100 shadow-[0_24px_70px_rgba(2,6,23,0.5)] sm:p-8">
+        <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-[#3dd2c8]/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 right-8 h-52 w-52 rounded-full bg-[#7ba54d]/20 blur-3xl" />
 
         <div className="relative z-10 space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#b6cedb] bg-white/85 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#2f5b6f]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#35546a] bg-[#0d2233]/85 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#9ec7dc]">
             <Sparkles className="size-3.5" />
             Dashboard Overview
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-bebas-neue text-4xl tracking-[0.08em] text-[#1f3f50] sm:text-5xl">
+            <h2 className="font-bebas-neue text-4xl tracking-[0.08em] text-[#d7e9f5] sm:text-5xl">
               Library Intelligence Dashboard
             </h2>
-            <p className="max-w-3xl text-sm text-slate-700 sm:text-base">
+            <p className="max-w-3xl text-sm text-slate-300 sm:text-base">
               Live operational insight for circulation, catalog quality, and user
               growth in one view.
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-[#bfd4df] bg-white/90 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-600">
+            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 Borrow Utilization
               </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">{utilizationRate}%</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-100">{utilizationRate}%</p>
             </div>
-            <div className="rounded-xl border border-[#bfd4df] bg-white/90 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-600">
+            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 User Approval
               </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">{approvalRate}%</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-100">{approvalRate}%</p>
             </div>
-            <div className="rounded-xl border border-[#bfd4df] bg-white/90 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-600">
+            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 Admin Coverage
               </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-900">
+              <p className="mt-1 text-2xl font-semibold text-slate-100">
                 {toPercent(adminUsers, Math.max(1, totalUsers))}%
               </p>
             </div>

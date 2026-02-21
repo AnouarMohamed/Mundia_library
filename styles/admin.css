@@ -4,28 +4,28 @@
 
 @layer base {
   .admin-theme {
-    --background: #f5f9fc;
+    --background: #f4fafc;
     --foreground: #0f172a;
     --card: #ffffff;
     --card-foreground: #0f172a;
     --popover: #ffffff;
     --popover-foreground: #0f172a;
-    --primary: #3d7388;
+    --primary: #2f6f82;
     --primary-foreground: #ffffff;
-    --secondary: #e9f2f7;
+    --secondary: #e7f2f6;
     --secondary-foreground: #1f3a4a;
-    --muted: #eef4f8;
+    --muted: #edf5f9;
     --muted-foreground: #4b6170;
-    --accent: #dbeaf2;
+    --accent: #d8e9f0;
     --accent-foreground: #1f3a4a;
-    --border: #d6e4ed;
-    --input: #d2e2ec;
-    --ring: #3d7388;
+    --border: #d0e2ea;
+    --input: #cfe1e9;
+    --ring: #2f6f82;
 
     background:
-      radial-gradient(circle at 8% 0%, rgba(107, 169, 188, 0.12), transparent 30%),
-      radial-gradient(circle at 88% 8%, rgba(144, 201, 115, 0.14), transparent 34%),
-      linear-gradient(160deg, #f8fbfe 0%, #f2f7fb 54%, #edf4f9 100%);
+      radial-gradient(circle at 8% 0%, rgba(134, 188, 203, 0.16), transparent 30%),
+      radial-gradient(circle at 88% 8%, rgba(204, 47, 102, 0.08), transparent 34%),
+      linear-gradient(160deg, #f9fcfe 0%, #f2f8fb 54%, #ecf4f8 100%);
     @apply text-slate-900;
   }
 }
@@ -34,7 +34,7 @@
   .admin-container {
     @apply flex min-w-0 flex-1 flex-col p-4 sm:p-6 lg:px-10 lg:py-8 xl:px-12 2xl:px-16;
     background:
-      radial-gradient(circle at 80% 0%, rgba(61, 115, 136, 0.08), transparent 26%),
+      radial-gradient(circle at 80% 0%, rgba(47, 111, 130, 0.1), transparent 28%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 252, 255, 0.92) 100%);
   }
 
