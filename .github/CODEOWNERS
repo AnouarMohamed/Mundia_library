@@ -1,0 +1,14 @@
+# Default maintainer ownership. GitHub can request reviews from these owners
+# automatically when branch protection enables code-owner reviews.
+* @AnouarMohamed
+
+.github/ @AnouarMohamed
+app/ @AnouarMohamed
+components/ @AnouarMohamed
+database/ @AnouarMohamed
+lib/ @AnouarMohamed
+middleware.ts @AnouarMohamed
+auth.ts @AnouarMohamed
+Dockerfile @AnouarMohamed
+package.json @AnouarMohamed
+package-lock.json @AnouarMohamed

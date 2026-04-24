@@ -1,0 +1,69 @@
+name: Repository Label Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repo-labels.yml
+      - .github/labeler.yml
+
+permissions:
+  issues: write
+
+concurrency:
+  group: repo-label-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: Create and update standard labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Sync labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              ["security", "b60205", "Security-sensitive changes or findings"],
+              ["dependencies", "0366d6", "Dependency manifest or lockfile changes"],
+              ["ci", "5319e7", "CI, automation, Docker, or repository infrastructure"],
+              ["frontend", "1d76db", "App UI, React components, styles, or client behavior"],
+              ["backend", "0e8a16", "API, server actions, auth, or server behavior"],
+              ["database", "fbca04", "Schema, migrations, seeds, or query behavior"],
+              ["docs", "0075ca", "Documentation-only changes"],
+              ["performance", "f9d0c4", "Benchmarks, load tests, caching, or query performance"],
+              ["bug", "d73a4a", "Something is broken"],
+              ["blocked", "000000", "Cannot proceed without external input"],
+              ["pinned", "ffffff", "Exempt from stale automation"],
+              ["stale", "ededed", "Inactive issue or pull request"],
+              ["size/XS", "2ea043", "Very small pull request"],
+              ["size/S", "56d364", "Small pull request"],
+              ["size/M", "d29922", "Medium pull request"],
+              ["size/L", "fb8500", "Large pull request"],
+              ["size/XL", "da3633", "Very large pull request"],
+            ];
+
+            for (const [name, color, description] of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name,
+                  color,
+                  description,
+                });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+                await github.rest.issues.updateLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name,
+                  color,
+                  description,
+                });
+              }
+            }

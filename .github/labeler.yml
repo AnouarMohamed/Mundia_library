@@ -1,0 +1,71 @@
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+          - Dockerfile
+          - docker-compose.yml
+          - .dockerignore
+
+security:
+  - changed-files:
+      - any-glob-to-any-file:
+          - auth.ts
+          - middleware.ts
+          - SECURITY.md
+          - .github/workflows/codeql.yml
+          - .github/workflows/container-security.yml
+          - .github/workflows/dependency-review.yml
+          - .github/workflows/npm-audit.yml
+          - .github/workflows/secret-scan.yml
+          - lib/ratelimit.ts
+          - lib/session.ts
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - package.json
+          - package-lock.json
+          - .github/dependabot.yml
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/**
+          - components/**
+          - hooks/**
+          - styles/**
+          - public/**
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file:
+          - app/api/**
+          - lib/**
+          - database/**
+          - auth.ts
+          - middleware.ts
+
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          - database/**
+          - migrations/**
+          - drizzle.config.ts
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+          - docs/**
+          - .github/pull_request_template.md
+          - .github/ISSUE_TEMPLATE/**
+
+performance:
+  - changed-files:
+      - any-glob-to-any-file:
+          - scripts/benchmark-api-routes.mjs
+          - scripts/nightly-load-test.mjs
+          - scripts/explain-hot-queries.ts
+          - perf-baselines/**
+          - .github/workflows/api-benchmarks.yml
+          - .github/workflows/nightly-load-test.yml

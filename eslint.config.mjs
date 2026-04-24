@@ -12,11 +12,23 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "coverage/**",
+      "artifacts/**",
+      "next-env.d.ts",
+    ],
+  },
   ...compat.extends(
     "next/core-web-vitals",
     "next/typescript",
     "plugin:tailwindcss/recommended",
-    "prettier"
+    "prettier",
   ),
   {
     rules: {
@@ -28,6 +40,11 @@ const eslintConfig = [
       ],
       // Ignore <img> element warning from next/next/no-img-element
       "@next/next/no-img-element": "off",
+      // Keep CI focused on correctness/security instead of cosmetic Tailwind churn.
+      "tailwindcss/classnames-order": "off",
+      "tailwindcss/enforces-shorthand": "off",
+      "tailwindcss/no-custom-classname": "off",
+      "tailwindcss/no-unnecessary-arbitrary-value": "off",
     },
   },
 ];

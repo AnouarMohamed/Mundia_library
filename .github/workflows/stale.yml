@@ -1,0 +1,46 @@
+name: Stale Issue and PR Bot
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: stale-bot
+  cancel-in-progress: false
+
+jobs:
+  stale:
+    name: Mark stale work
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Mark inactive issues and pull requests
+        uses: actions/stale@v9
+        with:
+          days-before-issue-stale: 45
+          days-before-issue-close: 14
+          days-before-pr-stale: 21
+          days-before-pr-close: 10
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: security,bug,blocked,pinned
+          exempt-pr-labels: security,blocked,pinned
+          stale-issue-message: >
+            This issue has been quiet for a while. It is marked stale so the
+            backlog stays readable. Add a fresh comment or the `pinned` label to
+            keep it open.
+          close-issue-message: >
+            Closing this stale issue. Reopen it with updated context if it is
+            still relevant.
+          stale-pr-message: >
+            This pull request has been quiet for a while. It is marked stale so
+            review queues stay clear. Push changes, comment, or add `pinned` to
+            keep it active.
+          close-pr-message: >
+            Closing this stale pull request. Reopen it when it is ready to move.

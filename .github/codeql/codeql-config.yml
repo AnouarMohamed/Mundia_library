@@ -1,0 +1,24 @@
+name: Mundia Library CodeQL Config
+
+disable-default-queries: false
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+paths:
+  - app
+  - components
+  - database
+  - hooks
+  - lib
+  - middleware.ts
+  - auth.ts
+
+paths-ignore:
+  - .next
+  - node_modules
+  - screenshots
+  - public
+  - coverage
+  - artifacts
