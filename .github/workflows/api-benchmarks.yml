@@ -4,21 +4,45 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/api-benchmarks.yml"
+      - "scripts/benchmark-api-routes.mjs"
+      - "app/api/**"
+      - "lib/**"
+      - "database/**"
+      - "migrations/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/api-benchmarks.yml"
+      - "scripts/benchmark-api-routes.mjs"
+      - "app/api/**"
+      - "lib/**"
+      - "database/**"
+      - "migrations/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.ts"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: api-bench-${{ github.ref }}
+  group: api-bench-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   benchmark:
     name: Benchmark key API routes
-    if: github.actor != 'dependabot[bot]'
+    if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     services:
       mysql:
@@ -53,6 +77,9 @@ jobs:
       ENABLE_WORKFLOWS: "false"
       DISABLE_RATE_LIMIT: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      BENCH_BASE_URL: http://127.0.0.1:3000
+      BENCH_WARMUP: "5"
+      BENCH_ITERATIONS: "20"
 
     steps:
       - name: Checkout
@@ -63,6 +90,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -75,22 +103,46 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Start app
+      - name: Start app and run benchmarks
         run: |
+          set -euo pipefail
+
           npm run start > /tmp/next-server.log 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            if kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+              kill "$SERVER_PID" >/dev/null 2>&1 || true
+              wait "$SERVER_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
           for i in {1..60}; do
             if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
               echo "API server is ready"
-              exit 0
+              break
             fi
             sleep 2
           done
-          echo "Server failed to start"
-          cat /tmp/next-server.log
-          exit 1
 
-      - name: Run benchmarks
-        run: node scripts/benchmark-api-routes.mjs
+          if ! curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
+            echo "Server failed to start"
+            cat /tmp/next-server.log
+            exit 1
+          fi
+
+          node scripts/benchmark-api-routes.mjs
+
+      - name: Upload benchmark summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: api-benchmark-summary
+          path: |
+            /tmp/api-benchmark-summary.md
+            /tmp/api-benchmark-results.json
+          if-no-files-found: ignore
 
       - name: Upload server log on failure
         if: failure()

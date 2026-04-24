@@ -1,5 +1,6 @@
 import process from "node:process";
 import { performance } from "node:perf_hooks";
+import { writeFile } from "node:fs/promises";
 
 const BASE_URL = process.env.BENCH_BASE_URL || "http://127.0.0.1:3000";
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS || 15);
@@ -86,6 +87,25 @@ function asMarkdown(results) {
   return `${lines.join("\n")}\n`;
 }
 
+async function persistArtifacts(results, markdown) {
+  const summaryPath = process.env.BENCH_SUMMARY_FILE || "/tmp/api-benchmark-summary.md";
+  const resultsPath = process.env.BENCH_RESULTS_FILE || "/tmp/api-benchmark-results.json";
+
+  await writeFile(summaryPath, markdown, "utf8");
+  await writeFile(
+    resultsPath,
+    `${JSON.stringify({
+      baseUrl: BASE_URL,
+      warmup: WARMUP,
+      iterations: ITERATIONS,
+      generatedAt: new Date().toISOString(),
+      results,
+      thresholds,
+    }, null, 2)}\n`,
+    "utf8"
+  );
+}
+
 async function main() {
   console.log(`Benchmarking API routes at ${BASE_URL}`);
   console.log(`Warmup=${WARMUP}, iterations=${ITERATIONS}`);
@@ -115,10 +135,10 @@ async function main() {
   const markdown = asMarkdown(results);
   console.log("\n" + markdown);
 
+  await persistArtifacts(results, markdown);
+
   if (process.env.GITHUB_STEP_SUMMARY) {
-    await import("node:fs/promises").then((fs) =>
-      fs.appendFile(process.env.GITHUB_STEP_SUMMARY, markdown)
-    );
+    await writeFile(process.env.GITHUB_STEP_SUMMARY, markdown, { encoding: "utf8", flag: "a" });
   }
 
   const checks = [
