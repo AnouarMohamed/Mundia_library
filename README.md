@@ -516,6 +516,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 | `npm run ci:quality` | Run lint + typecheck + build locally (CI parity) |
 | `npm run benchmark:api` | Benchmark key API routes and enforce p95 thresholds |
 | `npm run explain:hot-queries` | Run EXPLAIN plans for the hottest API query shapes |
+| `npm run loadtest:nightly` | Run higher-concurrency load test with regression checks |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Push schema to MySQL |
 | `npm run db:studio` | Open Drizzle Studio |
@@ -539,6 +540,7 @@ This repository now includes a multi-workflow GitHub Actions pipeline:
 - `Dependency Review` (`.github/workflows/dependency-review.yml`): blocks high-severity vulnerable dependency additions on PRs to `main`
 - `Secret Scan` (`.github/workflows/secret-scan.yml`): detects leaked credentials and tokens on pull requests and protected branch pushes
 - `API Performance Benchmarks` (`.github/workflows/api-benchmarks.yml`): validates latency for key API routes with p95 threshold gates
+- `Nightly API Load Test` (`.github/workflows/nightly-load-test.yml`): runs scheduled higher-concurrency checks and uploads trend artifacts
 
 Full operational documentation is available in `docs/CI_PIPELINES.md`.
 PR quality gates are standardized via `.github/pull_request_template.md`.

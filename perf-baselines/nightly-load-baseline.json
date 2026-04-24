@@ -1,0 +1,17 @@
+{
+  "routes": {
+    "/api/books?limit=12&sort=rating&page=1": {
+      "p95Ms": 600
+    },
+    "/api/books/genres": {
+      "p95Ms": 450
+    },
+    "/api/books/recommendations?limit=10": {
+      "p95Ms": 700
+    },
+    "/api/books/:id": {
+      "p95Ms": 550
+    }
+  },
+  "maxRegressionPercent": 25
+}

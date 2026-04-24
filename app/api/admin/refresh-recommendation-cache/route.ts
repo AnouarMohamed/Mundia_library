@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refreshRecommendationCache } from "@/lib/admin/actions/recommendations";
+import { revalidateRecommendationsTag } from "@/lib/cache/revalidate";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
 export const runtime = "nodejs";
@@ -12,6 +13,7 @@ export async function POST(_request: NextRequest) {
     }
 
     const result = await refreshRecommendationCache();
+    revalidateRecommendationsTag();
 
     return NextResponse.json({
       success: true,

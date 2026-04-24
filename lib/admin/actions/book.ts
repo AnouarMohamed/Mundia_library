@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { eq } from "drizzle-orm";
+import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
 export const createBook = async (
   params: BookParams & { updatedBy?: string }
@@ -26,6 +27,8 @@ export const createBook = async (
       .from(books)
       .where(eq(books.id, bookId))
       .limit(1);
+
+    revalidateCatalogTags();
 
     return {
       success: true,
@@ -89,6 +92,8 @@ export const updateBook = async (
         .where(eq(books.id, bookId))
         .limit(1);
 
+      revalidateCatalogTags();
+
       if (updatedBook.length === 0) {
         return {
           success: false,
@@ -116,6 +121,8 @@ export const updateBook = async (
         .from(books)
         .where(eq(books.id, bookId))
         .limit(1);
+
+      revalidateCatalogTags();
 
       if (updatedBook.length === 0) {
         return {

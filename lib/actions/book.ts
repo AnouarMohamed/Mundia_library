@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { books, borrowRecords } from "@/database/schema";
 import { eq } from "drizzle-orm";
+import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
 /**
  * Parameters for borrowing a book
@@ -95,6 +96,8 @@ export const borrowBook = async (
     }
 
     // Don't decrement available copies until admin approves
+
+    revalidateCatalogTags();
 
     return {
       success: true,

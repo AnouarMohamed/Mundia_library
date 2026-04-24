@@ -18,6 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { desc, asc, eq, like, and, or, sql } from "drizzle-orm";
@@ -25,6 +26,98 @@ import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+type BooksQueryInput = {
+  search: string;
+  genre: string;
+  availability: string;
+  rating: string;
+  sort: string;
+  page: number;
+  limit: number;
+};
+
+const fetchBooksPage = async (input: BooksQueryInput) => {
+  const whereConditions = [];
+
+  whereConditions.push(eq(books.isActive, true));
+
+  if (input.search) {
+    const searchPattern = `%${input.search}%`;
+    whereConditions.push(
+      or(like(books.title, searchPattern), like(books.author, searchPattern))
+    );
+  }
+
+  if (input.genre) {
+    whereConditions.push(eq(books.genre, input.genre));
+  }
+
+  if (input.availability === "available") {
+    whereConditions.push(sql`${books.availableCopies} > 0`);
+  } else if (input.availability === "unavailable") {
+    whereConditions.push(sql`${books.availableCopies} = 0`);
+  }
+
+  if (input.rating) {
+    const minRating = parseInt(input.rating, 10);
+    whereConditions.push(sql`${books.rating} >= ${minRating}`);
+  }
+
+  let orderBy;
+  switch (input.sort) {
+    case "author":
+      orderBy = asc(books.author);
+      break;
+    case "rating":
+      orderBy = desc(books.rating);
+      break;
+    case "date":
+      orderBy = desc(books.createdAt);
+      break;
+    case "title":
+    default:
+      orderBy = asc(books.title);
+      break;
+  }
+
+  const offset = (input.page - 1) * input.limit;
+  const whereClause =
+    whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+  const [allBooks, totalBooksResult] = await Promise.all([
+    db
+      .select()
+      .from(books)
+      .where(whereClause)
+      .orderBy(orderBy)
+      .limit(input.limit)
+      .offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(books).where(whereClause),
+  ]);
+
+  const totalBooks = totalBooksResult[0]?.count || 0;
+  const totalPages = Math.ceil(totalBooks / input.limit);
+
+  return {
+    books: allBooks,
+    pagination: {
+      currentPage: input.page,
+      totalPages,
+      totalBooks,
+      booksPerPage: input.limit,
+    },
+  };
+};
+
+const getCachedBooksPage = unstable_cache(
+  async (input: BooksQueryInput) => fetchBooksPage(input),
+  ["api-books-v5"],
+  {
+    revalidate: 60,
+    tags: ["books"],
+  }
+);
 
 /**
  * Get books list with filters and pagination
@@ -67,85 +160,20 @@ export async function GET(request: NextRequest) {
       ? 12
       : Math.min(50, Math.max(1, limitParam));
 
-    // Build where conditions
-    const whereConditions = [];
-
-    // Public catalog should only include active books.
-    whereConditions.push(eq(books.isActive, true));
-
-    // Search condition
-    if (search) {
-      const searchPattern = `%${search}%`;
-      whereConditions.push(
-        or(like(books.title, searchPattern), like(books.author, searchPattern))
-      );
-    }
-
-    // Genre filter
-    if (genre) {
-      whereConditions.push(eq(books.genre, genre));
-    }
-
-    // Availability filter
-    if (availability === "available") {
-      whereConditions.push(sql`${books.availableCopies} > 0`);
-    } else if (availability === "unavailable") {
-      whereConditions.push(sql`${books.availableCopies} = 0`);
-    }
-
-    // Rating filter
-    if (rating) {
-      const minRating = parseInt(rating, 10);
-      whereConditions.push(sql`${books.rating} >= ${minRating}`);
-    }
-
-    // Build sort order
-    let orderBy;
-    switch (sort) {
-      case "author":
-        orderBy = asc(books.author);
-        break;
-      case "rating":
-        orderBy = desc(books.rating);
-        break;
-      case "date":
-        orderBy = desc(books.createdAt);
-        break;
-      case "title":
-      default:
-        orderBy = asc(books.title);
-        break;
-    }
-
-    // Fetch books with pagination
-    const offset = (safePage - 1) * safeLimit;
-    const whereClause =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
-
-    // Run independent queries in parallel to reduce total API latency.
-    const [allBooks, totalBooksResult] = await Promise.all([
-      db
-        .select()
-        .from(books)
-        .where(whereClause)
-        .orderBy(orderBy)
-        .limit(safeLimit)
-        .offset(offset),
-      db.select({ count: sql<number>`count(*)` }).from(books).where(whereClause),
-    ]);
-
-    const totalBooks = totalBooksResult[0]?.count || 0;
-    const totalPages = Math.ceil(totalBooks / safeLimit);
+    const result = await getCachedBooksPage({
+      search,
+      genre,
+      availability,
+      rating,
+      sort,
+      page: safePage,
+      limit: safeLimit,
+    });
 
     return NextResponse.json({
       success: true,
-      books: allBooks,
-      pagination: {
-        currentPage: safePage,
-        totalPages,
-        totalBooks,
-        booksPerPage: safeLimit,
-      },
+      books: result.books,
+      pagination: result.pagination,
     });
   } catch (error) {
     console.error("Error fetching books:", error);

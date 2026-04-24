@@ -1,0 +1,101 @@
+name: Nightly API Load Test
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-load-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    name: Nightly load test and trend artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: library_management
+          MYSQL_ROOT_PASSWORD: rootpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: mysql://root:rootpassword@127.0.0.1:3306/library_management
+      NEXTAUTH_SECRET: ci-load-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3000
+      NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3000
+      NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
+      NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ci-load-public-key
+      IMAGEKIT_PRIVATE_KEY: ci-load-private-key
+      UPSTASH_REDIS_URL: https://example.upstash.io
+      UPSTASH_REDIS_TOKEN: ci-load-token
+      QSTASH_URL: https://qstash.upstash.io
+      QSTASH_TOKEN: ci-load-token
+      BREVO_API_KEY: ci-load-token
+      BREVO_SENDER_EMAIL: noreply@example.com
+      RESEND_TOKEN: ci-load-token
+      ENABLE_WORKFLOWS: "false"
+      DISABLE_RATE_LIMIT: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Apply schema and seed
+        run: |
+          npm run db:migrate
+          npm run seed
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app
+        run: |
+          npm run start > /tmp/next-nightly-server.log 2>&1 &
+          for i in {1..60}; do
+            if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
+              echo "API server is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Server failed to start"
+          cat /tmp/next-nightly-server.log
+          exit 1
+
+      - name: Run load test
+        run: node scripts/nightly-load-test.mjs
+
+      - name: Upload load test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-load-artifacts
+          path: |
+            artifacts/perf/nightly-load-report.json
+            artifacts/perf/nightly-load-report.md
+            /tmp/next-nightly-server.log

@@ -19,6 +19,7 @@
 import { db } from "@/database/drizzle";
 import { borrowRecords, books, users } from "@/database/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
 /**
  * Fetch all borrow requests with user and book details
@@ -176,6 +177,8 @@ export const approveBorrowRequest = async (recordId: string) => {
       .set({ availableCopies: book[0].availableCopies - 1 })
       .where(eq(books.id, record[0].bookId));
 
+    revalidateCatalogTags();
+
     return { success: true };
   } catch (error) {
     console.error("Error approving borrow request:", error);
@@ -188,6 +191,8 @@ export const rejectBorrowRequest = async (recordId: string) => {
     // For now, we'll just delete the pending request
     // In a real system, you might want to keep it for audit purposes
     await db.delete(borrowRecords).where(eq(borrowRecords.id, recordId));
+
+    revalidateCatalogTags();
 
     return { success: true };
   } catch (error) {
@@ -443,6 +448,8 @@ export const returnBook = async (recordId: string) => {
         .set({ availableCopies: book[0].availableCopies + 1 })
         .where(eq(books.id, record[0].bookId));
     }
+
+    revalidateCatalogTags();
 
     return {
       success: true,

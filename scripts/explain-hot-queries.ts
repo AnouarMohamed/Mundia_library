@@ -1,5 +1,7 @@
 import { config } from "dotenv";
 import mysql from "mysql2/promise";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -13,6 +15,14 @@ type QueryPlan = {
   description: string;
   sql: string;
   params?: Array<string | number>;
+};
+
+type TableAccessSummary = {
+  endpoint: string;
+  tableName: string;
+  accessType?: string;
+  key?: string;
+  rowsExaminedPerScan?: number;
 };
 
 const plans: QueryPlan[] = [
@@ -80,7 +90,74 @@ const plans: QueryPlan[] = [
   },
 ];
 
+function extractTableAccesses(node: unknown, endpoint: string): TableAccessSummary[] {
+  const summaries: TableAccessSummary[] = [];
+
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== "object") {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        visit(item);
+      }
+      return;
+    }
+
+    const record = value as Record<string, unknown>;
+    const tableNode = record.table;
+    if (tableNode && typeof tableNode === "object") {
+      const table = tableNode as Record<string, unknown>;
+      const tableName = table.table_name;
+
+      if (typeof tableName === "string") {
+        summaries.push({
+          endpoint,
+          tableName,
+          accessType:
+            typeof table.access_type === "string"
+              ? table.access_type
+              : undefined,
+          key: typeof table.key === "string" ? table.key : undefined,
+          rowsExaminedPerScan:
+            typeof table.rows_examined_per_scan === "number"
+              ? table.rows_examined_per_scan
+              : undefined,
+        });
+      }
+    }
+
+    for (const nested of Object.values(record)) {
+      visit(nested);
+    }
+  };
+
+  visit(node);
+  return summaries;
+}
+
+function buildMarkdown(summary: TableAccessSummary[]) {
+  const lines = [
+    "## Hot query index hit report",
+    "",
+    "| Endpoint | Table | Access type | Index key | Rows/scan |",
+    "| --- | --- | --- | --- | ---: |",
+  ];
+
+  for (const item of summary) {
+    lines.push(
+      `| ${item.endpoint} | ${item.tableName} | ${item.accessType || "n/a"} | ${item.key || "(none)"} | ${item.rowsExaminedPerScan ?? 0} |`
+    );
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 async function run() {
+  const artifactDir = path.resolve(process.cwd(), "artifacts/perf");
+  await fs.mkdir(artifactDir, { recursive: true });
+
   const pool = mysql.createPool({
     uri: process.env.DATABASE_URL,
     connectionLimit: 5,
@@ -88,6 +165,14 @@ async function run() {
 
   try {
     console.log("Running EXPLAIN plans for hot API queries...\n");
+
+    const summaryRows: TableAccessSummary[] = [];
+    const planDump: Array<{
+      endpoint: string;
+      description: string;
+      queryCost: string | number;
+      plan: unknown;
+    }> = [];
 
     for (const plan of plans) {
       const [rows] = await pool.execute(plan.sql, plan.params ?? []);
@@ -116,10 +201,46 @@ async function run() {
       };
 
       const queryCost = parsed.query_block?.cost_info?.query_cost ?? "unknown";
+      const accesses = extractTableAccesses(parsed, plan.endpoint);
+      summaryRows.push(...accesses);
+
+      planDump.push({
+        endpoint: plan.endpoint,
+        description: plan.description,
+        queryCost,
+        plan: parsed,
+      });
+
       console.log(`Estimated query cost: ${queryCost}`);
       console.log(JSON.stringify(parsed, null, 2));
       console.log("");
     }
+
+    const markdown = buildMarkdown(summaryRows);
+    const markdownPath = path.join(artifactDir, "query-plan-index-report.md");
+    const jsonPath = path.join(artifactDir, "query-plan-index-report.json");
+
+    await fs.writeFile(markdownPath, markdown, "utf8");
+    await fs.writeFile(
+      jsonPath,
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          plans: planDump,
+          summary: summaryRows,
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, markdown);
+    }
+
+    console.log(markdown);
+    console.log(`Saved index hit report to ${markdownPath}`);
   } finally {
     await pool.end();
   }

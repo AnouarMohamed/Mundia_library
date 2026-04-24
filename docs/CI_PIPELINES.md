@@ -114,6 +114,26 @@ Required checks recommendation:
 
 - `Benchmark key API routes`
 
+### 6) Nightly API Load Test
+
+File: `.github/workflows/nightly-load-test.yml`
+
+Triggers:
+
+- Scheduled nightly run
+- Manual dispatch
+
+Purpose:
+
+- Run higher-concurrency API load checks against seeded data
+- Compare p95 latency against baseline + regression tolerance
+- Publish JSON and Markdown trend artifacts
+
+Artifacts:
+
+- `artifacts/perf/nightly-load-report.json`
+- `artifacts/perf/nightly-load-report.md`
+
 ## Pull Request Governance
 
 File: `.github/pull_request_template.md`

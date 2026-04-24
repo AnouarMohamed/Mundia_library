@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books, borrowRecords } from "@/database/schema";
 import { desc, eq, sql, and, inArray, notInArray } from "drizzle-orm";
@@ -27,6 +28,94 @@ import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+const getFallbackRecommendations = unstable_cache(
+  async (limit: number) => {
+    return (await db
+      .select()
+      .from(books)
+      .where(eq(books.isActive, true))
+      .orderBy(desc(books.rating), desc(books.createdAt))
+      .limit(limit)) as Book[];
+  },
+  ["api-books-recommendations-fallback-v2"],
+  { revalidate: 90, tags: ["books", "recommendations"] }
+);
+
+const getPersonalizedRecommendations = unstable_cache(
+  async (userId: string, limit: number) => {
+    let recommendedBooks: Book[] = [];
+
+    const userBorrowHistory = await db
+      .select({
+        genre: books.genre,
+        author: books.author,
+      })
+      .from(borrowRecords)
+      .innerJoin(books, eq(borrowRecords.bookId, books.id))
+      .where(
+        and(eq(borrowRecords.userId, userId), eq(borrowRecords.status, "RETURNED"))
+      )
+      .orderBy(desc(borrowRecords.borrowDate))
+      .limit(10);
+
+    if (userBorrowHistory.length === 0) {
+      return [] as Book[];
+    }
+
+    const userBorrowedBookIds = await db
+      .select({ bookId: borrowRecords.bookId })
+      .from(borrowRecords)
+      .where(eq(borrowRecords.userId, userId));
+
+    const borrowedIds = userBorrowedBookIds.map((record) => record.bookId);
+    const userGenres = [...new Set(userBorrowHistory.map((h) => h.genre))];
+
+    const genreRecommendations = await db
+      .select()
+      .from(books)
+      .where(
+        and(
+          inArray(books.genre, userGenres),
+          borrowedIds.length > 0 ? notInArray(books.id, borrowedIds) : sql`1=1`,
+          eq(books.isActive, true)
+        )
+      )
+      .orderBy(desc(books.rating), desc(books.createdAt))
+      .limit(limit);
+
+    recommendedBooks = genreRecommendations as Book[];
+
+    if (recommendedBooks.length < limit) {
+      const remainingSlots = limit - recommendedBooks.length;
+      const additionalBooks = await db
+        .select()
+        .from(books)
+        .where(
+          and(
+            borrowedIds.length > 0 ? notInArray(books.id, borrowedIds) : sql`1=1`,
+            eq(books.isActive, true)
+          )
+        )
+        .orderBy(desc(books.rating), desc(books.createdAt))
+        .limit(remainingSlots);
+
+      const existingIds = recommendedBooks.map((book) => book.id);
+      const uniqueAdditionalBooks = additionalBooks.filter(
+        (book) => !existingIds.includes(book.id)
+      );
+
+      recommendedBooks = [...recommendedBooks, ...uniqueAdditionalBooks].slice(
+        0,
+        limit
+      );
+    }
+
+    return recommendedBooks;
+  },
+  ["api-books-recommendations-user-v2"],
+  { revalidate: 90, tags: ["books", "recommendations"] }
+);
 
 /**
  * Get book recommendations for a user
@@ -68,92 +157,11 @@ export async function GET(request: NextRequest) {
     let recommendedBooks: Book[] = [];
 
     if (finalUserId) {
-      // Try to get recommendations based on user's reading history
-      const userBorrowHistory = await db
-        .select({
-          genre: books.genre,
-          author: books.author,
-        })
-        .from(borrowRecords)
-        .innerJoin(books, eq(borrowRecords.bookId, books.id))
-        .where(
-          and(
-            eq(borrowRecords.userId, finalUserId),
-            eq(borrowRecords.status, "RETURNED")
-          )
-        )
-        .orderBy(desc(borrowRecords.borrowDate))
-        .limit(10);
-
-      if (userBorrowHistory.length > 0) {
-        // Get books from similar genres/authors that user hasn't borrowed
-        const userBorrowedBookIds = await db
-          .select({ bookId: borrowRecords.bookId })
-          .from(borrowRecords)
-          .where(eq(borrowRecords.userId, finalUserId));
-
-        const borrowedIds = userBorrowedBookIds.map((record) => record.bookId);
-
-        // Get unique genres from user's reading history
-        const userGenres = [...new Set(userBorrowHistory.map((h) => h.genre))];
-
-        // Get recommended books based on reading history
-        const genreRecommendations = await db
-          .select()
-          .from(books)
-          .where(
-            and(
-              inArray(books.genre, userGenres),
-              borrowedIds.length > 0
-                ? notInArray(books.id, borrowedIds)
-                : sql`1=1`,
-              eq(books.isActive, true)
-            )
-          )
-          .orderBy(desc(books.rating), desc(books.createdAt))
-          .limit(limit);
-
-        recommendedBooks = genreRecommendations as Book[];
-
-        // If we don't have enough recommendations from genres, fill with other high-rated books
-        if (recommendedBooks.length < limit) {
-          const remainingSlots = limit - recommendedBooks.length;
-          const additionalBooks = await db
-            .select()
-            .from(books)
-            .where(
-              and(
-                borrowedIds.length > 0
-                  ? notInArray(books.id, borrowedIds)
-                  : sql`1=1`,
-                eq(books.isActive, true)
-              )
-            )
-            .orderBy(desc(books.rating), desc(books.createdAt))
-            .limit(remainingSlots);
-
-          // Filter out books already in recommendations and add unique ones
-          const existingIds = recommendedBooks.map((book) => book.id);
-          const uniqueAdditionalBooks = additionalBooks.filter(
-            (book) => !existingIds.includes(book.id)
-          );
-
-          recommendedBooks = [
-            ...recommendedBooks,
-            ...uniqueAdditionalBooks,
-          ].slice(0, limit);
-        }
-      }
+      recommendedBooks = await getPersonalizedRecommendations(finalUserId, limit);
     }
 
-    // If no recommendations from history, get latest high-rated books
     if (recommendedBooks.length === 0) {
-      recommendedBooks = (await db
-        .select()
-        .from(books)
-        .where(eq(books.isActive, true))
-        .orderBy(desc(books.rating), desc(books.createdAt))
-        .limit(limit)) as Book[];
+      recommendedBooks = await getFallbackRecommendations(limit);
     }
 
     return NextResponse.json({

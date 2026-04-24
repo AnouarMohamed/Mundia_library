@@ -12,6 +12,7 @@
     "ci:quality": "npm run lint && npm run typecheck && npm run build",
     "benchmark:api": "node scripts/benchmark-api-routes.mjs",
     "explain:hot-queries": "tsx scripts/explain-hot-queries.ts",
+    "loadtest:nightly": "node scripts/nightly-load-test.mjs",
     "seed": "tsx database/seed.ts",
     "db:migrate-csv": "tsx database/migrate-from-csv.ts",
     "db:generate": "drizzle-kit generate",
