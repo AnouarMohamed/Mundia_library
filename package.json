@@ -45,7 +45,7 @@
     "@tanstack/react-query-devtools": "^5.87.4",
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.35.3",
-    "@upstash/workflow": "^0.2.4",
+    "@upstash/workflow": "^1.2.0",
     "argon2-browser": "^1.18.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
