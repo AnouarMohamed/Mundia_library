@@ -59,6 +59,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm run test
+
       - name: Build
         env:
           DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'mysql://build:build@localhost:3306/builddb' }}
