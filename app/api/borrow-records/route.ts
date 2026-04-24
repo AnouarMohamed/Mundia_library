@@ -68,7 +68,11 @@ export async function GET(request: NextRequest) {
     const overdue = searchParams.get("overdue") === "true";
     const sort = searchParams.get("sort") || "date";
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const limitParam = parseInt(searchParams.get("limit") || "50", 10);
+    const safePage = Number.isNaN(page) ? 1 : Math.max(1, page);
+    const safeLimit = Number.isNaN(limitParam)
+      ? 50
+      : Math.min(100, Math.max(1, limitParam));
 
     // CRITICAL: Authentication required for accessing borrow records
     // Borrow records contain sensitive user data and should only be accessible to authenticated users
@@ -158,7 +162,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch borrow records with book details
-    const offset = (page - 1) * limit;
+    const offset = (safePage - 1) * safeLimit;
     const whereClause =
       whereConditions.length > 0 ? and(...whereConditions) : undefined;
     const [allBorrowRecords, totalRecordsResult] = await Promise.all([
@@ -211,7 +215,7 @@ export async function GET(request: NextRequest) {
         .innerJoin(books, eq(borrowRecords.bookId, books.id))
         .where(whereClause)
         .orderBy(orderBy)
-        .limit(limit)
+        .limit(safeLimit)
         .offset(offset),
       db
         .select({ count: sql<number>`count(*)` })
@@ -220,16 +224,16 @@ export async function GET(request: NextRequest) {
     ]);
 
     const totalRecords = totalRecordsResult[0]?.count || 0;
-    const totalPages = Math.ceil(totalRecords / limit);
+    const totalPages = Math.ceil(totalRecords / safeLimit);
 
     return NextResponse.json({
       success: true,
       borrows: allBorrowRecords,
       pagination: {
-        currentPage: page,
+        currentPage: safePage,
         totalPages,
         totalRecords,
-        recordsPerPage: limit,
+        recordsPerPage: safeLimit,
       },
     });
   } catch (error) {

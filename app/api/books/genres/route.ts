@@ -11,13 +11,26 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
+
+const getCachedGenres = unstable_cache(
+  async () => {
+    return db
+      .selectDistinct({ genre: books.genre })
+      .from(books)
+      .where(eq(books.isActive, true))
+      .orderBy(asc(books.genre));
+  },
+  ["api-books-genres-v2"],
+  { revalidate: 300, tags: ["books"] }
+);
 
 /**
  * Get unique genres from all books
@@ -43,10 +56,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Get unique genres from all books
-    const genresResult = await db
-      .selectDistinct({ genre: books.genre })
-      .from(books)
-      .orderBy(asc(books.genre));
+    const genresResult = await getCachedGenres();
 
     const genres = genresResult.map((g) => g.genre).filter(Boolean);
 

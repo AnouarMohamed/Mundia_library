@@ -515,6 +515,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 | `npm run typecheck` | Run strict TypeScript checks |
 | `npm run ci:quality` | Run lint + typecheck + build locally (CI parity) |
 | `npm run benchmark:api` | Benchmark key API routes and enforce p95 thresholds |
+| `npm run explain:hot-queries` | Run EXPLAIN plans for the hottest API query shapes |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Push schema to MySQL |
 | `npm run db:studio` | Open Drizzle Studio |
@@ -541,6 +542,7 @@ This repository now includes a multi-workflow GitHub Actions pipeline:
 
 Full operational documentation is available in `docs/CI_PIPELINES.md`.
 PR quality gates are standardized via `.github/pull_request_template.md`.
+Phase-2 query optimization notes are documented in `docs/PHASE2_QUERY_TUNING.md`.
 
 ## API Surface
 

@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId") || undefined;
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const limitParam = parseInt(searchParams.get("limit") || "10", 10);
+    const limit = Number.isNaN(limitParam)
+      ? 10
+      : Math.min(20, Math.max(1, limitParam));
 
     // Get session to determine user if userId not provided
     // Note: Authentication is optional - works for both authenticated and anonymous users
@@ -79,6 +82,7 @@ export async function GET(request: NextRequest) {
             eq(borrowRecords.status, "RETURNED")
           )
         )
+        .orderBy(desc(borrowRecords.borrowDate))
         .limit(10);
 
       if (userBorrowHistory.length > 0) {
@@ -113,6 +117,7 @@ export async function GET(request: NextRequest) {
 
         // If we don't have enough recommendations from genres, fill with other high-rated books
         if (recommendedBooks.length < limit) {
+          const remainingSlots = limit - recommendedBooks.length;
           const additionalBooks = await db
             .select()
             .from(books)
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
               )
             )
             .orderBy(desc(books.rating), desc(books.createdAt))
-            .limit(limit);
+            .limit(remainingSlots);
 
           // Filter out books already in recommendations and add unique ones
           const existingIds = recommendedBooks.map((book) => book.id);

@@ -60,10 +60,18 @@ export async function GET(request: NextRequest) {
     const rating = searchParams.get("rating") || "";
     const sort = searchParams.get("sort") || "title";
     const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "12", 10);
+    const limitParam = parseInt(searchParams.get("limit") || "12", 10);
+
+    const safePage = Number.isNaN(page) ? 1 : Math.max(1, page);
+    const safeLimit = Number.isNaN(limitParam)
+      ? 12
+      : Math.min(50, Math.max(1, limitParam));
 
     // Build where conditions
     const whereConditions = [];
+
+    // Public catalog should only include active books.
+    whereConditions.push(eq(books.isActive, true));
 
     // Search condition
     if (search) {
@@ -110,7 +118,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch books with pagination
-    const offset = (page - 1) * limit;
+    const offset = (safePage - 1) * safeLimit;
     const whereClause =
       whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
@@ -121,22 +129,22 @@ export async function GET(request: NextRequest) {
         .from(books)
         .where(whereClause)
         .orderBy(orderBy)
-        .limit(limit)
+        .limit(safeLimit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(books).where(whereClause),
     ]);
 
     const totalBooks = totalBooksResult[0]?.count || 0;
-    const totalPages = Math.ceil(totalBooks / limit);
+    const totalPages = Math.ceil(totalBooks / safeLimit);
 
     return NextResponse.json({
       success: true,
       books: allBooks,
       pagination: {
-        currentPage: page,
+        currentPage: safePage,
         totalPages,
         totalBooks,
-        booksPerPage: limit,
+        booksPerPage: safeLimit,
       },
     });
   } catch (error) {

@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
@@ -65,7 +65,7 @@ export async function GET(
     const [book] = await db
       .select()
       .from(books)
-      .where(eq(books.id, id))
+      .where(and(eq(books.id, id), eq(books.isActive, true)))
       .limit(1);
 
     if (!book) {
