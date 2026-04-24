@@ -9,6 +9,8 @@ import { users } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
+
 const Layout = async ({ children }: { children: ReactNode }) => {
   const session = await getSession();
 
