@@ -197,7 +197,7 @@ const AuthForm = <T extends FieldValues>({
               name={field as Path<T>}
               render={({ field }) => (
                 <FormItem className="auth-field-row">
-                  <FormLabel className="text-xs capitalize uppercase tracking-[0.15em] text-light-100/75 sm:text-sm">
+                  <FormLabel className="text-xs uppercase tracking-[0.15em] text-light-100/75 sm:text-sm">
                     {FIELD_NAMES[field.name as keyof typeof FIELD_NAMES]}
                   </FormLabel>
                   <FormControl>
