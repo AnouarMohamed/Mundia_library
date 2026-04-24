@@ -4,7 +4,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
+
+FROM base AS prod-deps
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 
 FROM base AS builder
 ENV DATABASE_URL=mysql://build:build@localhost:3306/builddb
@@ -28,7 +32,10 @@ RUN npm run build
 
 FROM base AS runner
 ENV NODE_ENV=production
-COPY --from=builder /app ./
-COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY next.config.ts ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
 EXPOSE 3000
 CMD ["npm", "run", "start"]
