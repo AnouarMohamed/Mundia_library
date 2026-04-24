@@ -6,9 +6,24 @@ on:
       - main
       - develop
       - "release/**"
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "screenshots/**"
+      - ".github/ISSUE_TEMPLATE/**"
   pull_request:
     branches:
       - "**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "screenshots/**"
+      - ".github/ISSUE_TEMPLATE/**"
 
 permissions:
   contents: read
@@ -20,18 +35,20 @@ concurrency:
 jobs:
   quality:
     name: Quality (Lint, Typecheck, Build)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -44,38 +61,39 @@ jobs:
 
       - name: Build
         env:
-          DATABASE_URL: mysql://build:build@localhost:3306/builddb
-          NEXTAUTH_SECRET: ci-build-secret
+          DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'mysql://build:build@localhost:3306/builddb' }}
+          NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
           NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
-          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ci-build-public-key
-          IMAGEKIT_PRIVATE_KEY: ci-build-private-key
-          UPSTASH_REDIS_URL: https://example.upstash.io
-          UPSTASH_REDIS_TOKEN: ci-build-token
-          QSTASH_URL: https://qstash.upstash.io
-          QSTASH_TOKEN: ci-build-token
-          BREVO_API_KEY: ci-build-token
-          BREVO_SENDER_EMAIL: noreply@example.com
-          RESEND_TOKEN: ci-build-token
+          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ${{ secrets['NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY'] || 'ci-build-public-key' }}
+          IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
+          UPSTASH_REDIS_URL: ${{ secrets['UPSTASH_REDIS_URL'] || 'https://example.upstash.io' }}
+          UPSTASH_REDIS_TOKEN: ${{ secrets['UPSTASH_REDIS_TOKEN'] || 'ci-build-token' }}
+          QSTASH_URL: ${{ secrets['QSTASH_URL'] || 'https://qstash.upstash.io' }}
+          QSTASH_TOKEN: ${{ secrets['QSTASH_TOKEN'] || 'ci-build-token' }}
+          BREVO_API_KEY: ${{ secrets['BREVO_API_KEY'] || 'ci-build-token' }}
+          BREVO_SENDER_EMAIL: ${{ secrets['BREVO_SENDER_EMAIL'] || 'noreply@example.com' }}
+          RESEND_TOKEN: ${{ secrets['RESEND_TOKEN'] || 'ci-build-token' }}
           ENABLE_WORKFLOWS: "false"
         run: npm run build
 
   docker:
     name: Docker Image Build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Build Docker image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         with:
           context: .
           file: ./Dockerfile

@@ -5,6 +5,7 @@ import { writeFile } from "node:fs/promises";
 const BASE_URL = process.env.BENCH_BASE_URL || "http://127.0.0.1:3000";
 const ITERATIONS = Number(process.env.BENCH_ITERATIONS || 15);
 const WARMUP = Number(process.env.BENCH_WARMUP || 3);
+const ROUNDS = Math.max(1, Number(process.env.BENCH_ROUNDS || 1));
 
 const thresholds = {
   booksListP95: Number(process.env.BENCH_BOOKS_LIST_P95_MS || 500),
@@ -20,6 +21,16 @@ function percentile(values, p) {
   const sorted = [...values].sort((a, b) => a - b);
   const index = Math.ceil((p / 100) * sorted.length) - 1;
   return sorted[Math.max(0, index)];
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) {
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return sorted[mid];
 }
 
 function summarize(route, samples) {
@@ -70,18 +81,51 @@ async function benchmarkRoute(pathname) {
   return summarize(pathname, samples);
 }
 
+function aggregateRounds(pathname, roundResults) {
+  return {
+    route: pathname,
+    rounds: roundResults.length,
+    count: roundResults.reduce((sum, round) => sum + round.count, 0),
+    avg: median(roundResults.map((round) => round.avg)),
+    p95: median(roundResults.map((round) => round.p95)),
+    p99: median(roundResults.map((round) => round.p99)),
+    min: Math.min(...roundResults.map((round) => round.min)),
+    max: Math.max(...roundResults.map((round) => round.max)),
+    roundResults,
+  };
+}
+
+async function benchmarkRouteWithRounds(pathname) {
+  const roundResults = [];
+  for (let round = 1; round <= ROUNDS; round += 1) {
+    console.log(`Running ${pathname} round ${round}/${ROUNDS}`);
+    roundResults.push(await benchmarkRoute(pathname));
+  }
+  return aggregateRounds(pathname, roundResults);
+}
+
 function asMarkdown(results) {
   const lines = [
     "## API benchmark results",
     "",
-    "| Route | Avg (ms) | P95 (ms) | P99 (ms) | Min (ms) | Max (ms) |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
+    "| Route | Rounds | Median Avg (ms) | Median P95 (ms) | Median P99 (ms) | Min (ms) | Max (ms) |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
 
   for (const result of results) {
     lines.push(
-      `| ${result.route} | ${result.avg.toFixed(2)} | ${result.p95.toFixed(2)} | ${result.p99.toFixed(2)} | ${result.min.toFixed(2)} | ${result.max.toFixed(2)} |`
+      `| ${result.route} | ${result.rounds} | ${result.avg.toFixed(2)} | ${result.p95.toFixed(2)} | ${result.p99.toFixed(2)} | ${result.min.toFixed(2)} | ${result.max.toFixed(2)} |`
     );
+  }
+
+  if (ROUNDS > 1) {
+    lines.push("", "### Per-round P95 details", "");
+    for (const result of results) {
+      const p95Values = result.roundResults
+        .map((round, index) => `r${index + 1}=${round.p95.toFixed(2)}ms`)
+        .join(", ");
+      lines.push(`- ${result.route}: ${p95Values}`);
+    }
   }
 
   return `${lines.join("\n")}\n`;
@@ -98,6 +142,7 @@ async function persistArtifacts(results, markdown) {
       baseUrl: BASE_URL,
       warmup: WARMUP,
       iterations: ITERATIONS,
+      rounds: ROUNDS,
       generatedAt: new Date().toISOString(),
       results,
       thresholds,
@@ -108,7 +153,7 @@ async function persistArtifacts(results, markdown) {
 
 async function main() {
   console.log(`Benchmarking API routes at ${BASE_URL}`);
-  console.log(`Warmup=${WARMUP}, iterations=${ITERATIONS}`);
+  console.log(`Warmup=${WARMUP}, iterations=${ITERATIONS}, rounds=${ROUNDS}`);
 
   const booksListPath = "/api/books?limit=12&sort=rating&page=1";
   const booksGenresPath = "/api/books/genres";
@@ -127,10 +172,10 @@ async function main() {
   const bookDetailsPath = `/api/books/${firstBookId}`;
 
   const results = [];
-  results.push(await benchmarkRoute(booksListPath));
-  results.push(await benchmarkRoute(booksGenresPath));
-  results.push(await benchmarkRoute(recommendationsPath));
-  results.push(await benchmarkRoute(bookDetailsPath));
+  results.push(await benchmarkRouteWithRounds(booksListPath));
+  results.push(await benchmarkRouteWithRounds(booksGenresPath));
+  results.push(await benchmarkRouteWithRounds(recommendationsPath));
+  results.push(await benchmarkRouteWithRounds(bookDetailsPath));
 
   const markdown = asMarkdown(results);
   console.log("\n" + markdown);

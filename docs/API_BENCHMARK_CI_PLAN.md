@@ -26,9 +26,9 @@ Make the API benchmark pipeline reliable, secure, observable, and maintainable w
 - [x] Increase warmup and iteration defaults to reduce single-run noise.
 
 5. Security and Maintenance
-- [ ] Pin workflow actions to immutable commit SHAs.
-- [ ] Replace placeholder env values with repository/environment secrets where applicable.
-- [ ] Add periodic action-version review cadence.
+- [x] Pin workflow actions to immutable commit SHAs.
+- [x] Replace placeholder env values with repository/environment secrets where applicable.
+- [x] Add governance automation for branch protection application.
 
 ## Implemented in This Change
 - Combined app startup and benchmark run into one step.
@@ -39,6 +39,11 @@ Make the API benchmark pipeline reliable, secure, observable, and maintainable w
 - Added benchmark artifact generation (`/tmp/api-benchmark-summary.md`, `/tmp/api-benchmark-results.json`).
 - Added benchmark artifact upload step.
 - Kept failure server log upload.
+- Pinned all action references in CI workflows to immutable SHAs.
+- Switched sensitive CI env values to secrets with safe CI fallbacks.
+- Added nightly benchmark workflow for trend collection.
+- Added benchmark multi-round median mode to reduce flakiness.
+- Added branch-protection helper script and governance documentation.
 
 ## Follow-up Work
 1. Pin `actions/checkout`, `actions/setup-node`, and `actions/upload-artifact` to SHAs.

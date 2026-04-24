@@ -1,48 +1,23 @@
-name: API Performance Benchmarks
+name: API Performance Benchmarks Nightly
 
 on:
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - ".github/workflows/api-benchmarks.yml"
-      - "scripts/benchmark-api-routes.mjs"
-      - "app/api/**"
-      - "lib/**"
-      - "database/**"
-      - "migrations/**"
-      - "package.json"
-      - "package-lock.json"
-      - "next.config.ts"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/api-benchmarks.yml"
-      - "scripts/benchmark-api-routes.mjs"
-      - "app/api/**"
-      - "lib/**"
-      - "database/**"
-      - "migrations/**"
-      - "package.json"
-      - "package-lock.json"
-      - "next.config.ts"
+  schedule:
+    - cron: "0 2 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: api-bench-${{ github.workflow }}-${{ github.ref }}
+  group: api-bench-nightly-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  benchmark:
-    name: Benchmark key API routes
-    if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
+  benchmark-nightly:
+    name: Nightly benchmark key API routes
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     services:
       mysql:
@@ -78,9 +53,9 @@ jobs:
       DISABLE_RATE_LIMIT: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       BENCH_BASE_URL: http://127.0.0.1:3000
-      BENCH_WARMUP: "5"
-      BENCH_ITERATIONS: "20"
-      BENCH_ROUNDS: "3"
+      BENCH_WARMUP: "8"
+      BENCH_ITERATIONS: "30"
+      BENCH_ROUNDS: "5"
 
     steps:
       - name: Checkout
@@ -119,7 +94,7 @@ jobs:
           }
           trap cleanup EXIT
 
-          for i in {1..60}; do
+          for i in {1..90}; do
             if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
               echo "API server is ready"
               break
@@ -135,19 +110,14 @@ jobs:
 
           node scripts/benchmark-api-routes.mjs
 
-      - name: Upload benchmark summary
+      - name: Upload nightly benchmark artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: api-benchmark-summary
+          name: api-benchmark-nightly-${{ github.run_number }}
           path: |
             /tmp/api-benchmark-summary.md
             /tmp/api-benchmark-results.json
+            /tmp/next-server.log
           if-no-files-found: ignore
-
-      - name: Upload server log on failure
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: next-server-log
-          path: /tmp/next-server.log
+          retention-days: 30
