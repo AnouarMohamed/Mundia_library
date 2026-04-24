@@ -80,7 +80,7 @@
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
     "eslint": "^8.57.1",
-    "eslint-config-next": "15.1.2",
+    "eslint-config-next": "15.5.15",
     "eslint-config-prettier": "^9.1.0",
     "eslint-config-standard": "^17.1.0",
     "eslint-plugin-tailwindcss": "^3.17.5",
