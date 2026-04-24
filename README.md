@@ -29,6 +29,7 @@
 - [Docker Setup](#docker-setup)
 - [Environment Variables](#environment-variables)
 - [Scripts](#scripts)
+- [CI Pipelines](#ci-pipelines)
 - [API Surface](#api-surface)
 - [Security and Reliability Notes](#security-and-reliability-notes)
 - [Troubleshooting](#troubleshooting)
@@ -506,7 +507,9 @@ MYSQL_ROOT_PASSWORD=rootpassword
 | `npm run dev:turbo` | Start dev server with Turbopack |
 | `npm run build` | Create production build |
 | `npm run start` | Start production server |
-| `npm run lint` | Run Next.js lint |
+| `npm run lint` | Run ESLint checks |
+| `npm run typecheck` | Run strict TypeScript checks |
+| `npm run ci:quality` | Run lint + typecheck + build locally (CI parity) |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Push schema to MySQL |
 | `npm run db:studio` | Open Drizzle Studio |
@@ -520,6 +523,18 @@ MYSQL_ROOT_PASSWORD=rootpassword
 | `npm run find-missing-borrow` | Find missing borrow relationships |
 | `npm run check-all-books` | Validate book records |
 | `npm run fix-coding-interview` | Specialized maintenance fix script |
+
+## CI Pipelines
+
+This repository now includes a multi-workflow GitHub Actions pipeline:
+
+- `CI` (`.github/workflows/ci.yml`): lint, typecheck, production build, and Docker image build validation
+- `CodeQL Security Scan` (`.github/workflows/codeql.yml`): static security analysis on PRs, pushes, and weekly schedule
+- `Dependency Review` (`.github/workflows/dependency-review.yml`): blocks high-severity vulnerable dependency additions on PRs to `main`
+- `Secret Scan` (`.github/workflows/secret-scan.yml`): detects leaked credentials and tokens on pull requests and protected branch pushes
+
+Full operational documentation is available in `docs/CI_PIPELINES.md`.
+PR quality gates are standardized via `.github/pull_request_template.md`.
 
 ## API Surface
 

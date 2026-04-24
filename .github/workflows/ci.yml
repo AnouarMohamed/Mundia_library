@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "release/**"
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality (Lint, Typecheck, Build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        env:
+          DATABASE_URL: mysql://build:build@localhost:3306/builddb
+          NEXTAUTH_SECRET: ci-build-secret
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_API_ENDPOINT: http://localhost:3000
+          NEXT_PUBLIC_PROD_API_ENDPOINT: http://localhost:3000
+          NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
+          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ci-build-public-key
+          IMAGEKIT_PRIVATE_KEY: ci-build-private-key
+          UPSTASH_REDIS_URL: https://example.upstash.io
+          UPSTASH_REDIS_TOKEN: ci-build-token
+          QSTASH_URL: https://qstash.upstash.io
+          QSTASH_TOKEN: ci-build-token
+          BREVO_API_KEY: ci-build-token
+          BREVO_SENDER_EMAIL: noreply@example.com
+          RESEND_TOKEN: ci-build-token
+          ENABLE_WORKFLOWS: "false"
+        run: npm run build
+
+  docker:
+    name: Docker Image Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: mundia-library:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
