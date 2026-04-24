@@ -52,7 +52,7 @@
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
     "dayjs": "^1.11.13",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "imagekit": "^6.0.0",
     "imagekitio-next": "^1.0.1",
