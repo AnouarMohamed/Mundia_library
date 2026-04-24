@@ -16,6 +16,7 @@ concurrency:
 jobs:
   benchmark:
     name: Benchmark key API routes
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
