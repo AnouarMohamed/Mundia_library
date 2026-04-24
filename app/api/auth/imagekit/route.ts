@@ -4,13 +4,27 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
-const {
-  env: {
-    imagekit: { publicKey, privateKey, urlEndpoint },
-  },
-} = config;
+let imagekit: ImageKit | null = null;
 
-const imagekit = new ImageKit({ publicKey, privateKey, urlEndpoint });
+const getImageKit = () => {
+  if (imagekit) {
+    return imagekit;
+  }
+
+  const {
+    imagekit: { publicKey, privateKey, urlEndpoint },
+  } = config.env;
+
+  if (!publicKey || !privateKey || !urlEndpoint) {
+    throw new Error(
+      "ImageKit is not configured. Please check NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY, IMAGEKIT_PRIVATE_KEY, and NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT."
+    );
+  }
+
+  imagekit = new ImageKit({ publicKey, privateKey, urlEndpoint });
+
+  return imagekit;
+};
 
 export async function GET() {
   try {
@@ -37,7 +51,7 @@ export async function GET() {
     // However, rate limiting provides protection against abuse
     // Authenticated users get priority, but unauthenticated users can still use it for sign-up
 
-    return NextResponse.json(imagekit.getAuthenticationParameters());
+    return NextResponse.json(getImageKit().getAuthenticationParameters());
   } catch (error) {
     console.error("Error getting ImageKit authentication parameters:", error);
     return NextResponse.json(
