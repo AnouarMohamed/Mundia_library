@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Mark inactive issues and pull requests
-        uses: actions/stale@v9
+        uses: actions/stale@v10
         with:
           days-before-issue-stale: 45
           days-before-issue-close: 14

@@ -93,6 +93,7 @@ Purpose:
 
 - Keep runtime dependencies, development tooling, actions, and container bases current
 - Group minor/patch npm updates to reduce PR noise
+- Ignore npm semver-major version bumps by default so major upgrades happen deliberately
 - Label dependency PRs for easy triage
 
 ### 5) PR Labeler
@@ -250,6 +251,10 @@ Purpose:
 
 - Run repeatable latency benchmarks for key API routes
 - Fail CI when p95 exceeds configured thresholds
+
+Dependabot note:
+
+- Skipped for Dependabot PRs to avoid running expensive benchmark suites on routine dependency bumps
 
 Measured routes:
 
