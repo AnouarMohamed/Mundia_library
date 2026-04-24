@@ -454,6 +454,7 @@ What this does:
 
 - Starts `db` (MySQL 8) with a persistent volume.
 - Starts `app` (Next.js production server) on `http://localhost:3000`.
+- Starts `adminer` (lightweight browser DB admin) on `http://localhost:8080`.
 - Runs `npm run db:migrate` automatically before the app starts.
 
 ### 3. Optional seed after containers are up
@@ -475,7 +476,10 @@ Optional overrides in `.env` (Compose-level):
 ```env
 MYSQL_DATABASE=library_management
 MYSQL_ROOT_PASSWORD=rootpassword
+ADMINER_PORT=8080
 ```
+
+For standalone DB tooling recommendations (including DBeaver and Drizzle Studio), see `docs/DB_ADMIN_OPTIONS.md`.
 
 ## Environment Variables
 
@@ -510,6 +514,7 @@ MYSQL_ROOT_PASSWORD=rootpassword
 | `npm run lint` | Run ESLint checks |
 | `npm run typecheck` | Run strict TypeScript checks |
 | `npm run ci:quality` | Run lint + typecheck + build locally (CI parity) |
+| `npm run benchmark:api` | Benchmark key API routes and enforce p95 thresholds |
 | `npm run db:generate` | Generate Drizzle migration files |
 | `npm run db:migrate` | Push schema to MySQL |
 | `npm run db:studio` | Open Drizzle Studio |
@@ -532,6 +537,7 @@ This repository now includes a multi-workflow GitHub Actions pipeline:
 - `CodeQL Security Scan` (`.github/workflows/codeql.yml`): static security analysis on PRs, pushes, and weekly schedule
 - `Dependency Review` (`.github/workflows/dependency-review.yml`): blocks high-severity vulnerable dependency additions on PRs to `main`
 - `Secret Scan` (`.github/workflows/secret-scan.yml`): detects leaked credentials and tokens on pull requests and protected branch pushes
+- `API Performance Benchmarks` (`.github/workflows/api-benchmarks.yml`): validates latency for key API routes with p95 threshold gates
 
 Full operational documentation is available in `docs/CI_PIPELINES.md`.
 PR quality gates are standardized via `.github/pull_request_template.md`.

@@ -28,7 +28,7 @@ export const users = mysqlTable("users", {
   lastActivityDate: date("last_activity_date", { mode: "string" }).default(
     sql`(CURRENT_DATE)`
   ),
-  lastLogin: datetime("last_login", { mode: "date" }).default(null),
+  lastLogin: datetime("last_login", { mode: "date" }),
   createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -84,9 +84,7 @@ export const borrowRecords = mysqlTable("borrow_records", {
   ),
   notes: text("notes"),
   renewalCount: int("renewal_count").notNull().default(0),
-  lastReminderSent: datetime("last_reminder_sent", { mode: "date" }).default(
-    null
-  ),
+  lastReminderSent: datetime("last_reminder_sent", { mode: "date" }),
   updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
   updatedBy: text("updated_by"),
   createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
@@ -135,7 +133,7 @@ export const adminRequests = mysqlTable("admin_requests", {
     .notNull()
     .default("PENDING"),
   reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
-  reviewedAt: datetime("reviewed_at", { mode: "date" }).default(null),
+  reviewedAt: datetime("reviewed_at", { mode: "date" }),
   rejectionReason: text("rejection_reason"),
   createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
   updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),

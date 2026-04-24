@@ -89,6 +89,31 @@ Required checks recommendation:
 
 - `Detect leaked secrets`
 
+### 5) API Performance Benchmarks
+
+File: `.github/workflows/api-benchmarks.yml`
+
+Triggers:
+
+- Pull requests targeting `main`
+- Manual dispatch
+
+Purpose:
+
+- Run repeatable latency benchmarks for key API routes
+- Fail CI when p95 exceeds configured thresholds
+
+Measured routes:
+
+- `/api/books`
+- `/api/books/genres`
+- `/api/books/recommendations`
+- `/api/books/[id]`
+
+Required checks recommendation:
+
+- `Benchmark key API routes`
+
 ## Pull Request Governance
 
 File: `.github/pull_request_template.md`
@@ -128,6 +153,7 @@ Suggested required checks:
 - `Analyze (JavaScript/TypeScript)`
 - `Check dependency changes`
 - `Detect leaked secrets`
+- `Benchmark key API routes`
 
 ## Notes
 

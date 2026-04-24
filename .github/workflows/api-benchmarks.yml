@@ -1,0 +1,99 @@
+name: API Performance Benchmarks
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: api-bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    name: Benchmark key API routes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: library_management
+          MYSQL_ROOT_PASSWORD: rootpassword
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpassword --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: mysql://root:rootpassword@127.0.0.1:3306/library_management
+      NEXTAUTH_SECRET: ci-bench-secret
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3000
+      NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3000
+      NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
+      NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ci-build-public-key
+      IMAGEKIT_PRIVATE_KEY: ci-build-private-key
+      UPSTASH_REDIS_URL: https://example.upstash.io
+      UPSTASH_REDIS_TOKEN: ci-build-token
+      QSTASH_URL: https://qstash.upstash.io
+      QSTASH_TOKEN: ci-build-token
+      BREVO_API_KEY: ci-build-token
+      BREVO_SENDER_EMAIL: noreply@example.com
+      RESEND_TOKEN: ci-build-token
+      ENABLE_WORKFLOWS: "false"
+      DISABLE_RATE_LIMIT: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Apply schema and seed
+        run: |
+          npm run db:migrate
+          npm run seed
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app
+        run: |
+          npm run start > /tmp/next-server.log 2>&1 &
+          for i in {1..60}; do
+            if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
+              echo "API server is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Server failed to start"
+          cat /tmp/next-server.log
+          exit 1
+
+      - name: Run benchmarks
+        run: node scripts/benchmark-api-routes.mjs
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-server-log
+          path: /tmp/next-server.log

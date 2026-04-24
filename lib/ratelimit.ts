@@ -2,6 +2,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import redis from "@/database/redis";
 
 const isDevelopment = process.env.NODE_ENV !== "production";
+const isRateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true";
 
 const ratelimit = new Ratelimit({
   redis,
@@ -14,7 +15,7 @@ const ratelimit = new Ratelimit({
 const originalLimit = ratelimit.limit.bind(ratelimit);
 ratelimit.limit = async (key: string) => {
   // Avoid external Redis network round-trips in local development.
-  if (isDevelopment) {
+  if (isDevelopment || isRateLimitDisabled) {
     return {
       success: true,
       limit: 200,

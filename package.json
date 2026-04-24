@@ -10,6 +10,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "ci:quality": "npm run lint && npm run typecheck && npm run build",
+    "benchmark:api": "node scripts/benchmark-api-routes.mjs",
     "seed": "tsx database/seed.ts",
     "db:migrate-csv": "tsx database/migrate-from-csv.ts",
     "db:generate": "drizzle-kit generate",

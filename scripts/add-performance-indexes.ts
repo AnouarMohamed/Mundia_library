@@ -25,6 +25,11 @@ const statements: IndexStatement[] = [
           on books (is_active, rating, created_at);`,
   },
   {
+    name: "books is_active + genre + rating + created_at",
+    ddl: `create index books_is_active_genre_rating_created_idx
+          on books (is_active, genre(120), rating, created_at);`,
+  },
+  {
     name: "books title btree",
     ddl: `create index books_title_btree_idx
           on books (title);`,
@@ -60,9 +65,29 @@ const statements: IndexStatement[] = [
           on borrow_records (status, created_at);`,
   },
   {
+    name: "borrow_records user + status + created_at",
+    ddl: `create index borrow_records_user_status_created_idx
+          on borrow_records (user_id, status, created_at);`,
+  },
+  {
+    name: "borrow_records status + due_date + created_at",
+    ddl: `create index borrow_records_status_due_created_idx
+          on borrow_records (status, due_date, created_at);`,
+  },
+  {
     name: "borrow_records due_date",
     ddl: `create index borrow_records_due_date_idx
           on borrow_records (due_date);`,
+  },
+  {
+    name: "book_reviews book + created_at",
+    ddl: `create index book_reviews_book_created_idx
+          on book_reviews (book_id, created_at);`,
+  },
+  {
+    name: "admin_requests status + created_at",
+    ddl: `create index admin_requests_status_created_idx
+          on admin_requests (status, created_at);`,
   },
   {
     name: "users status",

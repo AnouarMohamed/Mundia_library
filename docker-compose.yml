@@ -42,5 +42,17 @@ services:
     ports:
       - "${APP_PORT:-3000}:3000"
 
+  adminer:
+    image: adminer:4.8.1-standalone
+    container_name: library_adminer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+
 volumes:
   mysql_data:
