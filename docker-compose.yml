@@ -25,22 +25,55 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     container_name: library_app
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file:
       - .env.local
     environment:
       NODE_ENV: production
       DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
       NEXT_PUBLIC_API_ENDPOINT: ${NEXT_PUBLIC_API_ENDPOINT:-http://localhost:3000}
       NEXT_PUBLIC_PROD_API_ENDPOINT: ${NEXT_PUBLIC_PROD_API_ENDPOINT:-http://localhost:3000}
-    command: sh -c "npm run db:migrate && npm run start"
+      ENABLE_WORKFLOWS: ${ENABLE_WORKFLOWS:-false}
+    command: npm run start
     ports:
       - "${APP_PORT:-3000}:3000"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: db-tools
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
+    command: npm run db:migrate
+
+  seed:
+    profiles:
+      - tools
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: db-tools
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
+    command: npm run seed
 
   adminer:
     image: adminer:4.8.1-standalone

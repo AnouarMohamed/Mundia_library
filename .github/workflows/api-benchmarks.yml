@@ -14,7 +14,7 @@ on:
       - "migrations/**"
       - "package.json"
       - "package-lock.json"
-      - "next.config.ts"
+      - "next.config.mjs"
   push:
     branches:
       - main
@@ -27,7 +27,7 @@ on:
       - "migrations/**"
       - "package.json"
       - "package-lock.json"
-      - "next.config.ts"
+      - "next.config.mjs"
   workflow_dispatch:
 
 permissions:
