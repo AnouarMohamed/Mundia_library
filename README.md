@@ -465,6 +465,13 @@ What this does:
 docker compose run --rm seed
 ```
 
+This also creates the sign-in page test accounts:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Guest User | `test@user.com` | `12345678` |
+| Guest Admin | `test@admin.com` | `12345678` |
+
 ### 4. Useful commands
 
 ```bash
