@@ -1,6 +1,7 @@
-FROM node:25-bookworm-slim AS base
+FROM node:25-bookworm-slim@sha256:e49fd70491eb042270f974167c874d6245287263ffc16422fcf93b3c150409d8 AS base
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm install -g npm@11.13.0 --no-audit --no-fund
 
 FROM base AS deps
 COPY package.json package-lock.json ./

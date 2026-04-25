@@ -4,18 +4,33 @@ import React from "react";
 import { IKVideo, ImageKitProvider } from "imagekitio-next";
 import config from "@/lib/config";
 
+const parseVideoUrl = (value: string): URL | null => {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+};
+
+const isTrustedImageKitHost = (hostname: string): boolean => {
+  return hostname === "imagekit.io" || hostname.endsWith(".imagekit.io");
+};
+
 const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
-  // Check if the URL is actually a video file or an ImageKit video URL
+  const parsedUrl = parseVideoUrl(videoUrl);
+  const path = parsedUrl?.pathname.toLowerCase() ?? "";
+  const hostname = parsedUrl?.hostname.toLowerCase() ?? "";
+
+  // Check if the URL is actually a video file or a trusted ImageKit video URL.
   const isVideoFile =
-    videoUrl &&
-    (videoUrl.endsWith(".mp4") ||
-      videoUrl.endsWith(".webm") ||
-      videoUrl.endsWith(".ogg") ||
-      videoUrl.endsWith(".avi") ||
-      videoUrl.endsWith(".mov") ||
-      videoUrl.includes("/video/") ||
-      (videoUrl.includes("imagekit.io") &&
-        videoUrl.includes("/books/videos/")));
+    Boolean(parsedUrl) &&
+    (path.endsWith(".mp4") ||
+      path.endsWith(".webm") ||
+      path.endsWith(".ogg") ||
+      path.endsWith(".avi") ||
+      path.endsWith(".mov") ||
+      path.includes("/video/") ||
+      (isTrustedImageKitHost(hostname) && path.includes("/books/videos/")));
 
   // If it's not a video file, show a placeholder
   if (!isVideoFile) {
@@ -28,7 +43,7 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
 
   // For ImageKit URLs in videos folder, try to play them as videos
   // even if they have .png extension (they might be misnamed video files)
-  if (videoUrl.includes("imagekit.io") && videoUrl.includes("/books/videos/")) {
+  if (isTrustedImageKitHost(hostname) && path.includes("/books/videos/")) {
     return (
       <ImageKitProvider
         publicKey={config.env.imagekit.publicKey}

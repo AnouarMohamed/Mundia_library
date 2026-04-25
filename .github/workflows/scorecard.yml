@@ -13,7 +13,6 @@ permissions:
   actions: read
   contents: read
   id-token: write
-  security-events: write
 
 concurrency:
   group: scorecard-${{ github.ref }}
@@ -24,6 +23,11 @@ jobs:
     name: Supply-chain posture score
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      security-events: write
 
     steps:
       - name: Checkout
