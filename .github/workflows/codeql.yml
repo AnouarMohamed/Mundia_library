@@ -15,7 +15,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
-      - "next.config.ts"
+      - "next.config.mjs"
       - ".github/workflows/codeql.yml"
       - ".github/codeql/**"
   pull_request:
@@ -37,7 +37,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "tsconfig.json"
-      - "next.config.ts"
+      - "next.config.mjs"
       - ".github/workflows/codeql.yml"
       - ".github/codeql/**"
   schedule:

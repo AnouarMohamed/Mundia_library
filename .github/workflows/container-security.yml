@@ -9,7 +9,7 @@ on:
       - .dockerignore
       - package.json
       - package-lock.json
-      - next.config.ts
+      - next.config.mjs
   push:
     branches:
       - main
@@ -18,7 +18,7 @@ on:
       - .dockerignore
       - package.json
       - package-lock.json
-      - next.config.ts
+      - next.config.mjs
   schedule:
     - cron: "45 4 * * 1"
   workflow_dispatch:
@@ -50,6 +50,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          pull: true
           load: true
           tags: mundia-library:security-scan
           cache-from: type=gha

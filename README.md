@@ -453,14 +453,16 @@ docker compose up --build
 What this does:
 
 - Starts `db` (MySQL 8) with a persistent volume.
+- Runs `migrate` once from a DB tooling image before the app starts.
 - Starts `app` (Next.js production server) on `http://localhost:3000`.
 - Starts `adminer` (lightweight browser DB admin) on `http://localhost:8080`.
-- Runs `npm run db:migrate` automatically before the app starts.
+- Sets `AUTH_TRUST_HOST=true` for local Docker host/port mappings.
+- Sets `ENABLE_WORKFLOWS=false` so local signups do not require QStash.
 
 ### 3. Optional seed after containers are up
 
 ```bash
-docker compose exec app npm run seed
+docker compose run --rm seed
 ```
 
 ### 4. Useful commands
@@ -488,6 +490,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 | `DATABASE_URL` | Yes | MySQL connection string |
 | `NEXTAUTH_SECRET` | Yes | NextAuth secret for JWT/cookies |
 | `NEXTAUTH_URL` | Yes | Base URL for auth callbacks |
+| `AUTH_TRUST_HOST` | No | Trust local/proxy host headers for Auth.js in Docker |
 | `NEXT_PUBLIC_API_ENDPOINT` | Yes | Public API base URL |
 | `NEXT_PUBLIC_PROD_API_ENDPOINT` | Yes | Production-style endpoint used by workflows |
 | `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Yes | ImageKit URL endpoint |
@@ -501,7 +504,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 | `BREVO_SENDER_EMAIL` | Yes | Sender email for Brevo |
 | `BREVO_SENDER_NAME` | No | Sender display name |
 | `RESEND_TOKEN` | Yes | Resend API token fallback |
-| `ENABLE_WORKFLOWS` | No | Force-enable onboarding workflow outside production |
+| `ENABLE_WORKFLOWS` | No | Enable or disable onboarding workflow delivery; set `false` for local Docker without QStash |
 
 ## Scripts
 
@@ -593,7 +596,7 @@ Phase-2 query optimization notes are documented in `docs/PHASE2_QUERY_TUNING.md`
 - Admin APIs enforce server-side access guards (`requireAdminRouteAccess`).
 - API rate limiting uses Upstash Redis; local development bypass is enabled for speed.
 - Database operations include retry logic for transient timeout/network failures.
-- `next.config.ts` currently sets `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds` to `true`. Tighten this before strict production CI.
+- `next.config.mjs` currently sets `typescript.ignoreBuildErrors` and `eslint.ignoreDuringBuilds` to `true`. Tighten this before strict production CI.
 
 ## Troubleshooting
 
@@ -607,4 +610,3 @@ Phase-2 query optimization notes are documented in `docs/PHASE2_QUERY_TUNING.md`
   - Validate Upstash, Brevo, and Resend environment variables.
 - CLI script works differently from app runtime
   - Some scripts explicitly load `.env`; ensure values are mirrored from `.env.local`.
-

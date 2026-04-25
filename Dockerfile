@@ -30,10 +30,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
+FROM deps AS db-tools
+COPY drizzle.config.ts tsconfig.json ./
+COPY database ./database
+COPY migrations ./migrations
+COPY dummybooks.json ./dummybooks.json
+
 FROM base AS runner
 ENV NODE_ENV=production
 COPY package.json ./
-COPY next.config.ts ./
+COPY next.config.mjs ./
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public

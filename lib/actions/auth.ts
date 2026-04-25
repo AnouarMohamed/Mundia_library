@@ -151,11 +151,13 @@ export const signUp = async (params: AuthCredentials) => {
       { retries: 2, delayMs: 300 }
     );
 
-    // Only trigger workflow in production or if explicitly enabled
-    if (
-      process.env.NODE_ENV === "production" ||
-      process.env.ENABLE_WORKFLOWS === "true"
-    ) {
+    const workflowsEnabled =
+      process.env.ENABLE_WORKFLOWS === "true" ||
+      (process.env.NODE_ENV === "production" &&
+        process.env.ENABLE_WORKFLOWS !== "false");
+
+    // Only trigger workflow when real QStash credentials are expected.
+    if (workflowsEnabled) {
       await workflowClient.trigger({
         url: `${config.env.prodApiEndpoint}/api/workflows/onboarding`,
         body: {
