@@ -7,6 +7,8 @@ describe("getInitials", () => {
     expect(getInitials("Jane Doe")).toBe("JD");
     expect(getInitials("john")).toBe("J");
     expect(getInitials("mary jane watson")).toBe("MJ");
+    expect(getInitials("  Ada   Lovelace  ")).toBe("AL");
+    expect(getInitials(" ")).toBe("");
   });
 });
 

@@ -335,7 +335,7 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
         daysOverdue > 0 ? (daysOverdue * dailyFineAmount).toFixed(2) : "0.00";
 
       // Use explicit transaction to ensure commit
-      const updateResult = await db
+      await db
         .update(borrowRecords)
         .set({
           fineAmount: fineAmount,
