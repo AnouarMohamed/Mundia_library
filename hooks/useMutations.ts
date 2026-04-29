@@ -55,10 +55,6 @@ import {
   invalidateAfterReviewChange,
   invalidateAfterAdminChange,
   invalidateAfterRecommendationChange,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  invalidateBooksQueries, // Used indirectly via invalidateAfter* functions
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  invalidateReviewsQueries, // Used indirectly via invalidateAfter* functions
 } from "@/lib/utils/queryInvalidation";
 // BookParams is a global type from types.d.ts, no import needed
 

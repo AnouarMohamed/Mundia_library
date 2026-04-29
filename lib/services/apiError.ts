@@ -92,3 +92,49 @@ export class ApiError extends Error {
     return this.status >= 500 && this.status < 600;
   }
 }
+
+type ApiErrorPayload = {
+  message?: unknown;
+  error?: unknown;
+};
+
+const isApiErrorPayload = (value: unknown): value is ApiErrorPayload =>
+  typeof value === "object" && value !== null;
+
+const getPayloadMessage = (payload: ApiErrorPayload): string | null => {
+  if (typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+
+  if (typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error.trim();
+  }
+
+  return null;
+};
+
+const getResponseFallbackMessage = (response: Response): string => {
+  if (response.statusText.trim()) {
+    return response.statusText.trim();
+  }
+
+  return `Request failed with status ${response.status}`;
+};
+
+export async function getApiErrorMessage(
+  response: Response
+): Promise<string> {
+  const fallbackMessage = getResponseFallbackMessage(response);
+
+  try {
+    const payload: unknown = await response.json();
+
+    if (isApiErrorPayload(payload)) {
+      return getPayloadMessage(payload) ?? fallbackMessage;
+    }
+  } catch {
+    return fallbackMessage;
+  }
+
+  return fallbackMessage;
+}

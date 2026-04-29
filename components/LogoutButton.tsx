@@ -18,8 +18,6 @@ import { signOut } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/lib/toast";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { invalidateAllQueries } from "@/lib/utils/queryInvalidation";
 
 const LogoutButton: React.FC = () => {
   const queryClient = useQueryClient();
@@ -43,8 +41,6 @@ const LogoutButton: React.FC = () => {
       // CRITICAL: Don't invalidate queries during logout - it causes unnecessary refetches
       // and flickering. The queries will naturally fail/clear when session is gone.
       // We'll clear the cache after redirect completes.
-      // invalidateAllQueries(queryClient); // Removed to prevent flicker during logout
-
       // CRITICAL: Use NextAuth's standard built-in redirect
       // This is the recommended approach - NextAuth handles:
       // 1. Session clearing (CSRF token validation)
