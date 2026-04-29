@@ -98,14 +98,8 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
     );
   }
 
-  // CRITICAL: Always prefer React Query data over initialBook
-  // React Query data is fresh and updates immediately after mutations
-  // initialBook is only used as fallback during initial load
-  const bookData = book ?? initialBook;
-
-  if (!bookData) {
-    return null;
-  }
+  // CRITICAL: Always prefer React Query data. The error guard above guarantees it.
+  const bookData = book;
 
   return (
     <div className="book-details">

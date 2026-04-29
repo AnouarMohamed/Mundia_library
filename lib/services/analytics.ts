@@ -15,7 +15,7 @@
  * These service functions are ready to use once API routes are available.
  */
 
-import { ApiError } from "./apiError";
+import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
  * Borrowing trend data point
@@ -156,15 +156,7 @@ export async function getBorrowingTrends(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -215,15 +207,7 @@ export async function getPopularBooks(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -274,15 +258,7 @@ export async function getPopularGenres(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -333,15 +309,7 @@ export async function getUserActivityPatterns(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -384,15 +352,7 @@ export async function getOverdueAnalysis(): Promise<OverdueBook[]> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -436,15 +396,7 @@ export async function getOverdueStats(): Promise<OverdueStats> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -489,15 +441,7 @@ export async function getMonthlyStats(): Promise<MonthlyStats> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -542,15 +486,7 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();

@@ -4,20 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "app/**"
-      - "components/**"
-      - "database/**"
-      - "hooks/**"
-      - "lib/**"
-      - "middleware.ts"
-      - "auth.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "next.config.mjs"
-      - ".github/workflows/codeql.yml"
-      - ".github/codeql/**"
   pull_request:
     branches:
       - main
@@ -26,20 +12,6 @@ on:
       - synchronize
       - reopened
       - ready_for_review
-    paths:
-      - "app/**"
-      - "components/**"
-      - "database/**"
-      - "hooks/**"
-      - "lib/**"
-      - "middleware.ts"
-      - "auth.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "next.config.mjs"
-      - ".github/workflows/codeql.yml"
-      - ".github/codeql/**"
   schedule:
     - cron: "30 2 * * 1"
   workflow_dispatch:

@@ -14,7 +14,7 @@
  * These service functions wrap those existing routes.
  */
 
-import { ApiError } from "./apiError";
+import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
  * Admin statistics interface
@@ -130,15 +130,7 @@ export async function getAdminStats(): Promise<AdminStats> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -179,15 +171,7 @@ export async function getFineConfig(): Promise<FineConfig> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -239,15 +223,7 @@ export async function updateFineConfig(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -290,15 +266,7 @@ export async function sendDueReminders(): Promise<ReminderResponse> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -341,15 +309,7 @@ export async function sendOverdueReminders(): Promise<ReminderResponse> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -402,15 +362,7 @@ export async function updateOverdueFines(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -468,15 +420,7 @@ export async function exportData(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   // Return the blob (file data)
@@ -506,15 +450,7 @@ export async function getReminderStats(): Promise<ReminderStats> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -559,15 +495,7 @@ export async function getExportStats(): Promise<ExportStats> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -642,15 +570,7 @@ export async function generateAllUserRecommendations(): Promise<GenerateRecommen
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -694,15 +614,7 @@ export async function updateTrendingBooks(): Promise<UpdateTrendingBooksResponse
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -744,15 +656,7 @@ export async function refreshRecommendationCache(): Promise<RefreshRecommendatio
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
