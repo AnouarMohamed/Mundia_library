@@ -303,10 +303,6 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
   const { getDailyFineAmount } = await import("./config");
   const dailyFineAmount = customFineAmount || (await getDailyFineAmount());
 
-  console.log(
-    `Force updating overdue fines with daily amount: $${dailyFineAmount}`
-  );
-
   // Update ALL overdue books regardless of existing fine amounts
   const overdueRecords = await db
     .select({
@@ -323,8 +319,6 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
       )
     );
 
-  console.log(`Found ${overdueRecords.length} overdue records to update`);
-
   const results = [];
 
   for (const record of overdueRecords) {
@@ -340,12 +334,8 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
       const fineAmount =
         daysOverdue > 0 ? (daysOverdue * dailyFineAmount).toFixed(2) : "0.00";
 
-      console.log(
-        `Updating record ${record.id}: ${record.currentFineAmount} -> ${fineAmount}`
-      );
-
       // Use explicit transaction to ensure commit
-      const updateResult = await db
+      await db
         .update(borrowRecords)
         .set({
           fineAmount: fineAmount,
@@ -354,16 +344,12 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
         })
         .where(eq(borrowRecords.id, record.id));
 
-      console.log(`Update result for ${record.id}:`, updateResult);
-
       // Verify the update was successful by reading back from database
       const verifyResult = await db
         .select({ id: borrowRecords.id, fineAmount: borrowRecords.fineAmount })
         .from(borrowRecords)
         .where(eq(borrowRecords.id, record.id))
         .limit(1);
-
-      console.log(`Verification for ${record.id}:`, verifyResult);
 
       results.push({
         recordId: record.id,
@@ -375,8 +361,6 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
       });
     }
   }
-
-  console.log(`Force update completed. Updated ${results.length} records.`);
 
   // Add a small delay to ensure database consistency
   await new Promise((resolve) => setTimeout(resolve, 100));
