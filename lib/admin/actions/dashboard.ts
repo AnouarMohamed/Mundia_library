@@ -3,6 +3,9 @@ import { books, borrowRecords, users } from "@/database/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
+/**
+ * Normalize numeric aggregates into finite numbers.
+ */
 const toNumber = (value: unknown): number => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -212,6 +215,9 @@ const getCachedAdminDashboardStats = unstable_cache(
   }
 );
 
+/**
+ * Fetch admin dashboard statistics with caching.
+ */
 export const getAdminDashboardStats = async () => {
   try {
     const data = await getCachedAdminDashboardStats();
