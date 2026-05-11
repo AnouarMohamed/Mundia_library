@@ -40,7 +40,7 @@ export async function createNotification(params: CreateNotificationParams) {
   const { userId, title, message, type = "INFO" } = params;
 
   try {
-    const [result] = await db.insert(notifications).values({
+    const result = await db.insert(notifications).values({
       userId,
       title,
       message,
@@ -85,13 +85,13 @@ export async function getUserNotifications(userId: string, limit: number = 20) {
  */
 export async function markAsRead(notificationId: string, userId: string) {
   try {
-    const updatedRows = await db
+    const result = await db
       .update(notifications)
       .set({ isRead: true })
-      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
-      .returning({ id: notifications.id });
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
 
-    return updatedRows.length > 0;
+    // For MySQL, check affectedRows from the result
+    return (result as any).affectedRows > 0;
   } catch (error) {
     console.error("Error marking notification as read:", error);
     return false;

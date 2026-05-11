@@ -64,7 +64,7 @@ export async function performAdvancedSearch(options: SearchOptions) {
 
   // Apply sorting
   let queryWithOrder;
-  if (sortBy === "relevance" || (sortBy as string) === "title" && query) {
+  if (sortBy === "relevance") {
     queryWithOrder = baseQuery.orderBy(desc(relevanceScore), asc(books.title));
   } else if (sortBy === "title") {
     queryWithOrder = baseQuery.orderBy(asc(books.title));
