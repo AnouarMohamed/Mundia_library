@@ -80,15 +80,18 @@ export async function getUserNotifications(userId: string, limit: number = 20) {
  * Mark a specific notification as read.
  * 
  * @param notificationId - The ID of the notification to update.
+ * @param userId - The ID of the user who must own the notification.
  * @returns A promise resolving to a boolean indicating success.
  */
-export async function markAsRead(notificationId: string) {
+export async function markAsRead(notificationId: string, userId: string) {
   try {
-    await db
+    const updatedRows = await db
       .update(notifications)
       .set({ isRead: true })
-      .where(eq(notifications.id, notificationId));
-    return true;
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
+      .returning({ id: notifications.id });
+
+    return updatedRows.length > 0;
   } catch (error) {
     console.error("Error marking notification as read:", error);
     return false;
