@@ -380,7 +380,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 </form>
 
                 <Button
-                  onClick={handleSearch}
+                  onClick={() => updateSearchParams({ search: localSearch })}
                   className="h-11 w-full rounded-xl border border-primary/50 bg-primary text-dark-100 hover:bg-primary/95"
                 >
                   Search
