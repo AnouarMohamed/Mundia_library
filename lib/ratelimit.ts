@@ -4,6 +4,9 @@ import redis from "@/database/redis";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const isRateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true";
 
+/**
+ * Shared rate limiter for public API endpoints.
+ */
 const ratelimit = new Ratelimit({
   redis,
   limiter: Ratelimit.fixedWindow(200, "1m"), // 200 requests per minute per IP
@@ -11,7 +14,7 @@ const ratelimit = new Ratelimit({
   prefix: "@upstash/ratelimit",
 });
 
-// Wrap ratelimit.limit() to handle development mode gracefully
+// Wrap ratelimit.limit() to handle development mode gracefully.
 const originalLimit = ratelimit.limit.bind(ratelimit);
 ratelimit.limit = async (key: string) => {
   // Avoid external Redis network round-trips in local development.
