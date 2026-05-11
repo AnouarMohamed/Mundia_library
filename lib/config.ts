@@ -40,7 +40,7 @@ const envSchema = z.object({
   resendToken: z.string().min(1, "Resend Token is required"),
 
   // Feature Flags
-  enableWorkflows: z.string().transform((v) => v === "true").default("false"),
+  enableWorkflows: z.string().default("false").transform((v) => v === "true"),
 });
 
 // Map process.env to the schema structure
