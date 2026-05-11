@@ -46,6 +46,9 @@ interface ReviewCardProps {
   onDelete: (reviewId: string) => void;
 }
 
+/**
+ * Single review card with edit/delete actions.
+ */
 function ReviewCard({
   review,
   currentUserEmail,
@@ -199,6 +202,9 @@ interface ReviewsSectionProps {
   currentUserEmail?: string | null;
 }
 
+/**
+ * Render the review list and inline editor.
+ */
 export default function ReviewsSection({
   bookId: _bookId,
   reviews,
