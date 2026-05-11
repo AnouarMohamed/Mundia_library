@@ -18,8 +18,14 @@ import { asc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Cache distinct genres for the filter UI.
+ */
 const getCachedGenres = unstable_cache(
   async () => {
     return db
