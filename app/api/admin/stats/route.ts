@@ -10,8 +10,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 import { getAdminDashboardStats } from "@/lib/admin/actions/dashboard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * GET /api/admin/stats
+ * Fetch dashboard statistics.
+ */
 export async function GET(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
