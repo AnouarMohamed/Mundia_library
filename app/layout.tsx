@@ -7,6 +7,7 @@ import localFont from "next/font/local";
 import { ReactNode } from "react";
 import SessionProviderWrapper from "./SessionProviderWrapper";
 
+// Local fonts for consistent typography across the app.
 const ibmPlexSans = localFont({
   src: [
     { path: "/fonts/IBMPlexSans-Regular.ttf", weight: "400", style: "normal" },
@@ -23,6 +24,9 @@ const bebasNeue = localFont({
   variable: "--bebas-neue",
 });
 
+/**
+ * Default metadata used across the application.
+ */
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_PROD_API_ENDPOINT || "http://localhost:3000"
@@ -76,6 +80,9 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Root layout wrapping providers, global styles, and typography.
+ */
 const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
     <html lang="en" suppressHydrationWarning>
