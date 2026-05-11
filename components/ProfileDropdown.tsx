@@ -32,6 +32,9 @@ interface ProfileDropdownProps {
   isAdmin: boolean;
 }
 
+/**
+ * Profile menu with account actions.
+ */
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   fullName,
   email,
