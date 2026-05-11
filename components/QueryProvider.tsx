@@ -18,6 +18,9 @@ import { useState } from "react";
  * - gcTime: 5 minutes - Keep unused data in cache for faster subsequent loads
  * - retry: 1 - Retry failed requests once (faster failure = faster error display)
  */
+/**
+ * Global React Query client with tuned defaults.
+ */
 export default function QueryProvider({
   children,
 }: {
