@@ -4,6 +4,9 @@ import { users } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { getWorkflowServeOptions, sendEmail } from "@/lib/workflow";
 
+/**
+ * Use Node.js runtime for DB access and workflow execution.
+ */
 export const runtime = "nodejs";
 
 type UserState = "non-active" | "active";
@@ -17,6 +20,9 @@ const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 const THREE_DAYS_IN_MS = 3 * ONE_DAY_IN_MS;
 const THIRTY_DAYS_IN_MS = 30 * ONE_DAY_IN_MS;
 
+/**
+ * Determine whether a user is active based on last activity.
+ */
 const getUserState = async (email: string): Promise<UserState> => {
   try {
     const user = await db
