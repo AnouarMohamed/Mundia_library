@@ -7,6 +7,9 @@ import { users } from "@/database/schema";
 import { sha256 } from "@noble/hashes/sha256";
 import { randomBytes } from "@noble/hashes/utils";
 
+/**
+ * Concatenate two Uint8Array buffers.
+ */
 function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
   const c = new Uint8Array(a.length + b.length);
   c.set(a, 0);
@@ -21,6 +24,9 @@ import { workflowClient } from "@/lib/workflow";
 import config from "@/lib/config";
 import { isTransientDbError, withDbRetry } from "@/lib/db/retry";
 
+/**
+ * Sign in using credential-based auth.
+ */
 export const signInWithCredentials = async (
   params: Pick<AuthCredentials, "email" | "password">
 ) => {
@@ -49,6 +55,9 @@ export const signInWithCredentials = async (
   }
 };
 
+/**
+ * Register a new user account and sign them in.
+ */
 export const signUp = async (params: AuthCredentials) => {
   const { fullName, email, universityId, password, universityCard } = params;
 
@@ -99,9 +108,9 @@ export const signUp = async (params: AuthCredentials) => {
     };
   }
 
-  // Generate a random salt
+  // Generate a random salt for password hashing.
   const salt = randomBytes(16);
-  // Hash the password with the salt
+  // Hash the password with the salt.
   const passwordBytes = new TextEncoder().encode(password);
   const hashBuffer = sha256(concatUint8Arrays(passwordBytes, salt));
   // Store salt and hash as base64

@@ -23,6 +23,9 @@ export type AdminRouteGuardResult = GuardSuccess | GuardFailure;
  * - If role exists in session JWT, we trust it and skip DB lookup.
  * - We fallback to DB when role is missing OR stale (e.g., recently promoted user).
  */
+/**
+ * Require an authenticated admin session for API access.
+ */
 export async function requireAdminRouteAccess(): Promise<AdminRouteGuardResult> {
   const session = await auth();
 

@@ -91,6 +91,9 @@ export interface ReviewResponse {
  * const reviews = await getBookReviews("123e4567-e89b-12d3-a456-426614174000");
  * ```
  */
+/**
+ * Fetch reviews for a book.
+ */
 export async function getBookReviews(bookId: string): Promise<Review[]> {
   if (!bookId) {
     throw new ApiError("Book ID is required", 400);
@@ -141,6 +144,9 @@ export async function getBookReviews(bookId: string): Promise<Review[]> {
  *   // Show review form
  * }
  * ```
+ */
+/**
+ * Fetch review eligibility for a book.
  */
 export async function getReviewEligibility(
   bookId: string
@@ -201,6 +207,9 @@ export async function getReviewEligibility(
  *   comment: "Great book! Highly recommend."
  * });
  * ```
+ */
+/**
+ * Create a new book review.
  */
 export async function createReview(
   bookId: string,
@@ -265,6 +274,9 @@ export async function createReview(
  * });
  * ```
  */
+/**
+ * Update an existing review.
+ */
 export async function updateReview(
   reviewId: string,
   reviewData: UpdateReviewInput
@@ -322,6 +334,9 @@ export async function updateReview(
  * await deleteReview(reviewId);
  * ```
  */
+/**
+ * Delete a review by id.
+ */
 export async function deleteReview(reviewId: string): Promise<void> {
   if (!reviewId) {
     throw new ApiError("Review ID is required", 400);
@@ -363,6 +378,9 @@ export async function deleteReview(reviewId: string): Promise<void> {
  * const stats = await getBookRatingStats(bookId);
  * console.log(`Average: ${stats.average}, Total: ${stats.count}`);
  * ```
+ */
+/**
+ * Calculate average rating stats for a book.
  */
 export async function getBookRatingStats(bookId: string): Promise<{
   average: number;

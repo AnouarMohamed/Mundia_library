@@ -23,6 +23,9 @@ export interface RecommendationStats {
 }
 
 // Get user's borrowing history for recommendation algorithms
+/**
+ * Fetch a user's borrow history for recommendation models.
+ */
 export async function getUserBorrowHistory(userId: string): Promise<
   Array<{
     bookId: string;
@@ -56,6 +59,9 @@ export async function getUserBorrowHistory(userId: string): Promise<
 }
 
 // Genre-based recommendations
+/**
+ * Generate recommendations based on favorite genres.
+ */
 export async function generateGenreBasedRecommendations(
   userId: string,
   limit: number = 5
@@ -121,6 +127,9 @@ export async function generateGenreBasedRecommendations(
 }
 
 // Author-based recommendations
+/**
+ * Generate recommendations based on favorite authors.
+ */
 export async function generateAuthorBasedRecommendations(
   userId: string,
   limit: number = 5
@@ -186,6 +195,9 @@ export async function generateAuthorBasedRecommendations(
 }
 
 // Trending recommendations (most borrowed books recently)
+/**
+ * Generate recommendations from trending borrows.
+ */
 export async function generateTrendingRecommendations(
   userId: string,
   limit: number = 5
@@ -242,6 +254,9 @@ export async function generateTrendingRecommendations(
  * 2. Find other users who have borrowed those same books.
  * 3. Find other books that those similar users have borrowed.
  * 4. Rank those books by frequency and recommend the ones the user hasn't read.
+ */
+/**
+ * Generate recommendations using collaborative filtering.
  */
 export async function generateCollaborativeRecommendations(
   userId: string,
@@ -307,6 +322,9 @@ export async function generateCollaborativeRecommendations(
 }
 
 // Generate all recommendations for a user
+/**
+ * Generate a combined recommendation list for a user.
+ */
 export async function generateUserRecommendations(
   userId: string
 ): Promise<Recommendation[]> {
@@ -329,6 +347,9 @@ export async function generateUserRecommendations(
 }
 
 // Generate recommendations for all users
+/**
+ * Generate recommendations for all approved users.
+ */
 export async function generateAllUserRecommendations(): Promise<
   { userId: string; recommendations: Recommendation[] }[]
 > {
@@ -357,6 +378,9 @@ export async function generateAllUserRecommendations(): Promise<
 }
 
 // Update trending books (refresh the trending algorithm data)
+/**
+ * Recompute trending books.
+ */
 export async function updateTrendingBooks(): Promise<{
   message: string;
   trendingCount: number;
@@ -390,6 +414,9 @@ export async function updateTrendingBooks(): Promise<{
 }
 
 // Refresh recommendation cache (simulate cache refresh)
+/**
+ * Refresh recommendation cache (stubbed).
+ */
 export async function refreshRecommendationCache(): Promise<{
   message: string;
   cacheCleared: boolean;

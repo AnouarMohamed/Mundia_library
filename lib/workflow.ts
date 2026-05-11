@@ -14,6 +14,9 @@ const createMissingQStashConfigError = () =>
     "Upstash QStash is not configured. Please check QSTASH_URL and QSTASH_TOKEN."
   );
 
+/**
+ * Lazily create the Upstash Workflow client.
+ */
 const getWorkflowClient = () => {
   if (workflowClientInstance) {
     return workflowClientInstance;
@@ -31,6 +34,9 @@ const getWorkflowClient = () => {
   return workflowClientInstance;
 };
 
+/**
+ * Lazily create the QStash client.
+ */
 const getQStashClient = () => {
   if (qstashClient) {
     return qstashClient;
@@ -47,6 +53,9 @@ const getQStashClient = () => {
   return qstashClient;
 };
 
+/**
+ * Create the Resend provider for email delivery.
+ */
 const getResendProvider = () => {
   if (!config.env.resendToken) {
     throw new Error(
@@ -71,10 +80,16 @@ const createMissingWorkflowQStashClient = () => {
   } as NonNullable<WorkflowServeOptions["qstashClient"]>;
 };
 
+/**
+ * Workflow client wrapper with lazy initialization.
+ */
 export const workflowClient = {
   trigger: (params: TriggerOptions) => getWorkflowClient().trigger(params),
 };
 
+/**
+ * Build serve options with an optional QStash client.
+ */
 export const getWorkflowServeOptions = <
   TInitialPayload = unknown,
   TResult = unknown,
@@ -84,6 +99,9 @@ export const getWorkflowServeOptions = <
     : createMissingWorkflowQStashClient(),
 });
 
+/**
+ * Send an email via QStash + Resend.
+ */
 export const sendEmail = async ({
   email,
   subject,

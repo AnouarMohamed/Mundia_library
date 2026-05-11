@@ -47,6 +47,9 @@ export interface RenewalResponse {
  * @param params - The borrow record ID and optional reason for renewal.
  * @returns A promise resolving to a success or error response.
  */
+/**
+ * Submit a renewal request for a borrow record.
+ */
 export async function requestRenewal(params: RequestRenewalParams): Promise<RenewalResponse> {
   const { borrowRecordId, reason } = params;
 
@@ -131,6 +134,9 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
  * 
  * @param borrowRecordId - The ID of the borrow record to check.
  * @returns A promise resolving to a boolean indicating eligibility.
+ */
+/**
+ * Check if the current user can request renewal.
  */
 export async function canRequestRenewal(borrowRecordId: string): Promise<boolean> {
   try {

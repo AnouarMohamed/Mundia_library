@@ -114,6 +114,9 @@ export interface BorrowResponse {
  * const borrows = await getBorrowsList({ status: "BORROWED", overdue: true });
  * ```
  */
+/**
+ * Fetch borrow records with optional filters.
+ */
 export async function getBorrowsList(
   filters: BorrowFilters = {}
 ): Promise<BorrowsListResponse> {
@@ -203,6 +206,9 @@ export async function getBorrowsList(
  * const userBorrows = await getUserBorrows(userId, "BORROWED");
  * ```
  */
+/**
+ * Fetch all borrow records for a user.
+ */
 export async function getUserBorrows(
   userId: string,
   status?: BorrowStatus
@@ -234,6 +240,9 @@ export async function getUserBorrows(
  * ```typescript
  * const requests = await getBorrowRequests("PENDING");
  * ```
+ */
+/**
+ * Fetch borrow requests for admin views.
  */
 export async function getBorrowRequests(
   status?: BorrowStatus,
@@ -291,6 +300,9 @@ export async function getBorrowRequests(
  * const borrow = await getBorrow("123e4567-e89b-12d3-a456-426614174000", true);
  * ```
  */
+/**
+ * Fetch a single borrow record by id.
+ */
 export async function getBorrow(
   borrowId: string,
   includeDetails: boolean = false
@@ -347,6 +359,9 @@ export async function getBorrow(
  * const overdue = await getOverdueBorrows();
  * ```
  */
+/**
+ * Fetch overdue borrows, optionally for a user.
+ */
 export async function getOverdueBorrows(
   userId?: string
 ): Promise<BorrowRecord[]> {
@@ -376,6 +391,9 @@ export async function getOverdueBorrows(
  * const pending = await getBorrowsByStatus("PENDING");
  * ```
  */
+/**
+ * Fetch borrow records by status.
+ */
 export async function getBorrowsByStatus(
   status: BorrowStatus,
   limit?: number
@@ -402,6 +420,9 @@ export async function getBorrowsByStatus(
  * ```typescript
  * const januaryBorrows = await getBorrowsByDateRange("2024-01-01", "2024-01-31");
  * ```
+ */
+/**
+ * Fetch borrow records within a date range.
  */
 export async function getBorrowsByDateRange(
   dateFrom: string,

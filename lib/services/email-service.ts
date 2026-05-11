@@ -17,6 +17,9 @@ const RESEND_SENDER_EMAIL = "Mundiapolis Library <onboarding@resend.dev>";
 /**
  * Send email via Brevo API (Primary Provider)
  */
+/**
+ * Send email via Brevo (primary provider).
+ */
 async function sendEmailViaBrevo(
   to: string,
   subject: string,
@@ -70,6 +73,9 @@ async function sendEmailViaBrevo(
 /**
  * Send email via Resend API (Fallback Provider)
  */
+/**
+ * Send email via Resend (fallback provider).
+ */
 async function sendEmailViaResend(
   to: string,
   subject: string,
@@ -110,6 +116,9 @@ async function sendEmailViaResend(
  * @param htmlContent - Email HTML content
  * @param textContent - Email plain text content
  * @returns Email send result with provider info
+ */
+/**
+ * Send email with provider fallback.
  */
 export async function sendEmailWithFallback(
   to: string,

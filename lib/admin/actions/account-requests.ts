@@ -3,6 +3,9 @@
 import { updateUserStatus } from "@/lib/admin/actions/user";
 import { redirect } from "next/navigation";
 
+/**
+ * Approve a pending user account request.
+ */
 export async function approveUserAction(userId: string) {
   const result = await updateUserStatus(userId, "APPROVED");
   if (result.success) {
@@ -12,6 +15,9 @@ export async function approveUserAction(userId: string) {
   }
 }
 
+/**
+ * Reject a pending user account request.
+ */
 export async function rejectUserAction(userId: string) {
   const result = await updateUserStatus(userId, "REJECTED");
   if (result.success) {

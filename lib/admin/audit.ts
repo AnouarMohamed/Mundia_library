@@ -10,6 +10,9 @@ import { auditLogs } from "@/database/schema";
  * @param targetType - Type of the record affected (e.g., "BORROW_RECORD")
  * @param details - Optional additional context
  */
+/**
+ * Persist an admin audit log entry.
+ */
 export async function logAdminAction(
   userId: string,
   action: string,

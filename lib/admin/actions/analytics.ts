@@ -3,6 +3,9 @@ import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
 
 // Get borrowing trends over time (last 30 days)
+/**
+ * Fetch borrowing trends over the last 30 days.
+ */
 export async function getBorrowingTrends() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -22,6 +25,9 @@ export async function getBorrowingTrends() {
 }
 
 // Get most popular books/genres
+/**
+ * Fetch most borrowed books.
+ */
 export async function getPopularBooks(limit = 10) {
   const popularBooks = await db
     .select({
@@ -42,6 +48,9 @@ export async function getPopularBooks(limit = 10) {
   return popularBooks;
 }
 
+/**
+ * Fetch most borrowed genres.
+ */
 export async function getPopularGenres() {
   const popularGenres = await db
     .select({
@@ -59,6 +68,9 @@ export async function getPopularGenres() {
 }
 
 // Get user activity patterns
+/**
+ * Fetch user activity aggregates.
+ */
 export async function getUserActivityPatterns() {
   const userActivity = await db
     .select({
@@ -81,6 +93,9 @@ export async function getUserActivityPatterns() {
 }
 
 // Get overdue book analysis
+/**
+ * Fetch overdue analysis details.
+ */
 export async function getOverdueAnalysis() {
   const now = new Date();
 
@@ -123,6 +138,9 @@ export async function getOverdueAnalysis() {
 }
 
 // Get overdue statistics
+/**
+ * Fetch aggregate overdue statistics.
+ */
 export async function getOverdueStats() {
   const now = new Date();
 
@@ -146,6 +164,9 @@ export async function getOverdueStats() {
 }
 
 // Get monthly borrowing statistics
+/**
+ * Fetch current vs last month borrow stats.
+ */
 export async function getMonthlyStats() {
   const currentMonth = new Date();
   const lastMonth = new Date();
@@ -200,6 +221,9 @@ export async function getMonthlyStats() {
 }
 
 // Get system health metrics
+/**
+ * Fetch system health metrics.
+ */
 export async function getSystemHealth() {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

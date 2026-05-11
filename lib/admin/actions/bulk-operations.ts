@@ -5,6 +5,9 @@ import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, inArray, and } from "drizzle-orm";
 
 // Bulk book operations
+/**
+ * Bulk update book fields.
+ */
 export async function bulkUpdateBooks(
   bookIds: string[],
   updates: Partial<typeof books.$inferInsert>
@@ -34,6 +37,9 @@ export async function bulkUpdateBooks(
   }
 }
 
+/**
+ * Bulk delete books after validation.
+ */
 export async function bulkDeleteBooks(bookIds: string[]) {
   if (bookIds.length === 0) {
     return { success: false, message: "No books selected" };
@@ -78,15 +84,24 @@ export async function bulkDeleteBooks(bookIds: string[]) {
   }
 }
 
+/**
+ * Bulk activate books.
+ */
 export async function bulkActivateBooks(bookIds: string[]) {
   return bulkUpdateBooks(bookIds, { isActive: true });
 }
 
+/**
+ * Bulk deactivate books.
+ */
 export async function bulkDeactivateBooks(bookIds: string[]) {
   return bulkUpdateBooks(bookIds, { isActive: false });
 }
 
 // Bulk user operations
+/**
+ * Bulk update user fields.
+ */
 export async function bulkUpdateUsers(
   userIds: string[],
   updates: Partial<typeof users.$inferInsert>
@@ -115,23 +130,38 @@ export async function bulkUpdateUsers(
   }
 }
 
+/**
+ * Bulk approve users.
+ */
 export async function bulkApproveUsers(userIds: string[]) {
   return bulkUpdateUsers(userIds, { status: "APPROVED" });
 }
 
+/**
+ * Bulk reject users.
+ */
 export async function bulkRejectUsers(userIds: string[]) {
   return bulkUpdateUsers(userIds, { status: "REJECTED" });
 }
 
+/**
+ * Bulk grant admin role to users.
+ */
 export async function bulkMakeAdminUsers(userIds: string[]) {
   return bulkUpdateUsers(userIds, { role: "ADMIN" });
 }
 
+/**
+ * Bulk remove admin role from users.
+ */
 export async function bulkRemoveAdminUsers(userIds: string[]) {
   return bulkUpdateUsers(userIds, { role: "USER" });
 }
 
 // Bulk borrow operations
+/**
+ * Bulk approve borrow requests.
+ */
 export async function bulkApproveBorrowRequests(recordIds: string[]) {
   if (recordIds.length === 0) {
     return { success: false, message: "No requests selected" };
@@ -163,6 +193,9 @@ export async function bulkApproveBorrowRequests(recordIds: string[]) {
   }
 }
 
+/**
+ * Bulk reject borrow requests.
+ */
 export async function bulkRejectBorrowRequests(recordIds: string[]) {
   if (recordIds.length === 0) {
     return { success: false, message: "No requests selected" };
@@ -190,6 +223,9 @@ export async function bulkRejectBorrowRequests(recordIds: string[]) {
 }
 
 // Get bulk operation statistics
+/**
+ * Fetch aggregate stats for bulk operations.
+ */
 export async function getBulkOperationStats() {
   const [totalBooks, totalUsers, pendingRequests, activeBorrows] =
     await Promise.all([
@@ -214,6 +250,9 @@ export async function getBulkOperationStats() {
 }
 
 // Validate bulk operations
+/**
+ * Validate a bulk book operation before execution.
+ */
 export async function validateBulkBookOperation(
   bookIds: string[],
   operation: string
@@ -245,6 +284,9 @@ export async function validateBulkBookOperation(
   return { valid: true, message: "Operation is valid" };
 }
 
+/**
+ * Validate a bulk user operation before execution.
+ */
 export async function validateBulkUserOperation(
   userIds: string[],
   operation: string

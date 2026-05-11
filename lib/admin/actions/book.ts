@@ -6,6 +6,9 @@ import { books } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
+/**
+ * Create a new book record.
+ */
 export const createBook = async (
   params: BookParams & { updatedBy?: string }
 ) => {
@@ -44,6 +47,9 @@ export const createBook = async (
   }
 };
 
+/**
+ * Update an existing book record.
+ */
 export const updateBook = async (
   bookId: string,
   params: Partial<BookParams> & { updatedBy?: string }
@@ -146,6 +152,9 @@ export const updateBook = async (
   }
 };
 
+/**
+ * Fetch a single book by id.
+ */
 export const getBookById = async (bookId: string) => {
   try {
     const book = await db

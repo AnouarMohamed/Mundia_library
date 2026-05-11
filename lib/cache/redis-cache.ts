@@ -89,6 +89,7 @@ export async function invalidateCache(key: string): Promise<void> {
 
 /**
  * Clear multiple keys using a pattern.
+ * Use sparingly on large keyspaces.
  */
 export async function invalidatePattern(pattern: string): Promise<void> {
   try {

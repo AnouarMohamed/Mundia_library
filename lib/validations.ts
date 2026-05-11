@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/**
+ * Validation schema for sign-up form data.
+ */
 export const signUpSchema = z.object({
   fullName: z
     .string()
@@ -40,11 +43,17 @@ export const signUpSchema = z.object({
     .or(z.literal("")),
 });
 
+/**
+ * Validation schema for sign-in form data.
+ */
 export const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
 });
 
+/**
+ * Validation schema for book create/update payloads.
+ */
 export const bookSchema = z.object({
   title: z
     .string()

@@ -66,6 +66,9 @@ export interface BookResponse {
  * const books = await getBooksList({ search: "react", genre: "Technology" });
  * ```
  */
+/**
+ * Fetch a page of books with optional filters.
+ */
 export async function getBooksList(
   filters: BookFilters = {}
 ): Promise<BooksListResponse> {
@@ -147,6 +150,9 @@ export async function getBooksList(
  * const book = await getBook("123e4567-e89b-12d3-a456-426614174000");
  * ```
  */
+/**
+ * Fetch a single book by id.
+ */
 export async function getBook(bookId: string): Promise<Book> {
   if (!bookId) {
     throw new ApiError("Book ID is required", 400);
@@ -192,6 +198,9 @@ export async function getBook(bookId: string): Promise<Book> {
  * ```typescript
  * const recommendations = await getBookRecommendations(userId, 5);
  * ```
+ */
+/**
+ * Fetch personalized book recommendations.
  */
 export async function getBookRecommendations(
   userId?: string,
@@ -244,6 +253,9 @@ export async function getBookRecommendations(
  * ```typescript
  * const featured = await getFeaturedBooks(5);
  * ```
+ */
+/**
+ * Fetch featured or popular books.
  */
 export async function getFeaturedBooks(limit: number = 10): Promise<Book[]> {
   const params = new URLSearchParams();
@@ -305,6 +317,9 @@ export interface BookBorrowStats {
  * console.log(`Total borrows: ${stats.totalBorrows}`);
  * ```
  */
+/**
+ * Fetch borrow stats for a book.
+ */
 export async function getBookBorrowStats(
   bookId: string
 ): Promise<BookBorrowStats> {
@@ -354,6 +369,9 @@ export async function getBookBorrowStats(
  * ```typescript
  * const genres = await getBookGenres();
  * ```
+ */
+/**
+ * Fetch distinct book genres.
  */
 export async function getBookGenres(): Promise<string[]> {
   const response = await fetch("/api/books/genres", {

@@ -38,6 +38,9 @@ export interface UpdateAdminRequestResult {
 }
 
 // Create a new admin request
+/**
+ * Create a new admin access request.
+ */
 export async function createAdminRequest(
   userId: string,
   requestReason: string
@@ -129,6 +132,9 @@ export async function createAdminRequest(
 }
 
 // Get all admin requests (including approved and rejected)
+/**
+ * Fetch all admin requests.
+ */
 export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
     const requests = await db
@@ -163,6 +169,9 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
 }
 
 // Get only pending admin requests
+/**
+ * Fetch pending admin requests.
+ */
 export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
     const requests = await db
@@ -198,6 +207,9 @@ export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult>
 }
 
 // Approve an admin request
+/**
+ * Approve an admin request and grant role.
+ */
 export async function approveAdminRequest(
   requestId: string,
   reviewedBy: string
@@ -274,6 +286,9 @@ export async function approveAdminRequest(
 }
 
 // Reject an admin request
+/**
+ * Reject an admin request.
+ */
 export async function rejectAdminRequest(
   requestId: string,
   reviewedBy: string,
@@ -346,6 +361,9 @@ export async function rejectAdminRequest(
 }
 
 // Remove admin privileges from a user
+/**
+ * Remove admin role from a user.
+ */
 export async function removeAdminPrivileges(
   userId: string,
   _removedBy: string
