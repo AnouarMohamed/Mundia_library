@@ -51,6 +51,9 @@ export type BorrowBookResponse =
  * @param params - Borrow book parameters (userId, bookId)
  * @returns Promise with success status and data or error message
  */
+/**
+ * Create a borrow request for a user/book pair.
+ */
 export const borrowBook = async (
   params: BorrowBookParams
 ): Promise<BorrowBookResponse> => {
