@@ -6,6 +6,9 @@ import ratelimit from "@/lib/ratelimit";
 
 let imagekit: ImageKit | null = null;
 
+/**
+ * Lazily initialize the ImageKit client from env config.
+ */
 const getImageKit = () => {
   if (imagekit) {
     return imagekit;
@@ -26,6 +29,10 @@ const getImageKit = () => {
   return imagekit;
 };
 
+/**
+ * GET /api/auth/imagekit
+ * Returns ImageKit auth parameters for client uploads.
+ */
 export async function GET() {
   try {
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
