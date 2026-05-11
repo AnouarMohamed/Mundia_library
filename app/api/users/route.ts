@@ -24,6 +24,9 @@ import { users } from "@/database/schema";
 import { desc, asc, eq, and, or, like, sql } from "drizzle-orm";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
 /**
