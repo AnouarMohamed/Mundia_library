@@ -27,6 +27,9 @@ import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
 /**
@@ -69,6 +72,7 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get("sort") || "date";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limitParam = parseInt(searchParams.get("limit") || "50", 10);
+    // Normalize pagination inputs.
     const safePage = Number.isNaN(page) ? 1 : Math.max(1, page);
     const safeLimit = Number.isNaN(limitParam)
       ? 50
