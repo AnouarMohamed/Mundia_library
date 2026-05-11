@@ -49,6 +49,9 @@ interface Props {
   value?: string;
 }
 
+/**
+ * ImageKit-backed file upload control.
+ */
 const FileUpload = ({
   type,
   accept,
