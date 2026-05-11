@@ -29,6 +29,9 @@ interface ReviewButtonProps {
   initialReviewEligibility?: ReviewEligibility;
 }
 
+/**
+ * Entry point for submitting a book review.
+ */
 export default function ReviewButton({
   bookId,
   userId: _userId,
