@@ -60,6 +60,9 @@ interface BookBorrowButtonProps {
   initialReviewEligibility?: ReviewEligibility;
 }
 
+/**
+ * Borrow/return actions with optional review entry.
+ */
 const BookBorrowButton: React.FC<BookBorrowButtonProps> = ({
   bookId,
   userId,
