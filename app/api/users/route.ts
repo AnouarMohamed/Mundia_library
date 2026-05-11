@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status") || "";
     const role = searchParams.get("role") || "";
     const sort = searchParams.get("sort") || "name";
+    // Normalize pagination inputs.
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
 
