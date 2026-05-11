@@ -22,10 +22,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogTrigger 
+} from "@/components/ui/dialog";
 import { useAllBooks } from "@/hooks/useQueries";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BooksListResponse } from "@/lib/services/books";
 import type { BorrowRecord } from "@/lib/services/borrows";
+import { Camera } from "lucide-react";
+import ISBNScanner from "@/components/ISBNScanner";
 
 interface BookCollectionProps {
   /**
@@ -217,6 +224,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     };
 
   const [localSearch, setLocalSearch] = useState(currentSearchParams.search);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const updateSearchParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParamsHook.toString());
@@ -240,6 +248,12 @@ const BookCollection: React.FC<BookCollectionProps> = ({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     updateSearchParams({ search: localSearch });
+  };
+
+  const handleScanSuccess = (isbn: string) => {
+    setLocalSearch(isbn);
+    updateSearchParams({ search: isbn });
+    setIsScannerOpen(false);
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -335,20 +349,43 @@ const BookCollection: React.FC<BookCollectionProps> = ({
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4">
               {/* Search */}
-              <form onSubmit={handleSearch} className="space-y-2">
-                <Input
-                  placeholder="Search books..."
-                  value={localSearch}
-                  onChange={(e) => setLocalSearch(e.target.value)}
-                  className="h-11 rounded-xl border-white/15 bg-white/5 text-light-100 placeholder:text-light-100/60"
-                />
+              <div className="space-y-2">
+                <form onSubmit={handleSearch} className="flex gap-2">
+                  <Input
+                    placeholder="Search books..."
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
+                    className="h-11 rounded-xl border-white/15 bg-white/5 text-light-100 placeholder:text-light-100/60"
+                  />
+                  
+                  {/* ISBN Scanner Dialog */}
+                  <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 shrink-0 rounded-xl border-white/20 bg-white/5 text-light-100 hover:bg-white/10"
+                        title="Scan ISBN"
+                      >
+                        <Camera className="size-5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="p-0 border-none bg-transparent max-w-sm sm:max-w-md">
+                      <ISBNScanner 
+                        onScanSuccess={handleScanSuccess} 
+                        onClose={() => setIsScannerOpen(false)} 
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </form>
+
                 <Button
-                  type="submit"
+                  onClick={() => updateSearchParams({ search: localSearch })}
                   className="h-11 w-full rounded-xl border border-primary/50 bg-primary text-dark-100 hover:bg-primary/95"
                 >
                   Search
                 </Button>
-              </form>
+              </div>
 
               {/* Genre Filter */}
               <div className="space-y-1.5 sm:space-y-2">

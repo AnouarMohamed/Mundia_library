@@ -11,7 +11,7 @@ export interface Recommendation {
   bookGenre: string;
   reason: string;
   score: number;
-  algorithm: "genre-based" | "author-based" | "trending";
+  algorithm: "genre-based" | "author-based" | "trending" | "collaborative";
 }
 
 export interface RecommendationStats {
@@ -234,18 +234,91 @@ export async function generateTrendingRecommendations(
   }));
 }
 
+/**
+ * Collaborative Filtering Recommendations
+ * 
+ * Logic:
+ * 1. Find the books the current user has borrowed.
+ * 2. Find other users who have borrowed those same books.
+ * 3. Find other books that those similar users have borrowed.
+ * 4. Rank those books by frequency and recommend the ones the user hasn't read.
+ */
+export async function generateCollaborativeRecommendations(
+  userId: string,
+  limit: number = 5
+): Promise<Recommendation[]> {
+  // 1. Get user's borrow history
+  const userHistory = await db
+    .select({ bookId: borrowRecords.bookId })
+    .from(borrowRecords)
+    .where(eq(borrowRecords.userId, userId));
+
+  if (userHistory.length === 0) return [];
+  const userBookIds = userHistory.map((h) => h.bookId);
+
+  // 2. Find similar users (who borrowed same books)
+  const similarUsers = await db
+    .select({ userId: borrowRecords.userId })
+    .from(borrowRecords)
+    .where(
+      and(
+        inArray(borrowRecords.bookId, userBookIds),
+        sql`${borrowRecords.userId} != ${userId}`
+      )
+    )
+    .limit(50); // Optimization: sample top 50 similar users
+
+  if (similarUsers.length === 0) return [];
+  const similarUserIds = [...new Set(similarUsers.map((u) => u.userId))];
+
+  // 3. Find books similar users liked that target user hasn't borrowed
+  const recommendedBooks = await db
+    .select({
+      bookId: books.id,
+      bookTitle: books.title,
+      bookAuthor: books.author,
+      bookGenre: books.genre,
+      rating: books.rating,
+      matchCount: sql<number>`count(${borrowRecords.id})`,
+    })
+    .from(books)
+    .innerJoin(borrowRecords, eq(books.id, borrowRecords.bookId))
+    .where(
+      and(
+        inArray(borrowRecords.userId, similarUserIds),
+        notInArray(books.id, userBookIds),
+        eq(books.isActive, true)
+      )
+    )
+    .groupBy(books.id, books.title, books.author, books.genre, books.rating)
+    .orderBy(desc(sql`count(${borrowRecords.id})`), desc(books.rating))
+    .limit(limit);
+
+  return recommendedBooks.map((book) => ({
+    userId,
+    bookId: book.bookId,
+    bookTitle: book.bookTitle,
+    bookAuthor: book.bookAuthor,
+    bookGenre: book.bookGenre || "Unknown",
+    reason: "Recommended based on similar users' reading habits",
+    score: (book.matchCount * 2) + (book.rating || 0), // Weight matches more than rating
+    algorithm: "collaborative" as const,
+  }));
+}
+
 // Generate all recommendations for a user
 export async function generateUserRecommendations(
   userId: string
 ): Promise<Recommendation[]> {
-  const [genreRecs, authorRecs, trendingRecs] = await Promise.all([
+  const [genreRecs, authorRecs, trendingRecs, collabRecs] = await Promise.all([
     generateGenreBasedRecommendations(userId, 3),
     generateAuthorBasedRecommendations(userId, 3),
     generateTrendingRecommendations(userId, 4),
+    generateCollaborativeRecommendations(userId, 4),
   ]);
 
   // Combine and deduplicate recommendations
-  const allRecs = [...genreRecs, ...authorRecs, ...trendingRecs];
+  const allRecs = [...collabRecs, ...genreRecs, ...authorRecs, ...trendingRecs];
   const uniqueRecs = allRecs.filter(
     (rec, index, self) =>
       index === self.findIndex((r) => r.bookId === rec.bookId)

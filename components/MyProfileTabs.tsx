@@ -34,6 +34,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useUserBorrows } from "@/hooks/useQueries";
 import { useReturnBook } from "@/hooks/useMutations";
 import type { BorrowRecord } from "@/lib/services/borrows";
+import RenewalRequestButton from "@/components/RenewalRequestButton";
 
 // Define the actual data structure from the database query
 interface BorrowRecordWithBook {
@@ -905,6 +906,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2">
+                  {record.status === "BORROWED" && (
+                    <RenewalRequestButton 
+                      borrowRecordId={record.id} 
+                      bookTitle={record.book.title} 
+                    />
+                  )}
+
                   {record.status === "BORROWED" && (
                     <button
                       onClick={handleReturnBook}

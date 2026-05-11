@@ -139,4 +139,54 @@ export const adminRequests = mysqlTable("admin_requests", {
   updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
 });
 
+export const auditLogs = mysqlTable("audit_logs", {
+  id: varchar("id", { length: 36 })
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  targetId: varchar("target_id", { length: 36 }),
+  targetType: varchar("target_type", { length: 50 }),
+  details: text("details"),
+  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const renewalRequests = mysqlTable("renewal_requests", {
+  id: varchar("id", { length: 36 })
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  borrowRecordId: varchar("borrow_record_id", { length: 36 })
+    .notNull()
+    .references(() => borrowRecords.id),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id),
+  status: mysqlEnum("status", ["PENDING", "APPROVED", "REJECTED"])
+    .notNull()
+    .default("PENDING"),
+  requestReason: text("request_reason"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const notifications = mysqlTable("notifications", {
+  id: varchar("id", { length: 36 })
+    .notNull()
+    .primaryKey()
+    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", ["INFO", "SUCCESS", "WARNING", "ERROR"]).notNull().default("INFO"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+});
+
 

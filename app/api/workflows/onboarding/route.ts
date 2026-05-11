@@ -56,8 +56,12 @@ export const { POST } = serve<InitialData>(
   async (context) => {
     const { email, fullName } = context.requestPayload;
 
-    // Welcome Email
-    await context.run("new-signup", async () => {
+    // Welcome Email with Retries
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (context as any).run("new-signup", {
+      retries: 3,
+      backoff: (retryCount: number) => Math.pow(2, retryCount) * 1000,
+    }, async () => {
       await sendEmail({
         email,
         subject: "Welcome to the platform",
@@ -72,8 +76,17 @@ export const { POST } = serve<InitialData>(
         return await getUserState(email);
       });
 
+      // If user no longer exists, terminate workflow
+      const userExists = await context.run("verify-user-exists", async () => {
+        const user = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+        return user.length > 0;
+      });
+
+      if (!userExists) break;
+
       if (state === "non-active") {
-        await context.run("send-email-non-active", async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (context as any).run("send-email-non-active", { retries: 2 }, async () => {
           await sendEmail({
             email,
             subject: "Are you still there?",
@@ -81,7 +94,8 @@ export const { POST } = serve<InitialData>(
           });
         });
       } else if (state === "active") {
-        await context.run("send-email-active", async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (context as any).run("send-email-active", { retries: 2 }, async () => {
           await sendEmail({
             email,
             subject: "Welcome back!",

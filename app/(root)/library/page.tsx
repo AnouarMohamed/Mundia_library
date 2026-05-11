@@ -81,6 +81,10 @@ const Page = async () => {
   const featuredBook = topBooks[0];
   const recommendations =
     topBooks.slice(1, 7).length > 0 ? topBooks.slice(1, 7) : topBooks;
+  const featuredRating =
+    typeof featuredBook.rating === "number"
+      ? featuredBook.rating.toFixed(1)
+      : String(featuredBook.rating ?? "N/A");
 
   const rawUserBorrows = await withDbRetry(
     () =>
@@ -137,22 +141,79 @@ const Page = async () => {
   }));
 
   return (
-    <section className="space-y-8 sm:space-y-10">
-      <div className="library">
-        <p className="library-subtitle">University Catalog</p>
-        <h1 className="library-title">Library</h1>
-        <p className="mx-auto mt-3 max-w-2xl text-sm text-light-200/85 sm:text-base">
-          Browse books, request borrows, and manage your reading activity.
-        </p>
-        <div className="mt-4 flex justify-center">
-          <Button
-            asChild
-            className="min-h-12 rounded-xl border border-primary/50 bg-primary px-6 text-dark-100 hover:bg-primary/95"
-          >
-            <Link href="/all-books">Browse All Books</Link>
-          </Button>
+    <section className="space-y-10 sm:space-y-12">
+      <section className="library-hero">
+        <div className="library-hero-grid">
+          <div className="library-hero-panel">
+            <p className="library-subtitle">University Catalog</p>
+            <h1 className="library-hero-title">Library</h1>
+            <p className="library-hero-copy">
+              Browse top-rated books, request borrows, and track reading activity
+              with real-time availability.
+            </p>
+
+            <div className="library-hero-actions">
+              <Button
+                asChild
+                className="min-h-12 rounded-xl border border-primary/50 bg-primary px-6 text-dark-100 hover:bg-primary/95"
+              >
+                <Link href="/all-books">Browse All Books</Link>
+              </Button>
+              <Link href="/my-profile" className="library-hero-link">
+                View My Profile
+              </Link>
+            </div>
+
+            <div className="library-hero-stats">
+              <div className="library-stat">
+                <p className="library-stat-label">Top Picks</p>
+                <p className="library-stat-value">{topBooks.length}</p>
+              </div>
+              <div className="library-stat">
+                <p className="library-stat-label">Featured Rating</p>
+                <p className="library-stat-value">{featuredRating}</p>
+              </div>
+              <div className="library-stat">
+                <p className="library-stat-label">Available Copies</p>
+                <p className="library-stat-value">
+                  {featuredBook.availableCopies}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="library-hero-aside">
+            <p className="library-featured-label">Featured Picks</p>
+            <ul className="library-featured-list">
+              {topBooks.slice(0, 3).map((book) => {
+                const rating =
+                  typeof book.rating === "number"
+                    ? book.rating.toFixed(1)
+                    : String(book.rating ?? "N/A");
+
+                return (
+                  <li key={book.id} className="library-featured-item">
+                    <div>
+                      <p className="library-featured-title">{book.title}</p>
+                      <p className="library-featured-author">{book.author}</p>
+                    </div>
+                    <span className="library-featured-rating">
+                      <img
+                        src="/icons/star.svg"
+                        alt="star"
+                        width={16}
+                        height={16}
+                        className="size-4"
+                      />
+                      {rating}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
-      </div>
+      </section>
 
       <BookOverview
         {...(featuredBook as Book)}

@@ -247,3 +247,27 @@ export async function getSystemHealth() {
     recentActivity: recentActivityResult[0]?.count || 0,
   };
 }
+
+/**
+ * Get genre performance broken down by month.
+ * 
+ * Returns the top genres for each of the last 6 months.
+ */
+export async function getGenrePerformanceByMonth() {
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const performance = await db
+    .select({
+      month: sql<string>`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m')`,
+      genre: books.genre,
+      borrowCount: count(),
+    })
+    .from(borrowRecords)
+    .innerJoin(books, eq(borrowRecords.bookId, books.id))
+    .where(gte(borrowRecords.createdAt, sixMonthsAgo))
+    .groupBy(sql`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m')`, books.genre)
+    .orderBy(sql`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m') DESC`, count());
+
+  return performance;
+}
