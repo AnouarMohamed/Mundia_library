@@ -109,6 +109,9 @@ interface MyProfileTabsProps {
   borrowHistory?: BorrowRecordWithBook[];
 }
 
+/**
+ * Tabbed profile view for borrow activity.
+ */
 const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
   userId,
   initialActiveBorrows,
