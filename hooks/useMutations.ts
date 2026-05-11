@@ -30,6 +30,10 @@ import {
   removeAdminPrivileges,
 } from "@/lib/admin/actions/admin-requests";
 import { updateUserRole, updateUserStatus } from "@/lib/admin/actions/user";
+import {
+  approveRenewal,
+  rejectRenewal,
+} from "@/lib/admin/actions/renewal";
 import { borrowBook } from "@/lib/actions/book";
 import {
   createReview,
@@ -1669,6 +1673,58 @@ export const useRefreshRecommendationCache = () => {
         error.message ||
           "Unable to refresh recommendation cache. Please try again."
       );
+    },
+  });
+};
+
+/**
+ * Hook to approve a renewal request (admin action).
+ */
+export const useApproveRenewal = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ requestId }: { requestId: string; bookTitle?: string; userName?: string }) => {
+      const result = await approveRenewal(requestId);
+      if (!result.success) throw new Error(result.error || "Failed to approve renewal");
+      return result;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["renewal-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["borrow-records"] });
+      queryClient.invalidateQueries({ queryKey: ["user-borrows"] });
+      
+      const bookTitle = variables.bookTitle || "Book";
+      const userName = variables.userName || "User";
+      showToast.success("Renewal Approved", `Due date extended for "${bookTitle}" requested by ${userName}.`);
+    },
+    onError: (error: Error) => {
+      showToast.error("Approval Failed", error.message);
+    },
+  });
+};
+
+/**
+ * Hook to reject a renewal request (admin action).
+ */
+export const useRejectRenewal = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ requestId, reason }: { requestId: string; reason?: string; bookTitle?: string; userName?: string }) => {
+      const result = await rejectRenewal(requestId, reason);
+      if (!result.success) throw new Error(result.error || "Failed to reject renewal");
+      return result;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["renewal-requests"] });
+      
+      const bookTitle = variables.bookTitle || "Book";
+      const userName = variables.userName || "User";
+      showToast.success("Renewal Rejected", `Renewal request for "${bookTitle}" by ${userName} has been rejected.`);
+    },
+    onError: (error: Error) => {
+      showToast.error("Rejection Failed", error.message);
     },
   });
 };
