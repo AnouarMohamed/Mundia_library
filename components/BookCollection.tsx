@@ -88,6 +88,9 @@ interface BookCollectionProps {
   };
 }
 
+/**
+ * Book collection with filters, search, and pagination.
+ */
 const BookCollection: React.FC<BookCollectionProps> = ({
   initialBooks,
   initialGenres,
