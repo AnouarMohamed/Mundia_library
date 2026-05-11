@@ -7,9 +7,15 @@ import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
-// GET /api/reviews/[bookId] - Get all reviews for a book
+/**
+ * GET /api/reviews/[bookId]
+ * Get all reviews for a book.
+ */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ bookId: string }> }
@@ -77,7 +83,10 @@ export async function GET(
   }
 }
 
-// POST /api/reviews/[bookId] - Create a new review
+/**
+ * POST /api/reviews/[bookId]
+ * Create a new review for a book.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ bookId: string }> }
