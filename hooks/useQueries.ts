@@ -46,6 +46,13 @@ import {
 } from "@/lib/services/analytics";
 import { getFineConfig, type FineConfig } from "@/lib/services/admin";
 import {
+  getNotifications,
+} from "@/lib/services/notifications";
+import {
+  getRenewalRequests,
+  type RenewalRequestWithDetails,
+} from "@/lib/services/renewals";
+import {
   getBookReviews,
   getReviewEligibility,
   type Review,
@@ -975,5 +982,41 @@ export const useExportStats = (initialData?: ExportStats) => {
     staleTime: Infinity, // Cache forever until invalidated
     refetchOnMount: true, // Refetch if stale (after invalidation)
     initialData, // Use SSR data if provided (prevents duplicate fetch)
+  });
+};
+
+/**
+ * Hook to fetch all renewal requests (admin view).
+ */
+export const useRenewalRequests = (initialData?: RenewalRequestWithDetails[]) => {
+  const { trackQuery } = useQueryPerformance();
+
+  return useQuery({
+    queryKey: ["renewal-requests"],
+    queryFn: () =>
+      trackQuery("renewal-requests", async () => {
+        return getRenewalRequests();
+      }),
+    staleTime: 30 * 1000,
+    refetchOnMount: true,
+    initialData,
+  });
+};
+
+/**
+ * Hook to fetch notifications for a specific user.
+ */
+export const useNotifications = (userId: string) => {
+  const { trackQuery } = useQueryPerformance();
+
+  return useQuery({
+    queryKey: ["notifications", userId],
+    queryFn: () =>
+      trackQuery(`notifications-${userId}`, async () => {
+        return getNotifications(userId);
+      }),
+    enabled: !!userId,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000, // Poll for new notifications every minute
   });
 };
