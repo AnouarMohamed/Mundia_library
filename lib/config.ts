@@ -1,10 +1,8 @@
 import { z } from "zod";
 
 /**
- * Application Configuration Schema
- * 
- * Validates environment variables at runtime to ensure all required 
- * services are correctly configured.
+ * Application configuration schema.
+ * Validates environment variables at runtime.
  */
 const envSchema = z.object({
   // API Endpoints
@@ -68,7 +66,7 @@ const envData = {
   enableWorkflows: process.env.ENABLE_WORKFLOWS,
 };
 
-// Validate environment variables
+// Validate environment variables.
 const parsedEnv = envSchema.safeParse(envData);
 
 if (!parsedEnv.success) {
@@ -83,6 +81,9 @@ if (!parsedEnv.success) {
   }
 }
 
+/**
+ * Normalized config with validated env values.
+ */
 const config = {
   env: parsedEnv.success
     ? parsedEnv.data
