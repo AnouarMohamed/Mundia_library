@@ -9,8 +9,14 @@ import React from "react";
 import { getAllBorrowRequests } from "@/lib/admin/actions/borrow";
 import AdminBookRequestsList from "@/components/AdminBookRequestsList";
 
+/**
+ * Use Node.js runtime for server-side data fetching.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Admin page for pending borrow requests.
+ */
 const Page = async ({
   searchParams,
 }: {
