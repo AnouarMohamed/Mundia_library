@@ -14,6 +14,9 @@ interface CountdownTimerProps {
  * CRITICAL: Memoized to prevent unnecessary re-renders when parent component updates.
  * Only recalculates when dueDate actually changes.
  */
+  /**
+   * Borrow due-date countdown badge.
+   */
 const CountdownTimer: React.FC<CountdownTimerProps> = React.memo(({
   dueDate,
   borrowDate: _borrowDate,
