@@ -41,6 +41,9 @@ interface BookBorrowStatsProps {
   };
 }
 
+/**
+ * Borrow stats panel with availability state.
+ */
 const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   bookId,
   availableCopies: propAvailableCopies,

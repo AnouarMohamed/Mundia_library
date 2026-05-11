@@ -1,3 +1,6 @@
+/**
+ * SVG backdrop for book covers.
+ */
 const BookCoverSvg = ({ coverColor }: { coverColor: string }) => {
     return (
         <svg

@@ -34,6 +34,9 @@ interface HomeRecommendationsProps {
   limit?: number;
 }
 
+/**
+ * Home page recommendations with SSR-friendly data.
+ */
 const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   initialRecommendations,
   userId,

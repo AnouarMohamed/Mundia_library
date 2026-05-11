@@ -28,6 +28,9 @@ interface Props {
   };
 }
 
+/**
+ * Borrow action button wired to mutation.
+ */
 const BorrowBook = ({
   userId,
   bookId,

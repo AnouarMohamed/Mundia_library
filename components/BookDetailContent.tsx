@@ -50,6 +50,9 @@ interface BookDetailContentProps {
   }>;
 }
 
+/**
+ * Book detail panel with video, summary, and reviews.
+ */
 const BookDetailContent: React.FC<BookDetailContentProps> = ({
   bookId,
   userId: _userId,

@@ -4,6 +4,9 @@ import React from "react";
 import { IKVideo, ImageKitProvider } from "imagekitio-next";
 import config from "@/lib/config";
 
+/**
+ * Safely parse a video URL.
+ */
 const parseVideoUrl = (value: string): URL | null => {
   try {
     return new URL(value);
@@ -12,10 +15,16 @@ const parseVideoUrl = (value: string): URL | null => {
   }
 };
 
+/**
+ * Restrict video playback to trusted ImageKit hosts.
+ */
 const isTrustedImageKitHost = (hostname: string): boolean => {
   return hostname === "imagekit.io" || hostname.endsWith(".imagekit.io");
 };
 
+/**
+ * Render a book trailer or fallback placeholder.
+ */
 const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
   const parsedUrl = parseVideoUrl(videoUrl);
   const path = parsedUrl?.pathname.toLowerCase() ?? "";

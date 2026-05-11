@@ -47,6 +47,9 @@ interface Props<T extends FieldValues> {
   type: "SIGN_IN" | "SIGN_UP";
 }
 
+/**
+ * Shared auth form for sign-in and sign-up flows.
+ */
 const AuthForm = <T extends FieldValues>({
   type,
   schema,

@@ -25,6 +25,9 @@ interface MobileMenuProps {
   isAdmin: boolean;
 }
 
+/**
+ * Mobile navigation drawer with user actions.
+ */
 const MobileMenu: React.FC<MobileMenuProps> = ({
   fullName,
   email,

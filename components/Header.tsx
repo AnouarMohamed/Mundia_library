@@ -8,6 +8,9 @@ interface HeaderProps {
   session: Session;
 }
 
+/**
+ * Top navigation with user context and admin shortcuts.
+ */
 const Header = async ({ session }: HeaderProps) => {
   const isAdmin = (session.user as { role?: string }).role === "ADMIN";
   const fullName = session.user?.name || "User";
