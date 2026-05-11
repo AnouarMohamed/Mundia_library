@@ -15,6 +15,9 @@ import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { sql, or, like, and, eq, desc, asc, getTableColumns } from "drizzle-orm";
 
+/**
+ * Options for catalog search.
+ */
 export interface SearchOptions {
   query: string;
   genre?: string;
@@ -33,7 +36,7 @@ export async function performAdvancedSearch(options: SearchOptions) {
   const { query, genre, limit = 12, offset = 0, sortBy = "relevance" } = options;
   const searchPattern = `%${query}%`;
 
-  // SQL expression for relevance scoring
+  // SQL expression for relevance scoring.
   const relevanceScore = sql<number>`
     (CASE WHEN ${books.title} LIKE ${searchPattern} THEN 10 ELSE 0 END) +
     (CASE WHEN ${books.author} LIKE ${searchPattern} THEN 5 ELSE 0 END) +
