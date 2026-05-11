@@ -121,6 +121,9 @@ const getResponseFallbackMessage = (response: Response): string => {
   return `Request failed with status ${response.status}`;
 };
 
+/**
+ * Extract a human-friendly error message from a response.
+ */
 export async function getApiErrorMessage(
   response: Response
 ): Promise<string> {
