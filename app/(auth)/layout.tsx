@@ -3,12 +3,13 @@ import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 
+/**
+ * Auth layout that blocks signed-in users from auth routes.
+ */
 const Layout = async ({ children }: { children: ReactNode }) => {
   const session = await getSession();
 
-  // CRITICAL: Redirect authenticated users to home
-  // NextAuth's signOut already clears the session before redirecting here
-  // So if we reach this point with a session, user should be redirected to home
+  // Redirect authenticated users back to home.
   if (session) {
     redirect("/");
   }
