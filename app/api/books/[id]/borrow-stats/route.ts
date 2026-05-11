@@ -23,6 +23,9 @@ import { eq, count, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
 /**
@@ -85,6 +88,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       stats: {
+        // Normalize numeric aggregates to plain numbers.
         totalBorrows: Number(stats.totalBorrows) || 0,
         activeBorrows: Number(stats.activeBorrows) || 0,
         returnedBorrows: Number(stats.returnedBorrows) || 0,
