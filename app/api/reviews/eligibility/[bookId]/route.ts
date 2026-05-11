@@ -150,7 +150,7 @@ export async function GET(
       )
       .limit(1);
 
-    // Calculate eligibility
+    // Calculate eligibility flags for client UI.
     const hasExistingReview = existingReview.length > 0;
     const canReview = userBorrows.length > 0 && !hasExistingReview; // Must have borrowed AND not already reviewed
     const isCurrentlyBorrowed = currentBorrow.length > 0;

@@ -5,8 +5,14 @@ import { bookReviews, books, borrowRecords, users } from "@/database/schema";
 import MyProfileTabs from "@/components/MyProfileTabs";
 import { getSession } from "@/lib/session";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Profile page with borrow history and review stats.
+ */
 const Page = async () => {
   const session = await getSession();
 
@@ -84,6 +90,7 @@ const Page = async () => {
     redirect("/sign-in");
   }
 
+  // Normalize DB fields into UI-friendly types.
   const transformedBorrows = borrowRows.map((record) => ({
     id: record.id,
     userId: record.userId,

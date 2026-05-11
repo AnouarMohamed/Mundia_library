@@ -8,6 +8,9 @@ import {
 } from "@/lib/admin/actions/data-export";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for export generation.
+ */
 export const runtime = "nodejs";
 
 type ExportType = "books" | "users" | "borrows" | "analytics" | "borrows-range";
@@ -20,11 +23,18 @@ const validExportTypes: ExportType[] = [
   "borrows-range",
 ];
 
+/**
+ * Parse export format from form data.
+ */
 const parseExportFormat = (value: FormDataEntryValue | null): ExportFormat => {
   if (value === "json") return "json";
   return "csv";
 };
 
+/**
+ * POST /api/admin/export/[type]
+ * Export admin data based on type and format.
+ */
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ type: string }> }
@@ -79,6 +89,7 @@ export async function POST(
         );
       }
 
+      // Parse date range for exports.
       const start = new Date(dateFrom);
       const end = new Date(dateTo);
 

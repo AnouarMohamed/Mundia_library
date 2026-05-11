@@ -5,11 +5,15 @@ import { getBookById } from "@/lib/admin/actions/book";
 import { redirect } from "next/navigation";
 import BookForm from "@/components/admin/forms/BookForm";
 
+/**
+ * Admin page for editing an existing book.
+ */
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = await params;
   const result = await getBookById(id);
 
   if (!result.success) {
+    // Return to list if the book no longer exists.
     redirect("/admin/books");
   }
 

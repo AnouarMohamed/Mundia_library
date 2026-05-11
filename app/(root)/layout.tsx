@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import Header from "@/components/Header";
 import { getSession } from "@/lib/session";
 
+/**
+ * Root layout that requires a valid session.
+ */
 const Layout = async ({ children }: { children: ReactNode }) => {
   const session = await getSession();
 

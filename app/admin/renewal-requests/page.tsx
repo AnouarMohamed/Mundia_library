@@ -14,8 +14,11 @@ export const metadata = {
   description: "Manage book renewal requests from students.",
 };
 
+/**
+ * Admin page for reviewing renewal requests.
+ */
 const RenewalRequestsPage = async () => {
-  // Fetch initial data for SSR
+  // Fetch initial data for SSR.
   let initialRequests: RenewalRequestWithDetails[] = [];
   try {
     initialRequests = await getRenewalRequests();

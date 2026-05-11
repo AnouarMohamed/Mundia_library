@@ -10,8 +10,14 @@ import { Button } from "@/components/ui/button";
 import { getSession } from "@/lib/session";
 import { withDbRetry } from "@/lib/db/retry";
 
+/**
+ * Use Node.js runtime for DB connectivity.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Cache the top-rated books to keep the landing page fast.
+ */
 const getCachedTopBooks = unstable_cache(
   async () => {
     return (await withDbRetry(
@@ -32,6 +38,9 @@ const getCachedTopBooks = unstable_cache(
   }
 );
 
+/**
+ * Library landing page showing top picks and recommendations.
+ */
 const Page = async () => {
   const session = await getSession();
 
@@ -121,6 +130,7 @@ const Page = async () => {
     return [];
   });
 
+  // Normalize date/fine fields for client consumption.
   const initialUserBorrows = rawUserBorrows.map((record) => ({
     id: record.id,
     userId: record.userId,

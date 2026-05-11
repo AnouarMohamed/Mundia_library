@@ -9,8 +9,14 @@ import React from "react";
 import { getAllUsers } from "@/lib/admin/actions/user";
 import AccountRequestsClient from "./AccountRequestsClient";
 
+/**
+ * Use Node.js runtime for server-side data fetching.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Admin page that lists pending account requests.
+ */
 const Page = async ({
   searchParams,
 }: {

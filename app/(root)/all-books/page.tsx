@@ -6,10 +6,19 @@ import { books } from "@/database/schema";
 import BookCollection from "@/components/BookCollection";
 import { getSession } from "@/lib/session";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Page size for paginated catalog view.
+ */
 const PAGE_SIZE = 12;
 
+/**
+ * Cache distinct genres for filter UI.
+ */
 const getCachedGenres = unstable_cache(
   async () => {
     return db
@@ -24,6 +33,9 @@ const getCachedGenres = unstable_cache(
   }
 );
 
+/**
+ * Paginated catalog page with server-side filtering.
+ */
 const Page = async ({
   searchParams,
 }: {
@@ -76,6 +88,7 @@ const Page = async ({
     }
   }
 
+  // Normalize sort selection into a Drizzle orderBy clause.
   let orderBy;
   switch (sort) {
     case "author":

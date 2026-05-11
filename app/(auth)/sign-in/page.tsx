@@ -5,9 +5,12 @@ import AuthForm from "@/components/AuthForm";
 import { signInSchema } from "@/lib/validations";
 import { signInWithCredentials } from "@/lib/actions/auth";
 
+/**
+ * Sign-in page using the shared AuthForm.
+ */
 const Page = () => {
   useEffect(() => {
-    // Clean up logout-in-progress cookie when sign-in page loads
+    // Clear the logout flag to avoid stale state after returning.
     document.cookie = "logout-in-progress=; path=/; max-age=0; SameSite=Lax";
   }, []);
 

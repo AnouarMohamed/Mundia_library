@@ -18,6 +18,9 @@ import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
 /**

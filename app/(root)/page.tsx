@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 
+/**
+ * Root entrypoint that routes users to the library view.
+ */
 const Home = async () => {
   const session = await getSession();
 
@@ -8,7 +11,8 @@ const Home = async () => {
     redirect("/sign-in");
   }
 
-  redirect(`/library`);
+  // Default landing for authenticated users.
+  redirect("/library");
 }
   /*
   const roleFromSession = (session.user as { role?: string }).role;

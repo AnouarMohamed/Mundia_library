@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateOverdueFines } from "@/lib/admin/actions/borrow";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/update-overdue-fines
+ * Apply overdue fine updates, optionally overriding the daily fine amount.
+ */
 export async function POST(request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();

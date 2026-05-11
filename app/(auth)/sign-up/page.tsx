@@ -4,6 +4,9 @@ import AuthForm from "@/components/AuthForm";
 import { signUpSchema } from "@/lib/validations";
 import { signUp } from "@/lib/actions/auth";
 
+/**
+ * Sign-up page using the shared AuthForm.
+ */
 const Page = () => (
   <AuthForm
     type="SIGN_UP"

@@ -9,8 +9,14 @@ import { users } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { getSession } from "@/lib/session";
 
+/**
+ * Ensure admin pages are always rendered dynamically.
+ */
 export const dynamic = "force-dynamic";
 
+/**
+ * Admin layout that enforces authenticated admin access.
+ */
 const Layout = async ({ children }: { children: ReactNode }) => {
   const session = await getSession();
 
@@ -20,7 +26,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
   let isAdmin = roleFromSession === "ADMIN";
 
   if (!isAdmin) {
-    // Fallback for old/stale sessions where role in JWT is missing or outdated.
+    // Fallback for stale sessions missing the role claim.
     isAdmin = await db
       .select({ role: users.role })
       .from(users)

@@ -6,9 +6,15 @@ import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
-// DELETE /api/reviews/delete/[reviewId] - Delete a review
+/**
+ * DELETE /api/reviews/delete/[reviewId]
+ * Delete a review.
+ */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }

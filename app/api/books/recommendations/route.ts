@@ -27,8 +27,14 @@ import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Cache fallback recommendations for anonymous users.
+ */
 const getFallbackRecommendations = unstable_cache(
   async (limit: number) => {
     return (await db
@@ -42,6 +48,9 @@ const getFallbackRecommendations = unstable_cache(
   { revalidate: 90, tags: ["books", "recommendations"] }
 );
 
+/**
+ * Cache personalized recommendations by user.
+ */
 const getPersonalizedRecommendations = unstable_cache(
   async (userId: string, limit: number) => {
     let recommendedBooks: Book[] = [];

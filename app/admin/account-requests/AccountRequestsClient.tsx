@@ -62,6 +62,9 @@ interface AccountRequestsClientProps {
   errorMessage?: string;
 }
 
+/**
+ * Client-side list for pending account approvals.
+ */
 const AccountRequestsClient = ({
   initialUsers,
   successMessage,
@@ -353,6 +356,9 @@ const AccountRequestsClient = ({
 };
 
 // Account Request Card Component
+/**
+ * Presentational card for a single pending account request.
+ */
 const AccountRequestCard = ({
   user,
   onApprove,
@@ -366,6 +372,9 @@ const AccountRequestCard = ({
 }) => {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
+  /**
+   * Build a short initials string from a full name.
+   */
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -375,6 +384,9 @@ const AccountRequestCard = ({
       .slice(0, 2);
   };
 
+  /**
+   * Resolve the full URL for the stored university card image.
+   */
   const getImageUrl = (universityCard: string) => {
     return universityCard.startsWith("http")
       ? universityCard

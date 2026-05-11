@@ -11,8 +11,14 @@ import BookOverview from "@/components/BookOverview";
 import BookDetailContent from "@/components/BookDetailContent";
 import { getSession } from "@/lib/session";
 
+/**
+ * Use Node.js runtime for DB access.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Book detail page that hydrates overview, reviews, and borrow state.
+ */
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
   const session = await getSession();
 
@@ -24,11 +30,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
   const { id } = await params;
 
-  const [
-    book,
-    reviewRows,
-    rawUserBorrows,
-  ] = await Promise.all([
+  const [book, reviewRows, rawUserBorrows] = await Promise.all([
     db
       .select()
       .from(books)
@@ -82,6 +84,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     notFound();
   }
 
+  // Normalize date/fine fields for client consumption.
   const initialUserBorrows = rawUserBorrows.map((record) => ({
     id: record.id,
     userId: record.userId,

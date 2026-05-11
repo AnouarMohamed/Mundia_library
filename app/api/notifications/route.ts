@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getUserNotifications, markAllAsRead } from "@/lib/services/notification-service";
 
+/**
+ * Use Node.js runtime for auth/session access.
+ */
 export const runtime = "nodejs";
 
 /**
@@ -29,10 +32,8 @@ export async function GET() {
 }
 
 /**
- * POST /api/notifications/mark-all-read
- * Note: Since we want a single route file if possible, we can use query params or handle it in a sub-route.
- * For simplicity and idiomatic Next.js, let's use this route for global actions if needed, 
- * or create a separate one for specific ID actions.
+ * POST /api/notifications
+ * Supports global actions such as marking all notifications as read.
  */
 export async function POST(request: NextRequest) {
   try {

@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { updateTrendingBooks } from "@/lib/admin/actions/recommendations";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/update-trending-books
+ * Recompute trending books for the catalog.
+ */
 export async function POST(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();

@@ -5,8 +5,15 @@ import {
 } from "@/lib/admin/actions/config";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * GET /api/admin/fine-config
+ * Retrieve the current daily fine amount.
+ */
 export async function GET(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
@@ -35,6 +42,10 @@ export async function GET(_request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/admin/fine-config
+ * Update the daily fine amount.
+ */
 export async function POST(request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { markAsRead } from "@/lib/services/notification-service";
 
+/**
+ * Use Node.js runtime for auth/session access.
+ */
 export const runtime = "nodejs";
 
 /**
@@ -19,6 +22,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    // markAsRead enforces ownership for the current user.
     const success = await markAsRead(id, session.user.id);
 
     return NextResponse.json({ success });

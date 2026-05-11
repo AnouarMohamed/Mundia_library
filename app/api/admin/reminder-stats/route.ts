@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getReminderStats } from "@/lib/admin/actions/reminders";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * GET /api/admin/reminder-stats
+ * Fetch reminder delivery stats.
+ */
 export async function GET(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
