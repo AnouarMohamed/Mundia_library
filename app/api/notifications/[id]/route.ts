@@ -22,6 +22,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    // markAsRead enforces ownership for the current user.
     const success = await markAsRead(id, session.user.id);
 
     return NextResponse.json({ success });
