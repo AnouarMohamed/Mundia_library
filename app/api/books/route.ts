@@ -66,12 +66,18 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
 
     let result: BooksResult;
     if (input.search) {
+      const searchSortBy = (
+        ["relevance", "title", "rating", "date"].includes(input.sort)
+          ? input.sort
+          : "relevance"
+      ) as "relevance" | "title" | "rating" | "date";
+
       const { books: searchedBooks, total } = await performAdvancedSearch({
         query: input.search,
         genre: input.genre || undefined,
         limit: input.limit,
         offset,
-        sortBy: (input.sort === "title" ? "relevance" : input.sort) as "relevance" | "title" | "rating" | "date",
+        sortBy: searchSortBy,
       });
 
       result = {
