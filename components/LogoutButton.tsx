@@ -19,6 +19,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { showToast } from "@/lib/toast";
 
+/**
+ * Sign-out button with cache-safe flow.
+ */
 const LogoutButton: React.FC = () => {
   const queryClient = useQueryClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
