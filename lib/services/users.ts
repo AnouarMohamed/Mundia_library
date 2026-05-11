@@ -92,6 +92,9 @@ export interface UserResponse {
  * const users = await getUsersList({ status: "APPROVED", role: "USER" });
  * ```
  */
+/**
+ * Fetch users with optional filters.
+ */
 export async function getUsersList(
   filters: UserFilters = {}
 ): Promise<UsersListResponse> {
@@ -173,6 +176,9 @@ export async function getUsersList(
  * const user = await getUser("123e4567-e89b-12d3-a456-426614174000");
  * ```
  */
+/**
+ * Fetch a single user by id.
+ */
 export async function getUser(userId: string): Promise<User> {
   if (!userId) {
     throw new ApiError("User ID is required", 400);
@@ -217,6 +223,9 @@ export async function getUser(userId: string): Promise<User> {
  * const currentUser = await getCurrentUser();
  * ```
  */
+/**
+ * Fetch the current authenticated user.
+ */
 export async function getCurrentUser(): Promise<User> {
   const response = await fetch("/api/users/me", {
     method: "GET",
@@ -259,6 +268,9 @@ export async function getCurrentUser(): Promise<User> {
  * const pendingUsers = await getUsersByStatus("PENDING");
  * ```
  */
+/**
+ * Fetch users by status.
+ */
 export async function getUsersByStatus(
   status: UserStatus,
   limit?: number
@@ -285,6 +297,9 @@ export async function getUsersByStatus(
  * const admins = await getUsersByRole("ADMIN");
  * ```
  */
+/**
+ * Fetch users by role.
+ */
 export async function getUsersByRole(
   role: UserRole,
   limit?: number
@@ -309,6 +324,9 @@ export async function getUsersByRole(
  * ```typescript
  * const pendingRequests = await getPendingUsers();
  * ```
+ */
+/**
+ * Fetch pending account requests.
  */
 export async function getPendingUsers(search?: string): Promise<User[]> {
   const filters: UserFilters = { status: "PENDING" };
@@ -351,6 +369,9 @@ export interface AdminRequest {
  * ```typescript
  * const requests = await getPendingAdminRequests();
  * ```
+ */
+/**
+ * Fetch pending admin access requests.
  */
 export async function getPendingAdminRequests(): Promise<AdminRequest[]> {
   const response = await fetch("/api/admin/admin-requests", {
