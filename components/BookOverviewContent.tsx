@@ -64,6 +64,9 @@ interface BookOverviewContentProps {
   initialReviewEligibility?: ReviewEligibility;
 }
 
+/**
+ * Client-rendered book overview with borrow actions.
+ */
 const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
   bookId,
   userId,
