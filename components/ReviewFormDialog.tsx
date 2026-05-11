@@ -33,6 +33,9 @@ interface ReviewFormDialogProps {
   onReviewSubmitted: () => void;
 }
 
+/**
+ * Modal review form with submission feedback.
+ */
 export default function ReviewFormDialog({
   bookId,
   isOpen,
