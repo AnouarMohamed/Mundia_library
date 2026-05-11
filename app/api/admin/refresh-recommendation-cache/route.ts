@@ -3,8 +3,15 @@ import { refreshRecommendationCache } from "@/lib/admin/actions/recommendations"
 import { revalidateRecommendationsTag } from "@/lib/cache/revalidate";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/refresh-recommendation-cache
+ * Refresh cached recommendation data.
+ */
 export async function POST(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
