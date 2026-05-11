@@ -77,6 +77,9 @@ export const getAllBorrowRequests = async () => {
   }
 };
 
+/**
+ * Update a borrow record status directly.
+ */
 export const updateBorrowStatus = async (
   recordId: string,
   status: "PENDING" | "BORROWED" | "RETURNED"
@@ -196,6 +199,9 @@ export const approveBorrowRequest = async (recordId: string) => {
   }
 };
 
+/**
+ * Reject a pending borrow request.
+ */
 export const rejectBorrowRequest = async (recordId: string) => {
   try {
     const session = await auth();
@@ -334,6 +340,9 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
 };
 
 // Force update fines for ALL overdue books (for testing/admin purposes)
+/**
+ * Force recalculation of all overdue fines (admin/testing).
+ */
 export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
   const today = new Date();
 
