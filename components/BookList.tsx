@@ -11,6 +11,9 @@ interface Props {
   showViewAllButton?: boolean;
 }
 
+/**
+ * Sectioned list of book cards with optional CTA.
+ */
 const BookList = ({
   title,
   books,
