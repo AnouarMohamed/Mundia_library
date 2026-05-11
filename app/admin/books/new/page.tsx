@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import BookForm from "@/components/admin/forms/BookForm";
 
+/**
+ * Admin page for creating a new book record.
+ */
 const Page = () => {
   return (
     <div className="p-3 sm:p-6">
