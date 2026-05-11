@@ -8,6 +8,9 @@ export const CONFIG_KEYS = {
 } as const;
 
 // Get configuration value
+/**
+ * Read a config value from storage.
+ */
 export async function getConfigValue(
   key: string,
   defaultValue?: string
@@ -27,6 +30,9 @@ export async function getConfigValue(
 }
 
 // Set configuration value
+/**
+ * Write or update a config value.
+ */
 export async function setConfigValue(
   key: string,
   value: string,
@@ -75,12 +81,18 @@ export async function setConfigValue(
 }
 
 // Get daily fine amount with default
+/**
+ * Read the daily fine amount with a default fallback.
+ */
 export async function getDailyFineAmount(): Promise<number> {
   const value = await getConfigValue(CONFIG_KEYS.DAILY_FINE_AMOUNT, "1.00");
   return parseFloat(value) || 1.0;
 }
 
 // Set daily fine amount
+/**
+ * Update the daily fine amount.
+ */
 export async function setDailyFineAmount(
   amount: number,
   updatedBy?: string
@@ -94,6 +106,9 @@ export async function setDailyFineAmount(
 }
 
 // Initialize default configurations
+/**
+ * Ensure default config entries exist.
+ */
 export async function initializeDefaultConfigs(): Promise<void> {
   try {
     // Check if daily fine amount exists
