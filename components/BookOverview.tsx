@@ -78,6 +78,9 @@ const getCachedBorrowStats = unstable_cache(
   }
 );
 
+/**
+ * Server wrapper that prepares book overview data.
+ */
 const BookOverview = async ({
   id,
   userId,
