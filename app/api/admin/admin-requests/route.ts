@@ -15,6 +15,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPendingAdminRequests } from "@/lib/admin/actions/admin-requests";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
 /**
