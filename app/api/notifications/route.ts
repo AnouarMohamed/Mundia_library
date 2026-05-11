@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getUserNotifications, markAllAsRead } from "@/lib/services/notification-service";
 
+/**
+ * Use Node.js runtime for auth/session access.
+ */
 export const runtime = "nodejs";
 
 /**
