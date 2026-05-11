@@ -4,6 +4,9 @@ import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import { eq, desc } from "drizzle-orm";
 
+/**
+ * Update a user's role.
+ */
 export const updateUserRole = async (
   userId: string,
   role: "USER" | "ADMIN"
@@ -18,6 +21,9 @@ export const updateUserRole = async (
   }
 };
 
+/**
+ * Update a user's approval status.
+ */
 export const updateUserStatus = async (
   userId: string,
   status: "PENDING" | "APPROVED" | "REJECTED"
@@ -32,6 +38,9 @@ export const updateUserStatus = async (
   }
 };
 
+/**
+ * Fetch all users sorted by creation date.
+ */
 export const getAllUsers = async () => {
   try {
     const allUsers = await db
