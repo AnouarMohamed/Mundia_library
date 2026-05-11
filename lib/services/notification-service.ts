@@ -91,7 +91,11 @@ export async function markAsRead(notificationId: string, userId: string) {
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
 
     // For MySQL, check affectedRows from the result
-    return (result as any).affectedRows > 0;
+    if (typeof result === "object" && result !== null && "affectedRows" in result) {
+      const { affectedRows } = result as { affectedRows: number };
+      return affectedRows > 0;
+    }
+    return false;
   } catch (error) {
     console.error("Error marking notification as read:", error);
     return false;
