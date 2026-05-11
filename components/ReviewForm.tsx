@@ -23,6 +23,9 @@ interface ReviewFormProps {
   onCancel: () => void;
 }
 
+/**
+ * Standalone review form for book pages.
+ */
 export default function ReviewForm({
   bookId,
   onReviewSubmitted,
