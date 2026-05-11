@@ -14,13 +14,13 @@ export async function PATCH(
 ) {
   try {
     const session = await auth();
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
-    const success = await markAsRead(id);
-    
+    const success = await markAsRead(id, session.user.id);
+
     return NextResponse.json({ success });
   } catch (error) {
     console.error("Error in notification update API:", error);
