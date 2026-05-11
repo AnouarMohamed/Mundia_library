@@ -8,12 +8,21 @@ Security fixes are expected to target the active `main` branch first.
 
 Please do not open public issues for suspected vulnerabilities.
 
-Report security issues privately to the repository owner or maintainer with:
+Report security issues privately through GitHub Security Advisories:
+
+https://github.com/AnouarMohamed/Mundia_library/security/advisories/new
+
+Include:
 
 - Affected route, workflow, or dependency
 - Reproduction steps or proof of concept
 - Expected impact
 - Suggested mitigation, if known
+
+The maintainer should acknowledge valid vulnerability reports within 3 business
+days, share remediation status as it becomes available, and coordinate public
+disclosure after a fix is released or within 90 days when a longer timeline is
+required.
 
 ## Automated Protection
 

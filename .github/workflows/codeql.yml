@@ -4,20 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "app/**"
-      - "components/**"
-      - "database/**"
-      - "hooks/**"
-      - "lib/**"
-      - "middleware.ts"
-      - "auth.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "next.config.mjs"
-      - ".github/workflows/codeql.yml"
-      - ".github/codeql/**"
   pull_request:
     branches:
       - main
@@ -26,20 +12,6 @@ on:
       - synchronize
       - reopened
       - ready_for_review
-    paths:
-      - "app/**"
-      - "components/**"
-      - "database/**"
-      - "hooks/**"
-      - "lib/**"
-      - "middleware.ts"
-      - "auth.ts"
-      - "package.json"
-      - "package-lock.json"
-      - "tsconfig.json"
-      - "next.config.mjs"
-      - ".github/workflows/codeql.yml"
-      - ".github/codeql/**"
   schedule:
     - cron: "30 2 * * 1"
   workflow_dispatch:
@@ -74,13 +46,13 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           languages: ${{ matrix.language }}
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
+        uses: github/codeql-action/autobuild@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4

@@ -14,7 +14,7 @@
  * These service functions are ready to use once API routes are available.
  */
 
-import { ApiError } from "./apiError";
+import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
  * Borrow record status type
@@ -147,16 +147,7 @@ export async function getBorrowsList(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      // If response is not JSON, use statusText
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -266,15 +257,7 @@ export async function getBorrowRequests(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -332,15 +315,7 @@ export async function getBorrow(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();

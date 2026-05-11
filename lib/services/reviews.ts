@@ -14,7 +14,7 @@
  * These service functions wrap those existing routes.
  */
 
-import { ApiError } from "./apiError";
+import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
  * Review interface matching the API response
@@ -104,15 +104,7 @@ export async function getBookReviews(bookId: string): Promise<Review[]> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -165,15 +157,7 @@ export async function getReviewEligibility(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -246,15 +230,7 @@ export async function createReview(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -317,15 +293,7 @@ export async function updateReview(
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
@@ -367,15 +335,7 @@ export async function deleteReview(reviewId: string): Promise<void> {
   });
 
   if (!response.ok) {
-    let errorMessage = response.statusText;
-    try {
-      const errorData = await response.json();
-      errorMessage =
-        errorData.message || errorData.error || response.statusText;
-    } catch {
-      errorMessage = response.statusText;
-    }
-    throw new ApiError(errorMessage, response.status);
+    throw new ApiError(await getApiErrorMessage(response), response.status);
   }
 
   const data = await response.json();
