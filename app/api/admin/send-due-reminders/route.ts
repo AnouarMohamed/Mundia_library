@@ -19,6 +19,7 @@ export async function POST(_request: NextRequest) {
     }
 
     const rawResults = await sendDueSoonReminders();
+    // Normalize delivery results for the admin UI.
     const results = rawResults.map((item) => ({
       userId: item.recordId,
       userEmail: item.userEmail,
