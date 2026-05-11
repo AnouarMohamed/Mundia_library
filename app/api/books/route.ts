@@ -27,6 +27,9 @@ import ratelimit from "@/lib/ratelimit";
 import { performAdvancedSearch } from "@/lib/services/search-service";
 import { getCachedData, setCachedData } from "@/lib/cache/redis-cache";
 
+/**
+ * Use Node.js runtime for DB access and Redis caching.
+ */
 export const runtime = "nodejs";
 
 type BooksQueryInput = {
@@ -49,6 +52,9 @@ interface BooksResult {
   };
 }
 
+/**
+ * Fetch a page of books with optional search, filters, and caching.
+ */
 const fetchBooksPage = async (input: BooksQueryInput) => {
   const cacheKey = `books:list:${JSON.stringify(input)}`;
 
@@ -167,6 +173,9 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
   return await fetchFromDb();
 };
 
+/**
+ * Next.js cache wrapper for the book list query.
+ */
 const getCachedBooksPage = unstable_cache(
   async (input: BooksQueryInput) => fetchBooksPage(input),
   ["api-books-v5"],
