@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendDueSoonReminders } from "@/lib/admin/actions/reminders";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/send-due-reminders
+ * Send reminders for upcoming due dates.
+ */
 export async function POST(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
