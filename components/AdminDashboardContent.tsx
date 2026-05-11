@@ -197,6 +197,9 @@ const EmptyState = ({ label }: { label: string }) => (
   </div>
 );
 
+/**
+ * Admin dashboard client component with charts and KPIs.
+ */
 const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
   initialStats,
   successMessage,
