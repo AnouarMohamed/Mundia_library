@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendOverdueReminders } from "@/lib/admin/actions/reminders";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/send-overdue-reminders
+ * Send reminders for overdue borrows.
+ */
 export async function POST(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
