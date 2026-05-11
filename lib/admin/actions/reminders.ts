@@ -5,6 +5,9 @@ import { sendEmailWithFallback } from "@/lib/services/email-service";
 
 // Email service for sending reminders
 export class EmailService {
+  /**
+   * Send a reminder email using the configured providers.
+   */
   static async sendReminderEmail(to: string, subject: string, body: string) {
     try {
       // Send email using multi-provider service (Brevo primary, Resend fallback)
@@ -143,6 +146,9 @@ export class EmailService {
 export type ReminderType = "due_soon" | "overdue" | "return_reminder";
 
 // Get books that are due soon (within 2 days, including today)
+/**
+ * Fetch borrows due within the next two days.
+ */
 export async function getBooksDueSoon() {
   const twoDaysFromNow = new Date();
   twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
@@ -182,6 +188,9 @@ export async function getBooksDueSoon() {
 }
 
 // Get overdue books
+/**
+ * Fetch borrows past due date.
+ */
 export async function getOverdueBooks() {
   const now = new Date();
   // Set to start of today to exclude books due today from overdue
@@ -218,6 +227,9 @@ export async function getOverdueBooks() {
 }
 
 // Send due soon reminders
+/**
+ * Send reminder emails for upcoming due dates.
+ */
 export async function sendDueSoonReminders() {
   const dueSoonBooks = await getBooksDueSoon();
   const results = [];
@@ -287,6 +299,9 @@ This is an automated reminder. For assistance, please contact us at support@mund
 }
 
 // Send overdue reminders
+/**
+ * Send reminder emails for overdue borrows.
+ */
 export async function sendOverdueReminders() {
   const overdueBooks = await getOverdueBooks();
   const results = [];
@@ -360,6 +375,9 @@ This is an automated notice. For assistance, please contact us at support@mundia
 }
 
 // Update last reminder sent timestamp
+/**
+ * Update last reminder timestamp for a borrow record.
+ */
 export async function updateLastReminderSent(recordId: string) {
   await db
     .update(borrowRecords)
@@ -371,6 +389,9 @@ export async function updateLastReminderSent(recordId: string) {
 }
 
 // Get reminder statistics
+/**
+ * Aggregate reminder stats for admin dashboards.
+ */
 export async function getReminderStats() {
   const now = new Date();
   const twoDaysFromNow = new Date();
