@@ -8,8 +8,14 @@ import type {
   ReminderStats,
 } from "@/lib/services/admin";
 
+/**
+ * Use Node.js runtime for server-side data fetching.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Admin automation dashboard page with initial metrics.
+ */
 const AutomationPage = async () => {
   const [fineResult, reminderResult, exportResult] = await Promise.allSettled([
     getDailyFineAmount(),
