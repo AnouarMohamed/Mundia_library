@@ -9,8 +9,14 @@ import React from "react";
 import AdminDashboardContent from "@/components/AdminDashboardContent";
 import { getAdminDashboardStats } from "@/lib/admin/actions/dashboard";
 
+/**
+ * Use Node.js runtime for server-side data fetching.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Admin dashboard entry with initial stats payload.
+ */
 const Page = async ({
   searchParams,
 }: {
