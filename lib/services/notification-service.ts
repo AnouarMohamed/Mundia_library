@@ -90,7 +90,7 @@ export async function markAsRead(notificationId: string, userId: string) {
       .set({ isRead: true })
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
 
-    // For MySQL, check affectedRows from the result
+    // For MySQL, check affectedRows from the result.
     if (typeof result === "object" && result !== null && "affectedRows" in result) {
       const { affectedRows } = result as { affectedRows: number };
       return affectedRows > 0;
