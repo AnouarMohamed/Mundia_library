@@ -7,6 +7,9 @@ export type ExportFormat = "csv" | "json" | "pdf";
 export type ExportType = "books" | "users" | "borrows" | "analytics";
 
 // CSV export utilities
+/**
+ * Utilities for generating CSV exports.
+ */
 export class CSVExporter {
   static escapeCSVField(field: unknown): string {
     if (field === null || field === undefined) {
@@ -40,6 +43,9 @@ export class CSVExporter {
 }
 
 // Export books data
+/**
+ * Export book catalog data.
+ */
 export async function exportBooks(format: ExportFormat = "csv") {
   const booksData = await db
     .select({
@@ -102,6 +108,9 @@ export async function exportBooks(format: ExportFormat = "csv") {
 }
 
 // Export users data
+/**
+ * Export user data.
+ */
 export async function exportUsers(format: ExportFormat = "csv") {
   const usersData = await db
     .select({
@@ -146,6 +155,9 @@ export async function exportUsers(format: ExportFormat = "csv") {
 }
 
 // Export borrows data
+/**
+ * Export borrow records, optionally within a date range.
+ */
 export async function exportBorrows(
   format: ExportFormat = "csv",
   dateRange?: { start: Date; end: Date }
@@ -219,6 +231,9 @@ export async function exportBorrows(
 }
 
 // Export analytics data
+/**
+ * Export analytics data.
+ */
 export async function exportAnalytics(format: ExportFormat = "csv") {
   const now = new Date();
   const thirtyDaysAgo = new Date();
@@ -344,6 +359,9 @@ export async function exportAnalytics(format: ExportFormat = "csv") {
 }
 
 // Generate export filename
+/**
+ * Generate a default export filename.
+ */
 export function generateExportFilename(
   type: ExportType,
   format: ExportFormat
@@ -353,6 +371,9 @@ export function generateExportFilename(
 }
 
 // Get export statistics
+/**
+ * Aggregate export counters for admin display.
+ */
 export async function getExportStats() {
   const [booksCount, usersCount, borrowsCount] = await Promise.all([
     db.select({ count: count() }).from(books),
