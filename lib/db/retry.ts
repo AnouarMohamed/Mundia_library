@@ -12,9 +12,13 @@ const TRANSIENT_CODES = new Set([
   "57P02",
 ]);
 
+// Simple async sleep for backoff timing.
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Detect transient DB errors that can be retried safely.
+ */
 export function isTransientDbError(error: unknown): boolean {
   const code = (error as { code?: string })?.code;
   if (code && TRANSIENT_CODES.has(code)) return true;
