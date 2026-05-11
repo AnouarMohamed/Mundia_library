@@ -20,6 +20,9 @@ import { db } from "@/database/drizzle";
 import { borrowRecords, books, users } from "@/database/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
+import { auth } from "@/auth";
+import { logAdminAction } from "@/lib/admin/audit";
+import { createNotification } from "@/lib/services/notification-service";
 
 /**
  * Fetch all borrow requests with user and book details
@@ -111,6 +114,14 @@ export const updateBorrowStatus = async (
  */
 export const approveBorrowRequest = async (recordId: string) => {
   try {
+    const session = await auth();
+    const user = session?.user as { id?: string; role?: string } | undefined;
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const adminId = user.id;
+
     // Get the borrow record with user context
     const record = await db
       .select({
@@ -127,7 +138,10 @@ export const approveBorrowRequest = async (recordId: string) => {
 
     // Check if book is still available (prevent over-borrowing)
     const book = await db
-      .select({ availableCopies: books.availableCopies })
+      .select({ 
+        availableCopies: books.availableCopies,
+        title: books.title
+      })
       .from(books)
       .where(eq(books.id, record[0].bookId))
       .limit(1);
@@ -136,46 +150,42 @@ export const approveBorrowRequest = async (recordId: string) => {
       return { success: false, error: "Book is no longer available" };
     }
 
-    /**
-     * Calculate due date (7 days from approval date, set to end of day)
-     * 
-     * Why end of day?
-     * - Gives user the full day to return the book
-     * - Prevents timezone issues
-     * - Standard library practice
-     */
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
     dueDate.setHours(23, 59, 59, 999); // Set to end of day
     const dueDateString = dueDate.toISOString().split("T")[0]; // Format as YYYY-MM-DD
-
-    // Track actor by user ID for DB compatibility (uuid columns in existing DB)
-    const actorId = record[0].userId;
 
     // Update borrow record status to BORROWED and set borrowedBy and dueDate
     await db
       .update(borrowRecords)
       .set({
         status: "BORROWED",
-        borrowedBy: actorId,
+        borrowedBy: adminId,
         dueDate: dueDateString, // Set due date when approved
         updatedAt: new Date(),
-        updatedBy: actorId,
+        updatedBy: adminId,
       })
       .where(eq(borrowRecords.id, recordId));
 
-    /**
-     * Decrement available copies
-     * 
-     * This is critical for inventory management:
-     * - Prevents multiple users from borrowing the same copy
-     * - Ensures availableCopies reflects actual availability
-     * - When book is returned, availableCopies is incremented
-     */
+    // Decrement available copies
     await db
       .update(books)
       .set({ availableCopies: book[0].availableCopies - 1 })
       .where(eq(books.id, record[0].bookId));
+
+    // Send notification to the student
+    await createNotification({
+      userId: record[0].userId,
+      title: "Borrow Request Approved",
+      message: `Your request to borrow "${book[0].title}" has been approved. The due date is ${dueDateString}.`,
+      type: "SUCCESS",
+    });
+
+    // Log the action
+    await logAdminAction(adminId!, "APPROVE_BORROW", recordId, "BORROW_RECORD", {
+      bookId: record[0].bookId,
+      userId: record[0].userId,
+    });
 
     revalidateCatalogTags();
 
@@ -188,9 +198,37 @@ export const approveBorrowRequest = async (recordId: string) => {
 
 export const rejectBorrowRequest = async (recordId: string) => {
   try {
+    const session = await auth();
+    const user = session?.user as { id?: string; role?: string } | undefined;
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const adminId = user.id;
+
+    // Get record info before deleting
+    const record = await db
+      .select({
+        bookId: borrowRecords.bookId,
+        userId: borrowRecords.userId,
+      })
+      .from(borrowRecords)
+      .where(eq(borrowRecords.id, recordId))
+      .limit(1);
+
+    if (record.length === 0) {
+      return { success: false, error: "Borrow record not found" };
+    }
+
     // For now, we'll just delete the pending request
     // In a real system, you might want to keep it for audit purposes
     await db.delete(borrowRecords).where(eq(borrowRecords.id, recordId));
+
+    // Log the action
+    await logAdminAction(adminId!, "REJECT_BORROW", recordId, "BORROW_RECORD", {
+      bookId: record[0].bookId,
+      userId: record[0].userId,
+    });
 
     revalidateCatalogTags();
 
@@ -370,6 +408,13 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
 
 export const returnBook = async (recordId: string) => {
   try {
+    const session = await auth();
+    const user = session?.user as { id?: string; role?: string } | undefined;
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    const adminId = user.id;
     const today = new Date().toISOString().split("T")[0];
 
     // Get the borrow record details first with user context
@@ -402,20 +447,17 @@ export const returnBook = async (recordId: string) => {
     const fineAmount =
       daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00"; // $1 per day overdue
 
-    // Keep actor fields as user IDs for compatibility with uuid-backed columns.
-    const actorId = record[0].userId;
-
     // Update borrow record with enhanced tracking
     await db
       .update(borrowRecords)
       .set({
         status: "RETURNED",
         returnDate: today,
-        returnedBy: actorId,
-        borrowedBy: record[0].borrowedBy || actorId,
+        returnedBy: adminId,
+        borrowedBy: record[0].borrowedBy || adminId,
         fineAmount: fineAmount,
         updatedAt: new Date(),
-        updatedBy: actorId,
+        updatedBy: adminId,
       })
       .where(eq(borrowRecords.id, recordId));
 
@@ -432,6 +474,14 @@ export const returnBook = async (recordId: string) => {
         .set({ availableCopies: book[0].availableCopies + 1 })
         .where(eq(books.id, record[0].bookId));
     }
+
+    // Log the action
+    await logAdminAction(adminId!, "RETURN_BOOK", recordId, "BORROW_RECORD", {
+      bookId: record[0].bookId,
+      userId: record[0].userId,
+      fineAmount,
+      daysOverdue,
+    });
 
     revalidateCatalogTags();
 
