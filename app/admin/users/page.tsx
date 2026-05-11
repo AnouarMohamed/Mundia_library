@@ -12,8 +12,14 @@ import { redirect } from "next/navigation";
 import AdminUsersList from "@/components/AdminUsersList";
 import { getSession } from "@/lib/session";
 
+/**
+ * Use Node.js runtime for server-side data fetching.
+ */
 export const runtime = "nodejs";
 
+/**
+ * Admin users page with pending requests summary.
+ */
 const Page = async ({
   searchParams,
 }: {
