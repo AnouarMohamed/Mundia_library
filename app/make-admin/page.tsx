@@ -7,6 +7,9 @@ import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/session";
 
+/**
+ * Request admin access by submitting a short justification.
+ */
 const Page = async ({
   searchParams,
 }: {
@@ -134,6 +137,7 @@ const Page = async ({
                 <form
                   action={async (formData) => {
                     "use server";
+                    // Validate input and redirect with an outcome query.
                     const requestReason = formData.get(
                       "requestReason"
                     ) as string;
