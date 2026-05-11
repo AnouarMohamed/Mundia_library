@@ -22,6 +22,9 @@ interface ISBNScannerProps {
   onClose: () => void;
 }
 
+/**
+ * Camera-based ISBN barcode scanner.
+ */
 const ISBNScanner: React.FC<ISBNScannerProps> = ({ onScanSuccess, onClose }) => {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
