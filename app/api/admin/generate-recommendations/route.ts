@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateAllUserRecommendations } from "@/lib/admin/actions/recommendations";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 
+/**
+ * Use Node.js runtime for admin actions.
+ */
 export const runtime = "nodejs";
 
+/**
+ * POST /api/admin/generate-recommendations
+ * Generate recommendations for all users.
+ */
 export async function POST(_request: NextRequest) {
   try {
     const guard = await requireAdminRouteAccess();
