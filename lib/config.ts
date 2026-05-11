@@ -1,64 +1,92 @@
+import { z } from "zod";
+
 /**
- * Application Configuration
+ * Application Configuration Schema
  * 
- * Centralized configuration object for environment variables
- * 
- * Usage:
- * import config from "@/lib/config";
- * const dbUrl = config.env.databaseUrl;
- * 
- * Environment Variables:
- * - NEXT_PUBLIC_*: Exposed to client-side code (browser)
- * - Without NEXT_PUBLIC_: Server-side only (secure, not exposed to browser)
- * 
- * Database:
- * - DATABASE_URL: MySQL connection string
- *   Format: mysql://user:password@host:port/database
- * 
- * Email Services:
- * - Brevo: Primary email service (supports all email providers)
- * - Resend: Fallback email service (Gmail only without custom domain)
- * 
- * External Services:
- * - ImageKit: Image hosting and optimization
- * - Upstash: Redis caching and QStash for background jobs
+ * Validates environment variables at runtime to ensure all required 
+ * services are correctly configured.
  */
+const envSchema = z.object({
+  // API Endpoints
+  apiEndpoint: z.string().url().default("http://localhost:3000"),
+  prodApiEndpoint: z.string().url().default("http://localhost:3000"),
+  
+  // ImageKit
+  imagekit: z.object({
+    publicKey: z.string().min(1, "ImageKit Public Key is required"),
+    urlEndpoint: z.string().url("ImageKit URL Endpoint must be a valid URL"),
+    privateKey: z.string().min(1, "ImageKit Private Key is required"),
+  }),
+  
+  // Database
+  databaseUrl: z.string().min(1, "DATABASE_URL is required"),
+  
+  // Upstash (Redis + QStash)
+  upstash: z.object({
+    redisUrl: z.string().url("Upstash Redis URL must be a valid URL"),
+    redisToken: z.string().min(1, "Upstash Redis Token is required"),
+    qstashUrl: z.string().url("QStash URL must be a valid URL"),
+    qstashToken: z.string().min(1, "QStash Token is required"),
+  }),
+  
+  // Email (Brevo)
+  brevo: z.object({
+    apiKey: z.string().min(1, "Brevo API Key is required"),
+    senderEmail: z.string().email("Brevo Sender Email must be a valid email"),
+    senderName: z.string().default("Mundiapolis Library"),
+  }),
+  
+  // Email (Resend)
+  resendToken: z.string().min(1, "Resend Token is required"),
+
+  // Feature Flags
+  enableWorkflows: z.string().transform((v) => v === "true").default("false"),
+});
+
+// Map process.env to the schema structure
+const envData = {
+  apiEndpoint: process.env.NEXT_PUBLIC_API_ENDPOINT,
+  prodApiEndpoint: process.env.NEXT_PUBLIC_PROD_API_ENDPOINT,
+  imagekit: {
+    publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY,
+    urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT,
+    privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+  },
+  databaseUrl: process.env.DATABASE_URL,
+  upstash: {
+    redisUrl: process.env.UPSTASH_REDIS_URL,
+    redisToken: process.env.UPSTASH_REDIS_TOKEN,
+    qstashUrl: process.env.QSTASH_URL,
+    qstashToken: process.env.QSTASH_TOKEN,
+  },
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY,
+    senderEmail: process.env.BREVO_SENDER_EMAIL,
+    senderName: process.env.BREVO_SENDER_NAME,
+  },
+  resendToken: process.env.RESEND_TOKEN,
+  enableWorkflows: process.env.ENABLE_WORKFLOWS,
+};
+
+// Validate environment variables
+const parsedEnv = envSchema.safeParse(envData);
+
+if (!parsedEnv.success) {
+  console.error(
+    "❌ Invalid environment variables:",
+    JSON.stringify(parsedEnv.error.format(), null, 2)
+  );
+  
+  // In production, we want to fail hard if config is missing
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Invalid environment variables. Check the logs for details.");
+  }
+}
 
 const config = {
-  env: {
-    // API endpoints (public, accessible from browser)
-    apiEndpoint: process.env.NEXT_PUBLIC_API_ENDPOINT!,
-    prodApiEndpoint: process.env.NEXT_PUBLIC_PROD_API_ENDPOINT!,
-    
-    // ImageKit configuration (image hosting service)
-    imagekit: {
-      publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-      urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY!, // Server-side only (secure)
-    },
-    
-    // Database connection string (MySQL)
-    // Server-side only (never exposed to browser)
-    databaseUrl: process.env.DATABASE_URL || "",
-    
-    // Upstash configuration (Redis + QStash)
-    upstash: {
-      redisUrl: process.env.UPSTASH_REDIS_URL!, // Redis connection URL
-      redisToken: process.env.UPSTASH_REDIS_TOKEN!, // Redis authentication token
-      qstashUrl: process.env.QSTASH_URL!, // QStash endpoint for background jobs
-      qstashToken: process.env.QSTASH_TOKEN!, // QStash authentication token
-    },
-    
-    // Email Service Configuration
-    // Brevo: Primary email service (supports all email providers)
-    brevo: {
-      apiKey: process.env.BREVO_API_KEY!,
-      senderEmail: process.env.BREVO_SENDER_EMAIL!,
-      senderName: process.env.BREVO_SENDER_NAME || "Mundiapolis Library",
-    },
-    // Resend: Fallback email service (Gmail only without custom domain)
-    resendToken: process.env.RESEND_TOKEN!,
-  },
+  env: parsedEnv.success
+    ? parsedEnv.data
+    : (envData as unknown as z.infer<typeof envSchema>),
 };
 
 export default config;
