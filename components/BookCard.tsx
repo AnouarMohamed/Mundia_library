@@ -9,6 +9,9 @@ interface BookCardProps extends Book {
   isLoanedBook?: boolean;
 }
 
+/**
+ * Compact book card with optional loaned state.
+ */
 const BookCard = ({
   id,
   title,
