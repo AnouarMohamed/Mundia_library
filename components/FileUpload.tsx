@@ -2,6 +2,7 @@
 
 import { IKImage, ImageKitProvider, IKUpload, IKVideo } from "imagekitio-next";
 import config from "@/lib/config";
+import type { ChangeEvent } from "react";
 import { useRef, useState, useEffect } from "react";
 // import Image from "next/image";
 import { showToast } from "@/lib/toast";
@@ -12,6 +13,7 @@ const {
     imagekit: { publicKey, urlEndpoint },
   },
 } = config;
+const isImageKitConfigured = Boolean(publicKey && urlEndpoint);
 
 const authenticator = async () => {
   try {
@@ -50,7 +52,8 @@ interface Props {
 }
 
 /**
- * ImageKit-backed file upload control.
+ * File upload control. Uses ImageKit when configured, otherwise stores a data URL
+ * so deployments can run without a third-party upload provider.
  */
 const FileUpload = ({
   type,
@@ -61,7 +64,8 @@ const FileUpload = ({
   onFileChange,
   value,
 }: Props) => {
-  const ikUploadRef = useRef(null);
+  const ikUploadRef = useRef<HTMLInputElement | null>(null);
+  const localUploadRef = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<{ filePath: string | null }>({
     filePath: value ?? null,
   });
@@ -166,6 +170,147 @@ const FileUpload = ({
     return true;
   };
 
+  const onLocalFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+
+    if (!selectedFile || !onValidate(selectedFile)) {
+      return;
+    }
+
+    setProgress(0);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const filePath = typeof reader.result === "string" ? reader.result : "";
+
+      if (!filePath) {
+        onError(new Error("Could not read selected file"));
+        return;
+      }
+
+      setFile({ filePath });
+      onFileChange(filePath);
+      setProgress(100);
+      showToast.success(
+        `${type === "image" ? "Image" : "Video"} Selected`,
+        "The file is stored with the form because no upload provider is configured."
+      );
+    };
+    reader.onerror = () => onError(reader.error);
+    reader.readAsDataURL(selectedFile);
+    event.target.value = "";
+  };
+
+  const uploadButton = (
+    <button
+      className={cn("upload-btn", styles.button)}
+      onClick={(e) => {
+        e.preventDefault();
+        ikUploadRef.current?.click();
+        localUploadRef.current?.click();
+      }}
+    >
+      <div className="flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <img
+            src="/icons/upload.svg"
+            alt="upload-icon"
+            width={20}
+            height={20}
+            className="size-4 shrink-0 object-contain sm:size-5"
+          />
+          <p className={cn("text-sm sm:text-base", styles.placeholder)}>
+            {placeholder}
+          </p>
+        </div>
+
+        {file && (
+          <p
+            className={cn(
+              "upload-filename break-all text-[10px] sm:text-xs",
+              styles.text
+            )}
+          >
+            {file.filePath}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+
+  const progressIndicator = (
+    <>
+      {progress > 0 && progress !== 100 && (
+        <div className="w-full rounded-full bg-green-200">
+          <div
+            className="progress text-[7px] sm:text-[8px]"
+            style={{ width: `${progress}%` }}
+          >
+            {progress}%
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const preview = (
+    <>
+      {file &&
+        (type === "image" ? (
+          file.filePath?.startsWith("http") ||
+          file.filePath?.startsWith("data:") ? (
+            <img
+              src={file.filePath}
+              alt="Uploaded image"
+              width={500}
+              height={300}
+              className="h-auto w-full max-w-full rounded-xl"
+            />
+          ) : (
+            <IKImage
+              alt={file.filePath ?? ""}
+              path={file.filePath ?? ""}
+              width={500}
+              height={300}
+              className="h-auto w-full max-w-full"
+            />
+          )
+        ) : type === "video" ? (
+          file.filePath?.startsWith("http") ||
+          file.filePath?.startsWith("data:") ? (
+            <video
+              src={file.filePath}
+              controls={true}
+              className="h-64 w-full rounded-xl sm:h-96"
+            />
+          ) : (
+            <IKVideo
+              path={file.filePath ?? ""}
+              controls={true}
+              className="h-64 w-full rounded-xl sm:h-96"
+            />
+          )
+        ) : null)}
+    </>
+  );
+
+  if (!isImageKitConfigured) {
+    return (
+      <>
+        <input
+          ref={localUploadRef}
+          type="file"
+          accept={accept}
+          className="hidden"
+          onChange={onLocalFileChange}
+        />
+        {uploadButton}
+        {progressIndicator}
+        {preview}
+      </>
+    );
+  }
+
   return (
     <ImageKitProvider
       publicKey={publicKey}
@@ -187,79 +332,9 @@ const FileUpload = ({
         accept={accept}
         className="hidden"
       />
-
-      <button
-        className={cn("upload-btn", styles.button)}
-        onClick={(e) => {
-          e.preventDefault();
-          if (ikUploadRef.current) {
-            // @ts-expect-error - IKUpload ref type doesn't expose click method, but it exists on the underlying input element
-            ikUploadRef.current?.click();
-          }
-        }}
-      >
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-1.5">
-            <img
-              src="/icons/upload.svg"
-              alt="upload-icon"
-              width={20}
-              height={20}
-              className="size-4 shrink-0 object-contain sm:size-5"
-            />
-            <p className={cn("text-sm sm:text-base", styles.placeholder)}>{placeholder}</p>
-          </div>
-
-          {file && (
-            <p className={cn("upload-filename text-[10px] sm:text-xs break-all", styles.text)}>{file.filePath}</p>
-          )}
-        </div>
-      </button>
-
-      {progress > 0 && progress !== 100 && (
-        <div className="w-full rounded-full bg-green-200">
-          <div className="progress text-[7px] sm:text-[8px]" style={{ width: `${progress}%` }}>
-            {progress}%
-          </div>
-        </div>
-      )}
-
-      {file &&
-        (type === "image" ? (
-          // Check if filePath is already a full URL
-          file.filePath?.startsWith("http") ? (
-            <img
-              src={file.filePath}
-              alt="Uploaded image"
-              width={500}
-              height={300}
-              className="h-auto w-full max-w-full rounded-xl"
-            />
-          ) : (
-            <IKImage
-              alt={file.filePath ?? ""}
-              path={file.filePath ?? ""}
-              width={500}
-              height={300}
-              className="h-auto w-full max-w-full"
-            />
-          )
-        ) : type === "video" ? (
-          // Check if filePath is already a full URL
-          file.filePath?.startsWith("http") ? (
-            <video
-              src={file.filePath}
-              controls={true}
-              className="h-64 w-full rounded-xl sm:h-96"
-            />
-          ) : (
-            <IKVideo
-              path={file.filePath ?? ""}
-              controls={true}
-              className="h-64 w-full rounded-xl sm:h-96"
-            />
-          )
-        ) : null)}
+      {uploadButton}
+      {progressIndicator}
+      {preview}
     </ImageKitProvider>
   );
 };

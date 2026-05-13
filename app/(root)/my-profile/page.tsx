@@ -112,19 +112,19 @@ const Page = async () => {
   }));
 
   const initialActiveBorrows = transformedBorrows.filter(
-    (record) => record.status === "BORROWED"
+    (record) => record.status === "BORROWED",
   );
   const initialPendingRequests = transformedBorrows.filter(
-    (record) => record.status === "PENDING"
+    (record) => record.status === "PENDING",
   );
   const initialBorrowHistory = transformedBorrows.filter(
-    (record) => record.status === "RETURNED"
+    (record) => record.status === "RETURNED",
   );
   const totalReviews = Number(reviewCountResult[0]?.count || 0);
 
   return (
     <section className="space-y-6">
-      <div className="rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.65)] p-5 sm:p-7">
+      <div className="catalog-header p-5 sm:p-7">
         <p className="text-[11px] uppercase tracking-[0.24em] text-light-200/70 sm:text-xs">
           Account
         </p>

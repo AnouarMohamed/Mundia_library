@@ -180,7 +180,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
             ...(record.book && { book: record.book }),
           };
         }) as (BorrowRecord & { book?: Book })[])
-      : undefined
+      : undefined,
   );
 
   // CRITICAL: No cache - always use React Query data directly
@@ -282,7 +282,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
       // Data changed or record is new, create new transformed record
       const getStableDate = (
         dateString: string | Date | null | undefined,
-        existingDate: Date | null | undefined
+        existingDate: Date | null | undefined,
       ): Date | null => {
         if (!dateString) return null;
         const timestamp =
@@ -308,7 +308,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         dueDate: getStableDate(record.dueDate, existingRecord?.dueDate),
         returnDate: getStableDate(
           record.returnDate,
-          existingRecord?.returnDate
+          existingRecord?.returnDate,
         ),
         status: record.status,
         borrowedBy: record.borrowedBy,
@@ -321,7 +321,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         renewalCount: record.renewalCount || 0,
         lastReminderSent: getStableDate(
           record.lastReminderSent,
-          existingRecord?.lastReminderSent
+          existingRecord?.lastReminderSent,
         ),
         updatedAt: getStableDate(record.updatedAt, existingRecord?.updatedAt),
         updatedBy: record.updatedBy,
@@ -372,7 +372,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         (prevRecord, index) =>
           prevRecord.id === transformed[index]?.id &&
           prevRecord.status === transformed[index]?.status &&
-          prevRecord.bookId === transformed[index]?.bookId
+          prevRecord.bookId === transformed[index]?.bookId,
       )
     ) {
       // Array contents are the same, return previous array to maintain reference equality
@@ -390,7 +390,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
   React.useEffect(() => {
     if (returningRecordIdRef.current) {
       const returnedRecord = allBorrowsFromQuery.find(
-        (r) => r.id === returningRecordIdRef.current && r.status === "RETURNED"
+        (r) => r.id === returningRecordIdRef.current && r.status === "RETURNED",
       );
       if (returnedRecord) {
         // Record has been returned, clear the ref to re-enable button
@@ -425,7 +425,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
   const pendingRequests: BorrowRecordWithBook[] = React.useMemo(() => {
     if (allBorrowsFromQuery.length > 0) {
       return allBorrowsFromQuery.filter(
-        (record) => record.status === "PENDING"
+        (record) => record.status === "PENDING",
       );
     }
     return (
@@ -444,7 +444,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
     if (allBorrowsFromQuery.length > 0) {
       // CRITICAL: Filter for RETURNED status only (borrow history)
       return allBorrowsFromQuery.filter(
-        (record) => record.status === "RETURNED"
+        (record) => record.status === "RETURNED",
       );
     }
     // Fallback to legacy/initial data, but also filter for RETURNED
@@ -650,7 +650,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 error,
               });
             },
-          }
+          },
           // CRITICAL: No onSuccess callback needed here
           // The useReturnBook mutation already handles all cache invalidation
           // via invalidateAfterBorrowChange() which invalidates:
@@ -667,7 +667,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
       const today = new Date();
       // Use UTC dates for consistent comparison
       const todayUTC = new Date(
-        today.getTime() + today.getTimezoneOffset() * 60000
+        today.getTime() + today.getTimezoneOffset() * 60000,
       );
       const dueDateUTC = record.dueDate ? new Date(record.dueDate) : null;
 
@@ -681,16 +681,16 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         Date.UTC(
           todayUTC.getUTCFullYear(),
           todayUTC.getUTCMonth(),
-          todayUTC.getUTCDate()
-        )
+          todayUTC.getUTCDate(),
+        ),
       );
       const dueDateOnlyUTC = dueDateUTC
         ? new Date(
             Date.UTC(
               dueDateUTC.getUTCFullYear(),
               dueDateUTC.getUTCMonth(),
-              dueDateUTC.getUTCDate()
-            )
+              dueDateUTC.getUTCDate(),
+            ),
           )
         : null;
 
@@ -698,7 +698,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         isOverdue && dueDateOnlyUTC
           ? Math.floor(
               (todayDateUTC.getTime() - dueDateOnlyUTC.getTime()) /
-                (1000 * 60 * 60 * 24)
+                (1000 * 60 * 60 * 24),
             )
           : 0;
 
@@ -706,35 +706,35 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         record.status === "BORROWED" && dueDateUTC && !isOverdue
           ? Math.ceil(
               (dueDateUTC.getTime() - todayUTC.getTime()) /
-                (1000 * 60 * 60 * 24)
+                (1000 * 60 * 60 * 24),
             )
           : 0;
       const calculatedFine = isOverdue ? daysOverdue * 1.0 : 0;
 
       return (
         <Card
-          className={`mb-3 border-2 transition-all duration-300 hover:shadow-lg ${
+          className={`mb-4 overflow-hidden rounded-[1.4rem] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_52px_rgba(1,7,12,0.28)] ${
             record.status === "PENDING"
-              ? "border-gray-500 bg-gray-800/20"
+              ? "border-[#d6b86d]/35 bg-[rgba(214,184,109,0.08)]"
               : record.status === "BORROWED" && isOverdue
-                ? "border-red-600 bg-red-900/10"
+                ? "border-red-400/45 bg-red-950/20"
                 : record.status === "BORROWED" &&
                     daysRemaining <= 2 &&
                     !isOverdue
-                  ? "border-orange-400 bg-orange-900/10"
+                  ? "border-orange-300/45 bg-orange-950/20"
                   : record.status === "BORROWED"
-                    ? "border-blue-500 bg-blue-900/10"
+                    ? "border-[#86bccb]/35 bg-[rgba(134,188,203,0.08)]"
                     : record.status === "RETURNED"
-                      ? "border-green-500 bg-green-900/10"
-                      : "border-gray-600 bg-gray-800/30"
+                      ? "border-emerald-400/35 bg-emerald-950/15"
+                      : "border-white/10 bg-[rgba(8,25,35,0.72)]"
           }`}
         >
-          <CardContent className="p-2.5 sm:p-3">
-            <div className="flex flex-col gap-3 sm:flex-row">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col gap-4 sm:flex-row">
               {/* Full Height Book Cover */}
               {/* CRITICAL: Don't use key prop - React.memo in BookCover handles re-render prevention
                 Using key would cause component remount on every data change, causing flicker */}
-              <div className="relative w-full shrink-0 sm:w-48">
+              <div className="relative w-full shrink-0 rounded-[1.15rem] border border-white/10 bg-white/5 p-3 sm:w-48">
                 <BookCover
                   variant="regular"
                   coverColor={record.book.coverColor}
@@ -746,9 +746,9 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
               {/* Main Content */}
               <div className="min-w-0 flex-1">
                 {/* Header with Status Badge */}
-                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-semibold text-light-100 sm:text-xl">
+                    <h3 className="text-base font-semibold leading-snug text-light-100 sm:text-xl">
                       {record.book.title}
                     </h3>
                     <p className="text-sm text-light-200/70 sm:text-base">
@@ -765,7 +765,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="px-1.5 py-0.5 text-xs text-light-100 sm:px-2 sm:text-sm"
+                    className="border-white/15 bg-white/5 px-2 py-1 text-xs text-light-100 sm:text-sm"
                   >
                     {record.book.genre}
                   </Badge>
@@ -778,7 +778,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 </div>
 
                 {/* Compact Information */}
-                <div className="mb-2 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:gap-4 sm:text-sm">
+                <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 sm:text-sm">
                   <div className="flex items-center gap-1">
                     <Calendar className="size-3 text-blue-400 sm:size-4" />
                     <span className="font-medium text-light-100">
@@ -910,9 +910,9 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2">
                   {record.status === "BORROWED" && (
-                    <RenewalRequestButton 
-                      borrowRecordId={record.id} 
-                      bookTitle={record.book.title} 
+                    <RenewalRequestButton
+                      borrowRecordId={record.id}
+                      bookTitle={record.book.title}
                     />
                   )}
 
@@ -1003,7 +1003,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
       // Return true if all props are equal (skip re-render)
       return recordEqual && countdownEqual;
-    }
+    },
   );
 
   // Set display name for React DevTools
@@ -1011,7 +1011,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
   return (
     <div className="container mx-auto">
-      <h1 className="mb-4 text-2xl font-bold text-light-100 sm:mb-6 sm:text-3xl">
+      <h1 className="mb-4 font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:mb-6 sm:text-5xl">
         My Borrowing History
       </h1>
 
@@ -1021,10 +1021,10 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         className="w-full"
         suppressHydrationWarning
       >
-        <TabsList className="flex h-auto w-full flex-wrap gap-2 border-2 border-gray-600 bg-gray-800/30 p-2 sm:grid sm:grid-cols-3 sm:gap-0 sm:p-0">
+        <TabsList className="catalog-toolbar flex h-auto w-full flex-wrap gap-2 p-2 sm:grid sm:grid-cols-3">
           <TabsTrigger
             value="active"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-md border border-gray-600 p-2 text-center text-xs text-light-200 data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md sm:min-w-0 sm:rounded-none sm:border-b-2 sm:border-gray-600 sm:px-4 sm:py-3 sm:text-sm sm:data-[state=active]:border-b-0"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#86bccb]/50 data-[state=active]:bg-[#86bccb] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Active</span>
@@ -1038,7 +1038,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="pending"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-md border border-gray-600 p-2 text-center text-xs text-light-200 data-[state=active]:border-yellow-600 data-[state=active]:bg-yellow-600 data-[state=active]:text-white data-[state=active]:shadow-md sm:min-w-0 sm:rounded-none sm:border-b-2 sm:border-gray-600 sm:px-4 sm:py-3 sm:text-sm sm:data-[state=active]:border-b-0"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#d6b86d]/50 data-[state=active]:bg-[#d6b86d] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Pending</span>
@@ -1052,7 +1052,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="history"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-md border border-gray-600 p-2 text-center text-xs text-light-200 data-[state=active]:border-purple-600 data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md sm:min-w-0 sm:rounded-none sm:border-b-2 sm:border-gray-600 sm:px-4 sm:py-3 sm:text-sm sm:data-[state=active]:border-b-0"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#7b2746]/60 data-[state=active]:bg-[#7b2746] data-[state=active]:text-white data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Borrow</span>
@@ -1066,13 +1066,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="active" className="mt-2">
+        <TabsContent value="active" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-base font-semibold text-light-100 sm:text-xl">
               Currently Borrowed Books
             </h2>
             {activeBorrows.length === 0 ? (
-              <Card className="border-2 border-gray-600 bg-gray-800/30">
+              <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
                   <p className="text-sm text-light-200/70 sm:text-base">
                     No active borrows
@@ -1091,13 +1091,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="pending" className="mt-2">
+        <TabsContent value="pending" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-base font-semibold text-light-100 sm:text-xl">
               Pending Approval
             </h2>
             {pendingRequests.length === 0 ? (
-              <Card className="border-2 border-gray-600 bg-gray-800/30">
+              <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
                   <p className="text-sm text-light-200/70 sm:text-base">
                     No pending requests
@@ -1112,13 +1112,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="history" className="mt-2">
+        <TabsContent value="history" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
             <h2 className="text-base font-semibold text-light-100 sm:text-xl">
               Complete Borrow History
             </h2>
             {borrowHistory.length === 0 ? (
-              <Card className="border-2 border-gray-600 bg-gray-800/30">
+              <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
                   <p className="text-sm text-light-200/70 sm:text-base">
                     No borrow history
@@ -1128,58 +1128,58 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
             ) : (
               <>
                 {/* Statistics */}
-                <Card className="mb-3 border-2 border-gray-600 bg-gray-800/30 sm:mb-4">
+                <Card className="catalog-panel mb-4">
                   <CardHeader className="pb-2 sm:pb-3">
                     <CardTitle className="text-base text-light-100 sm:text-lg">
-                       Borrow Statistics
+                      Borrow Statistics
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-                      <div className="rounded-lg bg-gray-50 p-1.5 text-center sm:p-2">
-                        <p className="text-lg font-bold text-gray-900 sm:text-xl">
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                        <p className="text-lg font-bold text-light-100 sm:text-xl">
                           {allBorrows.length}
                         </p>
-                        <p className="text-[10px] text-gray-600 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Total Borrows
                         </p>
                       </div>
-                      <div className="rounded-lg bg-blue-50 p-1.5 text-center sm:p-2">
-                        <p className="text-lg font-bold text-blue-600 sm:text-xl">
+                      <div className="rounded-xl border border-[#86bccb]/25 bg-[#86bccb]/10 p-2 text-center">
+                        <p className="text-lg font-bold text-[#bfe2eb] sm:text-xl">
                           {pendingRequests.length}
                         </p>
-                        <p className="text-[10px] text-blue-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Pending
                         </p>
                       </div>
-                      <div className="rounded-lg bg-orange-50 p-1.5 text-center sm:p-2">
-                        <p className="text-lg font-bold text-orange-600 sm:text-xl">
+                      <div className="rounded-xl border border-[#d6b86d]/25 bg-[#d6b86d]/10 p-2 text-center">
+                        <p className="text-lg font-bold text-[#f0d991] sm:text-xl">
                           {activeBorrows.length}
                         </p>
-                        <p className="text-[10px] text-orange-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Active
                         </p>
                       </div>
-                      <div className="rounded-lg bg-green-100 p-1.5 text-center sm:p-2">
-                        <p className="text-lg font-bold text-green-600 sm:text-xl">
+                      <div className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-2 text-center">
+                        <p className="text-lg font-bold text-emerald-200 sm:text-xl">
                           {borrowHistory.length}
                         </p>
-                        <p className="text-[10px] text-green-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Book Returned
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 md:grid-cols-4">
-                      <div className="rounded-lg bg-red-50 p-1.5 text-center sm:p-2">
-                        <p className="text-base font-bold text-red-600 sm:text-lg">
+                      <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-2 text-center">
+                        <p className="text-base font-bold text-red-200 sm:text-lg">
                           {
                             allBorrows.filter((r) => {
                               // Use same logic as individual cards for consistency
                               const today = new Date();
                               const todayUTC = new Date(
                                 today.getTime() +
-                                  today.getTimezoneOffset() * 60000
+                                  today.getTimezoneOffset() * 60000,
                               );
                               const dueDateUTC = r.dueDate
                                 ? new Date(r.dueDate)
@@ -1195,20 +1195,20 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                                   Date.UTC(
                                     todayUTC.getUTCFullYear(),
                                     todayUTC.getUTCMonth(),
-                                    todayUTC.getUTCDate()
-                                  )
+                                    todayUTC.getUTCDate(),
+                                  ),
                                 );
                                 const dueDateOnlyUTC = new Date(
                                   Date.UTC(
                                     dueDateUTC.getUTCFullYear(),
                                     dueDateUTC.getUTCMonth(),
-                                    dueDateUTC.getUTCDate()
-                                  )
+                                    dueDateUTC.getUTCDate(),
+                                  ),
                                 );
                                 const daysOverdue = Math.floor(
                                   (todayDateUTC.getTime() -
                                     dueDateOnlyUTC.getTime()) /
-                                    (1000 * 60 * 60 * 24)
+                                    (1000 * 60 * 60 * 24),
                                 );
                                 return daysOverdue > 0;
                               }
@@ -1221,12 +1221,12 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                             }).length
                           }
                         </p>
-                        <p className="text-[10px] text-red-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           With Fines
                         </p>
                       </div>
-                      <div className="rounded-lg bg-red-50 p-1.5 text-center sm:p-2">
-                        <p className="text-base font-bold text-red-600 sm:text-lg">
+                      <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-2 text-center">
+                        <p className="text-base font-bold text-red-200 sm:text-lg">
                           $
                           {allBorrows
                             .reduce((sum, r) => {
@@ -1234,7 +1234,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                               const today = new Date();
                               const todayUTC = new Date(
                                 today.getTime() +
-                                  today.getTimezoneOffset() * 60000
+                                  today.getTimezoneOffset() * 60000,
                               );
                               const dueDateUTC = r.dueDate
                                 ? new Date(r.dueDate)
@@ -1250,20 +1250,20 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                                   Date.UTC(
                                     todayUTC.getUTCFullYear(),
                                     todayUTC.getUTCMonth(),
-                                    todayUTC.getUTCDate()
-                                  )
+                                    todayUTC.getUTCDate(),
+                                  ),
                                 );
                                 const dueDateOnlyUTC = new Date(
                                   Date.UTC(
                                     dueDateUTC.getUTCFullYear(),
                                     dueDateUTC.getUTCMonth(),
-                                    dueDateUTC.getUTCDate()
-                                  )
+                                    dueDateUTC.getUTCDate(),
+                                  ),
                                 );
                                 const daysOverdue = Math.floor(
                                   (todayDateUTC.getTime() -
                                     dueDateOnlyUTC.getTime()) /
-                                    (1000 * 60 * 60 * 24)
+                                    (1000 * 60 * 60 * 24),
                                 );
                                 return sum + daysOverdue * 1.0;
                               }
@@ -1277,26 +1277,26 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                             }, 0)
                             .toFixed(2)}
                         </p>
-                        <p className="text-[10px] text-red-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Total Fines
                         </p>
                       </div>
-                      <div className="rounded-lg bg-purple-50 p-1.5 text-center sm:p-2">
-                        <p className="text-base font-bold text-purple-600 sm:text-lg">
+                      <div className="rounded-xl border border-[#7b2746]/35 bg-[#7b2746]/20 p-2 text-center">
+                        <p className="text-base font-bold text-pink-100 sm:text-lg">
                           {allBorrows.reduce(
                             (sum, r) => sum + (r.renewalCount || 0),
-                            0
+                            0,
                           )}
                         </p>
-                        <p className="text-[10px] text-purple-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Total Renewals
                         </p>
                       </div>
-                      <div className="rounded-lg bg-indigo-50 p-1.5 text-center sm:p-2">
-                        <p className="text-base font-bold text-indigo-600 sm:text-lg">
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
+                        <p className="text-base font-bold text-light-100 sm:text-lg">
                           {totalReviews}
                         </p>
-                        <p className="text-[10px] text-indigo-700 sm:text-xs">
+                        <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Total Reviews
                         </p>
                       </div>
@@ -1309,7 +1309,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                   .sort(
                     (a, b) =>
                       new Date(b.createdAt || 0).getTime() -
-                      new Date(a.createdAt || 0).getTime()
+                      new Date(a.createdAt || 0).getTime(),
                   )
                   .map((record) => (
                     <BorrowCard key={record.id} record={record} />

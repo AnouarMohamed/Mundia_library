@@ -28,14 +28,14 @@ const getCachedTopBooks = unstable_cache(
           .where(eq(books.isActive, true))
           .orderBy(desc(books.rating), desc(books.createdAt))
           .limit(7),
-      { retries: 2, delayMs: 300 }
+      { retries: 2, delayMs: 300 },
     )) as Book[];
   },
   ["library-top-books-v1"],
   {
     revalidate: 30,
     tags: ["books"],
-  }
+  },
 );
 
 /**
@@ -120,11 +120,11 @@ const Page = async () => {
         .where(
           and(
             eq(borrowRecords.userId, userId),
-            eq(borrowRecords.bookId, featuredBook.id)
-          )
+            eq(borrowRecords.bookId, featuredBook.id),
+          ),
         )
         .orderBy(desc(borrowRecords.createdAt)),
-    { retries: 1, delayMs: 250 }
+    { retries: 1, delayMs: 250 },
   ).catch((error) => {
     console.error("Failed to fetch user borrow records for /library:", error);
     return [];
@@ -156,10 +156,10 @@ const Page = async () => {
         <div className="library-hero-grid">
           <div className="library-hero-panel">
             <p className="library-subtitle">University Catalog</p>
-            <h1 className="library-hero-title">Library</h1>
+            <h1 className="library-hero-title">Mundiapolis Library</h1>
             <p className="library-hero-copy">
-              Browse top-rated books, request borrows, and track reading activity
-              with real-time availability.
+              Search the academic collection, reserve books, and track your
+              reading activity with real-time availability.
             </p>
 
             <div className="library-hero-actions">

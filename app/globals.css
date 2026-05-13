@@ -5,15 +5,17 @@
 @layer base {
   :root {
     --radius: 0.85rem;
-    --surface-0: #07161f;
-    --surface-1: #103142;
+    --surface-0: #07131b;
+    --surface-1: #102c3a;
     --surface-2: #1f5467;
-    --surface-card: rgba(8, 27, 38, 0.8);
-    --surface-card-strong: rgba(7, 21, 30, 0.9);
-    --text-main: #e7f2f6;
-    --text-muted: #9ab3be;
-    --accent-gold: #86bccb;
-    --accent-gold-strong: #2f6f82;
+    --surface-card: rgba(8, 24, 34, 0.84);
+    --surface-card-strong: rgba(5, 15, 24, 0.92);
+    --text-main: #eef6f4;
+    --text-muted: #9db6bd;
+    --accent-gold: #d6b86d;
+    --accent-gold-strong: #9b7a32;
+    --accent-sea: #86bccb;
+    --accent-burgundy: #7b2746;
   }
 
   html,
@@ -21,10 +23,12 @@
     @apply overflow-x-hidden;
     min-height: 100%;
     background:
-      radial-gradient(circle at 10% 0%, rgba(134, 188, 203, 0.18), transparent 34%),
-      radial-gradient(circle at 90% 18%, rgba(47, 111, 130, 0.24), transparent 40%),
-      radial-gradient(circle at 22% 88%, rgba(204, 47, 102, 0.1), transparent 30%),
-      linear-gradient(150deg, var(--surface-1) 0%, var(--surface-0) 54%, #051018 100%);
+      linear-gradient(
+        110deg,
+        rgba(214, 184, 109, 0.07) 0 1px,
+        transparent 1px 140px
+      ),
+      linear-gradient(160deg, #143848 0%, var(--surface-0) 45%, #040b12 100%);
     color: var(--text-main);
   }
 
@@ -35,9 +39,18 @@
     z-index: -1;
     pointer-events: none;
     background:
-      linear-gradient(45deg, rgba(255, 255, 255, 0.03), transparent 50%),
-      radial-gradient(circle at 20% 82%, rgba(139, 157, 60, 0.1), transparent 30%),
-      radial-gradient(circle at 82% 84%, rgba(198, 166, 60, 0.08), transparent 26%);
+      linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.035),
+        transparent 22%,
+        rgba(214, 184, 109, 0.04),
+        transparent 72%
+      ),
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.028) 0 1px,
+        transparent 1px 72px
+      );
   }
 
   ::selection {
@@ -101,6 +114,50 @@
   }
 
   /* Book Card */
+  .book-card-link {
+    @apply block h-full rounded-[1.4rem] border border-white/10 p-3 transition duration-300 sm:p-4;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 38%),
+      linear-gradient(155deg, rgba(8, 25, 35, 0.92), rgba(5, 14, 22, 0.82));
+    box-shadow:
+      0 18px 44px rgba(1, 7, 12, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .book-card-link:hover {
+    transform: translateY(-4px);
+    border-color: rgba(214, 184, 109, 0.42);
+    background:
+      linear-gradient(180deg, rgba(214, 184, 109, 0.08), transparent 42%),
+      linear-gradient(155deg, rgba(13, 40, 52, 0.96), rgba(5, 14, 22, 0.9));
+    box-shadow:
+      0 24px 58px rgba(1, 7, 12, 0.36),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .book-card-cover {
+    @apply flex justify-center rounded-[1.1rem] border border-white/10 py-4;
+    background:
+      linear-gradient(
+        120deg,
+        rgba(214, 184, 109, 0.08) 0 1px,
+        transparent 1px 42px
+      ),
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.08),
+        rgba(255, 255, 255, 0.03)
+      );
+  }
+
+  .book-card-rating {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[11px] font-semibold text-light-100;
+  }
+
+  .book-card-copy {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-light-100/70;
+  }
+
   .book-title {
     @apply mt-3 line-clamp-2 text-base font-semibold leading-tight text-light-100 xs:text-lg;
   }
@@ -153,14 +210,74 @@
 
   /* Book List */
   .book-list {
-    @apply mt-7 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6;
+    @apply mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6;
+  }
+
+  .book-section-heading {
+    @apply flex flex-col gap-2 border-t border-white/10 pt-5 sm:flex-row sm:items-end sm:justify-between sm:pt-7;
+  }
+
+  .book-section-kicker {
+    @apply text-[11px] uppercase tracking-[0.26em] text-light-200/70 sm:text-xs;
+  }
+
+  .book-section-title {
+    @apply font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:text-5xl;
+  }
+
+  .book-section-cta {
+    @apply min-h-12 rounded-xl border border-white/10 px-6 py-3 font-bebas-neue text-base tracking-[0.08em] text-dark-100 transition hover:opacity-95 sm:text-xl;
+    background: linear-gradient(135deg, #d6b86d 0%, #86bccb 100%);
+    box-shadow: 0 14px 34px rgba(10, 20, 30, 0.24);
+  }
+
+  .catalog-header,
+  .catalog-panel,
+  .catalog-toolbar {
+    @apply rounded-[1.5rem] border border-white/10;
+    background:
+      linear-gradient(
+        135deg,
+        rgba(214, 184, 109, 0.06) 0 1px,
+        transparent 1px 100px
+      ),
+      linear-gradient(155deg, rgba(8, 25, 35, 0.82), rgba(5, 14, 22, 0.72));
+    box-shadow:
+      0 20px 52px rgba(1, 7, 12, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .catalog-field {
+    @apply h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm;
+  }
+
+  .catalog-field option {
+    background: #07131b;
+    color: #eef6f4;
+  }
+
+  .catalog-action {
+    @apply h-11 rounded-xl border border-white/10 text-dark-100 transition hover:opacity-95;
+    background: linear-gradient(135deg, #d6b86d 0%, #86bccb 100%);
   }
 
   /* Book Overview */
   .book-overview {
-    @apply relative flex w-full max-w-full flex-col-reverse gap-8 overflow-hidden rounded-[1.75rem] border border-white/10 p-5 sm:gap-10 sm:p-8 xl:flex-row xl:items-start xl:gap-12 xl:p-10;
-    background: linear-gradient(145deg, rgba(11, 22, 34, 0.86) 0%, rgba(7, 14, 22, 0.78) 100%);
-    box-shadow: 0 24px 54px rgba(3, 8, 13, 0.45);
+    @apply relative flex w-full max-w-full flex-col-reverse gap-8 overflow-hidden rounded-[2rem] border border-white/10 p-5 sm:gap-10 sm:p-8 xl:flex-row xl:items-start xl:gap-12 xl:p-10;
+    background:
+      linear-gradient(
+        115deg,
+        rgba(214, 184, 109, 0.08) 0 1px,
+        transparent 1px 120px
+      ),
+      linear-gradient(
+        145deg,
+        rgba(9, 28, 39, 0.94) 0%,
+        rgba(5, 15, 24, 0.88) 100%
+      );
+    box-shadow:
+      0 28px 70px rgba(2, 7, 12, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .book-overview h1 {
@@ -198,7 +315,9 @@
   }
 
   .book-overview_btn {
-    @apply mt-4 min-h-12 w-fit rounded-xl bg-primary text-dark-100 hover:opacity-95 max-md:w-full !important;
+    @apply mt-4 min-h-12 w-fit rounded-xl text-dark-100 hover:opacity-95 max-md:w-full !important;
+    background: linear-gradient(135deg, #d6b86d 0%, #86bccb 100%);
+    box-shadow: 0 14px 34px rgba(214, 184, 109, 0.16);
   }
 
   /* File Upload */
@@ -217,6 +336,7 @@
   /* Search */
   .search {
     @apply relative mt-10 flex min-h-14 w-full items-center rounded-xl border border-white/10 bg-white/5 px-4 backdrop-blur-sm;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .search-input {
@@ -307,24 +427,48 @@
 
 @layer utilities {
   .gradient-vertical {
-    background: linear-gradient(180deg, rgba(16, 32, 48, 0.94) 0%, rgba(9, 18, 29, 0.92) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(16, 32, 48, 0.94) 0%,
+      rgba(9, 18, 29, 0.92) 100%
+    );
   }
 
   .gradient-gray {
-    background: linear-gradient(270deg, rgba(43, 59, 77, 0.92) 0%, rgba(27, 42, 58, 0.9) 100%);
+    background: linear-gradient(
+      270deg,
+      rgba(43, 59, 77, 0.92) 0%,
+      rgba(27, 42, 58, 0.9) 100%
+    );
   }
 
   .gradient-blue {
-    background: linear-gradient(180deg, rgba(24, 44, 66, 0.94) 0%, rgba(10, 20, 30, 0.9) 100%);
+    background: linear-gradient(
+      180deg,
+      rgba(24, 44, 66, 0.94) 0%,
+      rgba(10, 20, 30, 0.9) 100%
+    );
   }
 
   /* Auth */
   .auth-container {
     @apply relative grid min-h-screen overflow-hidden text-light-100 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)];
     background:
-      radial-gradient(circle at 8% 14%, rgba(134, 188, 203, 0.22), transparent 36%),
-      radial-gradient(circle at 88% 18%, rgba(47, 111, 130, 0.24), transparent 42%),
-      radial-gradient(circle at 22% 90%, rgba(204, 47, 102, 0.09), transparent 34%),
+      radial-gradient(
+        circle at 8% 14%,
+        rgba(134, 188, 203, 0.22),
+        transparent 36%
+      ),
+      radial-gradient(
+        circle at 88% 18%,
+        rgba(47, 111, 130, 0.24),
+        transparent 42%
+      ),
+      radial-gradient(
+        circle at 22% 90%,
+        rgba(204, 47, 102, 0.09),
+        transparent 34%
+      ),
       linear-gradient(132deg, #0b2431 0%, #07161f 44%, #051018 100%);
   }
 
@@ -423,8 +567,16 @@
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(135deg, rgba(8, 17, 26, 0.04) 0%, rgba(8, 17, 26, 0.6) 100%),
-      radial-gradient(circle at 12% 15%, rgba(134, 188, 203, 0.28), transparent 28%),
+      linear-gradient(
+        135deg,
+        rgba(8, 17, 26, 0.04) 0%,
+        rgba(8, 17, 26, 0.6) 100%
+      ),
+      radial-gradient(
+        circle at 12% 15%,
+        rgba(134, 188, 203, 0.28),
+        transparent 28%
+      ),
       linear-gradient(to top, rgba(4, 8, 12, 0.62) 8%, transparent 56%);
   }
 
@@ -558,6 +710,106 @@
     letter-spacing: 0.06em;
   }
 
+  .library-hero {
+    @apply relative overflow-hidden rounded-[2.25rem] border border-white/10 p-4 shadow-2xl sm:p-5 lg:p-6;
+    background:
+      linear-gradient(
+        115deg,
+        rgba(255, 255, 255, 0.06) 0 1px,
+        transparent 1px 118px
+      ),
+      linear-gradient(135deg, rgba(12, 43, 56, 0.96), rgba(5, 16, 24, 0.92));
+    box-shadow:
+      0 34px 90px rgba(2, 8, 13, 0.52),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+
+  .library-hero::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0;
+    background: linear-gradient(
+      120deg,
+      rgba(214, 184, 109, 0.16),
+      transparent 22%,
+      rgba(134, 188, 203, 0.1) 64%,
+      transparent 100%
+    );
+  }
+
+  .library-hero-grid {
+    @apply relative z-10 grid min-h-[28rem] gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)] lg:items-stretch;
+  }
+
+  .library-hero-panel {
+    @apply flex min-w-0 flex-col justify-between rounded-[1.65rem] border border-white/10 bg-[rgba(5,16,24,0.48)] p-5 backdrop-blur-sm sm:p-7 lg:p-8;
+  }
+
+  .library-hero-title {
+    @apply mt-3 max-w-4xl break-words font-bebas-neue text-5xl leading-none text-white sm:text-7xl lg:text-7xl xl:text-8xl;
+    letter-spacing: 0.06em;
+    text-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+  }
+
+  .library-hero-copy {
+    @apply mt-4 max-w-2xl text-base leading-7 text-light-100/80 sm:text-lg;
+  }
+
+  .library-hero-actions {
+    @apply mt-6 flex flex-col gap-3 xs:flex-row xs:items-center sm:mt-8;
+  }
+
+  .library-hero-link {
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-white/10 px-5 text-sm font-semibold text-light-100 transition hover:border-primary hover:bg-white/10 hover:text-white;
+  }
+
+  .library-hero-stats {
+    @apply mt-8 grid gap-3 sm:grid-cols-3 lg:max-w-3xl;
+  }
+
+  .library-stat {
+    @apply rounded-2xl border border-white/10 bg-white/5 p-4;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .library-stat-label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-light-200/70;
+  }
+
+  .library-stat-value {
+    @apply mt-2 font-bebas-neue text-4xl leading-none text-white;
+    letter-spacing: 0.04em;
+  }
+
+  .library-hero-aside {
+    @apply flex min-w-0 flex-col justify-between rounded-[1.65rem] border border-white/10 bg-[rgba(231,242,246,0.08)] p-5 backdrop-blur-md sm:p-6;
+  }
+
+  .library-featured-label {
+    @apply text-xs font-semibold uppercase tracking-[0.24em];
+    color: #d6b86d;
+  }
+
+  .library-featured-list {
+    @apply mt-5 space-y-3;
+  }
+
+  .library-featured-item {
+    @apply flex min-h-24 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[rgba(5,16,24,0.42)] p-4 transition hover:border-primary hover:bg-white/10;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .library-featured-title {
+    @apply line-clamp-2 text-base font-semibold leading-snug text-white;
+  }
+
+  .library-featured-author {
+    @apply mt-1 line-clamp-1 text-sm text-light-100/70;
+  }
+
+  .library-featured-rating {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-semibold text-light-100;
+  }
+
   .fade-in-up {
     animation: fade-in-up 0.6s ease-out both;
   }
@@ -584,7 +836,6 @@
       opacity: 0.75;
     }
   }
-
 }
 
 @layer base {

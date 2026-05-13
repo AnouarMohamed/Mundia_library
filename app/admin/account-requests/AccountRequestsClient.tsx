@@ -388,9 +388,16 @@ const AccountRequestCard = ({
    * Resolve the full URL for the stored university card image.
    */
   const getImageUrl = (universityCard: string) => {
-    return universityCard.startsWith("http")
-      ? universityCard
-      : `${config.env.imagekit.urlEndpoint}/${universityCard}`;
+    if (
+      universityCard.startsWith("http") ||
+      universityCard.startsWith("data:")
+    ) {
+      return universityCard;
+    }
+
+    return config.env.imagekit.urlEndpoint
+      ? `${config.env.imagekit.urlEndpoint}/${universityCard}`
+      : universityCard;
   };
 
   return (

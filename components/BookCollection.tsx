@@ -22,11 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogTrigger 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useAllBooks } from "@/hooks/useQueries";
 import { useQueryClient } from "@tanstack/react-query";
 import type { BooksListResponse } from "@/lib/services/books";
@@ -187,7 +183,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
             12,
         }
       : undefined,
-    initialData
+    initialData,
   );
 
   // Use React Query data if available, otherwise fall back to legacy props or initial data
@@ -285,11 +281,13 @@ const BookCollection: React.FC<BookCollectionProps> = ({
   if (isLoading && (!initialBooks || initialBooks.length === 0)) {
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-        <div className="mb-5 rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.6)] p-4 sm:mb-6 sm:p-6">
+        <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
           <h1 className="mb-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
             Book Collection
           </h1>
-          <p className="text-sm text-light-200/80 sm:text-base">Loading books...</p>
+          <p className="text-sm text-light-200/80 sm:text-base">
+            Loading books...
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {[...Array(12)].map((_, index) => (
@@ -304,7 +302,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
   if (isError) {
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-        <div className="mb-5 rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.6)] p-4 sm:mb-6 sm:p-6">
+        <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
           <h1 className="mb-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
             Book Collection
           </h1>
@@ -328,7 +326,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
   return (
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
       {/* Header */}
-      <div className="mb-4 rounded-[1.5rem] border border-white/10 bg-[rgba(8,14,22,0.6)] p-4 sm:mb-6 sm:p-6">
+      <div className="catalog-header mb-4 p-5 sm:mb-6 sm:p-7">
         <p className="text-[11px] uppercase tracking-[0.25em] text-light-200/70 sm:text-xs">
           Explore the Catalog
         </p>
@@ -344,7 +342,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-6">
         {/* Filters Sidebar */}
         <div className="w-full">
-          <Card className="rounded-2xl border border-white/12 bg-[rgba(8,14,22,0.65)] shadow-xl lg:sticky lg:top-28">
+          <Card className="catalog-panel shadow-xl lg:sticky lg:top-28">
             <CardHeader className="pb-2 sm:pb-3">
               <CardTitle className="font-bebas-neue text-2xl tracking-[0.08em] text-light-100 sm:text-3xl">
                 Filters
@@ -358,9 +356,9 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     placeholder="Search books..."
                     value={localSearch}
                     onChange={(e) => setLocalSearch(e.target.value)}
-                    className="h-11 rounded-xl border-white/15 bg-white/5 text-light-100 placeholder:text-light-100/60"
+                    className="catalog-field placeholder:text-light-100/60"
                   />
-                  
+
                   {/* ISBN Scanner Dialog */}
                   <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
                     <DialogTrigger asChild>
@@ -374,9 +372,9 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="p-0 border-none bg-transparent max-w-sm sm:max-w-md">
-                      <ISBNScanner 
-                        onScanSuccess={handleScanSuccess} 
-                        onClose={() => setIsScannerOpen(false)} 
+                      <ISBNScanner
+                        onScanSuccess={handleScanSuccess}
+                        onClose={() => setIsScannerOpen(false)}
                       />
                     </DialogContent>
                   </Dialog>
@@ -384,7 +382,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
                 <Button
                   onClick={() => updateSearchParams({ search: localSearch })}
-                  className="h-11 w-full rounded-xl border border-primary/50 bg-primary text-dark-100 hover:bg-primary/95"
+                  className="catalog-action w-full"
                 >
                   Search
                 </Button>
@@ -398,7 +396,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 <select
                   value={currentSearchParams.genre}
                   onChange={(e) => handleFilterChange("genre", e.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/60 sm:text-sm"
+                  className="catalog-field"
                 >
                   <option value="">All Genres</option>
                   {genres.map((genre: string) => (
@@ -419,7 +417,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                   onChange={(e) =>
                     handleFilterChange("availability", e.target.value)
                   }
-                  className="h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/60 sm:text-sm"
+                  className="catalog-field"
                 >
                   <option value="">All Books</option>
                   <option value="available">Available</option>
@@ -435,7 +433,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 <select
                   value={currentSearchParams.rating}
                   onChange={(e) => handleFilterChange("rating", e.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/60 sm:text-sm"
+                  className="catalog-field"
                 >
                   <option value="">All Ratings</option>
                   <option value="5">5 Stars</option>
@@ -463,7 +461,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
         {/* Main Content */}
         <div className="flex-1">
           {/* Sort and Results Header */}
-          <div className="mb-3 rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.55)] p-3 sm:mb-4 sm:p-4">
+          <div className="catalog-toolbar mb-3 p-3 sm:mb-4 sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <span className="text-xs text-light-100/80 sm:text-sm">
@@ -516,7 +514,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 <select
                   value={currentSearchParams.sort}
                   onChange={(e) => handleSortChange(e.target.value)}
-                  className="h-9 rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary/70 focus:ring-1 focus:ring-primary/60 sm:text-sm"
+                  className="catalog-field h-9 w-auto"
                 >
                   <option value="title">Title A-Z</option>
                   <option value="author">Author A-Z</option>
@@ -590,7 +588,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                         {pageNum}
                       </Button>
                     );
-                  }
+                  },
                 )}
               </div>
 

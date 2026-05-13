@@ -1,38 +1,61 @@
 import { sql } from "drizzle-orm";
 import {
-  mysqlTable,
+  pgEnum,
+  pgTable,
   varchar,
-  int,
+  integer,
   text,
   date,
-  datetime,
   boolean,
-  decimal,
-  mysqlEnum,
-} from "drizzle-orm/mysql-core";
+  numeric,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
+export const userStatusEnum = pgEnum("user_status", [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+]);
+export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
+export const borrowStatusEnum = pgEnum("borrow_status", [
+  "PENDING",
+  "BORROWED",
+  "RETURNED",
+]);
+export const requestStatusEnum = pgEnum("request_status", [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+]);
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "INFO",
+  "SUCCESS",
+  "WARNING",
+  "ERROR",
+]);
+
+export const users = pgTable("users", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
     .$defaultFn(() => globalThis.crypto.randomUUID()),
   fullName: varchar("full_name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  universityId: int("university_id").notNull().unique(),
+  universityId: integer("university_id").notNull().unique(),
   password: text("password").notNull(),
   universityCard: text("university_card").notNull(),
-  status: mysqlEnum("status", ["PENDING", "APPROVED", "REJECTED"])
+  status: userStatusEnum("status")
     .notNull()
     .default("PENDING"),
-  role: mysqlEnum("role", ["USER", "ADMIN"]).notNull().default("USER"),
+  role: userRoleEnum("role").notNull().default("USER"),
   lastActivityDate: date("last_activity_date", { mode: "string" }).default(
-    sql`(CURRENT_DATE)`
+    sql`CURRENT_DATE`
   ),
-  lastLogin: datetime("last_login", { mode: "date" }),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  lastLogin: timestamp("last_login", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const books = mysqlTable("books", {
+export const books = pgTable("books", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -40,27 +63,27 @@ export const books = mysqlTable("books", {
   title: varchar("title", { length: 255 }).notNull(),
   author: varchar("author", { length: 255 }).notNull(),
   genre: text("genre").notNull(),
-  rating: int("rating").notNull(),
+  rating: integer("rating").notNull(),
   coverUrl: text("cover_url").notNull(),
   coverColor: varchar("cover_color", { length: 7 }).notNull(),
   description: text("description").notNull(),
-  totalCopies: int("total_copies").notNull().default(1),
-  availableCopies: int("available_copies").notNull().default(0),
+  totalCopies: integer("total_copies").notNull().default(1),
+  availableCopies: integer("available_copies").notNull().default(0),
   videoUrl: text("video_url").notNull(),
   summary: text("summary").notNull(),
   isbn: varchar("isbn", { length: 20 }),
-  publicationYear: int("publication_year"),
+  publicationYear: integer("publication_year"),
   publisher: varchar("publisher", { length: 255 }),
   language: varchar("language", { length: 50 }).default("English"),
-  pageCount: int("page_count"),
+  pageCount: integer("page_count"),
   edition: varchar("edition", { length: 50 }),
   isActive: boolean("is_active").notNull().default(true),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
   updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const borrowRecords = mysqlTable("borrow_records", {
+export const borrowRecords = pgTable("borrow_records", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -71,26 +94,26 @@ export const borrowRecords = mysqlTable("borrow_records", {
   bookId: varchar("book_id", { length: 36 })
     .notNull()
     .references(() => books.id),
-  borrowDate: datetime("borrow_date", { mode: "date" }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  borrowDate: timestamp("borrow_date", { mode: "date" }).notNull().defaultNow(),
   dueDate: date("due_date", { mode: "string" }),
   returnDate: date("return_date", { mode: "string" }),
-  status: mysqlEnum("status", ["PENDING", "BORROWED", "RETURNED"])
+  status: borrowStatusEnum("status")
     .notNull()
     .default("BORROWED"),
   borrowedBy: text("borrowed_by"),
   returnedBy: text("returned_by"),
-  fineAmount: decimal("fine_amount", { precision: 10, scale: 2 }).default(
+  fineAmount: numeric("fine_amount", { precision: 10, scale: 2 }).default(
     "0.00"
   ),
   notes: text("notes"),
-  renewalCount: int("renewal_count").notNull().default(0),
-  lastReminderSent: datetime("last_reminder_sent", { mode: "date" }),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  renewalCount: integer("renewal_count").notNull().default(0),
+  lastReminderSent: timestamp("last_reminder_sent", { mode: "date" }),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
   updatedBy: text("updated_by"),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const systemConfig = mysqlTable("system_config", {
+export const systemConfig = pgTable("system_config", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -98,12 +121,12 @@ export const systemConfig = mysqlTable("system_config", {
   key: varchar("key", { length: 100 }).notNull().unique(),
   value: text("value").notNull(),
   description: text("description"),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
   updatedBy: text("updated_by"),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const bookReviews = mysqlTable("book_reviews", {
+export const bookReviews = pgTable("book_reviews", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -114,13 +137,13 @@ export const bookReviews = mysqlTable("book_reviews", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id),
-  rating: int("rating").notNull(),
+  rating: integer("rating").notNull(),
   comment: text("comment").notNull(),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
 
-export const adminRequests = mysqlTable("admin_requests", {
+export const adminRequests = pgTable("admin_requests", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -129,17 +152,17 @@ export const adminRequests = mysqlTable("admin_requests", {
     .notNull()
     .references(() => users.id),
   requestReason: text("request_reason").notNull(),
-  status: mysqlEnum("status", ["PENDING", "APPROVED", "REJECTED"])
+  status: requestStatusEnum("status")
     .notNull()
     .default("PENDING"),
   reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
-  reviewedAt: datetime("reviewed_at", { mode: "date" }),
+  reviewedAt: timestamp("reviewed_at", { mode: "date" }),
   rejectionReason: text("rejection_reason"),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
 
-export const auditLogs = mysqlTable("audit_logs", {
+export const auditLogs = pgTable("audit_logs", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -151,10 +174,10 @@ export const auditLogs = mysqlTable("audit_logs", {
   targetId: varchar("target_id", { length: 36 }),
   targetType: varchar("target_type", { length: 50 }),
   details: text("details"),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
-export const renewalRequests = mysqlTable("renewal_requests", {
+export const renewalRequests = pgTable("renewal_requests", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -165,16 +188,16 @@ export const renewalRequests = mysqlTable("renewal_requests", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id),
-  status: mysqlEnum("status", ["PENDING", "APPROVED", "REJECTED"])
+  status: requestStatusEnum("status")
     .notNull()
     .default("PENDING"),
   requestReason: text("request_reason"),
   rejectionReason: text("rejection_reason"),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
-  updatedAt: datetime("updated_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
 });
 
-export const notifications = mysqlTable("notifications", {
+export const notifications = pgTable("notifications", {
   id: varchar("id", { length: 36 })
     .notNull()
     .primaryKey()
@@ -184,9 +207,8 @@ export const notifications = mysqlTable("notifications", {
     .references(() => users.id),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
-  type: mysqlEnum("type", ["INFO", "SUCCESS", "WARNING", "ERROR"]).notNull().default("INFO"),
+  type: notificationTypeEnum("type").notNull().default("INFO"),
   isRead: boolean("is_read").notNull().default(false),
-  createdAt: datetime("created_at", { mode: "date" }).default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
-
 

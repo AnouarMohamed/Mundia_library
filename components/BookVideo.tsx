@@ -26,6 +26,16 @@ const isTrustedImageKitHost = (hostname: string): boolean => {
  * Render a book trailer or fallback placeholder.
  */
 const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
+  if (videoUrl.startsWith("data:video/")) {
+    return (
+      <video
+        src={videoUrl}
+        controls={true}
+        className="w-full rounded-xl"
+      />
+    );
+  }
+
   const parsedUrl = parseVideoUrl(videoUrl);
   const path = parsedUrl?.pathname.toLowerCase() ?? "";
   const hostname = parsedUrl?.hostname.toLowerCase() ?? "";
@@ -52,7 +62,12 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
 
   // For ImageKit URLs in videos folder, try to play them as videos
   // even if they have .png extension (they might be misnamed video files)
-  if (isTrustedImageKitHost(hostname) && path.includes("/books/videos/")) {
+  if (
+    isTrustedImageKitHost(hostname) &&
+    path.includes("/books/videos/") &&
+    config.env.imagekit.publicKey &&
+    config.env.imagekit.urlEndpoint
+  ) {
     return (
       <ImageKitProvider
         publicKey={config.env.imagekit.publicKey}
@@ -64,12 +79,7 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
   }
 
   return (
-    <ImageKitProvider
-      publicKey={config.env.imagekit.publicKey}
-      urlEndpoint={config.env.imagekit.urlEndpoint}
-    >
-      <IKVideo src={videoUrl} controls={true} className="w-full rounded-xl" />
-    </ImageKitProvider>
+    <video src={videoUrl} controls={true} className="w-full rounded-xl" />
   );
 };
 export default BookVideo;

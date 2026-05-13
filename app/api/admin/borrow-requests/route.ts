@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
           like(books.author, searchPattern),
           like(users.fullName, searchPattern),
           like(users.email, searchPattern),
-          sql`CAST(${users.universityId} AS CHAR) LIKE ${searchPattern}`
+          sql`CAST(${users.universityId} AS text) LIKE ${searchPattern}`
         )
       );
     }

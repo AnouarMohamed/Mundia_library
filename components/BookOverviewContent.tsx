@@ -171,8 +171,8 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
   return (
     <section className="book-overview motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500">
-      <div className="pointer-events-none absolute -left-20 -top-28 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-12 bottom-8 h-52 w-52 rounded-full bg-blue-200/20 blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d6b86d]/60 to-transparent" />
+      <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-[#86bccb]/45 via-transparent to-[#d6b86d]/45" />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-5 sm:gap-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -195,10 +195,17 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-light-100/90 sm:text-sm">
-            Category: <span className="font-semibold text-light-200">{genre}</span>
+            Category:{" "}
+            <span className="font-semibold text-light-200">{genre}</span>
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-light-100/90 sm:text-sm">
-            <img src="/icons/star.svg" alt="star" width={18} height={18} className="size-4" />
+            <img
+              src="/icons/star.svg"
+              alt="star"
+              width={18}
+              height={18}
+              className="size-4"
+            />
             {formattedRating}
           </span>
           <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-light-100/90 sm:text-sm">
@@ -297,7 +304,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
       <div className="relative z-10 flex flex-1 items-center justify-center">
         <div className="relative">
-          <div className="pointer-events-none absolute -left-6 -top-6 h-24 w-24 rounded-full bg-primary/25 blur-2xl" />
+          <div className="pointer-events-none absolute -left-5 -top-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] rounded-[1.4rem] border border-white/10 bg-white/5" />
           <BookCover
             variant="wide"
             className="z-10 drop-shadow-[0_18px_26px_rgba(0,0,0,0.45)]"

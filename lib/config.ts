@@ -11,31 +11,31 @@ const envSchema = z.object({
   
   // ImageKit
   imagekit: z.object({
-    publicKey: z.string().min(1, "ImageKit Public Key is required"),
-    urlEndpoint: z.string().url("ImageKit URL Endpoint must be a valid URL"),
-    privateKey: z.string().min(1, "ImageKit Private Key is required"),
+    publicKey: z.string().default(""),
+    urlEndpoint: z.union([z.string().url(), z.literal("")]).default(""),
+    privateKey: z.string().default(""),
   }),
   
   // Database
-  databaseUrl: z.string().min(1, "DATABASE_URL is required"),
+  databaseUrl: z.string().default(""),
   
   // Upstash (Redis + QStash)
   upstash: z.object({
-    redisUrl: z.string().url("Upstash Redis URL must be a valid URL"),
-    redisToken: z.string().min(1, "Upstash Redis Token is required"),
-    qstashUrl: z.string().url("QStash URL must be a valid URL"),
-    qstashToken: z.string().min(1, "QStash Token is required"),
+    redisUrl: z.union([z.string().url(), z.literal("")]).default(""),
+    redisToken: z.string().default(""),
+    qstashUrl: z.union([z.string().url(), z.literal("")]).default(""),
+    qstashToken: z.string().default(""),
   }),
   
   // Email (Brevo)
   brevo: z.object({
-    apiKey: z.string().min(1, "Brevo API Key is required"),
-    senderEmail: z.string().email("Brevo Sender Email must be a valid email"),
+    apiKey: z.string().default(""),
+    senderEmail: z.string().email("Brevo Sender Email must be a valid email").default("noreply@example.com"),
     senderName: z.string().default("Mundiapolis Library"),
   }),
   
   // Email (Resend)
-  resendToken: z.string().min(1, "Resend Token is required"),
+  resendToken: z.string().default(""),
 
   // Feature Flags
   enableWorkflows: z.string().default("false").transform((v) => v === "true"),
@@ -66,8 +66,23 @@ const envData = {
   enableWorkflows: process.env.ENABLE_WORKFLOWS,
 };
 
+const scrubUndefined = <T extends Record<string, unknown>>(value: T): T => {
+  for (const key of Object.keys(value)) {
+    const item = value[key];
+
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      scrubUndefined(item as Record<string, unknown>);
+    } else if (item === undefined) {
+      delete value[key];
+    }
+  }
+
+  return value;
+};
+
 // Validate environment variables.
 const parsedEnv = envSchema.safeParse(envData);
+const isServer = typeof window === "undefined";
 
 if (!parsedEnv.success) {
   console.error(
@@ -75,8 +90,9 @@ if (!parsedEnv.success) {
     JSON.stringify(parsedEnv.error.format(), null, 2)
   );
   
-  // In production, we want to fail hard if config is missing
-  if (process.env.NODE_ENV === "production") {
+  // In production, fail hard on the server. Client bundles do not receive
+  // server-only variables like DATABASE_URL.
+  if (process.env.NODE_ENV === "production" && isServer) {
     throw new Error("Invalid environment variables. Check the logs for details.");
   }
 }
@@ -87,7 +103,7 @@ if (!parsedEnv.success) {
 const config = {
   env: parsedEnv.success
     ? parsedEnv.data
-    : (envData as unknown as z.infer<typeof envSchema>),
+    : (scrubUndefined(envData) as unknown as z.infer<typeof envSchema>),
 };
 
 export default config;

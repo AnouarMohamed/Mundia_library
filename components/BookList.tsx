@@ -22,13 +22,16 @@ const BookList = ({
 }: Props) => {
   return (
     <section className={cn("fade-in-up", containerClassName)}>
-      <div className="mb-2">
-        <p className="text-[11px] uppercase tracking-[0.26em] text-light-200/70 sm:text-xs">
-          Curated Shelf
-        </p>
-        <h2 className="font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:text-5xl">
-          {title}
-        </h2>
+      <div className="book-section-heading">
+        <div>
+          <p className="book-section-kicker">Curated Shelf</p>
+          <h2 className="book-section-title">{title}</h2>
+        </div>
+        {showViewAllButton && books.length > 0 && (
+          <Link href="/all-books" className="hidden sm:block">
+            <Button className="book-section-cta">View All Books</Button>
+          </Link>
+        )}
       </div>
 
       {books.length > 0 ? (
@@ -39,16 +42,16 @@ const BookList = ({
         </ul>
       ) : (
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-          <p className="text-base text-light-100/85 sm:text-lg">No books available.</p>
+          <p className="text-base text-light-100/85 sm:text-lg">
+            No books available.
+          </p>
         </div>
       )}
 
       {showViewAllButton && (
-        <div className="mt-6 flex justify-center sm:mt-12">
+        <div className="mt-6 flex justify-center sm:hidden">
           <Link href="/all-books">
-            <Button className="min-h-12 rounded-xl border border-primary/50 bg-primary px-6 py-3 font-bebas-neue text-base tracking-[0.08em] text-dark-100 hover:bg-primary/95 sm:text-xl">
-              View All Books
-            </Button>
+            <Button className="book-section-cta">View All Books</Button>
           </Link>
         </div>
       )}

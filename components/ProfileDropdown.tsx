@@ -83,7 +83,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       setIsLoggingOut(false);
       showToast.error(
         "Logout Failed",
-        "There was an error logging out. Please try again."
+        "There was an error logging out. Please try again.",
       );
     }
   };
@@ -93,7 +93,8 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       <DropdownMenuTrigger asChild>
         <button className="relative size-8 overflow-hidden rounded-full border border-white/20 transition-all hover:border-primary/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
           {universityCard ? (
-            universityCard.startsWith("http") ? (
+            universityCard.startsWith("http") ||
+            universityCard.startsWith("data:") ? (
               <Image
                 src={universityCard}
                 alt="Profile"
@@ -101,7 +102,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                 className="object-cover"
                 sizes="(max-width: 640px) 32px, 40px"
               />
-            ) : (
+            ) : config.env.imagekit.urlEndpoint ? (
               <IKImage
                 path={
                   universityCard.startsWith("/")
@@ -113,6 +114,12 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                 fill
                 className="rounded-full object-cover"
               />
+            ) : (
+              <div className="flex size-full items-center justify-center bg-white/10 text-light-100">
+                <span className="text-[10px] font-semibold sm:text-xs">
+                  {fullName.charAt(0).toUpperCase()}
+                </span>
+              </div>
             )
           ) : (
             <div className="flex size-full items-center justify-center bg-white/10 text-light-100">
@@ -125,11 +132,13 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-56 rounded-2xl border border-white/12 bg-[rgba(7,14,22,0.96)] p-1 text-light-100 shadow-2xl backdrop-blur-xl sm:w-64"
+        className="w-56 rounded-2xl border border-white/10 bg-[rgba(7,14,22,0.96)] p-1 text-light-100 shadow-2xl backdrop-blur-xl sm:w-64"
       >
         <DropdownMenuLabel className="rounded-xl bg-white/5 px-2.5 py-1.5 sm:px-3 sm:py-2">
           <div className="space-y-0.5 sm:space-y-1">
-            <p className="text-xs font-semibold text-light-100 sm:text-sm">{fullName}</p>
+            <p className="text-xs font-semibold text-light-100 sm:text-sm">
+              {fullName}
+            </p>
             <p className="text-[10px] text-light-200/70 sm:text-xs">{email}</p>
             {typeof universityId === "number" && (
               <p className="text-[10px] text-light-200/70 sm:text-xs">
@@ -144,7 +153,10 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
             asChild
             className="cursor-pointer rounded-xl px-0 py-2 text-light-100 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white sm:py-3 [&>a]:block [&>a]:w-full"
           >
-            <Link href="/make-admin" className="px-2.5 text-xs sm:px-3 sm:text-sm">
+            <Link
+              href="/make-admin"
+              className="px-2.5 text-xs sm:px-3 sm:text-sm"
+            >
               Become Admin
             </Link>
           </DropdownMenuItem>
