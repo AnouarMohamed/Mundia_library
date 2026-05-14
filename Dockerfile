@@ -7,7 +7,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 FROM base AS builder
-ENV DATABASE_URL=mysql://build:build@localhost:3306/builddb
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/builddb
 ENV NEXTAUTH_SECRET=build-secret
 ENV NEXTAUTH_URL=http://localhost:3000
 ENV NEXT_PUBLIC_API_ENDPOINT=http://localhost:3000
