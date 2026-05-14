@@ -60,7 +60,12 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
 }) => {
   if (variant === "card") {
     return (
-      <Card className={cn("border-blue-200 bg-blue-50", className)}>
+      <Card
+        className={cn(
+          "border-[var(--mundia-line)] bg-[var(--mundia-paper)]",
+          className,
+        )}
+      >
         <CardHeader className="pb-2">
           <Skeleton className="h-5 w-24" />
         </CardHeader>
@@ -78,8 +83,8 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5",
-        className
+        "rounded-2xl border border-[var(--mundia-line)] bg-white p-4 shadow-sm sm:p-5",
+        className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -87,7 +92,7 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-8 w-16" />
         </div>
-        <Skeleton className="size-9 rounded-xl" />
+        <Skeleton className="size-10 rounded-xl" />
       </div>
       <Skeleton className="mt-4 h-3.5 w-40" />
     </div>

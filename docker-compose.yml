@@ -1,20 +1,21 @@
 services:
   db:
-    image: mysql:8.0
+    image: postgres:15
     container_name: library_db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-library_management}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-library_management}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
         ]
       interval: 5s
       timeout: 5s
@@ -35,13 +36,12 @@ services:
       - .env.local
     environment:
       NODE_ENV: production
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-rootpassword}@db:5432/${POSTGRES_DB:-library_management}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
       NEXT_PUBLIC_API_ENDPOINT: ${NEXT_PUBLIC_API_ENDPOINT:-http://localhost:3000}
       NEXT_PUBLIC_PROD_API_ENDPOINT: ${NEXT_PUBLIC_PROD_API_ENDPOINT:-http://localhost:3000}
       ENABLE_WORKFLOWS: ${ENABLE_WORKFLOWS:-false}
-    command: npm run start
     ports:
       - "${APP_PORT:-3000}:3000"
 
@@ -56,7 +56,7 @@ services:
     env_file:
       - .env.local
     environment:
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-rootpassword}@db:5432/${POSTGRES_DB:-library_management}
     command: npm run db:migrate
 
   seed:
@@ -72,7 +72,7 @@ services:
     env_file:
       - .env.local
     environment:
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-rootpassword}@db:3306/${MYSQL_DATABASE:-library_management}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-rootpassword}@db:5432/${POSTGRES_DB:-library_management}
     command: npm run seed
 
   adminer:
@@ -88,4 +88,4 @@ services:
       - "${ADMINER_PORT:-8080}:8080"
 
 volumes:
-  mysql_data:
+  postgres_data:

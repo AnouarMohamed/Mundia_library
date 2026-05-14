@@ -23,7 +23,6 @@ import {
   ChartColumnIncreasing,
   LibraryBig,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
 import AdminStatsSkeleton from "@/components/skeletons/AdminStatsSkeleton";
@@ -87,19 +86,19 @@ interface AdminDashboardContentProps {
 }
 
 const chartColors = [
-  "oklch(56% 0.09 214)",
-  "oklch(63% 0.11 150)",
-  "oklch(78% 0.105 88)",
+  "var(--mundia-teal-strong)",
+  "var(--mundia-success)",
+  "var(--mundia-gold)",
 ];
-const chartGrid = "oklch(76% 0.035 218 / 0.7)";
-const chartAxis = "oklch(46% 0.035 225)";
-const chartBorrow = "oklch(56% 0.09 214)";
-const chartReturn = "oklch(63% 0.11 150)";
-const chartGold = "oklch(78% 0.105 88)";
+const chartGrid = "var(--mundia-line)";
+const chartAxis = "var(--mundia-ink)";
+const chartBorrow = "var(--mundia-teal-strong)";
+const chartReturn = "var(--mundia-success)";
 const chartTooltipStyle = {
   borderRadius: "0.75rem",
   border: "1px solid var(--mundia-line)",
   background: "var(--mundia-paper)",
+  color: "var(--mundia-ink)",
 };
 
 const toNumber = (value: unknown): number => {
@@ -146,11 +145,13 @@ const Panel = ({
   children: React.ReactNode;
 }) => (
   <article className="surface-panel-light min-w-0 p-5 sm:p-6">
-    <div className="mb-4">
-      <h3 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+    <div className="mb-5">
+      <h3 className="text-lg font-bold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
         {title}
       </h3>
-      {subtitle && <p className="mt-1 text-sm text-slate-600">{subtitle}</p>}
+      {subtitle && (
+        <p className="mt-1 text-sm text-[var(--mundia-ink)]/70">{subtitle}</p>
+      )}
     </div>
     {children}
   </article>
@@ -173,40 +174,54 @@ const MetricCard = ({
     "blue" | "teal" | "amber" | "slate",
     { badge: string; ring: string }
   > = {
-    blue: { badge: "bg-blue-100 text-blue-700", ring: "ring-blue-200/70" },
-    teal: { badge: "bg-teal-100 text-teal-700", ring: "ring-teal-200/70" },
-    amber: { badge: "bg-amber-100 text-amber-700", ring: "ring-amber-200/70" },
-    slate: { badge: "bg-slate-200 text-slate-700", ring: "ring-slate-300/70" },
+    blue: {
+      badge: "bg-[var(--mundia-ink)]/10 text-[var(--mundia-ink)]",
+      ring: "ring-[var(--mundia-line)]/50",
+    },
+    teal: {
+      badge: "bg-[var(--mundia-teal)]/20 text-[var(--mundia-teal-strong)]",
+      ring: "ring-[var(--mundia-teal)]/30",
+    },
+    amber: {
+      badge: "bg-[var(--mundia-gold)]/20 text-[var(--mundia-gold-strong)]",
+      ring: "ring-[var(--mundia-gold)]/30",
+    },
+    slate: {
+      badge: "bg-[var(--mundia-muted)]/20 text-[var(--mundia-ink)]",
+      ring: "ring-[var(--mundia-line)]/50",
+    },
   };
 
   const styles = toneStyles[tone];
 
   return (
     <article
-      className={`rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm ring-1 ${styles.ring} sm:p-5`}
+      className={`rounded-2xl border border-[var(--mundia-line)] bg-white p-4 shadow-sm ring-1 ${styles.ring} sm:p-5`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/60">
             {title}
           </p>
-          <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+          <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
             {value}
           </p>
         </div>
         <span
-          className={`inline-flex size-9 items-center justify-center rounded-xl ${styles.badge}`}
+          className={`inline-flex size-10 items-center justify-center rounded-xl ${styles.badge}`}
         >
-          <Icon className="size-4.5" />
+          <Icon className="size-5" />
         </span>
       </div>
-      <p className="mt-3 text-sm text-slate-600">{subtitle}</p>
+      <p className="mt-4 text-xs font-medium text-[var(--mundia-ink)]/65">
+        {subtitle}
+      </p>
     </article>
   );
 };
 
 const EmptyState = ({ label }: { label: string }) => (
-  <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/90 px-4 text-center text-sm text-slate-600">
+  <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 text-center text-sm font-medium text-[var(--mundia-ink)]/50">
     {label}
   </div>
 );
@@ -324,63 +339,44 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </div>
       )}
 
-      <section
-        className="relative overflow-hidden rounded-[2rem] border border-white/10 p-6 text-slate-100 sm:p-8"
-        style={{ boxShadow: "0 24px 70px oklch(10% 0.02 225 / 0.5)" }}
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(115deg, oklch(78% 0.105 88 / 0.10) 0 1px, transparent 1px 118px), linear-gradient(135deg, oklch(18% 0.025 225) 0%, oklch(24% 0.04 218) 48%, oklch(31% 0.055 218) 100%)",
-          }}
-        />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--mundia-gold)]/70 to-transparent" />
-
-        <div className="relative z-10 space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-light-100/80">
-            <Sparkles className="size-3.5" />
-            Dashboard Overview
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
-              Library Intelligence Dashboard
+      <header className="mb-8 space-y-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-[var(--mundia-teal-strong)]">
+              <div className="h-4 w-1 rounded-full bg-current" />
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em]">
+                System Administration
+              </p>
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+              Dashboard Overview
             </h2>
-            <p className="max-w-3xl text-sm text-slate-300 sm:text-base">
-              Live operational insight for circulation, catalog quality, and
-              user growth in one view.
+            <p className="max-w-2xl text-sm text-[var(--mundia-ink)]/70 sm:text-base">
+              Operational overview of library circulation, catalog metadata, and
+              user activity.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="rounded-xl border border-[var(--mundia-line)] bg-white px-4 py-2 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/50">
                 Borrow Utilization
               </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-100">
+              <p className="text-lg font-bold text-[var(--mundia-teal-strong)]">
                 {utilizationRate}%
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+            <div className="rounded-xl border border-[var(--mundia-line)] bg-white px-4 py-2 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/50">
                 User Approval
               </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-100">
+              <p className="text-lg font-bold text-[var(--mundia-gold-strong)]">
                 {approvalRate}%
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
-                Admin Coverage
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-slate-100">
-                {toPercent(adminUsers, Math.max(1, totalUsers))}%
               </p>
             </div>
           </div>
         </div>
-      </section>
+      </header>
 
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -411,6 +407,95 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           icon={ShieldCheck}
           tone="slate"
         />
+      </section>
+
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <Panel
+          title="Recent Borrow Activity"
+          subtitle="Latest circulation updates and pending approvals"
+        >
+          {recentBorrows.length === 0 ? (
+            <EmptyState label="No borrow records found yet." />
+          ) : (
+            <div className="space-y-2.5">
+              {recentBorrows.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-2 rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
+                      {item.bookTitle}
+                    </p>
+                    <p className="truncate text-xs text-[var(--mundia-ink)]/60">
+                      {item.userName}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusClasses(item.status)}`}
+                    >
+                      {item.status}
+                    </span>
+                    {item.status === "PENDING" && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="inline-flex min-h-8 items-center rounded-lg bg-[var(--mundia-success)] px-3 py-1 text-[11px] font-bold text-white transition hover:bg-[var(--mundia-success-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={approveBorrowMutation.isPending}
+                          onClick={() =>
+                            approveBorrowMutation.mutate({
+                              recordId: item.id,
+                              bookTitle: item.bookTitle,
+                              userName: item.userName,
+                            })
+                          }
+                        >
+                          Approve
+                        </button>
+                        <Link
+                          href="/admin/book-requests?status=PENDING"
+                          className="text-[11px] font-bold text-[var(--mundia-ink)]/50 underline underline-offset-2 hover:text-[var(--mundia-ink)]"
+                        >
+                          Manage
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel title="Recent Users" subtitle="Newest registrations">
+          {recentUsers.length === 0 ? (
+            <EmptyState label="No recent user signups found yet." />
+          ) : (
+            <div className="space-y-2.5">
+              {recentUsers.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-2 rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
+                      {item.fullName}
+                    </p>
+                    <p className="truncate text-xs text-[var(--mundia-ink)]/60">
+                      {item.email}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusClasses(item.status)}`}
+                  >
+                    {item.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
       </section>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
@@ -514,18 +599,18 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             {borrowMixData.map((item) => (
               <div
                 key={item.name}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                className="rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-2 shadow-sm"
               >
                 <div className="flex items-center gap-2">
                   <span
-                    className="inline-block size-2.5 rounded-full"
+                    className="inline-block size-2 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--mundia-ink)]/50">
                     {item.name}
                   </p>
                 </div>
-                <p className="mt-1 text-lg font-semibold text-slate-900">
+                <p className="mt-1 text-lg font-bold text-[var(--mundia-ink)]">
                   {item.value}
                 </p>
               </div>
@@ -567,20 +652,22 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {booksByLanguage.length === 0 ? (
             <EmptyState label="No language metadata available yet." />
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {booksByLanguage.map((item) => (
                 <div key={item.language} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    <p className="font-medium text-slate-700">
+                  <div className="flex items-center justify-between text-xs">
+                    <p className="font-bold text-[var(--mundia-ink)]">
                       {item.language}
                     </p>
-                    <p className="font-semibold text-slate-900">{item.count}</p>
+                    <p className="font-bold text-[var(--mundia-ink)]">
+                      {item.count}
+                    </p>
                   </div>
-                  <div className="h-2 rounded-full bg-slate-100">
+                  <div className="h-2 rounded-full bg-[var(--mundia-line)]/20">
                     <div
                       className="h-2 rounded-full"
                       style={{
-                        background: `linear-gradient(90deg, ${chartBorrow}, ${chartReturn})`,
+                        background: `linear-gradient(90deg, var(--mundia-teal-strong), var(--mundia-success))`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxLanguageCount) * 100),
@@ -598,7 +685,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel
           title="Genre Performance"
-          subtitle="Top genres by number of titles"
+          subtitle="Top genres by number of titles and availability"
         >
           {categoryStats.length === 0 ? (
             <EmptyState label="No genre analytics available yet." />
@@ -607,21 +694,21 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
               {categoryStats.map((item) => (
                 <div
                   key={item.genre}
-                  className="rounded-xl border border-slate-200 bg-slate-50/80 p-3"
+                  className="rounded-xl border border-[var(--mundia-line)] bg-white p-3 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-800">
+                    <p className="text-sm font-bold text-[var(--mundia-ink)]">
                       {item.genre}
                     </p>
-                    <p className="text-sm font-medium text-slate-600">
+                    <p className="text-xs font-bold text-[var(--mundia-teal-strong)]">
                       {item.count} titles
                     </p>
                   </div>
-                  <div className="mt-2 h-2 rounded-full bg-slate-200">
+                  <div className="mt-2 h-1.5 rounded-full bg-[var(--mundia-line)]/20">
                     <div
-                      className="h-2 rounded-full"
+                      className="h-1.5 rounded-full"
                       style={{
-                        background: `linear-gradient(90deg, ${chartBorrow}, ${chartGold})`,
+                        background: `linear-gradient(90deg, var(--mundia-teal-strong), var(--mundia-gold))`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxGenreCount) * 100),
@@ -629,7 +716,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                       }}
                     />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                  <div className="mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--mundia-ink)]/50">
                     <span>
                       {item.availableCopies}/{item.totalCopies} available
                     </span>
@@ -649,25 +736,24 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
               {topRatedBooks.map((book) => (
                 <div
                   key={book.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3"
+                  className="flex items-center justify-between rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 shadow-sm"
                 >
                   <div className="min-w-0 pr-3">
-                    <p className="truncate text-sm font-semibold text-slate-800">
+                    <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
                       {book.title}
                     </p>
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-xs text-[var(--mundia-ink)]/60">
                       {book.author}
                     </p>
                   </div>
-                  <div className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                    <Sparkles className="size-3.5" />
+                  <div className="inline-flex items-center gap-1 rounded-full bg-[var(--mundia-gold)]/20 px-2.5 py-1 text-[11px] font-bold text-[var(--mundia-gold-strong)]">
                     {book.rating.toFixed(1)}
                   </div>
                 </div>
               ))}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-2 text-xs text-[var(--mundia-ink)]/60">
                 Avg pages per book:{" "}
-                <span className="font-semibold text-slate-700">
+                <span className="font-bold text-[var(--mundia-ink)]">
                   {Math.round(averagePageCount)}
                 </span>
               </div>
@@ -676,132 +762,47 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </Panel>
       </section>
 
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <Panel
-          title="Recent Borrow Activity"
-          subtitle="Latest circulation updates"
-        >
-          {recentBorrows.length === 0 ? (
-            <EmptyState label="No borrow records found yet." />
-          ) : (
-            <div className="space-y-2.5">
-              {recentBorrows.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-800">
-                      {item.bookTitle}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {item.userName}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(item.status)}`}
-                    >
-                      {item.status}
-                    </span>
-                    {item.status === "PENDING" && (
-                      <>
-                        <button
-                          type="button"
-                          className="inline-flex min-h-9 items-center rounded-full bg-[var(--mundia-success)] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[var(--mundia-success-strong)] disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={approveBorrowMutation.isPending}
-                          onClick={() =>
-                            approveBorrowMutation.mutate({
-                              recordId: item.id,
-                              bookTitle: item.bookTitle,
-                              userName: item.userName,
-                            })
-                          }
-                        >
-                          Approve
-                        </button>
-                        <Link
-                          href="/admin/book-requests?status=PENDING"
-                          className="text-xs font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
-                        >
-                          Manage
-                        </Link>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Recent Users" subtitle="Newest registrations">
-          {recentUsers.length === 0 ? (
-            <EmptyState label="No recent user signups found yet." />
-          ) : (
-            <div className="space-y-2.5">
-              {recentUsers.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-800">
-                      {item.fullName}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">
-                      {item.email}
-                    </p>
-                  </div>
-                  <span
-                    className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getStatusClasses(item.status)}`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </section>
-
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-600">
+        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
             <ArrowDownToLine className="size-4" />
-            <p className="text-xs uppercase tracking-[0.14em]">
+            <p className="text-[10px] font-bold uppercase tracking-wider">
               Borrow Pressure
             </p>
           </div>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
             {activeBorrows + pendingBorrows}
           </p>
-          <p className="mt-1 text-sm text-slate-500">open borrow flows</p>
+          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+            Pending and active borrow flows requiring attention
+          </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-600">
+        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
             <ArrowUpFromLine className="size-4" />
-            <p className="text-xs uppercase tracking-[0.14em]">
+            <p className="text-[10px] font-bold uppercase tracking-wider">
               Return Velocity
             </p>
           </div>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
             {compact(returnedBooks)}
           </p>
-          <p className="mt-1 text-sm text-slate-500">returned records</p>
+          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+            Total number of successfully returned books
+          </p>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-slate-600">
+        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
             <ChartColumnIncreasing className="size-4" />
-            <p className="text-xs uppercase tracking-[0.14em]">
+            <p className="text-[10px] font-bold uppercase tracking-wider">
               Catalog Utilization
             </p>
           </div>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
             {utilizationRate}%
           </p>
-          <p className="mt-1 text-sm text-slate-500">
-            of copies currently in circulation
+          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+            Percentage of total book copies currently in circulation
           </p>
         </div>
       </section>

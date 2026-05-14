@@ -224,7 +224,7 @@ const FileUpload = ({
           </p>
         </div>
 
-        {file && (
+        {file.filePath && (
           <p
             className={cn(
               "upload-filename break-all text-[10px] sm:text-xs",
@@ -253,46 +253,45 @@ const FileUpload = ({
     </>
   );
 
-  const preview = (
+  const preview = file.filePath ? (
     <>
-      {file &&
-        (type === "image" ? (
-          file.filePath?.startsWith("http") ||
-          file.filePath?.startsWith("data:") ? (
-            <img
-              src={file.filePath}
-              alt="Uploaded image"
-              width={500}
-              height={300}
-              className="h-auto w-full max-w-full rounded-xl"
-            />
-          ) : (
-            <IKImage
-              alt={file.filePath ?? ""}
-              path={file.filePath ?? ""}
-              width={500}
-              height={300}
-              className="h-auto w-full max-w-full"
-            />
-          )
-        ) : type === "video" ? (
-          file.filePath?.startsWith("http") ||
-          file.filePath?.startsWith("data:") ? (
-            <video
-              src={file.filePath}
-              controls={true}
-              className="h-64 w-full rounded-xl sm:h-96"
-            />
-          ) : (
-            <IKVideo
-              path={file.filePath ?? ""}
-              controls={true}
-              className="h-64 w-full rounded-xl sm:h-96"
-            />
-          )
-        ) : null)}
+      {type === "image" ? (
+        file.filePath.startsWith("http") ||
+        file.filePath.startsWith("data:") ? (
+          <img
+            src={file.filePath}
+            alt="Uploaded image"
+            width={500}
+            height={300}
+            className="h-auto w-full max-w-full rounded-xl"
+          />
+        ) : isImageKitConfigured ? (
+          <IKImage
+            alt={file.filePath}
+            path={file.filePath}
+            width={500}
+            height={300}
+            className="h-auto w-full max-w-full"
+          />
+        ) : null
+      ) : type === "video" ? (
+        file.filePath.startsWith("http") ||
+        file.filePath.startsWith("data:") ? (
+          <video
+            src={file.filePath}
+            controls={true}
+            className="h-64 w-full rounded-xl sm:h-96"
+          />
+        ) : isImageKitConfigured ? (
+          <IKVideo
+            path={file.filePath}
+            controls={true}
+            className="h-64 w-full rounded-xl sm:h-96"
+          />
+        ) : null
+      ) : null}
     </>
-  );
+  ) : null;
 
   if (!isImageKitConfigured) {
     return (
