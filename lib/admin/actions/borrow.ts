@@ -1,17 +1,18 @@
 /**
- * Borrow Management Server Actions
+ * Administrative Borrow Management Server Actions
  * 
- * This file contains server actions for managing book borrowing operations.
- * All functions are marked with "use server" to run on the server side.
+ * This file contains server-side logic for administrators to manage the full 
+ * lifecycle of book loans. It handles high-stakes operations like approvals, 
+ * returns, and financial penalties (fines).
  * 
  * Key Operations:
- * - Fetching borrow requests
- * - Approving/rejecting borrow requests
- * - Returning books
- * - Calculating and updating overdue fines
+ * - Fetching all borrow requests (joins users and books)
+ * - Approving borrow requests (sets due dates, decrements inventory)
+ * - Rejecting borrow requests
+ * - Returning books (increments inventory, finalizes fines)
+ * - Calculating/Updating overdue fines
  * 
- * IMPORTANT: These are Server Actions, not API routes.
- * They can be called directly from Client Components without fetch().
+ * Security: All state-changing actions require ADMIN role authorization.
  */
 
 "use server";
@@ -25,13 +26,12 @@ import { logAdminAction } from "@/lib/admin/audit";
 import { createNotification } from "@/lib/services/notification-service";
 
 /**
- * Fetch all borrow requests with user and book details
+ * Fetches all borrow records with associated student and book details.
  * 
- * Returns borrow records joined with:
- * - User information (name, email, university ID)
- * - Book information (title, author, genre, cover)
+ * Performance: Uses inner joins to provide a complete view for the admin dashboard
+ * without requiring multiple client-side requests.
  * 
- * Used by: Admin dashboard to display all borrow requests
+ * @returns Success status and the list of joined records.
  */
 export const getAllBorrowRequests = async () => {
   try {
@@ -45,7 +45,6 @@ export const getAllBorrowRequests = async () => {
         returnDate: borrowRecords.returnDate,
         status: borrowRecords.status,
         createdAt: borrowRecords.createdAt,
-        // Enhanced tracking fields
         borrowedBy: borrowRecords.borrowedBy,
         returnedBy: borrowRecords.returnedBy,
         fineAmount: borrowRecords.fineAmount,
@@ -54,11 +53,11 @@ export const getAllBorrowRequests = async () => {
         lastReminderSent: borrowRecords.lastReminderSent,
         updatedAt: borrowRecords.updatedAt,
         updatedBy: borrowRecords.updatedBy,
-        // User details
+        // Joined Student Details
         userName: users.fullName,
         userEmail: users.email,
         userUniversityId: users.universityId,
-        // Book details
+        // Joined Book Details
         bookTitle: books.title,
         bookAuthor: books.author,
         bookGenre: books.genre,
@@ -78,7 +77,11 @@ export const getAllBorrowRequests = async () => {
 };
 
 /**
- * Update a borrow record status directly.
+ * Directly updates the status of a borrow record.
+ * 
+ * @param recordId - ID of the record to update.
+ * @param status - New status (PENDING, BORROWED, RETURNED).
+ * @returns Success status or error message.
  */
 export const updateBorrowStatus = async (
   recordId: string,
@@ -98,22 +101,19 @@ export const updateBorrowStatus = async (
 };
 
 /**
- * Approve a borrow request
+ * Approves a student's request to borrow a book.
  * 
- * This function:
- * 1. Validates the borrow record exists
- * 2. Checks if book is still available (availableCopies > 0)
- * 3. Sets due date to 7 days from approval (end of day)
- * 4. Updates status to BORROWED
- * 5. Decrements availableCopies in books table
+ * Workflow:
+ * 1. Authorization: Verifies the requester is an ADMIN.
+ * 2. Validation: Confirms record existence and physical book availability.
+ * 3. Logistics: Sets a due date (default: 7 days from now, end of day).
+ * 4. Persistence: Updates status to 'BORROWED' and assigns an admin ID to `borrowedBy`.
+ * 5. Inventory: Decrements the `availableCopies` for the book.
+ * 6. Communication: Sends an in-app notification to the student.
+ * 7. Audit: Logs the administrative action for accountability.
  * 
- * Business Logic:
- * - Due date is calculated as 7 days from approval (configurable via systemConfig)
- * - Due date is set to end of day (23:59:59) to give full day
- * - availableCopies is decremented to prevent over-borrowing
- * 
- * @param recordId - UUID of the borrow record to approve
- * @returns Success/error response
+ * @param recordId - UUID of the borrow record.
+ * @returns Success status or detailed error message.
  */
 export const approveBorrowRequest = async (recordId: string) => {
   try {
@@ -125,7 +125,6 @@ export const approveBorrowRequest = async (recordId: string) => {
 
     const adminId = user.id;
 
-    // Get the borrow record with user context
     const record = await db
       .select({
         bookId: borrowRecords.bookId,
@@ -139,7 +138,6 @@ export const approveBorrowRequest = async (recordId: string) => {
       return { success: false, error: "Borrow record not found" };
     }
 
-    // Check if book is still available (prevent over-borrowing)
     const book = await db
       .select({ 
         availableCopies: books.availableCopies,
@@ -154,29 +152,26 @@ export const approveBorrowRequest = async (recordId: string) => {
     }
 
     const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 7); // 7 days from now
-    dueDate.setHours(23, 59, 59, 999); // Set to end of day
-    const dueDateString = dueDate.toISOString().split("T")[0]; // Format as YYYY-MM-DD
+    dueDate.setDate(dueDate.getDate() + 7); // Standard 7-day loan period
+    dueDate.setHours(23, 59, 59, 999); // Due by the end of the day
+    const dueDateString = dueDate.toISOString().split("T")[0];
 
-    // Update borrow record status to BORROWED and set borrowedBy and dueDate
     await db
       .update(borrowRecords)
       .set({
         status: "BORROWED",
         borrowedBy: adminId,
-        dueDate: dueDateString, // Set due date when approved
+        dueDate: dueDateString,
         updatedAt: new Date(),
         updatedBy: adminId,
       })
       .where(eq(borrowRecords.id, recordId));
 
-    // Decrement available copies
     await db
       .update(books)
       .set({ availableCopies: book[0].availableCopies - 1 })
       .where(eq(books.id, record[0].bookId));
 
-    // Send notification to the student
     await createNotification({
       userId: record[0].userId,
       title: "Borrow Request Approved",
@@ -184,7 +179,6 @@ export const approveBorrowRequest = async (recordId: string) => {
       type: "SUCCESS",
     });
 
-    // Log the action
     await logAdminAction(adminId!, "APPROVE_BORROW", recordId, "BORROW_RECORD", {
       bookId: record[0].bookId,
       userId: record[0].userId,
@@ -200,7 +194,13 @@ export const approveBorrowRequest = async (recordId: string) => {
 };
 
 /**
- * Reject a pending borrow request.
+ * Rejects a pending borrow request.
+ * 
+ * Note: Currently deletes the record for simplicity. In audit-heavy environments, 
+ * this should be changed to a status update (e.g., 'REJECTED').
+ * 
+ * @param recordId - UUID of the request.
+ * @returns Success status or error.
  */
 export const rejectBorrowRequest = async (recordId: string) => {
   try {
@@ -212,7 +212,6 @@ export const rejectBorrowRequest = async (recordId: string) => {
 
     const adminId = user.id;
 
-    // Get record info before deleting
     const record = await db
       .select({
         bookId: borrowRecords.bookId,
@@ -226,11 +225,8 @@ export const rejectBorrowRequest = async (recordId: string) => {
       return { success: false, error: "Borrow record not found" };
     }
 
-    // For now, we'll just delete the pending request
-    // In a real system, you might want to keep it for audit purposes
     await db.delete(borrowRecords).where(eq(borrowRecords.id, recordId));
 
-    // Log the action
     await logAdminAction(adminId!, "REJECT_BORROW", recordId, "BORROW_RECORD", {
       bookId: record[0].bookId,
       userId: record[0].userId,
@@ -246,46 +242,23 @@ export const rejectBorrowRequest = async (recordId: string) => {
 };
 
 /**
- * Update fines for overdue books (without returning them)
+ * Periodically updates fines for books that are overdue but not yet returned.
  * 
- * This function is called by automation/admin to calculate fines for overdue books.
+ * Logic:
+ * - Only targets records where `status` is 'BORROWED' and `dueDate` < current date.
+ * - Idempotency: Only updates records where `fineAmount` is currently 0 or NULL 
+ *   to avoid accidental overcharging or overwriting manual adjustments.
  * 
- * Business Logic:
- * - Only updates books that are BORROWED and overdue (dueDate < today)
- * - Only updates books that don't have fines calculated yet (fineAmount is NULL or 0.00)
- * - Fine = (days overdue) × dailyFineAmount
- * - Days overdue = floor((today - dueDate) / 1 day)
- * 
- * Why only update books without fines?
- * - Prevents recalculating fines that were already set
- * - Fair to users (fine is calculated once, not continuously increasing)
- * - Fine is recalculated when book is returned if needed
- * 
- * @param customFineAmount - Optional override for daily fine amount (for testing)
- * @returns Array of updated records with fine details
+ * @param customFineAmount - Optional daily rate override.
+ * @returns List of updated records and their calculated fines.
  */
 export const updateOverdueFines = async (customFineAmount?: number) => {
   const today = new Date();
 
-  /**
-   * Import getDailyFineAmount dynamically to avoid circular dependency
-   * 
-   * Circular dependency can occur if:
-   * - borrow.ts imports config.ts
-   * - config.ts imports borrow.ts
-   * 
-   * Dynamic import breaks the cycle by loading at runtime instead of module load time
-   */
+  // Dynamic import to resolve circular dependency with config.ts
   const { getDailyFineAmount } = await import("./config");
   const dailyFineAmount = customFineAmount || (await getDailyFineAmount());
 
-  /**
-   * Only update fines for overdue books that don't have fines calculated yet
-   * 
-   * This ensures we don't change existing fine amounts unfairly.
-   * For example, if a fine was manually adjusted by an admin, we don't want
-   * to overwrite it with an automated calculation.
-   */
   const overdueRecords = await db
     .select({
       id: borrowRecords.id,
@@ -298,7 +271,6 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
       and(
         eq(borrowRecords.status, "BORROWED"),
         sql`${borrowRecords.dueDate} < ${today}`,
-        // Only update records that don't have fines calculated yet
         sql`${borrowRecords.fineAmount} IS NULL OR ${borrowRecords.fineAmount} = '0.00'`
       )
     );
@@ -339,24 +311,25 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
   return results;
 };
 
-// Force update fines for ALL overdue books (for testing/admin purposes)
 /**
- * Force recalculation of all overdue fines (admin/testing).
+ * Forcefully recalculates fines for all overdue books, regardless of current state.
+ * Primarily used for maintenance or after system-wide fine rate changes.
+ * 
+ * @param customFineAmount - Daily rate override.
+ * @returns Detailed results of the recalculation.
  */
 export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
   const today = new Date();
 
-  // Import getDailyFineAmount dynamically to avoid circular dependency
   const { getDailyFineAmount } = await import("./config");
   const dailyFineAmount = customFineAmount || (await getDailyFineAmount());
 
-  // Update ALL overdue books regardless of existing fine amounts
   const overdueRecords = await db
     .select({
       id: borrowRecords.id,
       userId: borrowRecords.userId,
       dueDate: borrowRecords.dueDate,
-      currentFineAmount: borrowRecords.fineAmount, // Add this to see current value
+      currentFineAmount: borrowRecords.fineAmount,
     })
     .from(borrowRecords)
     .where(
@@ -381,7 +354,6 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
       const fineAmount =
         daysOverdue > 0 ? (daysOverdue * dailyFineAmount).toFixed(2) : "0.00";
 
-      // Use explicit transaction to ensure commit
       await db
         .update(borrowRecords)
         .set({
@@ -391,7 +363,6 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
         })
         .where(eq(borrowRecords.id, record.id));
 
-      // Verify the update was successful by reading back from database
       const verifyResult = await db
         .select({ id: borrowRecords.id, fineAmount: borrowRecords.fineAmount })
         .from(borrowRecords)
@@ -409,12 +380,24 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
     }
   }
 
-  // Add a small delay to ensure database consistency
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   return results;
 };
 
+/**
+ * Processes the return of a borrowed book.
+ * 
+ * Workflow:
+ * 1. Authorization: Checks for ADMIN role.
+ * 2. Logistics: Calculates final fine if the book is overdue.
+ * 3. Persistence: Updates record status to 'RETURNED' and sets return date/processed by.
+ * 4. Inventory: Increments the `availableCopies` for the book.
+ * 5. Audit: Logs the return action with fine details.
+ * 
+ * @param recordId - UUID of the loan record.
+ * @returns Summary of fines and overdue status.
+ */
 export const returnBook = async (recordId: string) => {
   try {
     const session = await auth();
@@ -426,7 +409,6 @@ export const returnBook = async (recordId: string) => {
     const adminId = user.id;
     const today = new Date().toISOString().split("T")[0];
 
-    // Get the borrow record details first with user context
     const record = await db
       .select({
         bookId: borrowRecords.bookId,
@@ -442,7 +424,7 @@ export const returnBook = async (recordId: string) => {
       return { success: false, error: "Borrow record not found" };
     }
 
-    // Calculate fine if overdue
+    // Final Fine Calculation
     const dueDate = record[0].dueDate ? new Date(record[0].dueDate) : null;
     const returnDate = new Date(today);
     const daysOverdue = dueDate
@@ -454,9 +436,8 @@ export const returnBook = async (recordId: string) => {
         )
       : 0;
     const fineAmount =
-      daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00"; // $1 per day overdue
+      daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00"; // $1 per day overdue rate
 
-    // Update borrow record with enhanced tracking
     await db
       .update(borrowRecords)
       .set({
@@ -470,7 +451,6 @@ export const returnBook = async (recordId: string) => {
       })
       .where(eq(borrowRecords.id, recordId));
 
-    // Update available copies
     const book = await db
       .select({ availableCopies: books.availableCopies })
       .from(books)
@@ -484,7 +464,6 @@ export const returnBook = async (recordId: string) => {
         .where(eq(books.id, record[0].bookId));
     }
 
-    // Log the action
     await logAdminAction(adminId!, "RETURN_BOOK", recordId, "BORROW_RECORD", {
       bookId: record[0].bookId,
       userId: record[0].userId,
