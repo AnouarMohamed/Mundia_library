@@ -2,7 +2,7 @@
  * Renewal Management Server Actions (Student)
  * 
  * This file contains server actions for students to manage their book renewals.
- * These actions are designed to be modular, scalable, and heavily documented.
+ * It handles the lifecycle of a renewal request from the student's perspective.
  * 
  * Key Operations:
  * - Requesting a book renewal
@@ -18,37 +18,44 @@ import { auth } from "@/auth";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
 /**
- * Interface for renewal request parameters
+ * Parameters required to submit a renewal request.
  */
 export interface RequestRenewalParams {
+  /** The unique ID of the original borrow record. */
   borrowRecordId: string;
+  /** Optional explanation from the student for why they need the renewal. */
   reason?: string;
 }
 
 /**
- * Interface for renewal request response
+ * Standardized response for renewal operations.
  */
 export interface RenewalResponse {
+  /** Indicates if the operation was successful. */
   success: boolean;
+  /** Feedback message for the user on success. */
   message?: string;
+  /** Error message for the user on failure. */
   error?: string;
 }
 
 /**
- * Request a renewal for a currently borrowed book
+ * Submits a request to extend the due date of a currently borrowed book.
  * 
- * Business Logic:
- * 1. Authenticate the user.
- * 2. Validate the borrow record exists and belongs to the user.
- * 3. Ensure the book is currently in "BORROWED" status.
- * 4. Check if there's already a "PENDING" renewal request for this record.
- * 5. Create a new renewal request record.
+ * Business Logic Lifecycle:
+ * 1. Authentication: Ensures the request is coming from a logged-in user.
+ * 2. Ownership Verification: Confirms that the borrow record exists and actually
+ *    belongs to the authenticated student.
+ * 3. Status Check: Validates that the book is currently in the "BORROWED" state.
+ *    Renewals cannot be requested for pending, returned, or cancelled loans.
+ * 4. Duplicate Prevention: Ensures there isn't already a pending renewal request
+ *    for this specific loan to avoid redundant administrative work.
+ * 5. Persistence: Creates a new entry in the `renewalRequests` table.
+ * 6. UI Synchronization: Triggers a revalidation of catalog tags to update the 
+ *    user's profile view.
  * 
- * @param params - The borrow record ID and optional reason for renewal.
- * @returns A promise resolving to a success or error response.
- */
-/**
- * Submit a renewal request for a borrow record.
+ * @param params - The borrow record ID and optional reason.
+ * @returns A promise resolving to a success or error response object.
  */
 export async function requestRenewal(params: RequestRenewalParams): Promise<RenewalResponse> {
   const { borrowRecordId, reason } = params;
@@ -62,7 +69,7 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
 
     const userId = session.user.id;
 
-    // 2. Validate the borrow record
+    // 2. Validate the borrow record and ownership
     const [record] = await db
       .select({
         status: borrowRecords.status,
@@ -76,7 +83,6 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
       return { success: false, error: "Borrow record not found." };
     }
 
-    // Ensure the record belongs to the authenticated user
     if (record.userId !== userId) {
       return { success: false, error: "Unauthorized: This borrow record does not belong to you." };
     }
@@ -102,7 +108,7 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
       return { success: false, error: "A renewal request for this book is already pending approval." };
     }
 
-    // 5. Create the renewal request
+    // 5. Create the renewal request record
     await db.insert(renewalRequests).values({
       borrowRecordId,
       userId: userId!,
@@ -110,7 +116,7 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
       status: "PENDING",
     });
 
-    // Revalidate tags to update the UI
+    // 6. Refresh UI data
     revalidateCatalogTags();
 
     return { 
@@ -128,15 +134,19 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
 }
 
 /**
- * Check if a user is eligible to request a renewal for a specific book
+ * Checks if the current user is eligible to request a renewal for a specific loan.
  * 
- * Useful for conditionally rendering the "Request Renewal" button in the UI.
+ * This utility function is primarily used to control the visibility of the
+ * "Request Renewal" button in the student's dashboard.
  * 
- * @param borrowRecordId - The ID of the borrow record to check.
- * @returns A promise resolving to a boolean indicating eligibility.
- */
-/**
- * Check if the current user can request renewal.
+ * Eligibility Criteria:
+ * - User must be authenticated.
+ * - Borrow record must belong to the user.
+ * - Current status of the loan must be "BORROWED".
+ * - No other "PENDING" renewal requests must exist for this loan.
+ * 
+ * @param borrowRecordId - The ID of the borrow record to verify.
+ * @returns A promise resolving to true if eligible, false otherwise.
  */
 export async function canRequestRenewal(borrowRecordId: string): Promise<boolean> {
   try {
@@ -152,11 +162,12 @@ export async function canRequestRenewal(borrowRecordId: string): Promise<boolean
       .where(eq(borrowRecords.id, borrowRecordId))
       .limit(1);
 
+    // Basic ownership and status check
     if (!record || record.userId !== session.user.id || record.status !== "BORROWED") {
       return false;
     }
 
-    // Check if there's already a pending request
+    // Check for existing pending request
     const [pendingRequest] = await db
       .select({ id: renewalRequests.id })
       .from(renewalRequests)

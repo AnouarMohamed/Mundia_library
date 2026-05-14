@@ -8,7 +8,12 @@ import { sha256 } from "@noble/hashes/sha256";
 import { randomBytes } from "@noble/hashes/utils";
 
 /**
- * Concatenate two Uint8Array buffers.
+ * Concatenates two Uint8Array buffers into a single buffer.
+ * Used primarily for combining password bytes with salt bytes before hashing.
+ * 
+ * @param a - First buffer.
+ * @param b - Second buffer.
+ * @returns Combined buffer.
  */
 function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
   const c = new Uint8Array(a.length + b.length);
@@ -25,7 +30,15 @@ import config from "@/lib/config";
 import { isTransientDbError, withDbRetry } from "@/lib/db/retry";
 
 /**
- * Sign in using credential-based auth.
+ * Server action to authenticate a user using email and password credentials.
+ * 
+ * Flow:
+ * 1. Enforces rate limiting based on the client IP.
+ * 2. Invokes NextAuth `signIn` with the 'credentials' provider.
+ * 3. Returns success status or an error message.
+ * 
+ * @param params - Object containing user email and password.
+ * @returns Success status or error object.
  */
 export const signInWithCredentials = async (
   params: Pick<AuthCredentials, "email" | "password">
@@ -56,7 +69,24 @@ export const signInWithCredentials = async (
 };
 
 /**
- * Register a new user account and sign them in.
+ * Server action to register a new student account.
+ * 
+ * Security Features:
+ * - Rate limiting by IP to prevent registration spam.
+ * - Password hashing using SHA-256 with a unique 16-byte random salt per user.
+ * - Database retry logic for transient connectivity issues.
+ * - Explicit validation of University ID ranges and uniqueness.
+ * 
+ * Flow:
+ * 1. Validates University ID constraints (8-digit limit).
+ * 2. Checks for existing users with the same email or University ID.
+ * 3. Generates salt and hashes the password.
+ * 4. Inserts the new user into the database.
+ * 5. Optionally triggers an onboarding workflow via Upstash QStash.
+ * 6. Automatically signs the user in upon successful registration.
+ * 
+ * @param params - Full student registration details.
+ * @returns Success status or field-specific error messages.
  */
 export const signUp = async (params: AuthCredentials) => {
   const { fullName, email, universityId, password, universityCard } = params;

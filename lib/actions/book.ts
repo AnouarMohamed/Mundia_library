@@ -7,19 +7,22 @@ import { eq } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 
 /**
- * Parameters for borrowing a book
+ * Parameters required to initiate a book borrow request.
  */
 export interface BorrowBookParams {
+  /** The unique ID of the student borrowing the book. */
   userId: string;
+  /** The unique ID of the book being borrowed. */
   bookId: string;
 }
 
 /**
- * Response type for borrow book operation
+ * Standardized response for the borrow book operation.
  */
 export type BorrowBookResponse =
   | {
       success: true;
+      /** The newly created borrow record(s). */
       data: Array<{
         id: string;
         userId: string;
@@ -41,18 +44,23 @@ export type BorrowBookResponse =
     }
   | {
       success: false;
+      /** Error message describing why the request failed. */
       error: string;
     };
 
 /**
- * Borrow a book for a user
- * Creates a PENDING borrow request that requires admin approval
+ * Initiates a borrow request for a specific book.
+ * 
+ * Flow:
+ * 1. Checks if the book exists and has available copies.
+ * 2. Creates a new record in `borrowRecords` with a 'PENDING' status.
+ * 3. Triggers catalog cache revalidation to reflect the new state.
+ * 
+ * Note: Available copies are NOT decremented at this stage. 
+ * This happens only after an administrator approves the request.
  *
- * @param params - Borrow book parameters (userId, bookId)
- * @returns Promise with success status and data or error message
- */
-/**
- * Create a borrow request for a user/book pair.
+ * @param params - The userId and bookId for the request.
+ * @returns A promise resolving to the created record or an error message.
  */
 export const borrowBook = async (
   params: BorrowBookParams
@@ -60,6 +68,7 @@ export const borrowBook = async (
   const { userId, bookId } = params;
 
   try {
+    // 1. Availability check
     const book = await db
       .select({ availableCopies: books.availableCopies })
       .from(books)
@@ -75,13 +84,14 @@ export const borrowBook = async (
 
     const recordId = randomUUID();
 
+    // 2. Insert pending record
     await db
       .insert(borrowRecords)
       .values({
         id: recordId,
         userId,
         bookId,
-        dueDate: null, // Will be set when admin approves
+        dueDate: null, // Set during admin approval
         status: "PENDING",
       });
 
@@ -98,16 +108,15 @@ export const borrowBook = async (
       };
     }
 
-    // Don't decrement available copies until admin approves
-
+    // 3. Cache maintenance
     revalidateCatalogTags();
 
     return {
       success: true,
-      data: [record], // Return as array to match the response type
+      data: [record],
     };
   } catch (error: unknown) {
-    console.log(error);
+    console.error("Borrow operation failed:", error);
 
     return {
       success: false,
