@@ -1,16 +1,37 @@
+/**
+ * Administrative Dashboard Data Aggregation
+ * 
+ * This file contains the "hub" for dashboard metrics. It aggregates data from 
+ * across the system (users, books, borrows) into a single, highly-performant 
+ * cached object.
+ */
+
 import { db } from "@/database/drizzle";
 import { books, borrowRecords, users } from "@/database/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
 /**
- * Normalize numeric aggregates into finite numbers.
+ * Utility to safely normalize numeric database aggregates into finite JavaScript numbers.
+ * Prevents issues with nulls or non-numeric results from complex SQL fragments.
+ * 
+ * @param value - The value to normalize.
+ * @returns A finite number (defaults to 0).
  */
 const toNumber = (value: unknown): number => {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+/**
+ * Core dashboard data fetcher with built-in Next.js caching.
+ * 
+ * Performance Strategy:
+ * - Uses `unstable_cache` to store the aggregated result for 10 seconds.
+ * - Tagged with `admin-stats`, `books`, `borrow-records`, and `users` to allow
+ *   targeted revalidation when data changes in any of these domains.
+ * - Executes all sub-queries in parallel using `Promise.all` for minimal latency.
+ */
 const getCachedAdminDashboardStats = unstable_cache(
   async () => {
     const fourteenDaysAgo = new Date();
@@ -28,6 +49,7 @@ const getCachedAdminDashboardStats = unstable_cache(
       topRatedBooksResult,
       borrowTrendsResult,
     ] = await Promise.all([
+      // 1. User Account Statistics
       db
         .select({
           totalUsers: sql<number>`count(*)`,
@@ -39,6 +61,7 @@ const getCachedAdminDashboardStats = unstable_cache(
             sql<number>`coalesce(sum(case when ${users.role} = 'ADMIN' then 1 else 0 end), 0)`,
         })
         .from(users),
+      // 2. Catalog Inventory Statistics
       db
         .select({
           totalBooks: sql<number>`count(*)`,
@@ -57,6 +80,7 @@ const getCachedAdminDashboardStats = unstable_cache(
             sql<number>`coalesce(avg(${books.pageCount}), 0)`,
         })
         .from(books),
+      // 3. Current Borrow State
       db
         .select({
           activeBorrows:
@@ -67,6 +91,7 @@ const getCachedAdminDashboardStats = unstable_cache(
             sql<number>`coalesce(sum(case when ${borrowRecords.status} = 'RETURNED' then 1 else 0 end), 0)`,
         })
         .from(borrowRecords),
+      // 4. Activity Feeds
       db
         .select({
           id: borrowRecords.id,
@@ -89,6 +114,7 @@ const getCachedAdminDashboardStats = unstable_cache(
         .from(users)
         .orderBy(desc(users.createdAt))
         .limit(5),
+      // 5. Categorical Breakdown (Genres)
       db
         .select({
           genre: books.genre,
@@ -103,6 +129,7 @@ const getCachedAdminDashboardStats = unstable_cache(
         .groupBy(books.genre)
         .orderBy(sql`count(*) desc`)
         .limit(8),
+      // 6. Chronological Distribution (Publication Years)
       db
         .select({
           year: books.publicationYear,
@@ -113,6 +140,7 @@ const getCachedAdminDashboardStats = unstable_cache(
         .groupBy(books.publicationYear)
         .orderBy(desc(books.publicationYear))
         .limit(10),
+      // 7. Linguistic Breakdown
       db
         .select({
           language: books.language,
@@ -123,6 +151,7 @@ const getCachedAdminDashboardStats = unstable_cache(
         .groupBy(books.language)
         .orderBy(sql`count(*) desc`)
         .limit(6),
+      // 8. Quality Metrics (Top Rated)
       db
         .select({
           id: books.id,
@@ -134,6 +163,7 @@ const getCachedAdminDashboardStats = unstable_cache(
         .where(eq(books.isActive, true))
         .orderBy(desc(books.rating), desc(books.createdAt))
         .limit(6),
+      // 9. Operational Trends (Last 14 days)
       db
         .select({
           date: sql<string>`DATE(${borrowRecords.createdAt})`,
@@ -216,7 +246,14 @@ const getCachedAdminDashboardStats = unstable_cache(
 );
 
 /**
- * Fetch admin dashboard statistics with caching.
+ * Public accessor for administrative dashboard statistics.
+ * 
+ * Flow:
+ * 1. Invokes the cached fetcher.
+ * 2. Handles any potential database or runtime errors gracefully.
+ * 3. Returns a structured response suitable for consumption by Client Components.
+ * 
+ * @returns Object with success status and the aggregated dashboard data.
  */
 export const getAdminDashboardStats = async () => {
   try {
