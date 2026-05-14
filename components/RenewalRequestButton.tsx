@@ -1,9 +1,9 @@
 /**
  * RenewalRequestButton Component
- * 
+ *
  * A client component that allows students to request a renewal for a borrowed book.
  * It includes a dialog to provide an optional reason for the renewal.
- * 
+ *
  * Features:
  * - Checks eligibility before allowing the request.
  * - Displays a loading state during the submission.
@@ -13,14 +13,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogDescription
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,9 +33,9 @@ interface RenewalRequestButtonProps {
   bookTitle: string;
 }
 
-const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({ 
-  borrowRecordId, 
-  bookTitle 
+const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
+  borrowRecordId,
+  bookTitle,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -56,14 +56,14 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const result = await requestRenewal({ 
-        borrowRecordId, 
-        reason: reason.trim() || undefined 
+      const result = await requestRenewal({
+        borrowRecordId,
+        reason: reason.trim() || undefined,
       });
 
       if (result.success) {
         toast({
-          title: "Request Submitted",
+          title: "Request submitted",
           description: result.message,
           variant: "default",
         });
@@ -71,7 +71,7 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
         setIsEligible(false); // Disable button after successful request
       } else {
         toast({
-          title: "Request Failed",
+          title: "Request failed",
           description: result.error,
           variant: "destructive",
         });
@@ -93,49 +93,51 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="flex items-center gap-1 border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex min-h-11 items-center gap-1 border-white/15 bg-white/5 text-light-100 hover:border-primary hover:bg-white/10"
         >
           <RotateCcw className="size-3 sm:size-4" />
-          <span>Request Renewal</span>
+          <span>Request renewal</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="surface-panel border-white/10 sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Request Renewal</DialogTitle>
+          <DialogTitle className="text-light-100">Request renewal</DialogTitle>
           <DialogDescription>
-            Request to extend the due date for <strong>{bookTitle}</strong> by 7 days.
+            Request to extend the due date for <strong>{bookTitle}</strong> by 7
+            days.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex flex-col gap-2">
             <label htmlFor="reason" className="text-sm font-medium">
-              Reason (Optional)
+              Reason (optional)
             </label>
             <Textarea
               id="reason"
               placeholder="Why do you need more time?"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="resize-none"
+              className="app-control min-h-24 resize-none py-3"
               rows={3}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => setIsOpen(false)}
             disabled={isLoading}
+            className="text-light-100 hover:bg-white/10 hover:text-light-100"
           >
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             disabled={isLoading}
-            className="bg-purple-600 hover:bg-purple-700"
+            className="bg-primary text-dark-100 hover:bg-primary/90"
           >
             {isLoading ? (
               <>
@@ -143,7 +145,7 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
                 Submitting...
               </>
             ) : (
-              "Submit Request"
+              "Submit request"
             )}
           </Button>
         </DialogFooter>

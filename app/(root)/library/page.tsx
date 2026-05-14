@@ -55,7 +55,7 @@ const Page = async () => {
   } catch (error) {
     console.error("Failed to fetch books for /library:", error);
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.65)] p-6 text-center sm:p-8">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
         <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
           Library
         </h1>
@@ -76,7 +76,7 @@ const Page = async () => {
 
   if (topBooks.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.65)] p-6 text-center sm:p-8">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
         <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
           Library
         </h1>

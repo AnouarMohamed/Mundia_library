@@ -132,7 +132,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-56 rounded-2xl border border-white/10 bg-[rgba(7,14,22,0.96)] p-1 text-light-100 shadow-2xl backdrop-blur-xl sm:w-64"
+        className="w-56 rounded-2xl border border-white/10 bg-[var(--surface-card-strong)] p-1 text-light-100 shadow-2xl sm:w-64"
       >
         <DropdownMenuLabel className="rounded-xl bg-white/5 px-2.5 py-1.5 sm:px-3 sm:py-2">
           <div className="space-y-0.5 sm:space-y-1">

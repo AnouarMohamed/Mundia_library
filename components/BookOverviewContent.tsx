@@ -171,8 +171,20 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
   return (
     <section className="book-overview motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d6b86d]/60 to-transparent" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-px w-full bg-gradient-to-r from-[#86bccb]/45 via-transparent to-[#d6b86d]/45" />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background:
+            "linear-gradient(90deg, transparent, oklch(78% 0.105 88 / 0.6), transparent)",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 left-0 h-px w-full"
+        style={{
+          background:
+            "linear-gradient(90deg, oklch(72% 0.08 212 / 0.45), transparent, oklch(78% 0.105 88 / 0.45))",
+        }}
+      />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-5 sm:gap-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -307,7 +319,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
           <div className="pointer-events-none absolute -left-5 -top-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] rounded-[1.4rem] border border-white/10 bg-white/5" />
           <BookCover
             variant="wide"
-            className="z-10 drop-shadow-[0_18px_26px_rgba(0,0,0,0.45)]"
+            className="z-10 drop-shadow-2xl"
             coverColor={coverColor}
             coverImage={coverUrl}
           />

@@ -92,7 +92,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
       {/* Mobile Menu Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/75 backdrop-blur-[2px] md:hidden"
+          className="fixed inset-0 z-40 bg-[var(--mundia-veil)] md:hidden"
           onClick={closeMenu}
           aria-hidden="true"
         />
@@ -100,7 +100,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
 
       {/* Mobile Menu Drawer */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full w-4/5 border-l border-white/10 bg-[rgba(7,14,22,0.98)] shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed right-0 top-0 z-50 h-full w-4/5 border-l border-white/10 bg-[var(--surface-card-strong)] shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -156,7 +156,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
                   e.stopPropagation();
                   closeMenu();
                 }}
-                className="text-light-100 hover:text-light-200 focus:outline-none"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-full text-light-100 transition hover:bg-white/10 hover:text-light-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label="Close menu"
               >
                 <X className="size-5 sm:size-6" />

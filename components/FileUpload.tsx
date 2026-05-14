@@ -23,7 +23,7 @@ const authenticator = async () => {
       const errorText = await response.text();
 
       throw new Error(
-        `Request failed with status ${response.status}: ${errorText}`
+        `Request failed with status ${response.status}: ${errorText}`,
       );
     }
 
@@ -95,11 +95,11 @@ const FileUpload = ({
    * @param error - Error object from ImageKit upload
    */
   const onError = (error: unknown): void => {
-    console.log(error);
+    void error;
 
     showToast.error(
       `${type === "image" ? "Image" : "Video"} Upload Failed`,
-      `Your ${type} could not be uploaded. Please try again.`
+      `Your ${type} could not be uploaded. Please try again.`,
     );
   };
 
@@ -137,7 +137,7 @@ const FileUpload = ({
 
     showToast.success(
       ` ${type === "image" ? "Image" : "Video"} Uploaded Successfully!`,
-      `${response.filePath} has been uploaded and is ready to use.`
+      `${response.filePath} has been uploaded and is ready to use.`,
     );
   };
 
@@ -152,7 +152,7 @@ const FileUpload = ({
       if (file.size > 20 * 1024 * 1024) {
         showToast.error(
           " File Too Large",
-          "Image files must be smaller than 20MB. Please compress your image and try again."
+          "Image files must be smaller than 20MB. Please compress your image and try again.",
         );
 
         return false;
@@ -161,7 +161,7 @@ const FileUpload = ({
       if (file.size > 50 * 1024 * 1024) {
         showToast.error(
           " File Too Large",
-          "Video files must be smaller than 50MB. Please compress your video and try again."
+          "Video files must be smaller than 50MB. Please compress your video and try again.",
         );
         return false;
       }
@@ -193,7 +193,7 @@ const FileUpload = ({
       setProgress(100);
       showToast.success(
         `${type === "image" ? "Image" : "Video"} Selected`,
-        "The file is stored with the form because no upload provider is configured."
+        "The file is stored with the form because no upload provider is configured.",
       );
     };
     reader.onerror = () => onError(reader.error);
@@ -228,7 +228,7 @@ const FileUpload = ({
           <p
             className={cn(
               "upload-filename break-all text-[10px] sm:text-xs",
-              styles.text
+              styles.text,
             )}
           >
             {file.filePath}

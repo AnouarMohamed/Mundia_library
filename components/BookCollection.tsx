@@ -527,7 +527,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
           {/* Books Grid */}
           {books.length === 0 ? (
-            <Card className="rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.58)]">
+            <Card className="rounded-2xl border border-white/10 bg-[var(--surface-card)]">
               <CardContent className="p-4 text-center sm:p-8">
                 <p className="text-sm text-light-200/70 sm:text-base">
                   No books found matching your criteria.
@@ -558,7 +558,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 variant="outline"
                 onClick={() => handlePageChange(pagination.currentPage - 1)}
                 disabled={pagination.currentPage === 1}
-                className="rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
+                className="min-h-11 rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
               >
                 Previous
               </Button>
@@ -579,7 +579,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                             : "outline"
                         }
                         onClick={() => handlePageChange(pageNum)}
-                        className={`h-8 w-8 rounded-xl text-xs sm:h-10 sm:w-10 sm:text-sm ${
+                        className={`h-11 w-11 rounded-xl text-xs sm:text-sm ${
                           pageNum === pagination.currentPage
                             ? "border border-primary/60 bg-primary text-dark-100 hover:bg-primary/95"
                             : "border-white/20 bg-white/5 text-light-100 hover:bg-white/10"
@@ -596,7 +596,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 variant="outline"
                 onClick={() => handlePageChange(pagination.currentPage + 1)}
                 disabled={pagination.currentPage === pagination.totalPages}
-                className="rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
+                className="min-h-11 rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
               >
                 Next
               </Button>

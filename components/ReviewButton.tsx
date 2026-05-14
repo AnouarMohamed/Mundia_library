@@ -42,7 +42,7 @@ export default function ReviewButton({
   // Use React Query hook for eligibility check with SSR initial data
   const { data: eligibility, isLoading } = useReviewEligibility(
     bookId,
-    initialReviewEligibility
+    initialReviewEligibility,
   );
 
   const canReview = eligibility?.canReview || false;
@@ -62,10 +62,12 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="flex items-center gap-1.5 border-gray-600 bg-gray-700/50 text-light-200/50 sm:gap-2"
+        className="flex items-center gap-1.5 border-white/15 bg-white/5 text-light-200/50 sm:gap-2"
       >
         <MessageCircle className="size-4 text-light-200/50 sm:size-5" />
-        <p className="font-bebas-neue text-base text-light-200/50 sm:text-xl">Loading...</p>
+        <span className="text-sm font-semibold text-light-200/50">
+          Loading...
+        </span>
       </Button>
     );
   }
@@ -74,12 +76,12 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="hover:bg-primary/90 mt-3 min-h-12 w-full bg-primary text-dark-100 sm:mt-4 sm:min-h-14 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-6" />
-        <p className="font-bebas-neue text-base text-dark-100 sm:text-xl">
-          Review Submitted
-        </p>
+        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
+        <span className="text-sm font-semibold text-dark-100">
+          Review submitted
+        </span>
       </Button>
     );
   }
@@ -88,14 +90,14 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="hover:bg-primary/90 mt-3 min-h-12 w-full bg-primary text-dark-100 sm:mt-4 sm:min-h-14 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-6" />
-        <p className="font-bebas-neue text-base text-dark-100 sm:text-xl">
+        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
+        <span className="text-sm font-semibold text-dark-100">
           {isCurrentlyBorrowed
-            ? "Return Borrow Book to Review"
+            ? "Return borrowed book to review"
             : "Borrow Book to Review"}
-        </p>
+        </span>
       </Button>
     );
   }
@@ -104,12 +106,12 @@ export default function ReviewButton({
     <>
       <Button
         onClick={() => setShowDialog(true)}
-        className="hover:bg-primary/90 mt-3 min-h-12 w-full bg-primary text-dark-100 sm:mt-4 sm:min-h-14 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-6" />
-        <p className="font-bebas-neue text-base text-dark-100 sm:text-xl">
-          Review This Book
-        </p>
+        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
+        <span className="text-sm font-semibold text-dark-100">
+          Review this book
+        </span>
       </Button>
 
       <ReviewFormDialog

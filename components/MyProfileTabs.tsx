@@ -713,9 +713,9 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
       return (
         <Card
-          className={`mb-4 overflow-hidden rounded-[1.4rem] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_52px_rgba(1,7,12,0.28)] ${
+          className={`mb-4 overflow-hidden rounded-[1.4rem] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl ${
             record.status === "PENDING"
-              ? "border-[#d6b86d]/35 bg-[rgba(214,184,109,0.08)]"
+              ? "border-[var(--mundia-gold)] bg-[var(--surface-card)]"
               : record.status === "BORROWED" && isOverdue
                 ? "border-red-400/45 bg-red-950/20"
                 : record.status === "BORROWED" &&
@@ -723,10 +723,10 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                     !isOverdue
                   ? "border-orange-300/45 bg-orange-950/20"
                   : record.status === "BORROWED"
-                    ? "border-[#86bccb]/35 bg-[rgba(134,188,203,0.08)]"
+                    ? "border-[var(--mundia-teal)] bg-[var(--surface-card)]"
                     : record.status === "RETURNED"
                       ? "border-emerald-400/35 bg-emerald-950/15"
-                      : "border-white/10 bg-[rgba(8,25,35,0.72)]"
+                      : "border-white/10 bg-[var(--surface-card)]"
           }`}
         >
           <CardContent className="p-3 sm:p-4">
@@ -924,7 +924,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                           returningRecordIdRef.current === record.id) ||
                         returningRecordIdRef.current === record.id
                       }
-                      className={`flex items-center gap-1 rounded px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-sm ${
+                      className={`flex min-h-11 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-sm ${
                         isOverdue
                           ? "bg-red-600 text-white hover:bg-red-700"
                           : "bg-orange-600 text-white hover:bg-orange-700"
@@ -942,7 +942,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                   {record.status !== "RETURNED" && (
                     <button
                       onClick={handleViewDetails}
-                      className="flex items-center gap-1 rounded bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 sm:px-3 sm:text-sm"
+                      className="flex min-h-11 items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 sm:px-3 sm:text-sm"
                     >
                       <Eye className="size-3 sm:size-4" />
                       <span>View Details</span>
@@ -952,7 +952,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                   {record.status === "RETURNED" && (
                     <button
                       onClick={handleViewDetails}
-                      className="flex items-center gap-1 rounded bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:px-3 sm:text-sm"
+                      className="flex min-h-11 items-center gap-1 rounded-lg bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:px-3 sm:text-sm"
                     >
                       <Star className="size-3 sm:size-4" />
                       <span>Review Book</span>
@@ -1024,7 +1024,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         <TabsList className="catalog-toolbar flex h-auto w-full flex-wrap gap-2 p-2 sm:grid sm:grid-cols-3">
           <TabsTrigger
             value="active"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#86bccb]/50 data-[state=active]:bg-[#86bccb] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-teal)] data-[state=active]:bg-[var(--mundia-teal)] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Active</span>
@@ -1038,7 +1038,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="pending"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#d6b86d]/50 data-[state=active]:bg-[#d6b86d] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-gold)] data-[state=active]:bg-[var(--mundia-gold)] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Pending</span>
@@ -1052,7 +1052,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="history"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[#7b2746]/60 data-[state=active]:bg-[#7b2746] data-[state=active]:text-white data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-burgundy)] data-[state=active]:bg-[var(--mundia-burgundy)] data-[state=active]:text-light-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Borrow</span>
@@ -1144,16 +1144,16 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                           Total Borrows
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[#86bccb]/25 bg-[#86bccb]/10 p-2 text-center">
-                        <p className="text-lg font-bold text-[#bfe2eb] sm:text-xl">
+                      <div className="rounded-xl border border-[var(--mundia-teal)] bg-white/5 p-2 text-center">
+                        <p className="text-lg font-bold text-[var(--mundia-teal)] sm:text-xl">
                           {pendingRequests.length}
                         </p>
                         <p className="text-[10px] text-light-100/65 sm:text-xs">
                           Pending
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[#d6b86d]/25 bg-[#d6b86d]/10 p-2 text-center">
-                        <p className="text-lg font-bold text-[#f0d991] sm:text-xl">
+                      <div className="rounded-xl border border-[var(--mundia-gold)] bg-white/5 p-2 text-center">
+                        <p className="text-lg font-bold text-[var(--mundia-gold)] sm:text-xl">
                           {activeBorrows.length}
                         </p>
                         <p className="text-[10px] text-light-100/65 sm:text-xs">
@@ -1281,7 +1281,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                           Total Fines
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[#7b2746]/35 bg-[#7b2746]/20 p-2 text-center">
+                      <div className="rounded-xl border border-[var(--mundia-burgundy)] bg-white/5 p-2 text-center">
                         <p className="text-base font-bold text-pink-100 sm:text-lg">
                           {allBorrows.reduce(
                             (sum, r) => sum + (r.renewalCount || 0),

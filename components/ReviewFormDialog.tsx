@@ -73,7 +73,7 @@ export default function ReviewFormDialog({
             setComment("");
           }, 1500);
         },
-      }
+      },
     );
   };
 
@@ -93,13 +93,14 @@ export default function ReviewFormDialog({
           key={star}
           type="button"
           onClick={() => setRating(star)}
-          className="transition-colors hover:scale-110"
+          aria-label={`Set rating to ${star} star${star === 1 ? "" : "s"}`}
+          className="focus-ring rounded p-1 transition-colors hover:text-[var(--mundia-gold)]"
         >
           <Star
             className={`size-5 sm:size-6 ${
               star <= rating
-                ? "fill-yellow-400 text-yellow-400"
-                : "fill-gray-300 text-gray-300"
+                ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
+                : "fill-light-100/20 text-light-100/20"
             }`}
           />
         </button>
@@ -112,13 +113,13 @@ export default function ReviewFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="border-gray-600 bg-gray-800/95 sm:max-w-md [&>button]:text-white [&>button]:hover:text-white">
+      <DialogContent className="surface-panel border-white/10 sm:max-w-md [&>button]:text-light-100 [&>button]:hover:text-light-100">
         <DialogHeader>
           <DialogTitle className="text-base text-light-100 sm:text-lg">
-            Write a Review
+            Write a review
           </DialogTitle>
           <DialogDescription className="text-xs text-light-200/70 sm:text-sm">
-            Share your thoughts and rate this book
+            Rate the book and leave a short note for other readers.
           </DialogDescription>
         </DialogHeader>
 
@@ -138,7 +139,7 @@ export default function ReviewFormDialog({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Share your thoughts about this book..."
-              className="w-full resize-none rounded-md border border-gray-600 bg-gray-700/50 px-2.5 py-1.5 text-xs text-light-100 placeholder:text-light-200/50 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 sm:px-3 sm:py-2 sm:text-sm"
+              className="app-control min-h-28 w-full resize-none py-3"
               rows={4}
               required
             />
@@ -153,16 +154,18 @@ export default function ReviewFormDialog({
               variant="outline"
               onClick={handleClose}
               disabled={createReviewMutation.isPending}
-              className="w-full border-gray-500 bg-gray-600 text-xs text-white hover:bg-gray-500 hover:text-white sm:w-auto sm:text-sm"
+              className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={createReviewMutation.isPending || !comment.trim()}
-              className="w-full bg-green-600 text-xs text-white hover:bg-green-700 sm:w-auto sm:text-sm"
+              className="w-full bg-primary text-xs text-dark-100 hover:bg-primary/90 sm:w-auto sm:text-sm"
             >
-              {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+              {createReviewMutation.isPending
+                ? "Submitting..."
+                : "Submit review"}
             </Button>
           </DialogFooter>
         </form>

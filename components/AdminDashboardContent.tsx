@@ -86,7 +86,21 @@ interface AdminDashboardContentProps {
   successMessage?: string;
 }
 
-const chartColors = ["#2f6f86", "#2aa198", "#c9963b"];
+const chartColors = [
+  "oklch(56% 0.09 214)",
+  "oklch(63% 0.11 150)",
+  "oklch(78% 0.105 88)",
+];
+const chartGrid = "oklch(76% 0.035 218 / 0.7)";
+const chartAxis = "oklch(46% 0.035 225)";
+const chartBorrow = "oklch(56% 0.09 214)";
+const chartReturn = "oklch(63% 0.11 150)";
+const chartGold = "oklch(78% 0.105 88)";
+const chartTooltipStyle = {
+  borderRadius: "0.75rem",
+  border: "1px solid var(--mundia-line)",
+  background: "var(--mundia-paper)",
+};
 
 const toNumber = (value: unknown): number => {
   const parsed = Number(value ?? 0);
@@ -113,12 +127,12 @@ const formatDateLabel = (value: string): string => {
 const getStatusClasses = (status: string): string => {
   switch (status) {
     case "BORROWED":
-      return "bg-blue-100 text-blue-800 border-blue-200";
+      return "status-info";
     case "RETURNED":
-      return "bg-emerald-100 text-emerald-800 border-emerald-200";
+      return "status-success";
     case "PENDING":
     default:
-      return "bg-amber-100 text-amber-800 border-amber-200";
+      return "status-warning";
   }
 };
 
@@ -131,7 +145,7 @@ const Panel = ({
   subtitle?: string;
   children: React.ReactNode;
 }) => (
-  <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_36px_rgba(15,23,42,0.08)] sm:p-6">
+  <article className="surface-panel-light min-w-0 p-5 sm:p-6">
     <div className="mb-4">
       <h3 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
         {title}
@@ -302,7 +316,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 pr-1 sm:space-y-8 sm:pr-2 lg:pr-4">
       {successMessage === "admin-granted" && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800">
+        <div className="status-success rounded-2xl border px-4 py-3">
           <p className="text-sm font-semibold">Admin access granted</p>
           <p className="text-sm">
             You now have access to dashboard analytics and management actions.
@@ -310,24 +324,27 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </div>
       )}
 
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#2b4658] p-6 text-slate-100 shadow-[0_24px_70px_rgba(2,6,23,0.5)] sm:p-8">
+      <section
+        className="relative overflow-hidden rounded-[2rem] border border-white/10 p-6 text-slate-100 sm:p-8"
+        style={{ boxShadow: "0 24px 70px oklch(10% 0.02 225 / 0.5)" }}
+      >
         <div
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(115deg, rgba(214,184,109,0.10) 0 1px, transparent 1px 118px), linear-gradient(135deg, #0f172a 0%, #102538 48%, #16364b 100%)",
+              "linear-gradient(115deg, oklch(78% 0.105 88 / 0.10) 0 1px, transparent 1px 118px), linear-gradient(135deg, oklch(18% 0.025 225) 0%, oklch(24% 0.04 218) 48%, oklch(31% 0.055 218) 100%)",
           }}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#d6b86d]/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--mundia-gold)]/70 to-transparent" />
 
         <div className="relative z-10 space-y-5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#35546a] bg-[#0d2233]/85 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-[#9ec7dc]">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.22em] text-light-100/80">
             <Sparkles className="size-3.5" />
             Dashboard Overview
           </div>
 
           <div className="space-y-2">
-            <h2 className="font-bebas-neue text-4xl tracking-[0.08em] text-[#d7e9f5] sm:text-5xl">
+            <h2 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
               Library Intelligence Dashboard
             </h2>
             <p className="max-w-3xl text-sm text-slate-300 sm:text-base">
@@ -337,7 +354,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 Borrow Utilization
               </p>
@@ -345,7 +362,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                 {utilizationRate}%
               </p>
             </div>
-            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 User Approval
               </p>
@@ -353,7 +370,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                 {approvalRate}%
               </p>
             </div>
-            <div className="rounded-xl border border-[#35546a] bg-[#0d2233]/80 px-4 py-3">
+            <div className="rounded-xl border border-white/10 bg-white/10 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
                 Admin Coverage
               </p>
@@ -404,7 +421,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {borrowTrendData.length === 0 ? (
             <EmptyState label="No recent borrow trend data yet." />
           ) : (
-            <div className="h-72 w-full">
+            <div className="h-72 min-w-0 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={borrowTrendData}>
                   <defs>
@@ -417,12 +434,12 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                     >
                       <stop
                         offset="5%"
-                        stopColor="#0f4c81"
+                        stopColor={chartBorrow}
                         stopOpacity={0.45}
                       />
                       <stop
                         offset="95%"
-                        stopColor="#0f4c81"
+                        stopColor={chartBorrow}
                         stopOpacity={0.05}
                       />
                     </linearGradient>
@@ -435,37 +452,31 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                     >
                       <stop
                         offset="5%"
-                        stopColor="#0ea5a1"
+                        stopColor={chartReturn}
                         stopOpacity={0.35}
                       />
                       <stop
                         offset="95%"
-                        stopColor="#0ea5a1"
+                        stopColor={chartReturn}
                         stopOpacity={0.05}
                       />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                  <XAxis dataKey="label" stroke="#64748b" fontSize={12} />
-                  <YAxis stroke="#64748b" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "0.75rem",
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                    }}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                  <XAxis dataKey="label" stroke={chartAxis} fontSize={12} />
+                  <YAxis stroke={chartAxis} fontSize={12} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                   <Area
                     type="monotone"
                     dataKey="borrows"
-                    stroke="#0f4c81"
+                    stroke={chartBorrow}
                     strokeWidth={2.2}
                     fill="url(#borrowGradient)"
                   />
                   <Area
                     type="monotone"
                     dataKey="returns"
-                    stroke="#0ea5a1"
+                    stroke={chartReturn}
                     strokeWidth={2}
                     fill="url(#returnGradient)"
                   />
@@ -479,7 +490,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {borrowMixData.length === 0 ? (
             <EmptyState label="No borrow activity recorded yet." />
           ) : (
-            <div className="h-72 w-full">
+            <div className="h-72 min-w-0 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -494,13 +505,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "0.75rem",
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                    }}
-                  />
+                  <Tooltip contentStyle={chartTooltipStyle} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -537,20 +542,18 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {booksByYear.length === 0 ? (
             <EmptyState label="No publication-year metadata available yet." />
           ) : (
-            <div className="h-72 w-full">
+            <div className="h-72 min-w-0 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={booksByYear}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#cbd5e1" />
-                  <XAxis dataKey="year" stroke="#64748b" fontSize={12} />
-                  <YAxis stroke="#64748b" fontSize={12} />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: "0.75rem",
-                      border: "1px solid #cbd5e1",
-                      background: "#ffffff",
-                    }}
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                  <XAxis dataKey="year" stroke={chartAxis} fontSize={12} />
+                  <YAxis stroke={chartAxis} fontSize={12} />
+                  <Tooltip contentStyle={chartTooltipStyle} />
+                  <Bar
+                    dataKey="count"
+                    radius={[8, 8, 0, 0]}
+                    fill={chartBorrow}
                   />
-                  <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#0f4c81" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -575,8 +578,9 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                   </div>
                   <div className="h-2 rounded-full bg-slate-100">
                     <div
-                      className="h-2 rounded-full bg-gradient-to-r from-[#0f4c81] to-[#0ea5a1]"
+                      className="h-2 rounded-full"
                       style={{
+                        background: `linear-gradient(90deg, ${chartBorrow}, ${chartReturn})`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxLanguageCount) * 100),
@@ -615,8 +619,9 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-slate-200">
                     <div
-                      className="h-2 rounded-full bg-gradient-to-r from-[#0f4c81] to-[#f59e0b]"
+                      className="h-2 rounded-full"
                       style={{
+                        background: `linear-gradient(90deg, ${chartBorrow}, ${chartGold})`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxGenreCount) * 100),
@@ -703,7 +708,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                       <>
                         <button
                           type="button"
-                          className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex min-h-9 items-center rounded-full bg-[var(--mundia-success)] px-3 py-1 text-xs font-semibold text-white transition hover:bg-[var(--mundia-success-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                           disabled={approveBorrowMutation.isPending}
                           onClick={() =>
                             approveBorrowMutation.mutate({
