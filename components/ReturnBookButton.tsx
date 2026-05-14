@@ -41,7 +41,7 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
         onError: (error) => {
           console.error("[ReturnBookButton] Mutation error:", error);
         },
-      }
+      },
     );
   };
 
@@ -50,13 +50,13 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
   const isOverdue = dueDate && today > new Date(dueDate);
   const daysOverdue = isOverdue
     ? Math.floor(
-        (today.getTime() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24)
+        (today.getTime() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24),
       )
     : 0;
 
   return (
     <Button
-      className={`mt-0 min-h-12 w-full rounded-xl border text-dark-100 sm:w-fit ${
+      className={`mt-0 min-h-12 w-full rounded-lg border text-white sm:w-fit ${
         isOverdue
           ? "border-red-300/40 bg-red-500 hover:bg-red-500/90"
           : "border-orange-300/40 bg-orange-500 hover:bg-orange-500/90"
@@ -64,14 +64,20 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
       onClick={handleReturnBook}
       disabled={returnBookMutation.isPending}
     >
-      <img src="/icons/book.svg" alt="return book" width={20} height={20} className="size-4 sm:size-5" />
-      <p className="font-bebas-neue text-base text-dark-100 sm:text-xl">
+      <img
+        src="/icons/book.svg"
+        alt="return book"
+        width={20}
+        height={20}
+        className="size-4 sm:size-5"
+      />
+      <span className="text-sm font-semibold text-white">
         {returnBookMutation.isPending
           ? "Returning..."
           : isOverdue
             ? `Return Book (${daysOverdue} days overdue)`
             : "Return Book"}
-      </p>
+      </span>
     </Button>
   );
 };

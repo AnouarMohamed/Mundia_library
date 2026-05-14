@@ -2,17 +2,22 @@ import { Session } from "next-auth";
 
 const Header = ({ session }: { session: Session }) => {
   return (
-    <header className="admin-header surface-panel-light px-4 py-4 sm:px-6 sm:py-5">
-      <div className="space-y-1 sm:space-y-2">
-        <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
-          {session?.user?.name}
+    <header className="admin-header">
+      <div className="space-y-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
+          Library operations
+        </p>
+        <h2 className="text-xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-2xl">
+          Circulation desk
         </h2>
         <p className="text-sm text-slate-600 sm:text-base">
-          Monitor all of your users and books here
+          Signed in as {session?.user?.name || "administrator"}
         </p>
       </div>
 
-      {/*<p>Search</p>*/}
+      <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-panel)] px-3 py-2 text-xs font-medium text-[var(--mundia-ink)]/70">
+        Admin workspace
+      </div>
     </header>
   );
 };

@@ -10,16 +10,16 @@ import { Button } from "@/components/ui/button";
  * Extends the base Book type and adds UI-specific flags.
  */
 interface BookCardProps extends Book {
-  /** 
-   * If true, renders additional information relevant to a borrowed book 
-   * (e.g., return countdown, receipt download). 
+  /**
+   * If true, renders additional information relevant to a borrowed book
+   * (e.g., return countdown, receipt download).
    */
   isLoanedBook?: boolean;
 }
 
 /**
  * A compact, visually rich card representing a book in the library.
- * 
+ *
  * Features:
  * - Displays book cover using the `BookCover` component.
  * - Shows genre, rating, title, and author.
@@ -41,7 +41,7 @@ const BookCard = ({
   // Safe formatting for the star rating
   const formattedRating =
     typeof rating === "number" ? rating.toFixed(1) : String(rating ?? "N/A");
-  
+
   // Logic to determine if inventory details should be shown
   const hasCopyData =
     typeof availableCopies === "number" && typeof totalCopies === "number";
@@ -68,7 +68,7 @@ const BookCard = ({
           )}
         >
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="line-clamp-1 text-[10px] uppercase tracking-[0.18em] text-light-200/85 sm:text-xs">
+            <p className="book-genre line-clamp-1 text-[10px] uppercase tracking-[0.14em] sm:text-xs">
               {genre}
             </p>
             <span className="book-card-rating">
@@ -82,13 +82,13 @@ const BookCard = ({
               {formattedRating}
             </span>
           </div>
-          <p className="line-clamp-2 text-sm font-semibold leading-snug text-light-100 transition-colors group-hover:text-white sm:text-base">
+          <p className="book-title line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
             {title}
           </p>
-          <p className="mt-1.5 line-clamp-1 text-xs text-light-100/70 sm:text-sm">
+          <p className="book-author mt-1.5 line-clamp-1 text-xs sm:text-sm">
             {author}
           </p>
-          
+
           {/* Inventory Stats (Hidden on loaned books to save space) */}
           {hasCopyData && (
             <p className="book-card-copy mt-3">
@@ -100,7 +100,7 @@ const BookCard = ({
         {/* Loaned Book Specific Actions */}
         {isLoanedBook && (
           <div className="mt-2.5 w-full sm:mt-3">
-            <div className="book-loaned rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+            <div className="book-loaned rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-2 py-1.5">
               <img
                 src="/icons/calendar.svg"
                 alt="calendar"
@@ -108,7 +108,7 @@ const BookCard = ({
                 height={18}
                 className="size-4 object-contain sm:size-[18px]"
               />
-              <p className="text-xs text-light-100 sm:text-sm">
+              <p className="text-xs text-[var(--mundia-ink)] sm:text-sm">
                 11 days left to return
               </p>
             </div>

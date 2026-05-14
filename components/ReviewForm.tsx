@@ -74,12 +74,12 @@ export default function ReviewForm({
             className={`size-5 sm:size-6 ${
               star <= rating
                 ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
-                : "fill-light-100/20 text-light-100/20"
+                : "fill-slate-200 text-slate-200"
             }`}
           />
         </button>
       ))}
-      <span className="ml-1.5 text-xs text-light-200/70 sm:ml-2 sm:text-sm">
+      <span className="ml-1.5 text-xs text-slate-600 sm:ml-2 sm:text-sm">
         {rating} star{rating !== 1 ? "s" : ""}
       </span>
     </div>
@@ -87,20 +87,20 @@ export default function ReviewForm({
 
   return (
     <div className="surface-panel p-4 shadow-sm sm:p-6">
-      <h3 className="mb-3 text-base font-semibold text-light-100 sm:mb-4 sm:text-lg">
+      <h3 className="mb-3 text-base font-semibold text-[var(--mundia-ink)] sm:mb-4 sm:text-lg">
         Write a review
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-light-200 sm:mb-2 sm:text-sm">
+          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
             Rating
           </label>
           <StarRating />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-light-200 sm:mb-2 sm:text-sm">
+          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
             Your Review
           </label>
           <textarea
@@ -111,7 +111,7 @@ export default function ReviewForm({
             rows={4}
             required
           />
-          <p className="mt-1 text-[10px] text-light-200/70 sm:text-xs">
+          <p className="mt-1 text-[10px] text-slate-500 sm:text-xs">
             {comment.length}/500 characters
           </p>
         </div>
@@ -122,14 +122,14 @@ export default function ReviewForm({
             variant="outline"
             onClick={onCancel}
             disabled={createReviewMutation.isPending}
-            className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm"
+            className="w-full border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:w-auto sm:text-sm"
           >
             Cancel
           </Button>
           <Button
             type="submit"
             disabled={createReviewMutation.isPending || !comment.trim()}
-            className="w-full bg-primary text-xs text-dark-100 hover:bg-primary/90 sm:w-auto sm:text-sm"
+            className="w-full bg-[var(--mundia-teal-strong)] text-xs text-white hover:opacity-95 sm:w-auto sm:text-sm"
           >
             {createReviewMutation.isPending ? "Submitting..." : "Submit review"}
           </Button>

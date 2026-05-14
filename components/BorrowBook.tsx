@@ -64,20 +64,20 @@ const BorrowBook = ({
           // Show error to user
           alert(`Failed to borrow book: ${error.message}`);
         },
-      }
+      },
     );
   };
 
   return (
     <Button
-      className="mt-0 min-h-12 w-full rounded-xl border border-primary/50 bg-primary text-dark-100 hover:bg-primary/95 sm:w-fit"
+      className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:w-fit"
       onClick={handleBorrowBook}
       disabled={borrowBookMutation.isPending || !isEligible}
     >
-      <BookOpen className="size-4 text-dark-100 sm:size-5" />
-      <p className="font-bebas-neue text-base text-dark-100 sm:text-xl">
+      <BookOpen className="size-4 text-white sm:size-5" />
+      <span className="text-sm font-semibold text-white">
         {borrowBookMutation.isPending ? "Borrowing ..." : "Borrow Book"}
-      </p>
+      </span>
     </Button>
   );
 };

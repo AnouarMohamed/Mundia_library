@@ -51,10 +51,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   initialStats,
 }) => {
   // Use React Query hook to get book data (for availableCopies that updates immediately)
-  const {
-    data: book,
-    isLoading: bookLoading,
-  } = useBook(bookId, initialBook);
+  const { data: book, isLoading: bookLoading } = useBook(bookId, initialBook);
 
   // Use React Query hook with SSR initial data for borrow stats
   const {
@@ -67,12 +64,13 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   // React Query data is fresh and updates immediately after mutations
   // initial/prop data is only used as fallback during initial load
   const statsData = stats ?? initialStats;
-  
+
   // Get availableCopies from React Query book data (updates immediately)
   // Fallback to prop or initialBook if React Query data not yet loaded
-  const availableCopies = book?.availableCopies ?? 
-    initialBook?.availableCopies ?? 
-    propAvailableCopies ?? 
+  const availableCopies =
+    book?.availableCopies ??
+    initialBook?.availableCopies ??
+    propAvailableCopies ??
     0;
 
   const isLoading = bookLoading || statsLoading;
@@ -80,15 +78,15 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   // Show skeleton while loading (only if no initial data)
   if (isLoading && !initialStats) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-light-200/75 sm:text-sm">
+      <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)] p-4 sm:p-5">
+        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-sm">
           Borrow Insights
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Skeleton className="h-16 w-full rounded-xl bg-white/10" />
-          <Skeleton className="h-16 w-full rounded-xl bg-white/10" />
-          <Skeleton className="h-16 w-full rounded-xl bg-white/10" />
-          <Skeleton className="h-16 w-full rounded-xl bg-white/10" />
+          <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
+          <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
+          <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
+          <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
         </div>
       </div>
     );
@@ -97,8 +95,8 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   // Show error state (fallback to initial stats if available)
   if (isError && !initialStats) {
     return (
-      <div className="rounded-2xl border border-red-300/30 bg-red-500/10 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-200 sm:text-sm">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-red-700 sm:text-sm">
           Failed to load borrow statistics
         </p>
       </div>
@@ -110,47 +108,49 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-light-200/75 sm:text-sm">
+    <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)] p-4 sm:p-5">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-sm">
         Borrow Insights
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-light-100/60">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Total Borrows
           </p>
-          <p className="mt-1 text-lg font-semibold text-light-100">
+          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.totalBorrows || 0}
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-light-100/60">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Active Borrows
           </p>
-          <p className="mt-1 text-lg font-semibold text-light-100">
+          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.activeBorrows || 0}
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-light-100/60">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Availability
           </p>
           <p
             className={`mt-1 text-lg font-semibold ${
-              availableCopies > 0 ? "text-green-300" : "text-red-300"
+              availableCopies > 0
+                ? "text-[var(--mundia-success-strong)]"
+                : "text-[var(--mundia-danger)]"
             }`}
           >
             {availableCopies > 0 ? "Available" : "Unavailable"}
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-light-100/60">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
             Returned
           </p>
-          <p className="mt-1 text-lg font-semibold text-light-100">
+          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.returnedBorrows || 0}
           </p>
         </div>

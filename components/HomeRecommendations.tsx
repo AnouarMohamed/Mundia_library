@@ -57,7 +57,7 @@ const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   ) {
     return (
       <section className="mt-12 fade-in-up sm:mt-20">
-        <h2 className="font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:text-5xl">
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
           Book Recommendations
         </h2>
         <ul className="book-list">
@@ -73,14 +73,14 @@ const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
   if (isError) {
     return (
       <section className="mt-12 fade-in-up sm:mt-20">
-        <h2 className="font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:text-5xl">
+        <h2 className="text-2xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
           Book Recommendations
         </h2>
-        <div className="mt-3 rounded-xl border border-red-300/30 bg-red-500/15 p-3 text-red-100 sm:mt-4 sm:p-4">
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 sm:mt-4 sm:p-4">
           <p className="text-sm font-semibold sm:text-base">
             Failed to load recommendations
           </p>
-          <p className="text-xs text-red-100/90 sm:text-sm">
+          <p className="text-xs text-red-600 sm:text-sm">
             {error instanceof Error
               ? error.message
               : "An unknown error occurred"}

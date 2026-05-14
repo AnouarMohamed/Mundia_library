@@ -80,16 +80,16 @@ const ISBNScanner: React.FC<ISBNScannerProps> = ({
   }, [onScanSuccess]);
 
   return (
-    <div className="relative flex flex-col items-center gap-4 bg-dark-400 p-6 rounded-2xl border border-white/10">
+    <div className="relative flex flex-col items-center gap-4 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-6">
       <div className="flex w-full items-center justify-between mb-2">
-        <h3 className="text-lg font-bebas-neue tracking-widest text-light-100">
+        <h3 className="text-lg font-semibold tracking-tight text-[var(--mundia-ink)]">
           Scan Book ISBN
         </h3>
         <Button
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="text-light-200 hover:text-white"
+          className="text-slate-600 hover:text-[var(--mundia-ink)]"
         >
           <X className="size-5" />
         </Button>
@@ -100,7 +100,7 @@ const ISBNScanner: React.FC<ISBNScannerProps> = ({
         className="w-full overflow-hidden rounded-xl bg-[var(--mundia-ink-strong)]"
       ></div>
 
-      <p className="text-center text-xs text-light-200/60">
+      <p className="text-center text-xs text-slate-500">
         Position the barcode within the frame to scan.
       </p>
     </div>

@@ -26,33 +26,27 @@ const Header = async ({ session }: HeaderProps) => {
   ];
 
   return (
-    <header className="sticky top-3 z-40 mb-6 sm:mb-8">
-      <div
-        className="rounded-[1.35rem] border border-white/10 px-4 py-3 sm:px-6 sm:py-4"
-        style={{
-          background: "oklch(14% 0.025 225 / 0.94)",
-          boxShadow: "0 20px 60px oklch(10% 0.02 225 / 0.34)",
-        }}
-      >
+    <header className="sticky top-0 z-40 -mx-4 mb-6 border-b border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 sm:-mx-7 sm:mb-8 sm:px-7 md:-mx-10 md:px-10 lg:-mx-14 lg:px-14">
+      <div className="mx-auto max-w-[1500px] py-3 sm:py-4">
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/"
             className="group inline-flex min-w-0 items-center gap-2 sm:gap-3"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-inner sm:size-12">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] sm:size-11">
               <img
                 src="/icons/logo.svg"
-                alt="logo"
+                alt="Mundiapolis Library"
                 width={40}
                 height={40}
                 className="size-7 sm:size-8"
               />
             </span>
             <div className="min-w-0">
-              <p className="truncate font-bebas-neue text-2xl leading-none tracking-[0.12em] text-light-100 sm:text-3xl">
+              <p className="truncate text-base font-semibold leading-tight tracking-tight text-[var(--mundia-ink)] sm:text-lg">
                 Mundiapolis
               </p>
-              <p className="truncate text-[10px] uppercase tracking-[0.28em] text-[var(--mundia-gold)] sm:text-xs">
+              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--mundia-gold-strong)] sm:text-xs">
                 University Library
               </p>
             </div>
@@ -64,7 +58,7 @@ const Header = async ({ session }: HeaderProps) => {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="rounded-full px-3 py-2 text-sm font-medium text-light-100/85 transition hover:bg-white/10 hover:text-light-100 lg:px-4"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--mundia-ink)]/72 transition hover:bg-[var(--mundia-panel)] hover:text-[var(--mundia-ink)] lg:px-4"
                 >
                   {link.label}
                 </Link>

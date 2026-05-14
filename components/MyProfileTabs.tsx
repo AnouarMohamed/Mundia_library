@@ -713,20 +713,20 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
       return (
         <Card
-          className={`mb-4 overflow-hidden rounded-[1.4rem] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl ${
+          className={`mb-4 overflow-hidden rounded-xl border transition-colors duration-200 hover:border-[var(--mundia-teal-strong)] ${
             record.status === "PENDING"
               ? "border-[var(--mundia-gold)] bg-[var(--surface-card)]"
               : record.status === "BORROWED" && isOverdue
-                ? "border-red-400/45 bg-red-950/20"
+                ? "border-red-200 bg-red-50"
                 : record.status === "BORROWED" &&
                     daysRemaining <= 2 &&
                     !isOverdue
-                  ? "border-orange-300/45 bg-orange-950/20"
+                  ? "border-orange-200 bg-orange-50"
                   : record.status === "BORROWED"
                     ? "border-[var(--mundia-teal)] bg-[var(--surface-card)]"
                     : record.status === "RETURNED"
-                      ? "border-emerald-400/35 bg-emerald-950/15"
-                      : "border-white/10 bg-[var(--surface-card)]"
+                      ? "border-emerald-200 bg-emerald-50"
+                      : "border-[var(--mundia-line)] bg-[var(--surface-card)]"
           }`}
         >
           <CardContent className="p-3 sm:p-4">
@@ -734,7 +734,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
               {/* Full Height Book Cover */}
               {/* CRITICAL: Don't use key prop - React.memo in BookCover handles re-render prevention
                 Using key would cause component remount on every data change, causing flicker */}
-              <div className="relative w-full shrink-0 rounded-[1.15rem] border border-white/10 bg-white/5 p-3 sm:w-48">
+              <div className="relative w-full shrink-0 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-3 sm:w-48">
                 <BookCover
                   variant="regular"
                   coverColor={record.book.coverColor}
@@ -748,10 +748,10 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 {/* Header with Status Badge */}
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-base font-semibold leading-snug text-light-100 sm:text-xl">
+                    <h3 className="text-base font-semibold leading-snug text-[var(--mundia-ink)] sm:text-xl">
                       {record.book.title}
                     </h3>
-                    <p className="text-sm text-light-200/70 sm:text-base">
+                    <p className="text-sm text-slate-600 sm:text-base">
                       by {record.book.author}
                     </p>
                   </div>
@@ -765,7 +765,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="border-white/15 bg-white/5 px-2 py-1 text-xs text-light-100 sm:text-sm"
+                    className="border-[var(--mundia-line)] bg-[var(--surface-0)] px-2 py-1 text-xs text-[var(--mundia-ink)] sm:text-sm"
                   >
                     {record.book.genre}
                   </Badge>
@@ -778,28 +778,32 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 </div>
 
                 {/* Compact Information */}
-                <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 sm:text-sm">
+                <div className="mb-3 flex flex-col gap-2 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 sm:text-sm">
                   <div className="flex items-center gap-1">
-                    <Calendar className="size-3 text-blue-400 sm:size-4" />
-                    <span className="font-medium text-light-100">
+                    <Calendar className="size-3 text-[var(--mundia-teal-strong)] sm:size-4" />
+                    <span className="font-medium text-[var(--mundia-ink)]">
                       Borrowed:
                     </span>
-                    <span className="text-light-200/70">
+                    <span className="text-slate-600">
                       {formatDate(record.borrowDate)}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Clock className="size-3 text-purple-400 sm:size-4" />
-                    <span className="font-medium text-light-100">Due:</span>
-                    <span className="text-light-200/70">
+                    <Clock className="size-3 text-[var(--mundia-gold-strong)] sm:size-4" />
+                    <span className="font-medium text-[var(--mundia-ink)]">
+                      Due:
+                    </span>
+                    <span className="text-slate-600">
                       {record.dueDate ? formatDate(record.dueDate) : "Not set"}
                     </span>
                   </div>
                   {record.book.isbn && (
                     <div className="flex items-center gap-1">
-                      <BookOpen className="size-3 text-green-400 sm:size-4" />
-                      <span className="font-medium text-light-100">ISBN:</span>
-                      <span className="font-mono text-light-200/70">
+                      <BookOpen className="size-3 text-[var(--mundia-success-strong)] sm:size-4" />
+                      <span className="font-medium text-[var(--mundia-ink)]">
+                        ISBN:
+                      </span>
+                      <span className="font-mono text-slate-600">
                         {record.book.isbn.slice(-4)}
                       </span>
                     </div>
@@ -1011,7 +1015,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
   return (
     <div className="container mx-auto">
-      <h1 className="mb-4 font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:mb-6 sm:text-5xl">
+      <h1 className="mb-4 text-2xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:mb-6 sm:text-3xl">
         My Borrowing History
       </h1>
 
@@ -1024,7 +1028,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         <TabsList className="catalog-toolbar flex h-auto w-full flex-wrap gap-2 p-2 sm:grid sm:grid-cols-3">
           <TabsTrigger
             value="active"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-teal)] data-[state=active]:bg-[var(--mundia-teal)] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-teal-strong)] data-[state=active]:bg-[var(--mundia-teal-strong)] data-[state=active]:text-white sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Active</span>
@@ -1038,7 +1042,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="pending"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-gold)] data-[state=active]:bg-[var(--mundia-gold)] data-[state=active]:text-dark-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-gold)] data-[state=active]:bg-[var(--mundia-gold)] data-[state=active]:text-[var(--mundia-ink)] sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Pending</span>
@@ -1052,7 +1056,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="history"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-xl border border-white/10 bg-white/5 p-2 text-center text-xs text-light-200 data-[state=active]:border-[var(--mundia-burgundy)] data-[state=active]:bg-[var(--mundia-burgundy)] data-[state=active]:text-light-100 data-[state=active]:shadow-md sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-burgundy)] data-[state=active]:bg-[var(--mundia-burgundy)] data-[state=active]:text-white sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Borrow</span>
@@ -1068,13 +1072,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
         <TabsContent value="active" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
-            <h2 className="text-base font-semibold text-light-100 sm:text-xl">
+            <h2 className="text-base font-semibold text-[var(--mundia-ink)] sm:text-xl">
               Currently Borrowed Books
             </h2>
             {activeBorrows.length === 0 ? (
               <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-light-200/70 sm:text-base">
+                  <p className="text-sm text-slate-600 sm:text-base">
                     No active borrows
                   </p>
                 </CardContent>
@@ -1093,13 +1097,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
         <TabsContent value="pending" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
-            <h2 className="text-base font-semibold text-light-100 sm:text-xl">
+            <h2 className="text-base font-semibold text-[var(--mundia-ink)] sm:text-xl">
               Pending Approval
             </h2>
             {pendingRequests.length === 0 ? (
               <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-light-200/70 sm:text-base">
+                  <p className="text-sm text-slate-600 sm:text-base">
                     No pending requests
                   </p>
                 </CardContent>
@@ -1114,13 +1118,13 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
         <TabsContent value="history" className="mt-5">
           <div className="space-y-3 sm:space-y-4">
-            <h2 className="text-base font-semibold text-light-100 sm:text-xl">
+            <h2 className="text-base font-semibold text-[var(--mundia-ink)] sm:text-xl">
               Complete Borrow History
             </h2>
             {borrowHistory.length === 0 ? (
               <Card className="catalog-panel">
                 <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-light-200/70 sm:text-base">
+                  <p className="text-sm text-slate-600 sm:text-base">
                     No borrow history
                   </p>
                 </CardContent>
@@ -1130,41 +1134,41 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 {/* Statistics */}
                 <Card className="catalog-panel mb-4">
                   <CardHeader className="pb-2 sm:pb-3">
-                    <CardTitle className="text-base text-light-100 sm:text-lg">
+                    <CardTitle className="text-base text-[var(--mundia-ink)] sm:text-lg">
                       Borrow Statistics
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
-                        <p className="text-lg font-bold text-light-100 sm:text-xl">
+                      <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-2 text-center">
+                        <p className="text-lg font-bold text-[var(--mundia-ink)] sm:text-xl">
                           {allBorrows.length}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Total Borrows
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[var(--mundia-teal)] bg-white/5 p-2 text-center">
-                        <p className="text-lg font-bold text-[var(--mundia-teal)] sm:text-xl">
+                      <div className="rounded-lg border border-[var(--mundia-teal)] bg-[var(--surface-0)] p-2 text-center">
+                        <p className="text-lg font-bold text-[var(--mundia-teal-strong)] sm:text-xl">
                           {pendingRequests.length}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Pending
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[var(--mundia-gold)] bg-white/5 p-2 text-center">
-                        <p className="text-lg font-bold text-[var(--mundia-gold)] sm:text-xl">
+                      <div className="rounded-lg border border-[var(--mundia-gold)] bg-[var(--surface-0)] p-2 text-center">
+                        <p className="text-lg font-bold text-[var(--mundia-gold-strong)] sm:text-xl">
                           {activeBorrows.length}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Active
                         </p>
                       </div>
-                      <div className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-2 text-center">
-                        <p className="text-lg font-bold text-emerald-200 sm:text-xl">
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center">
+                        <p className="text-lg font-bold text-emerald-700 sm:text-xl">
                           {borrowHistory.length}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Book Returned
                         </p>
                       </div>
@@ -1221,7 +1225,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                             }).length
                           }
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           With Fines
                         </p>
                       </div>
@@ -1277,26 +1281,26 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                             }, 0)
                             .toFixed(2)}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Total Fines
                         </p>
                       </div>
-                      <div className="rounded-xl border border-[var(--mundia-burgundy)] bg-white/5 p-2 text-center">
-                        <p className="text-base font-bold text-pink-100 sm:text-lg">
+                      <div className="rounded-lg border border-[var(--mundia-burgundy)] bg-[var(--surface-0)] p-2 text-center">
+                        <p className="text-base font-bold text-[var(--mundia-burgundy)] sm:text-lg">
                           {allBorrows.reduce(
                             (sum, r) => sum + (r.renewalCount || 0),
                             0,
                           )}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Total Renewals
                         </p>
                       </div>
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-2 text-center">
-                        <p className="text-base font-bold text-light-100 sm:text-lg">
+                      <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-2 text-center">
+                        <p className="text-base font-bold text-[var(--mundia-ink)] sm:text-lg">
                           {totalReviews}
                         </p>
-                        <p className="text-[10px] text-light-100/65 sm:text-xs">
+                        <p className="text-[10px] text-slate-500 sm:text-xs">
                           Total Reviews
                         </p>
                       </div>

@@ -109,16 +109,22 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
       <div className="flex-[1.5] w-full min-w-0 max-w-full overflow-hidden">
         {/* Video Section */}
         <section className="flex flex-col gap-4 sm:gap-7">
-          <h3 className="text-base font-semibold text-primary sm:text-lg">Video</h3>
+          <h3 className="text-base font-semibold text-primary sm:text-lg">
+            Video
+          </h3>
           <BookVideo videoUrl={bookData.videoUrl} />
         </section>
 
         {/* Summary Section */}
         <section className="mt-6 flex flex-col gap-4 sm:mt-10 sm:gap-7">
-          <h3 className="text-base font-semibold text-primary sm:text-lg">Summary</h3>
-          <div className="space-y-3 text-base text-light-100 sm:space-y-5 sm:text-xl break-words">
+          <h3 className="text-base font-semibold text-primary sm:text-lg">
+            Summary
+          </h3>
+          <div className="space-y-3 break-words text-base text-slate-700 sm:space-y-5 sm:text-xl">
             {bookData.summary?.split("\n").map((line: string, i: number) => (
-              <p key={i} className="break-words">{line}</p>
+              <p key={i} className="break-words">
+                {line}
+              </p>
             ))}
           </div>
         </section>
@@ -136,7 +142,9 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
           {/* Show error message for reviews if failed but book loaded */}
           {isErrorReviews && (
             <div className="rounded-lg border border-yellow-500 bg-yellow-50 p-3 text-yellow-800 sm:p-4">
-              <p className="text-sm font-semibold sm:text-base">Failed to load reviews</p>
+              <p className="text-sm font-semibold sm:text-base">
+                Failed to load reviews
+              </p>
               <p className="text-xs sm:text-sm">
                 {reviewsError instanceof Error
                   ? reviewsError.message

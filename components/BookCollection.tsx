@@ -282,10 +282,10 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
         <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
             Book Collection
           </h1>
-          <p className="text-sm text-light-200/80 sm:text-base">
+          <p className="text-sm text-slate-600 sm:text-base">
             Loading books...
           </p>
         </div>
@@ -303,16 +303,16 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
         <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
             Book Collection
           </h1>
         </div>
-        <Card className="rounded-2xl border-red-300/30 bg-red-500/10">
+        <Card className="rounded-xl border-red-200 bg-red-50">
           <CardContent className="p-4 text-center sm:p-8">
-            <p className="mb-2 text-base font-semibold text-red-200 sm:text-lg">
+            <p className="mb-2 text-base font-semibold text-red-700 sm:text-lg">
               Failed to load books
             </p>
-            <p className="text-xs text-red-100/90 sm:text-sm">
+            <p className="text-xs text-red-600 sm:text-sm">
               {error instanceof Error
                 ? error.message
                 : "An unknown error occurred"}
@@ -327,13 +327,13 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
       {/* Header */}
       <div className="catalog-header mb-4 p-5 sm:mb-6 sm:p-7">
-        <p className="text-[11px] uppercase tracking-[0.25em] text-light-200/70 sm:text-xs">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)] sm:text-xs">
           Explore the Catalog
         </p>
-        <h1 className="mb-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Book Collection
         </h1>
-        <p className="text-sm text-light-200/85 sm:text-base">
+        <p className="text-sm text-slate-600 sm:text-base">
           Discover and explore our complete library of {pagination.totalBooks}{" "}
           books
         </p>
@@ -344,7 +344,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
         <div className="w-full">
           <Card className="catalog-panel shadow-xl lg:sticky lg:top-28">
             <CardHeader className="pb-2 sm:pb-3">
-              <CardTitle className="font-bebas-neue text-2xl tracking-[0.08em] text-light-100 sm:text-3xl">
+              <CardTitle className="text-lg font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
                 Filters
               </CardTitle>
             </CardHeader>
@@ -356,7 +356,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     placeholder="Search books..."
                     value={localSearch}
                     onChange={(e) => setLocalSearch(e.target.value)}
-                    className="catalog-field placeholder:text-light-100/60"
+                    className="catalog-field"
                   />
 
                   {/* ISBN Scanner Dialog */}
@@ -365,7 +365,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 shrink-0 rounded-xl border-white/20 bg-white/5 text-light-100 hover:bg-white/10"
+                        className="h-11 shrink-0 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
                         title="Scan ISBN"
                       >
                         <Camera className="size-5" />
@@ -390,7 +390,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Genre Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-medium uppercase tracking-[0.16em] text-light-100/75 sm:text-sm">
+                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
                   Genre
                 </label>
                 <select
@@ -409,7 +409,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Availability Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-medium uppercase tracking-[0.16em] text-light-100/75 sm:text-sm">
+                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
                   Availability
                 </label>
                 <select
@@ -427,7 +427,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Rating Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-medium uppercase tracking-[0.16em] text-light-100/75 sm:text-sm">
+                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
                   Minimum Rating
                 </label>
                 <select
@@ -449,7 +449,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 <Button
                   variant="outline"
                   onClick={clearFilters}
-                  className="h-11 w-full rounded-xl border-white/20 bg-white/5 text-light-100 hover:bg-white/10"
+                  className="h-11 w-full rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
                 >
                   Clear All Filters
                 </Button>
@@ -464,7 +464,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
           <div className="catalog-toolbar mb-3 p-3 sm:mb-4 sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-xs text-light-100/80 sm:text-sm">
+                <span className="text-xs text-slate-600 sm:text-sm">
                   Showing {books.length} of {pagination.totalBooks} books
                 </span>
                 {hasActiveFilters && (
@@ -472,7 +472,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     {currentSearchParams.search && (
                       <Badge
                         variant="secondary"
-                        className="rounded-full border border-white/20 bg-white/10 text-xs text-light-100 sm:text-sm"
+                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
                       >
                         Search: &quot;{currentSearchParams.search}&quot;
                       </Badge>
@@ -480,7 +480,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     {currentSearchParams.genre && (
                       <Badge
                         variant="secondary"
-                        className="rounded-full border border-white/20 bg-white/10 text-xs text-light-100 sm:text-sm"
+                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
                       >
                         Genre: {currentSearchParams.genre}
                       </Badge>
@@ -488,7 +488,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     {currentSearchParams.availability && (
                       <Badge
                         variant="secondary"
-                        className="rounded-full border border-white/20 bg-white/10 text-xs text-light-100 sm:text-sm"
+                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
                       >
                         {currentSearchParams.availability === "available"
                           ? "Available"
@@ -498,7 +498,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                     {currentSearchParams.rating && (
                       <Badge
                         variant="secondary"
-                        className="rounded-full border border-white/20 bg-white/10 text-xs text-light-100 sm:text-sm"
+                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
                       >
                         {currentSearchParams.rating}+ Stars
                       </Badge>
@@ -508,7 +508,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-[0.14em] text-light-100/65 sm:text-sm">
+                <span className="text-xs font-semibold text-slate-600 sm:text-sm">
                   Sort by
                 </span>
                 <select
@@ -527,16 +527,16 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
           {/* Books Grid */}
           {books.length === 0 ? (
-            <Card className="rounded-2xl border border-white/10 bg-[var(--surface-card)]">
+            <Card className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)]">
               <CardContent className="p-4 text-center sm:p-8">
-                <p className="text-sm text-light-200/70 sm:text-base">
+                <p className="text-sm text-slate-600 sm:text-base">
                   No books found matching your criteria.
                 </p>
                 {hasActiveFilters && (
                   <Button
                     variant="outline"
                     onClick={clearFilters}
-                    className="mt-3 rounded-xl border-white/20 bg-white/5 text-light-100 hover:bg-white/10 sm:mt-4"
+                    className="mt-3 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:mt-4"
                   >
                     Clear Filters
                   </Button>
@@ -558,7 +558,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 variant="outline"
                 onClick={() => handlePageChange(pagination.currentPage - 1)}
                 disabled={pagination.currentPage === 1}
-                className="min-h-11 rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
+                className="min-h-11 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:text-sm"
               >
                 Previous
               </Button>
@@ -581,8 +581,8 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                         onClick={() => handlePageChange(pageNum)}
                         className={`h-11 w-11 rounded-xl text-xs sm:text-sm ${
                           pageNum === pagination.currentPage
-                            ? "border border-primary/60 bg-primary text-dark-100 hover:bg-primary/95"
-                            : "border-white/20 bg-white/5 text-light-100 hover:bg-white/10"
+                            ? "border border-[var(--mundia-teal-strong)] bg-[var(--mundia-teal-strong)] text-white hover:opacity-95"
+                            : "border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
                         }`}
                       >
                         {pageNum}
@@ -596,7 +596,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                 variant="outline"
                 onClick={() => handlePageChange(pagination.currentPage + 1)}
                 disabled={pagination.currentPage === pagination.totalPages}
-                className="min-h-11 rounded-xl border-white/20 bg-white/5 text-xs text-light-100 hover:bg-white/10 sm:text-sm"
+                className="min-h-11 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:text-sm"
               >
                 Next
               </Button>

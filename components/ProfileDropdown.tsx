@@ -91,7 +91,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button className="relative size-8 overflow-hidden rounded-full border border-white/20 transition-all hover:border-primary/80 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
+        <button className="relative size-8 overflow-hidden rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] transition-all hover:border-[var(--mundia-teal-strong)] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
           {universityCard ? (
             universityCard.startsWith("http") ||
             universityCard.startsWith("data:") ? (
@@ -115,14 +115,14 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                 className="rounded-full object-cover"
               />
             ) : (
-              <div className="flex size-full items-center justify-center bg-white/10 text-light-100">
+              <div className="flex size-full items-center justify-center bg-[var(--mundia-panel)] text-[var(--mundia-ink)]">
                 <span className="text-[10px] font-semibold sm:text-xs">
                   {fullName.charAt(0).toUpperCase()}
                 </span>
               </div>
             )
           ) : (
-            <div className="flex size-full items-center justify-center bg-white/10 text-light-100">
+            <div className="flex size-full items-center justify-center bg-[var(--mundia-panel)] text-[var(--mundia-ink)]">
               <span className="text-[10px] font-semibold sm:text-xs">
                 {fullName.charAt(0).toUpperCase()}
               </span>
@@ -132,26 +132,26 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-56 rounded-2xl border border-white/10 bg-[var(--surface-card-strong)] p-1 text-light-100 shadow-2xl sm:w-64"
+        className="w-56 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1 text-[var(--mundia-ink)] shadow-xl sm:w-64"
       >
-        <DropdownMenuLabel className="rounded-xl bg-white/5 px-2.5 py-1.5 sm:px-3 sm:py-2">
+        <DropdownMenuLabel className="rounded-lg bg-[var(--surface-0)] px-2.5 py-1.5 sm:px-3 sm:py-2">
           <div className="space-y-0.5 sm:space-y-1">
-            <p className="text-xs font-semibold text-light-100 sm:text-sm">
+            <p className="text-xs font-semibold text-[var(--mundia-ink)] sm:text-sm">
               {fullName}
             </p>
-            <p className="text-[10px] text-light-200/70 sm:text-xs">{email}</p>
+            <p className="text-[10px] text-slate-600 sm:text-xs">{email}</p>
             {typeof universityId === "number" && (
-              <p className="text-[10px] text-light-200/70 sm:text-xs">
+              <p className="text-[10px] text-slate-600 sm:text-xs">
                 University ID: {universityId}
               </p>
             )}
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className="my-1 bg-white/10" />
+        <DropdownMenuSeparator className="my-1 bg-[var(--mundia-line)]" />
         {!isAdmin && (
           <DropdownMenuItem
             asChild
-            className="cursor-pointer rounded-xl px-0 py-2 text-light-100 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white sm:py-3 [&>a]:block [&>a]:w-full"
+            className="cursor-pointer rounded-lg px-0 py-2 text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus:bg-[var(--mundia-panel)] sm:py-3 [&>a]:block [&>a]:w-full"
           >
             <Link
               href="/make-admin"
@@ -164,7 +164,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
         <DropdownMenuItem
           onClick={handleLogout}
           disabled={isLoggingOut}
-          className="cursor-pointer rounded-xl px-0 py-2 text-light-100 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white disabled:opacity-50 sm:py-3"
+          className="cursor-pointer rounded-lg px-0 py-2 text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus:bg-[var(--mundia-panel)] disabled:opacity-50 sm:py-3"
         >
           <span className="block w-full px-2.5 py-0 text-left text-xs sm:px-3 sm:text-sm">
             {isLoggingOut ? "Logging out..." : "Logout"}

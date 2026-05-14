@@ -226,200 +226,205 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
 
   return (
     <section className="admin-page-panel">
-      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
-          All Books ({allBooks.length})
-        </h2>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          {/* Search Input */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const trimmedSearch = localSearch.trim();
-              updateSearchParams({ search: trimmedSearch });
-            }}
-            className="flex-1 sm:min-w-[250px]"
-          >
-            <Input
-              type="text"
-              placeholder="Search books..."
-              value={localSearch}
-              onChange={(e) => setLocalSearch(e.target.value)}
-              className="admin-field w-full"
-            />
-          </form>
-          {/* Filter Dropdowns */}
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-            <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm font-medium text-slate-700">Genre</span>
-              <select
-                value={currentGenre}
-                onChange={(e) => handleFilterChange("genre", e.target.value)}
-                className="admin-field w-full sm:min-w-[170px]"
-              >
-                <option value="all">All</option>
-                {genres.map((genre) => (
-                  <option key={genre} value={genre}>
-                    {genre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm font-medium text-slate-700">
-                Availability
-              </span>
-              <select
-                value={currentAvailability}
-                onChange={(e) =>
-                  handleFilterChange("availability", e.target.value)
-                }
-                className="admin-field w-full sm:min-w-[170px]"
-              >
-                <option value="all">All</option>
-                <option value="available">Available</option>
-                <option value="unavailable">Unavailable</option>
-              </select>
-            </div>
-          </div>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
+            Catalog management
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--mundia-ink)]">
+            Books ({allBooks.length})
+          </h2>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
-          className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+          className="w-full rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-90 sm:w-fit"
           asChild
         >
           <Link href="/admin/books/new">Create book</Link>
         </Button>
       </div>
 
-      <div className="mt-4 w-full overflow-hidden sm:mt-7">
+      <div className="mt-5 grid gap-3 xl:grid-cols-[minmax(18rem,1fr)_auto_auto] xl:items-end">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const trimmedSearch = localSearch.trim();
+            updateSearchParams({ search: trimmedSearch });
+          }}
+          className="min-w-0"
+        >
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+            Search
+          </label>
+          <Input
+            type="text"
+            placeholder="Title, author, ISBN"
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
+            className="admin-field w-full"
+          />
+        </form>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+            Genre
+          </label>
+          <select
+            value={currentGenre}
+            onChange={(e) => handleFilterChange("genre", e.target.value)}
+            className="admin-field w-full xl:min-w-[180px]"
+          >
+            <option value="all">All genres</option>
+            {genres.map((genre) => (
+              <option key={genre} value={genre}>
+                {genre}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+            Availability
+          </label>
+          <select
+            value={currentAvailability}
+            onChange={(e) => handleFilterChange("availability", e.target.value)}
+            className="admin-field w-full xl:min-w-[180px]"
+          >
+            <option value="all">All statuses</option>
+            <option value="available">Available</option>
+            <option value="unavailable">Unavailable</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-6 w-full overflow-hidden">
         {allBooks.length === 0 ? (
-          <div className="py-6 text-center sm:py-8">
-            <p className="mb-4 text-base font-medium text-slate-600 sm:text-lg">
+          <div className="rounded-xl border border-dashed border-[var(--mundia-line)] py-10 text-center">
+            <p className="mb-4 text-base font-medium text-slate-600">
               {hasActiveFilters
                 ? "No books found matching your criteria."
-                : "No books found. Create your first book!"}
+                : "No books found. Create your first book."}
             </p>
             {hasActiveFilters && (
               <Button
                 variant="outline"
                 onClick={clearFilters}
-                className="mt-2 border-[var(--mundia-line)] text-slate-700 hover:bg-[var(--mundia-panel)]"
+                className="border-[var(--mundia-line)] text-slate-700 hover:bg-[var(--mundia-panel)]"
               >
                 Clear filters
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {allBooks.map((book) => (
-              <div
-                key={book.id}
-                className="rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-3 shadow-sm transition hover:border-[var(--mundia-teal)] sm:p-4"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-                  <BookCover
-                    coverColor={book.coverColor}
-                    coverImage={book.coverUrl}
-                    className="h-16 w-12 sm:h-20 sm:w-16"
-                  />
+          <div className="overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="hidden grid-cols-[minmax(18rem,1.4fr)_minmax(10rem,0.7fr)_minmax(12rem,0.8fr)_auto] gap-4 border-b border-[var(--mundia-line)] bg-[var(--mundia-panel)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600 lg:grid">
+              <span>Title</span>
+              <span>Inventory</span>
+              <span>Metadata</span>
+              <span className="text-right">Actions</span>
+            </div>
 
-                  <div className="flex-1">
-                    <h3 className="line-clamp-2 text-base font-semibold text-slate-900 sm:text-lg">
-                      {book.title}
-                    </h3>
-                    <p className="text-sm text-slate-600">by {book.author}</p>
-                    <p className="mt-1 text-xs text-slate-500">{book.genre}</p>
+            <div className="divide-y divide-[var(--mundia-line)]">
+              {allBooks.map((book) => {
+                const isAvailable = book.availableCopies > 0;
+                const statusClass = book.isActive
+                  ? isAvailable
+                    ? "status-success"
+                    : "status-warning"
+                  : "status-danger";
 
-                    <div className="mt-3 space-y-1 text-slate-600">
-                      <div className="flex justify-between text-sm">
-                        <span>Total Copies:</span>
-                        <span className="font-medium">{book.totalCopies}</span>
+                return (
+                  <div
+                    key={book.id}
+                    className="grid gap-4 px-4 py-4 transition hover:bg-[var(--surface-2)]/70 lg:grid-cols-[minmax(18rem,1.4fr)_minmax(10rem,0.7fr)_minmax(12rem,0.8fr)_auto] lg:items-center"
+                  >
+                    <div className="flex min-w-0 gap-3">
+                      <BookCover
+                        coverColor={book.coverColor}
+                        coverImage={book.coverUrl}
+                        className="h-20 w-14 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="line-clamp-2 text-base font-semibold text-[var(--mundia-ink)]">
+                          {book.title}
+                        </h3>
+                        <p className="mt-1 truncate text-sm text-slate-600">
+                          {book.author}
+                        </p>
+                        <p className="mt-2 inline-flex rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] px-2.5 py-1 text-xs font-medium text-slate-600">
+                          {book.genre}
+                        </p>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Available:</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm lg:block lg:space-y-1">
+                      <p className="text-slate-600">
+                        Total{" "}
+                        <span className="font-semibold text-[var(--mundia-ink)]">
+                          {book.totalCopies}
+                        </span>
+                      </p>
+                      <p className="text-slate-600">
+                        Available{" "}
                         <span
-                          className={`font-medium ${
-                            book.availableCopies > 0
-                              ? "text-[var(--mundia-success)]"
-                              : "text-[var(--mundia-danger)]"
-                          }`}
+                          className={
+                            isAvailable
+                              ? "font-semibold text-[var(--mundia-success-strong)]"
+                              : "font-semibold text-[var(--mundia-danger)]"
+                          }
                         >
                           {book.availableCopies}
                         </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Rating:</span>
-                        <span className="font-medium">{book.rating}/5</span>
-                      </div>
-
-                      {/* Enhanced Information */}
-                      {book.isbn && (
-                        <div className="flex justify-between text-sm">
-                          <span>ISBN:</span>
-                          <span className="text-xs font-medium">
-                            {book.isbn}
-                          </span>
-                        </div>
-                      )}
-
-                      {book.publicationYear && (
-                        <div className="flex justify-between text-sm">
-                          <span>Published:</span>
-                          <span className="font-medium">
-                            {book.publicationYear}
-                          </span>
-                        </div>
-                      )}
-
-                      {book.publisher && (
-                        <div className="flex justify-between text-sm">
-                          <span>Publisher:</span>
-                          <span
-                            className="max-w-20 truncate text-xs font-medium"
-                            title={book.publisher}
-                          >
-                            {book.publisher}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between text-sm">
-                        <span>Status:</span>
-                        <span
-                          className={`font-medium ${
-                            book.isActive
-                              ? "text-[var(--mundia-success)]"
-                              : "text-[var(--mundia-danger)]"
-                          }`}
-                        >
-                          {book.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
+                      </p>
+                      <span className={`status-pill mt-1 w-fit ${statusClass}`}>
+                        {book.isActive
+                          ? isAvailable
+                            ? "Active"
+                            : "Unavailable"
+                          : "Inactive"}
+                      </span>
                     </div>
 
-                    <div className="mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row">
+                    <div className="space-y-1 text-sm text-slate-600">
+                      <p>
+                        Rating{" "}
+                        <span className="font-semibold text-[var(--mundia-ink)]">
+                          {book.rating}/5
+                        </span>
+                      </p>
+                      {book.publicationYear && (
+                        <p>Published {book.publicationYear}</p>
+                      )}
+                      {book.isbn && (
+                        <p className="truncate font-mono text-xs">
+                          ISBN {book.isbn}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 lg:justify-end">
                       <Button
                         size="sm"
-                        className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+                        variant="outline"
+                        className="rounded-lg border-[var(--mundia-line)]"
                         asChild
                       >
-                        <Link href={`/admin/books/${book.id}/edit`}>
-                          Open Book
-                        </Link>
+                        <Link href={`/books/${book.id}`}>View</Link>
                       </Button>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={`/admin/books/${book.id}/edit`}>
-                          Edit Book
-                        </Link>
+                      <Button
+                        size="sm"
+                        className="rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+                        asChild
+                      >
+                        <Link href={`/admin/books/${book.id}/edit`}>Edit</Link>
                       </Button>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

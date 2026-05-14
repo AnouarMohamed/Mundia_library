@@ -96,15 +96,17 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
         <Button
           variant="outline"
           size="sm"
-          className="flex min-h-11 items-center gap-1 border-white/15 bg-white/5 text-light-100 hover:border-primary hover:bg-white/10"
+          className="flex min-h-11 items-center gap-1 border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:border-primary hover:bg-[var(--mundia-panel)]"
         >
           <RotateCcw className="size-3 sm:size-4" />
           <span>Request renewal</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="surface-panel border-white/10 sm:max-w-[425px]">
+      <DialogContent className="surface-panel sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-light-100">Request renewal</DialogTitle>
+          <DialogTitle className="text-[var(--mundia-ink)]">
+            Request renewal
+          </DialogTitle>
           <DialogDescription>
             Request to extend the due date for <strong>{bookTitle}</strong> by 7
             days.
@@ -130,14 +132,14 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
             variant="ghost"
             onClick={() => setIsOpen(false)}
             disabled={isLoading}
-            className="text-light-100 hover:bg-white/10 hover:text-light-100"
+            className="text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="bg-primary text-dark-100 hover:bg-primary/90"
+            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-95"
           >
             {isLoading ? (
               <>
