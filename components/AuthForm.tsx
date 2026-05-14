@@ -40,7 +40,7 @@ interface Props<T extends FieldValues> {
   schema: ZodType<T>;
   defaultValues: T;
   onSubmit: (
-    data: T
+    data: T,
   ) => Promise<
     { success: true } | { success: false; error?: string; fieldError?: string }
   >;
@@ -121,7 +121,7 @@ const AuthForm = <T extends FieldValues>({
         // Generic error
         showToast.error(
           "Authentication Error",
-          result.error ?? "An unexpected error occurred. Please try again."
+          result.error ?? "An unexpected error occurred. Please try again.",
         );
       }
     }
@@ -167,7 +167,7 @@ const AuthForm = <T extends FieldValues>({
                 <SelectTrigger className="form-input text-white">
                   <SelectValue placeholder="Select Role Based Test Account" />
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border border-white/15 bg-[rgba(7,14,22,0.98)] text-light-100">
+                <SelectContent className="rounded-2xl border border-white/15 bg-[var(--surface-card-strong)] text-light-100">
                   <SelectItem
                     value="guest-user"
                     className="cursor-pointer rounded-lg text-white focus:bg-white/10 focus:text-white"
@@ -241,7 +241,7 @@ const AuthForm = <T extends FieldValues>({
                           // For number inputs, convert empty string to undefined
                           if (field.name === "universityId") {
                             field.onChange(
-                              value === "" ? undefined : Number(value)
+                              value === "" ? undefined : Number(value),
                             );
                           } else {
                             field.onChange(value);
@@ -282,10 +282,7 @@ const AuthForm = <T extends FieldValues>({
         <p className="text-center text-sm font-medium sm:text-base">
           {isSignIn ? "New to Mundiapolis? " : "Already have an account? "}
 
-          <Link
-            href={isSignIn ? "/sign-up" : "/sign-in"}
-            className="auth-link"
-          >
+          <Link href={isSignIn ? "/sign-up" : "/sign-in"} className="auth-link">
             {isSignIn ? "Create an account" : "Sign in"}
           </Link>
         </p>

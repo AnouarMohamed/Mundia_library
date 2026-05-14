@@ -4,28 +4,36 @@
 
 @layer base {
   .admin-theme {
-    --background: #f4fafc;
-    --foreground: #0f172a;
-    --card: #ffffff;
-    --card-foreground: #0f172a;
-    --popover: #ffffff;
-    --popover-foreground: #0f172a;
-    --primary: #2f6f82;
-    --primary-foreground: #ffffff;
-    --secondary: #e7f2f6;
-    --secondary-foreground: #1f3a4a;
-    --muted: #edf5f9;
-    --muted-foreground: #4b6170;
-    --accent: #d8e9f0;
-    --accent-foreground: #1f3a4a;
-    --border: #d0e2ea;
-    --input: #cfe1e9;
-    --ring: #2f6f82;
+    --background: oklch(97% 0.008 218);
+    --foreground: oklch(18% 0.025 225);
+    --card: oklch(98% 0.006 218);
+    --card-foreground: oklch(18% 0.025 225);
+    --popover: oklch(98% 0.006 218);
+    --popover-foreground: oklch(18% 0.025 225);
+    --primary: oklch(56% 0.09 214);
+    --primary-foreground: oklch(97% 0.008 218);
+    --secondary: oklch(94% 0.02 218);
+    --secondary-foreground: oklch(24% 0.035 225);
+    --muted: oklch(95% 0.012 218);
+    --muted-foreground: oklch(45% 0.03 225);
+    --accent: oklch(93% 0.035 212);
+    --accent-foreground: oklch(24% 0.035 225);
+    --border: oklch(76% 0.035 218);
+    --input: oklch(80% 0.035 218);
+    --ring: oklch(56% 0.09 214);
 
     background:
-      radial-gradient(circle at 8% 0%, rgba(134, 188, 203, 0.16), transparent 30%),
-      radial-gradient(circle at 88% 8%, rgba(204, 47, 102, 0.08), transparent 34%),
-      linear-gradient(160deg, #f9fcfe 0%, #f2f8fb 54%, #ecf4f8 100%);
+      linear-gradient(
+        115deg,
+        oklch(78% 0.105 88 / 0.08) 0 1px,
+        transparent 1px 132px
+      ),
+      linear-gradient(
+        160deg,
+        oklch(98% 0.006 218) 0%,
+        oklch(96% 0.012 218) 54%,
+        oklch(94% 0.018 218) 100%
+      );
     @apply text-slate-900;
   }
 }
@@ -34,8 +42,12 @@
   .admin-container {
     @apply flex min-w-0 flex-1 flex-col p-4 sm:p-6 lg:px-10 lg:py-8 xl:px-12 2xl:px-16;
     background:
-      radial-gradient(circle at 80% 0%, rgba(47, 111, 130, 0.1), transparent 28%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.7) 0%, rgba(248, 252, 255, 0.92) 100%);
+      linear-gradient(90deg, oklch(56% 0.09 214 / 0.08), transparent 38%),
+      linear-gradient(
+        180deg,
+        oklch(98% 0.006 218 / 0.72) 0%,
+        oklch(97% 0.008 218 / 0.94) 100%
+      );
   }
 
   .back-btn {
@@ -197,7 +209,10 @@
 
   /* Sidebar */
   .admin-sidebar {
-    @apply sticky top-0 z-40 flex h-screen w-[82px] shrink-0 flex-col justify-between overflow-y-auto border-r border-slate-200/85 bg-white/90 px-2 pb-5 pt-8 shadow-[inset_-1px_0_0_rgba(148,163,184,0.08)] backdrop-blur-sm sm:w-[248px] sm:px-5 sm:pt-10 lg:w-[264px];
+    @apply sticky top-0 z-40 flex h-screen w-[82px] shrink-0 flex-col justify-between overflow-y-auto border-r px-2 pb-5 pt-8 sm:w-[248px] sm:px-5 sm:pt-10 lg:w-[264px];
+    border-color: oklch(76% 0.035 218 / 0.72);
+    background: oklch(98% 0.006 218 / 0.94);
+    box-shadow: inset -1px 0 0 oklch(60% 0.025 225 / 0.08);
   }
 
   .admin-sidebar .logo {

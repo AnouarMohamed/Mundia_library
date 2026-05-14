@@ -16,6 +16,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCreateReview } from "@/hooks/useMutations";
+import { Star } from "lucide-react";
 
 interface ReviewFormProps {
   bookId: string;
@@ -55,7 +56,7 @@ export default function ReviewForm({
         onSuccess: () => {
           onReviewSubmitted();
         },
-      }
+      },
     );
   };
 
@@ -66,23 +67,28 @@ export default function ReviewForm({
           key={star}
           type="button"
           onClick={() => setRating(star)}
-          className={`text-xl transition-colors sm:text-2xl ${
-            star <= rating ? "text-yellow-400" : "text-gray-300"
-          } hover:text-yellow-400`}
+          aria-label={`Set rating to ${star} star${star === 1 ? "" : "s"}`}
+          className="focus-ring rounded p-1 transition-colors hover:text-[var(--mundia-gold)]"
         >
-          
+          <Star
+            className={`size-5 sm:size-6 ${
+              star <= rating
+                ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
+                : "fill-light-100/20 text-light-100/20"
+            }`}
+          />
         </button>
       ))}
-      <span className="ml-1.5 text-xs text-gray-600 sm:ml-2 sm:text-sm">
+      <span className="ml-1.5 text-xs text-light-200/70 sm:ml-2 sm:text-sm">
         {rating} star{rating !== 1 ? "s" : ""}
       </span>
     </div>
   );
 
   return (
-    <div className="rounded-lg border border-gray-600 bg-gray-800/50 p-4 shadow-sm sm:p-6">
+    <div className="surface-panel p-4 shadow-sm sm:p-6">
       <h3 className="mb-3 text-base font-semibold text-light-100 sm:mb-4 sm:text-lg">
-        Write a Review
+        Write a review
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
@@ -101,7 +107,7 @@ export default function ReviewForm({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your thoughts about this book..."
-            className="w-full rounded-md border border-gray-600 bg-gray-700/50 px-2.5 py-1.5 text-xs text-light-100 placeholder:text-light-200/50 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 sm:px-3 sm:py-2 sm:text-sm"
+            className="app-control min-h-28 w-full resize-none py-3"
             rows={4}
             required
           />
@@ -116,16 +122,16 @@ export default function ReviewForm({
             variant="outline"
             onClick={onCancel}
             disabled={createReviewMutation.isPending}
-            className="w-full border-gray-600 text-xs text-light-200 hover:bg-gray-100 sm:w-auto sm:text-sm"
+            className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm"
           >
             Cancel
           </Button>
           <Button
             type="submit"
             disabled={createReviewMutation.isPending || !comment.trim()}
-            className="w-full bg-green-600 text-xs text-white hover:bg-green-700 sm:w-auto sm:text-sm"
+            className="w-full bg-primary text-xs text-dark-100 hover:bg-primary/90 sm:w-auto sm:text-sm"
           >
-            {createReviewMutation.isPending ? "Submitting..." : "Submit Review"}
+            {createReviewMutation.isPending ? "Submitting..." : "Submit review"}
           </Button>
         </div>
       </form>

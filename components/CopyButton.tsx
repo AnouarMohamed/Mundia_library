@@ -9,6 +9,9 @@ interface CopyButtonProps {
   className?: string;
 }
 
+/**
+ * Icon button for copying text to clipboard.
+ */
 export const CopyButton = ({ text, className }: CopyButtonProps) => {
   const [copied, setCopied] = useState(false);
 

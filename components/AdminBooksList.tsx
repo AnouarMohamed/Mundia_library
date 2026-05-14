@@ -106,7 +106,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
       limit: 1000, // High limit to get all books
       page: 1,
     }),
-    [currentSearch, currentGenre, currentAvailability]
+    [currentSearch, currentGenre, currentAvailability],
   );
 
   // Check if any filters are active
@@ -168,13 +168,16 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
   // Show skeleton while loading (only if no initial data)
   if (isLoading && (!initialBooks || initialBooks.length === 0)) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold sm:text-xl">All Books</h2>
-          <Button className="bg-primary-admin" asChild>
-            <Link href="/admin/books/new" className="text-white">
-              + Create a New Book
-            </Link>
+          <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
+            All Books
+          </h2>
+          <Button
+            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+            asChild
+          >
+            <Link href="/admin/books/new">Create book</Link>
           </Button>
         </div>
 
@@ -192,22 +195,25 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
   // Show error state
   if (isError && (!initialBooks || initialBooks.length === 0)) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold sm:text-xl">All Books</h2>
-          <Button className="bg-primary-admin" asChild>
-            <Link href="/admin/books/new" className="text-white">
-              + Create a New Book
-            </Link>
+          <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
+            All Books
+          </h2>
+          <Button
+            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+            asChild
+          >
+            <Link href="/admin/books/new">Create book</Link>
           </Button>
         </div>
 
         <div className="mt-4 w-full overflow-hidden sm:mt-7">
           <div className="py-6 text-center sm:py-8">
-            <p className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
+            <p className="mb-2 text-base font-semibold text-[var(--mundia-danger)] sm:text-lg">
               Failed to load books
             </p>
-            <p className="text-xs text-gray-500 sm:text-sm">
+            <p className="text-xs text-slate-600 sm:text-sm">
               {error instanceof Error
                 ? error.message
                 : "An unknown error occurred"}
@@ -219,9 +225,9 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
   }
 
   return (
-    <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+    <section className="admin-page-panel">
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 className="text-lg font-semibold text-dark-400 sm:text-xl">
+        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
           All Books ({allBooks.length})
         </h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -239,17 +245,17 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
               placeholder="Search books..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300"
+              className="admin-field w-full"
             />
           </form>
           {/* Filter Dropdowns */}
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm text-dark-400">Genre:</span>
+              <span className="text-sm font-medium text-slate-700">Genre</span>
               <select
                 value={currentGenre}
                 onChange={(e) => handleFilterChange("genre", e.target.value)}
-                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:min-w-[170px]"
+                className="admin-field w-full sm:min-w-[170px]"
               >
                 <option value="all">All</option>
                 {genres.map((genre) => (
@@ -260,13 +266,15 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
               </select>
             </div>
             <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm text-dark-400">Availability:</span>
+              <span className="text-sm font-medium text-slate-700">
+                Availability
+              </span>
               <select
                 value={currentAvailability}
                 onChange={(e) =>
                   handleFilterChange("availability", e.target.value)
                 }
-                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:min-w-[170px]"
+                className="admin-field w-full sm:min-w-[170px]"
               >
                 <option value="all">All</option>
                 <option value="available">Available</option>
@@ -278,17 +286,18 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button className="bg-primary-admin" asChild>
-          <Link href="/admin/books/new" className="text-white">
-            + Create a New Book
-          </Link>
+        <Button
+          className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+          asChild
+        >
+          <Link href="/admin/books/new">Create book</Link>
         </Button>
       </div>
 
       <div className="mt-4 w-full overflow-hidden sm:mt-7">
         {allBooks.length === 0 ? (
           <div className="py-6 text-center sm:py-8">
-            <p className="mb-4 text-base font-medium text-gray-600 sm:text-lg">
+            <p className="mb-4 text-base font-medium text-slate-600 sm:text-lg">
               {hasActiveFilters
                 ? "No books found matching your criteria."
                 : "No books found. Create your first book!"}
@@ -297,9 +306,9 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
               <Button
                 variant="outline"
                 onClick={clearFilters}
-                className="mt-2 border-gray-300 text-dark-400 hover:bg-gray-100"
+                className="mt-2 border-[var(--mundia-line)] text-slate-700 hover:bg-[var(--mundia-panel)]"
               >
-                Clear All Filters
+                Clear filters
               </Button>
             )}
           </div>
@@ -308,7 +317,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
             {allBooks.map((book) => (
               <div
                 key={book.id}
-                className="rounded-lg border border-gray-200 p-3 transition-shadow hover:shadow-md sm:p-4"
+                className="rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-3 shadow-sm transition hover:border-[var(--mundia-teal)] sm:p-4"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                   <BookCover
@@ -318,13 +327,13 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                   />
 
                   <div className="flex-1">
-                    <h3 className="line-clamp-2 text-base font-semibold sm:text-lg">
+                    <h3 className="line-clamp-2 text-base font-semibold text-slate-900 sm:text-lg">
                       {book.title}
                     </h3>
-                    <p className="text-sm text-gray-600">by {book.author}</p>
-                    <p className="mt-1 text-xs text-gray-500">{book.genre}</p>
+                    <p className="text-sm text-slate-600">by {book.author}</p>
+                    <p className="mt-1 text-xs text-slate-500">{book.genre}</p>
 
-                    <div className="mt-3 space-y-1">
+                    <div className="mt-3 space-y-1 text-slate-600">
                       <div className="flex justify-between text-sm">
                         <span>Total Copies:</span>
                         <span className="font-medium">{book.totalCopies}</span>
@@ -334,8 +343,8 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                         <span
                           className={`font-medium ${
                             book.availableCopies > 0
-                              ? "text-green-600"
-                              : "text-red-600"
+                              ? "text-[var(--mundia-success)]"
+                              : "text-[var(--mundia-danger)]"
                           }`}
                         >
                           {book.availableCopies}
@@ -381,7 +390,9 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                         <span>Status:</span>
                         <span
                           className={`font-medium ${
-                            book.isActive ? "text-green-600" : "text-red-600"
+                            book.isActive
+                              ? "text-[var(--mundia-success)]"
+                              : "text-[var(--mundia-danger)]"
                           }`}
                         >
                           {book.isActive ? "Active" : "Inactive"}
@@ -390,11 +401,12 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                     </div>
 
                     <div className="mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row">
-                      <Button size="sm" asChild>
-                        <Link
-                          href={`/admin/books/${book.id}/edit`}
-                          className="text-white"
-                        >
+                      <Button
+                        size="sm"
+                        className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+                        asChild
+                      >
+                        <Link href={`/admin/books/${book.id}/edit`}>
                           Open Book
                         </Link>
                       </Button>

@@ -72,10 +72,11 @@ function ReviewCard({
       {[1, 2, 3, 4, 5].map((star) => (
         <Star
           key={star}
+          aria-hidden="true"
           className={`size-3 sm:size-4 ${
             star <= rating
-              ? "fill-yellow-400 text-yellow-400"
-              : "fill-gray-300 text-gray-300"
+              ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
+              : "fill-light-100/20 text-light-100/20"
           }`}
         />
       ))}
@@ -93,14 +94,14 @@ function ReviewCard({
           onDelete(review.id);
           setShowMenu(false);
         },
-      }
+      },
     );
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-800/50 p-3 shadow-sm sm:p-4">
+    <div className="surface-panel p-3 sm:p-4">
       <div className="flex flex-row items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <h4 className="text-sm font-medium text-light-100 sm:text-base">
               {review.userFullName}
@@ -133,35 +134,46 @@ function ReviewCard({
         {isOwner && (
           <div className="relative shrink-0">
             <button
+              type="button"
               onClick={() => setShowMenu(!showMenu)}
-              className="rounded-full p-1 text-light-200/60 hover:bg-gray-700/50 hover:text-light-100"
+              aria-label="Review actions"
+              className="focus-ring rounded-full p-2 text-light-200/70 hover:bg-white/10 hover:text-light-100"
             >
-              <svg className="size-4 sm:size-5" fill="currentColor" viewBox="0 0 20 20">
+              <svg
+                className="size-4 sm:size-5"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+              >
                 <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
               </svg>
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-8 z-10 w-28 rounded-md border border-gray-600 bg-gray-800 py-1 shadow-lg sm:w-32">
+              <div className="absolute right-0 top-10 z-10 w-32 rounded-xl border border-white/10 bg-[var(--mundia-ink)] py-1 shadow-lg">
                 <button
+                  type="button"
                   onClick={() => {
                     onEdit(review);
                     setShowMenu(false);
                   }}
-                  className="block w-full px-2.5 py-1.5 text-left text-xs text-light-100 hover:bg-gray-700 sm:px-3 sm:py-2 sm:text-sm"
+                  className="block w-full px-3 py-2 text-left text-sm text-light-100 hover:bg-white/10"
                 >
                   Edit
                 </button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="block w-full px-2.5 py-1.5 text-left text-xs text-red-400 hover:bg-gray-700 sm:px-3 sm:py-2 sm:text-sm">
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-2 text-left text-sm text-red-200 hover:bg-white/10"
+                    >
                       Delete
                     </button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent className="border-gray-600 bg-gray-800/95">
+                  <AlertDialogContent className="surface-panel border-white/10">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-base text-light-100 sm:text-lg">
-                        Delete Review
+                        Delete review
                       </AlertDialogTitle>
                       <AlertDialogDescription className="text-xs text-light-200 sm:text-sm">
                         Are you sure you want to delete this review? This action
@@ -169,12 +181,12 @@ function ReviewCard({
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0">
-                      <AlertDialogCancel className="w-full border-gray-500 bg-gray-600 text-xs text-white hover:bg-gray-500 hover:text-white sm:w-auto sm:text-sm">
+                      <AlertDialogCancel className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm">
                         Cancel
                       </AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
-                        className="w-full bg-red-600 text-xs text-white hover:bg-red-700 sm:w-auto sm:text-sm"
+                        className="w-full bg-[var(--mundia-danger)] text-xs text-white hover:opacity-90 sm:w-auto sm:text-sm"
                       >
                         Delete
                       </AlertDialogAction>
@@ -182,8 +194,9 @@ function ReviewCard({
                   </AlertDialogContent>
                 </AlertDialog>
                 <button
+                  type="button"
                   onClick={() => setShowMenu(false)}
-                  className="block w-full px-2.5 py-1.5 text-left text-xs text-light-100 hover:bg-gray-700 sm:px-3 sm:py-2 sm:text-sm"
+                  className="block w-full px-3 py-2 text-left text-sm text-light-100 hover:bg-white/10"
                 >
                   Cancel
                 </button>
@@ -248,9 +261,9 @@ export default function ReviewsSection({
       </h3>
 
       {reviews.length === 0 ? (
-        <div className="rounded-lg border border-gray-600 bg-gray-800/30 p-4 text-center sm:p-8">
+        <div className="surface-panel p-4 text-center sm:p-8">
           <p className="text-sm text-light-200/70 sm:text-base">
-            No reviews yet. Be the first to review this book!
+            No reviews yet. Return this book to add the first review.
           </p>
         </div>
       ) : (
@@ -302,7 +315,7 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
         onSuccess: () => {
           onUpdate();
         },
-      }
+      },
     );
   };
 
@@ -313,13 +326,14 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
           key={star}
           type="button"
           onClick={() => setRating(star)}
-          className="transition-colors hover:scale-110"
+          aria-label={`Set rating to ${star} star${star === 1 ? "" : "s"}`}
+          className="focus-ring rounded p-1 transition-colors hover:text-[var(--mundia-gold)]"
         >
           <Star
             className={`size-5 sm:size-6 ${
               star <= rating
-                ? "fill-yellow-400 text-yellow-400"
-                : "fill-gray-300 text-gray-300"
+                ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
+                : "fill-light-100/20 text-light-100/20"
             }`}
           />
         </button>
@@ -331,7 +345,7 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
   );
 
   return (
-    <div className="rounded-lg border border-gray-600 bg-gray-800/50 p-4 sm:p-6">
+    <div className="surface-panel p-4 sm:p-6">
       <h3 className="mb-3 text-base font-semibold text-light-100 sm:mb-4 sm:text-lg">
         Edit Your Review
       </h3>
@@ -352,7 +366,7 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your thoughts about this book..."
-            className="w-full rounded-md border border-gray-600 bg-gray-700/50 px-2.5 py-1.5 text-xs text-light-100 placeholder:text-light-200/50 focus:border-green-400 focus:outline-none focus:ring-1 focus:ring-green-400 sm:px-3 sm:py-2 sm:text-sm"
+            className="app-control min-h-28 w-full resize-none py-3"
             rows={4}
             required
           />
@@ -367,14 +381,14 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
             variant="outline"
             onClick={onCancel}
             disabled={updateReviewMutation.isPending}
-            className="w-full border-gray-600 bg-gray-700/50 text-xs text-light-100 hover:bg-gray-700 hover:text-white sm:w-auto sm:text-sm"
+            className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm"
           >
             Cancel
           </Button>
           <Button
             type="submit"
             disabled={updateReviewMutation.isPending || !comment.trim()}
-            className="w-full bg-green-600 text-xs text-white hover:bg-green-700 sm:w-auto sm:text-sm"
+            className="w-full bg-primary text-xs text-dark-100 hover:bg-primary/90 sm:w-auto sm:text-sm"
           >
             {updateReviewMutation.isPending ? "Updating..." : "Update Review"}
           </Button>

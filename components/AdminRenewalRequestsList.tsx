@@ -1,6 +1,6 @@
 /**
  * AdminRenewalRequestsList Component
- * 
+ *
  * A client component for administrators to manage book renewal requests.
  * Uses React Query for data fetching and mutations.
  */
@@ -19,8 +19,8 @@ interface AdminRenewalRequestsListProps {
   initialRequests?: RenewalRequestWithDetails[];
 }
 
-const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({ 
-  initialRequests 
+const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
+  initialRequests,
 }) => {
   const { data, isLoading, isError } = useRenewalRequests(initialRequests);
   const approveMutation = useApproveRenewal();
@@ -40,7 +40,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
 
   if (isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center text-red-800">
+      <div className="status-danger rounded-xl border p-4 text-center">
         Failed to load renewal requests.
       </div>
     );
@@ -48,41 +48,65 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold text-dark-400">
+      <h2 className="text-xl font-semibold text-slate-900">
         Renewal Requests ({requests.length})
       </h2>
 
       {requests.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-200 py-8 text-center text-gray-500">
+        <div className="rounded-2xl border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] py-8 text-center text-slate-500">
           No pending renewal requests found.
         </div>
       ) : (
         requests.map((request) => (
-          <div 
-            key={request.id} 
-            className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-hover hover:shadow-md sm:flex-row sm:items-center"
+          <div
+            key={request.id}
+            className="flex flex-col gap-4 rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-4 shadow-sm transition hover:border-[var(--mundia-teal)] sm:flex-row sm:items-center"
           >
             <div className="flex-1">
               <div className="mb-1 flex items-center gap-2">
-                <h3 className="text-base font-bold text-dark-400">{request.bookTitle}</h3>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                  request.status === "PENDING" ? "bg-yellow-100 text-yellow-800" :
-                  request.status === "APPROVED" ? "bg-green-100 text-green-800" :
-                  "bg-red-100 text-red-800"
-                }`}>
+                <h3 className="text-base font-bold text-slate-900">
+                  {request.bookTitle}
+                </h3>
+                <span
+                  className={`status-pill ${
+                    request.status === "PENDING"
+                      ? "status-warning"
+                      : request.status === "APPROVED"
+                        ? "status-success"
+                        : "status-danger"
+                  }`}
+                >
                   {request.status}
                 </span>
               </div>
-              
-              <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm text-gray-600 sm:grid-cols-2">
-                <p><span className="font-medium">User:</span> {request.userName} ({request.userEmail})</p>
-                <p><span className="font-medium">Current Due:</span> {request.dueDate ? new Date(request.dueDate).toLocaleDateString() : "N/A"}</p>
-                <p><span className="font-medium">Renewals:</span> {request.renewalCount}</p>
-                <p><span className="font-medium">Requested:</span> {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : "N/A"}</p>
+
+              <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm text-slate-600 sm:grid-cols-2">
+                <p>
+                  <span className="font-medium text-slate-800">User:</span>{" "}
+                  {request.userName} ({request.userEmail})
+                </p>
+                <p>
+                  <span className="font-medium text-slate-800">
+                    Current Due:
+                  </span>{" "}
+                  {request.dueDate
+                    ? new Date(request.dueDate).toLocaleDateString()
+                    : "N/A"}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-800">Renewals:</span>{" "}
+                  {request.renewalCount}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-800">Requested:</span>{" "}
+                  {request.createdAt
+                    ? new Date(request.createdAt).toLocaleDateString()
+                    : "N/A"}
+                </p>
               </div>
 
               {request.requestReason && (
-                <p className="mt-2 rounded bg-gray-50 p-2 text-xs italic text-gray-500">
+                <p className="mt-2 rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper-warm)] p-2 text-xs italic text-slate-600">
                   &quot;{request.requestReason}&quot;
                 </p>
               )}
@@ -93,35 +117,41 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
                 <>
                   <Button
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => approveMutation.mutate({ 
-                      requestId: request.id, 
-                      bookTitle: request.bookTitle || "",
-                      userName: request.userName || ""
-                    })}
-                    disabled={approveMutation.isPending || rejectMutation.isPending}
+                    className="bg-[var(--mundia-success)] text-white hover:bg-[var(--mundia-success-strong)]"
+                    onClick={() =>
+                      approveMutation.mutate({
+                        requestId: request.id,
+                        bookTitle: request.bookTitle || "",
+                        userName: request.userName || "",
+                      })
+                    }
+                    disabled={
+                      approveMutation.isPending || rejectMutation.isPending
+                    }
                   >
-                    <CheckCircle className="mr-1.5 size-4" />
+                    <CheckCircle className="mr-1.5 size-4" aria-hidden="true" />
                     Approve
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
-                    onClick={() => rejectMutation.mutate({ 
-                      requestId: request.id,
-                      bookTitle: request.bookTitle || "",
-                      userName: request.userName || ""
-                    })}
-                    disabled={approveMutation.isPending || rejectMutation.isPending}
+                    onClick={() =>
+                      rejectMutation.mutate({
+                        requestId: request.id,
+                        bookTitle: request.bookTitle || "",
+                        userName: request.userName || "",
+                      })
+                    }
+                    disabled={
+                      approveMutation.isPending || rejectMutation.isPending
+                    }
                   >
-                    <XCircle className="mr-1.5 size-4" />
+                    <XCircle className="mr-1.5 size-4" aria-hidden="true" />
                     Reject
                   </Button>
                 </>
               ) : (
-                <div className="text-sm text-gray-400">
-                  Processed
-                </div>
+                <div className="text-sm text-slate-500">Processed</div>
               )}
             </div>
           </div>

@@ -21,6 +21,8 @@ const eslintConfig = [
       "dist/**",
       "coverage/**",
       "artifacts/**",
+      ".agents/**",
+      ".cursor/**",
       "next-env.d.ts",
     ],
   },

@@ -114,12 +114,12 @@ export async function getOverdueAnalysis() {
       dueDate: borrowRecords.dueDate,
       daysOverdue: sql<number>`CASE 
         WHEN ${borrowRecords.dueDate} IS NOT NULL 
-        THEN DATEDIFF(DATE(${now}), ${borrowRecords.dueDate})
+        THEN (CAST(${now} AS date) - ${borrowRecords.dueDate})
         ELSE 0 
       END`,
       fineAmount: sql<string>`CASE 
         WHEN ${borrowRecords.dueDate} IS NOT NULL AND ${borrowRecords.dueDate} < ${now}
-        THEN CAST((DATEDIFF(DATE(${now}), ${borrowRecords.dueDate}) * ${dailyFineAmount}) AS CHAR)
+        THEN CAST(((CAST(${now} AS date) - ${borrowRecords.dueDate}) * ${dailyFineAmount}) AS text)
         ELSE '0.00'
       END`,
     })
@@ -132,7 +132,7 @@ export async function getOverdueAnalysis() {
         sql`${borrowRecords.dueDate} < ${now}`
       )
     )
-    .orderBy(sql`DATEDIFF(DATE(${now}), ${borrowRecords.dueDate}) DESC`);
+    .orderBy(sql`(CAST(${now} AS date) - ${borrowRecords.dueDate}) DESC`);
 
   return overdueBooks;
 }
@@ -151,8 +151,8 @@ export async function getOverdueStats() {
   const stats = await db
     .select({
       totalOverdue: sql<number>`count(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then 1 end)`,
-      totalFines: sql<number>`COALESCE(sum(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then (DATEDIFF(DATE(${now}), ${borrowRecords.dueDate}) * ${dailyFineAmount}) end), 0)`,
-      avgDaysOverdue: sql<number>`COALESCE(AVG(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then DATEDIFF(DATE(${now}), ${borrowRecords.dueDate}) end), 0)`,
+      totalFines: sql<number>`COALESCE(sum(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then ((CAST(${now} AS date) - ${borrowRecords.dueDate}) * ${dailyFineAmount}) end), 0)`,
+      avgDaysOverdue: sql<number>`COALESCE(AVG(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then (CAST(${now} AS date) - ${borrowRecords.dueDate}) end), 0)`,
     })
     .from(borrowRecords);
 
@@ -283,15 +283,15 @@ export async function getGenrePerformanceByMonth() {
 
   const performance = await db
     .select({
-      month: sql<string>`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m')`,
+      month: sql<string>`to_char(${borrowRecords.createdAt}, 'YYYY-MM')`,
       genre: books.genre,
       borrowCount: count(),
     })
     .from(borrowRecords)
     .innerJoin(books, eq(borrowRecords.bookId, books.id))
     .where(gte(borrowRecords.createdAt, sixMonthsAgo))
-    .groupBy(sql`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m')`, books.genre)
-    .orderBy(sql`DATE_FORMAT(${borrowRecords.createdAt}, '%Y-%m') DESC`, count());
+    .groupBy(sql`to_char(${borrowRecords.createdAt}, 'YYYY-MM')`, books.genre)
+    .orderBy(sql`to_char(${borrowRecords.createdAt}, 'YYYY-MM') DESC`, count());
 
   return performance;
 }

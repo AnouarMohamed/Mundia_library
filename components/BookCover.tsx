@@ -48,7 +48,8 @@ const BookCover = React.memo(
           className="absolute z-10"
           style={{ left: "12%", width: "87.5%", height: "88%" }}
         >
-          {coverImage && coverImage.startsWith("http") ? (
+          {coverImage &&
+          (coverImage.startsWith("http") || coverImage.startsWith("data:")) ? (
             <img
               // CRITICAL: Removed key prop - it causes remounts and flickering
               // React.memo handles re-render prevention, key causes unnecessary remounts
@@ -59,7 +60,7 @@ const BookCover = React.memo(
               decoding="async"
               fetchPriority="high"
             />
-          ) : coverImage ? (
+          ) : coverImage && config.env.imagekit.urlEndpoint ? (
             <IKImage
               // CRITICAL: Removed key prop - it causes remounts and flickering
               // React.memo handles re-render prevention, key causes unnecessary remounts

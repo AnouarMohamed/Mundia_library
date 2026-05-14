@@ -189,15 +189,15 @@ const AccountRequestsClient = ({
   // Show skeleton while loading (only if no initial data)
   if (usersLoading && (!initialUsers || initialUsers.length === 0)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-0 sm:p-6">
+      <div className="w-full p-0 sm:p-6">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-6 sm:mb-8">
+          <div className="admin-page-panel mb-6 sm:mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
                   Account Requests
                 </h1>
-                <p className="mt-1.5 text-sm text-gray-600 sm:mt-2 sm:text-base">
+                <p className="mt-1.5 text-sm text-slate-600 sm:mt-2 sm:text-base">
                   Review and approve pending user registrations
                 </p>
               </div>
@@ -217,13 +217,13 @@ const AccountRequestsClient = ({
   // Show error state
   if (usersError && (!initialUsers || initialUsers.length === 0)) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-0 sm:p-6">
+      <div className="w-full p-0 sm:p-6">
         <div className="mx-auto max-w-7xl">
-          <div className="py-6 text-center sm:py-8">
-            <p className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
+          <div className="admin-page-panel py-6 text-center sm:py-8">
+            <p className="mb-2 text-base font-semibold text-[var(--mundia-danger)] sm:text-lg">
               Failed to load account requests
             </p>
-            <p className="text-xs text-gray-500 sm:text-sm">
+            <p className="text-xs text-slate-600 sm:text-sm">
               {usersErrorData instanceof Error
                 ? usersErrorData.message
                 : "An unknown error occurred"}
@@ -235,16 +235,16 @@ const AccountRequestsClient = ({
   }
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-br from-slate-50 to-blue-50 p-0 sm:p-6">
+    <div className="w-full max-w-full overflow-x-hidden p-0 sm:p-6">
       <div className="mx-auto w-full max-w-7xl">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
+        <div className="admin-page-panel mb-6 sm:mb-8">
           <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="min-w-0 flex-1">
-              <h1 className="break-words text-2xl font-bold text-gray-900 sm:text-3xl">
+              <h1 className="break-words text-2xl font-bold text-slate-900 sm:text-3xl">
                 Account Requests
               </h1>
-              <p className="mt-1.5 break-words text-sm text-gray-600 sm:mt-2 sm:text-base">
+              <p className="mt-1.5 max-w-2xl break-words text-sm text-slate-600 sm:mt-2 sm:text-base">
                 Review and approve pending user registrations
               </p>
             </div>
@@ -263,13 +263,14 @@ const AccountRequestsClient = ({
                   placeholder="Search by name, email, ID..."
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
-                  className="w-full rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-900 placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:px-3 sm:py-2 sm:text-sm"
+                  className="admin-field w-full"
                 />
               </form>
               <div className="flex w-full items-center justify-start sm:w-auto sm:justify-center">
-                <div className="shrink-0 rounded-full bg-orange-100 px-2.5 py-1 sm:px-3">
-                  <span className="whitespace-nowrap text-xs font-medium text-orange-800 sm:text-sm">
-                    {users.length} Pending
+                <div className="status-pill status-warning shrink-0">
+                  <Clock className="mr-1 size-3" aria-hidden="true" />
+                  <span className="whitespace-nowrap text-xs font-medium sm:text-sm">
+                    {users.length} pending
                   </span>
                 </div>
               </div>
@@ -279,15 +280,15 @@ const AccountRequestsClient = ({
 
         {/* Success/Error Messages */}
         {successMessage && (
-          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 sm:mb-6 sm:p-4">
+          <div className="status-success mb-4 rounded-xl border p-3 sm:mb-6 sm:p-4">
             <div className="flex items-center">
-              <CheckCircle className="size-4 text-green-400 sm:size-5" />
+              <CheckCircle className="size-4 sm:size-5" aria-hidden="true" />
               <div className="ml-2 sm:ml-3">
-                <h3 className="text-xs font-medium text-green-800 sm:text-sm">
+                <h3 className="text-xs font-medium sm:text-sm">
                   {successMessage === "account-approved" &&
-                    " Account Approved Successfully!"}
+                    "Account approved successfully."}
                   {successMessage === "account-rejected" &&
-                    " Account Rejected Successfully!"}
+                    "Account rejected successfully."}
                 </h3>
               </div>
             </div>
@@ -295,12 +296,12 @@ const AccountRequestsClient = ({
         )}
 
         {errorMessage && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 sm:mb-6 sm:p-4">
+          <div className="status-danger mb-4 rounded-xl border p-3 sm:mb-6 sm:p-4">
             <div className="flex items-center">
-              <XCircle className="size-4 text-red-400 sm:size-5" />
+              <XCircle className="size-4 sm:size-5" aria-hidden="true" />
               <div className="ml-2 sm:ml-3">
-                <h3 className="text-xs font-medium text-red-800 sm:text-sm">
-                   Operation Failed
+                <h3 className="text-xs font-medium sm:text-sm">
+                  Operation failed.
                 </h3>
               </div>
             </div>
@@ -309,17 +310,17 @@ const AccountRequestsClient = ({
 
         {/* Requests Grid */}
         {users.length === 0 ? (
-          <Card className="text-center">
+          <Card className="surface-panel-light text-center">
             <CardContent className="py-8 sm:py-12">
-              <div className="mx-auto mb-3 flex size-20 items-center justify-center rounded-full bg-gray-100 sm:mb-4 sm:size-24">
-                <User className="size-10 text-gray-400 sm:size-12" />
+              <div className="mx-auto mb-3 flex size-20 items-center justify-center rounded-full bg-[var(--mundia-paper-warm)] sm:mb-4 sm:size-24">
+                <User className="size-10 text-slate-500 sm:size-12" />
               </div>
-              <h3 className="mb-1.5 text-base font-medium text-gray-900 sm:mb-2 sm:text-lg">
+              <h3 className="mb-1.5 text-base font-medium text-slate-900 sm:mb-2 sm:text-lg">
                 {hasActiveFilters
                   ? "No pending requests found matching your criteria."
-                  : "No Pending Requests"}
+                  : "No pending requests"}
               </h3>
-              <p className="mb-3 text-sm text-gray-500 sm:mb-4 sm:text-base">
+              <p className="mb-3 text-sm text-slate-600 sm:mb-4 sm:text-base">
                 {hasActiveFilters
                   ? "Try adjusting your search terms."
                   : "All account requests have been processed."}
@@ -328,9 +329,9 @@ const AccountRequestsClient = ({
                 <Button
                   variant="outline"
                   onClick={clearFilters}
-                  className="mt-1.5 border-gray-300 text-xs text-gray-700 hover:bg-gray-100 sm:mt-2 sm:text-sm"
+                  className="mt-1.5 border-[var(--mundia-line)] text-xs text-slate-700 hover:bg-[var(--mundia-panel)] sm:mt-2 sm:text-sm"
                 >
-                  Clear All Filters
+                  Clear filters
                 </Button>
               )}
             </CardContent>
@@ -388,39 +389,49 @@ const AccountRequestCard = ({
    * Resolve the full URL for the stored university card image.
    */
   const getImageUrl = (universityCard: string) => {
-    return universityCard.startsWith("http")
-      ? universityCard
-      : `${config.env.imagekit.urlEndpoint}/${universityCard}`;
+    if (
+      universityCard.startsWith("http") ||
+      universityCard.startsWith("data:")
+    ) {
+      return universityCard;
+    }
+
+    return config.env.imagekit.urlEndpoint
+      ? `${config.env.imagekit.urlEndpoint}/${universityCard}`
+      : universityCard;
   };
 
   return (
-    <Card className="group border-0 shadow-md transition-all duration-300 hover:shadow-lg">
+    <Card className="surface-panel-light group transition duration-300 hover:border-[var(--mundia-teal)]">
       <CardHeader className="pb-3 sm:pb-4">
         <div className="space-y-2 sm:space-y-3">
           {/* Badge on its own row */}
           <div className="flex justify-start">
             <Badge
-              variant="pending"
-              className="flex items-center gap-0.5 sm:space-x-1"
+              variant="outline"
+              className="status-pill status-warning flex items-center gap-0.5 border sm:space-x-1"
             >
-              <Clock className="size-2.5 sm:size-3" />
-              <span className="text-[10px] sm:text-xs">PENDING</span>
+              <Clock className="size-2.5 sm:size-3" aria-hidden="true" />
+              <span className="text-[10px] sm:text-xs">Pending</span>
             </Badge>
           </div>
           {/* Avatar and user info with full width */}
           <div className="flex items-center gap-2 sm:space-x-3">
             <Avatar className="size-10 sm:size-12">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-xs font-semibold text-white sm:text-sm">
+              <AvatarFallback className="bg-[var(--mundia-teal-strong)] text-xs font-semibold text-[var(--mundia-paper)] sm:text-sm">
                 {getInitials(user.fullName)}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <h3 className="break-words text-base font-semibold text-gray-900 sm:text-lg">
+              <h3 className="break-words text-base font-semibold text-slate-900 sm:text-lg">
                 {user.fullName}
               </h3>
-              <div className="flex items-center gap-1 text-xs text-gray-500 sm:space-x-1 sm:text-sm">
-                <Mail className="size-2.5 shrink-0 sm:size-3" />
+              <div className="flex items-center gap-1 text-xs text-slate-500 sm:space-x-1 sm:text-sm">
+                <Mail
+                  className="size-2.5 shrink-0 sm:size-3"
+                  aria-hidden="true"
+                />
                 <span className="break-all">{user.email}</span>
               </div>
             </div>
@@ -431,18 +442,24 @@ const AccountRequestCard = ({
       <CardContent className="space-y-3 sm:space-y-4">
         {/* University ID */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs sm:space-x-2 sm:text-sm">
-          <GraduationCap className="size-3 shrink-0 text-blue-500 sm:size-4" />
-          <span className="text-gray-600">University ID:</span>
-          <span className="break-words font-medium text-gray-900">
+          <GraduationCap
+            className="size-3 shrink-0 text-[var(--mundia-teal-strong)] sm:size-4"
+            aria-hidden="true"
+          />
+          <span className="text-slate-600">University ID:</span>
+          <span className="break-words font-medium text-slate-900">
             {user.universityId}
           </span>
         </div>
 
         {/* Join Date */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs sm:space-x-2 sm:text-sm">
-          <Calendar className="size-3 shrink-0 text-green-500 sm:size-4" />
-          <span className="text-gray-600">Joined:</span>
-          <span className="break-words font-medium text-gray-900">
+          <Calendar
+            className="size-3 shrink-0 text-[var(--mundia-success)] sm:size-4"
+            aria-hidden="true"
+          />
+          <span className="text-slate-600">Joined:</span>
+          <span className="break-words font-medium text-slate-900">
             {user.createdAt
               ? new Date(user.createdAt).toLocaleDateString()
               : "N/A"}
@@ -452,47 +469,57 @@ const AccountRequestCard = ({
         {/* University Card */}
         <div className="space-y-1.5 sm:space-y-2">
           <div className="flex flex-wrap items-center gap-1.5 sm:space-x-2">
-            <Shield className="size-3 shrink-0 text-purple-500 sm:size-4" />
-            <span className="break-words text-xs font-medium text-gray-700 sm:text-sm">
+            <Shield
+              className="size-3 shrink-0 text-[var(--mundia-gold-strong)] sm:size-4"
+              aria-hidden="true"
+            />
+            <span className="break-words text-xs font-medium text-slate-700 sm:text-sm">
               University Card
             </span>
           </div>
           {user.universityCard ? (
             <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
               <DialogTrigger asChild>
-                <div className="group relative cursor-pointer">
+                <button
+                  type="button"
+                  className="group relative block w-full cursor-pointer rounded-lg focus-ring"
+                  aria-label={`View university card for ${user.fullName}`}
+                >
                   <img
                     src={getImageUrl(user.universityCard)}
                     alt="University Card"
-                    className="h-24 w-full rounded-lg border border-gray-200 object-cover transition-colors hover:border-blue-300 sm:h-32"
+                    className="h-24 w-full rounded-lg border border-[var(--mundia-line)] object-cover transition-colors group-hover:border-[var(--mundia-teal)] sm:h-32"
                   />
-                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-all duration-200 group-hover:bg-black/20">
-                    <div className="rounded-full bg-white/90 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 sm:p-2">
-                      <Eye className="size-3 text-gray-700 sm:size-4" />
+                  <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-transparent transition duration-200 group-hover:bg-[var(--mundia-veil)]">
+                    <div className="rounded-full bg-[var(--mundia-paper)] p-1.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 sm:p-2">
+                      <Eye
+                        className="size-3 text-slate-700 sm:size-4"
+                        aria-hidden="true"
+                      />
                     </div>
                   </div>
-                </div>
+                </button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="surface-panel-light max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle className="text-base sm:text-lg">
-                    University Card - {user.fullName}
+                  <DialogTitle className="text-base text-slate-900 sm:text-lg">
+                    University Card: {user.fullName}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="mt-3 sm:mt-4">
                   <img
                     src={getImageUrl(user.universityCard)}
                     alt="University Card"
-                    className="h-auto w-full rounded-lg"
+                    className="h-auto w-full rounded-lg border border-[var(--mundia-line)]"
                   />
                 </div>
               </DialogContent>
             </Dialog>
           ) : (
-            <div className="flex h-24 w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-100 sm:h-32">
+            <div className="flex h-24 w-full items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper-warm)] sm:h-32">
               <div className="text-center">
-                <Shield className="mx-auto mb-1.5 size-6 text-gray-400 sm:mb-2 sm:size-8" />
-                <p className="text-xs text-gray-500 sm:text-sm">
+                <Shield className="mx-auto mb-1.5 size-6 text-slate-500 sm:mb-2 sm:size-8" />
+                <p className="text-xs text-slate-500 sm:text-sm">
                   No card uploaded
                 </p>
               </div>
@@ -503,21 +530,27 @@ const AccountRequestCard = ({
         {/* Action Buttons */}
         <div className="flex flex-col gap-1.5 pt-1.5 sm:flex-row sm:space-x-2 sm:pt-2">
           <Button
-            className="w-full rounded-lg bg-green-600 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 sm:flex-1 sm:px-4 sm:py-2 sm:text-sm"
+            className="min-h-11 w-full rounded-lg bg-[var(--mundia-success)] px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--mundia-success-strong)] sm:flex-1 sm:px-4 sm:py-2 sm:text-sm"
             onClick={() => onApprove(user.id)}
             disabled={isPending}
           >
-            <CheckCircle className="mr-1 size-3 sm:mr-2 sm:size-4" />
+            <CheckCircle
+              className="mr-1 size-3 sm:mr-2 sm:size-4"
+              aria-hidden="true"
+            />
             Approve
           </Button>
 
           <Button
             variant="destructive"
-            className="w-full rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:flex-1 sm:px-4 sm:py-2 sm:text-sm"
+            className="min-h-11 w-full rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors sm:flex-1 sm:px-4 sm:py-2 sm:text-sm"
             onClick={() => onReject(user.id)}
             disabled={isPending}
           >
-            <XCircle className="mr-1 size-3 sm:mr-2 sm:size-4" />
+            <XCircle
+              className="mr-1 size-3 sm:mr-2 sm:size-4"
+              aria-hidden="true"
+            />
             Reject
           </Button>
         </div>

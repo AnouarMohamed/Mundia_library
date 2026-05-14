@@ -23,6 +23,9 @@ interface Props {
   dueDate: Date | null; // Can be null for pending requests
 }
 
+/**
+ * Return action with overdue styling.
+ */
 const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
   // Use React Query mutation for returning book
   const returnBookMutation = useReturnBook();

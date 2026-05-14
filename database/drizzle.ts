@@ -1,6 +1,7 @@
 import config from "@/lib/config";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import * as schema from "@/database/schema";
 
 const missingDatabaseUrlMessage =
   "No database connection string was provided. Please check your DATABASE_URL environment variable.";
@@ -8,22 +9,18 @@ const missingDatabaseUrlMessage =
 const createMissingDatabaseUrlError = () =>
   new Error(missingDatabaseUrlMessage);
 
-const createPool = () => {
+const createClient = () => {
   if (!config.env.databaseUrl) {
     throw createMissingDatabaseUrlError();
   }
 
-  return mysql.createPool({
-    uri: config.env.databaseUrl,
-    connectionLimit: 10,
-    waitForConnections: true,
-    queueLimit: 0,
-    enableKeepAlive: true,
-  });
+  return neon(config.env.databaseUrl);
 };
 
-const createDb = (pool: mysql.Pool) =>
-  drizzle({ client: pool, casing: "snake_case" });
+type Client = ReturnType<typeof createClient>;
+
+const createDb = (client: Client) =>
+  drizzle({ client, schema });
 
 type Db = ReturnType<typeof createDb>;
 
@@ -43,25 +40,25 @@ const createMissingDatabase = () =>
 
 declare global {
   // eslint-disable-next-line no-var
-  var __libraryPool: mysql.Pool | undefined;
+  var __libraryClient: Client | undefined;
   // eslint-disable-next-line no-var
   var __libraryDb: Db | undefined;
 }
 
 const globalForDb = globalThis as typeof globalThis & {
-  __libraryPool?: mysql.Pool;
+  __libraryClient?: Client;
   __libraryDb?: Db;
 };
 
-const pool = config.env.databaseUrl
-  ? globalForDb.__libraryPool ?? createPool()
+const client = config.env.databaseUrl
+  ? globalForDb.__libraryClient ?? createClient()
   : undefined;
-const db = pool
-  ? globalForDb.__libraryDb ?? createDb(pool)
+const db = client
+  ? globalForDb.__libraryDb ?? createDb(client)
   : createMissingDatabase();
 
-if (process.env.NODE_ENV !== "production" && pool) {
-  globalForDb.__libraryPool = pool;
+if (process.env.NODE_ENV !== "production" && client) {
+  globalForDb.__libraryClient = client;
   globalForDb.__libraryDb = db;
 }
 

@@ -28,14 +28,14 @@ const getCachedTopBooks = unstable_cache(
           .where(eq(books.isActive, true))
           .orderBy(desc(books.rating), desc(books.createdAt))
           .limit(7),
-      { retries: 2, delayMs: 300 }
+      { retries: 2, delayMs: 300 },
     )) as Book[];
   },
   ["library-top-books-v1"],
   {
     revalidate: 30,
     tags: ["books"],
-  }
+  },
 );
 
 /**
@@ -55,7 +55,7 @@ const Page = async () => {
   } catch (error) {
     console.error("Failed to fetch books for /library:", error);
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.65)] p-6 text-center sm:p-8">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
         <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
           Library
         </h1>
@@ -76,7 +76,7 @@ const Page = async () => {
 
   if (topBooks.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[rgba(8,14,22,0.65)] p-6 text-center sm:p-8">
+      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
         <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
           Library
         </h1>
@@ -120,11 +120,11 @@ const Page = async () => {
         .where(
           and(
             eq(borrowRecords.userId, userId),
-            eq(borrowRecords.bookId, featuredBook.id)
-          )
+            eq(borrowRecords.bookId, featuredBook.id),
+          ),
         )
         .orderBy(desc(borrowRecords.createdAt)),
-    { retries: 1, delayMs: 250 }
+    { retries: 1, delayMs: 250 },
   ).catch((error) => {
     console.error("Failed to fetch user borrow records for /library:", error);
     return [];
@@ -156,10 +156,10 @@ const Page = async () => {
         <div className="library-hero-grid">
           <div className="library-hero-panel">
             <p className="library-subtitle">University Catalog</p>
-            <h1 className="library-hero-title">Library</h1>
+            <h1 className="library-hero-title">Mundiapolis Library</h1>
             <p className="library-hero-copy">
-              Browse top-rated books, request borrows, and track reading activity
-              with real-time availability.
+              Search the academic collection, reserve books, and track your
+              reading activity with real-time availability.
             </p>
 
             <div className="library-hero-actions">

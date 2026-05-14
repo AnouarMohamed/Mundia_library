@@ -2,18 +2,15 @@ import dummyBooks from "../dummybooks.json";
 import { books, users } from "@/database/schema";
 import { sha256 } from "@noble/hashes/sha256";
 import { randomBytes } from "@noble/hashes/utils";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
 
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL!,
-  connectionLimit: 10,
-});
-export const db = drizzle({ client: pool, casing: "snake_case" });
+const sql = neon(process.env.DATABASE_URL!);
+export const db = drizzle({ client: sql });
 
 const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
   const c = new Uint8Array(a.length + b.length);
@@ -54,15 +51,19 @@ const seedGuestUsers = async () => {
   ];
 
   for (const guestUser of guestUsers) {
-    await db.insert(users).values(guestUser).onDuplicateKeyUpdate({
-      set: {
+    await db
+      .insert(users)
+      .values(guestUser)
+      .onConflictDoUpdate({
+        target: users.email,
+        set: {
         fullName: guestUser.fullName,
         password: guestUser.password,
         universityCard: guestUser.universityCard,
         status: guestUser.status,
         role: guestUser.role,
-      },
-    });
+        },
+      });
   }
 };
 
@@ -73,11 +74,14 @@ const seed = async () => {
     await seedGuestUsers();
 
     for (const book of dummyBooks) {
-      await db.insert(books).values({
-        ...book,
-        coverUrl: book.coverUrl,
-        videoUrl: book.videoUrl,
-      });
+      await db
+        .insert(books)
+        .values({
+          ...book,
+          coverUrl: book.coverUrl,
+          videoUrl: book.videoUrl,
+        })
+        .onConflictDoNothing();
     }
 
     console.log("Data seeded successfully!");
@@ -91,6 +95,3 @@ seed()
     console.error("Seeding failed:", error);
     process.exitCode = 1;
   })
-  .finally(async () => {
-    await pool.end();
-  });

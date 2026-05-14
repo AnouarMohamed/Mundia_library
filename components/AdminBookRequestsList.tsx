@@ -109,7 +109,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
         currentStatus !== "all" ? (currentStatus as BorrowStatus) : undefined,
       search: currentSearch || undefined,
     }),
-    [currentStatus, currentSearch]
+    [currentStatus, currentSearch],
   );
 
   // Check if any filters are active
@@ -198,9 +198,11 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
   // Show skeleton while loading (only if no initial data)
   if (requestsLoading && (!initialRequests || initialRequests.length === 0)) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold sm:text-xl">Borrow Requests</h2>
+          <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
+            Borrow Requests
+          </h2>
         </div>
 
         <div className="mt-4 w-full overflow-hidden sm:mt-7">
@@ -217,12 +219,12 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
   // Show error state
   if (requestsError && (!initialRequests || initialRequests.length === 0)) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="py-6 text-center sm:py-8">
-          <p className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
+          <p className="mb-2 text-base font-semibold text-[var(--mundia-danger)] sm:text-lg">
             Failed to load borrow requests
           </p>
-          <p className="text-xs text-gray-500 sm:text-sm">
+          <p className="text-xs text-slate-600 sm:text-sm">
             {requestsErrorData instanceof Error
               ? requestsErrorData.message
               : "An unknown error occurred"}
@@ -233,16 +235,17 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
   }
 
   return (
-    <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+    <section className="admin-page-panel">
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
+        <div className="status-success mb-4 rounded-xl border p-3 sm:p-4">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
-                className="size-5 text-green-400"
+                className="size-5"
                 viewBox="0 0 20 20"
                 fill="currentColor"
+                aria-hidden="true"
               >
                 <path
                   fillRule={"evenodd" as const}
@@ -252,13 +255,13 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-green-800">
+              <h3 className="text-sm font-medium">
                 {successMessage === "approved" &&
-                  " Borrow Request Approved Successfully!"}
+                  "Borrow request approved successfully."}
                 {successMessage === "rejected" &&
-                  " Borrow Request Rejected Successfully!"}
+                  "Borrow request rejected successfully."}
                 {successMessage === "returned" &&
-                  " Book Returned Successfully!"}
+                  "Book marked as returned successfully."}
               </h3>
             </div>
           </div>
@@ -266,13 +269,14 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
       )}
 
       {errorMessage && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 sm:p-4">
+        <div className="status-danger mb-4 rounded-xl border p-3 sm:p-4">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
-                className="size-5 text-red-400"
+                className="size-5"
                 viewBox="0 0 20 20"
                 fill="currentColor"
+                aria-hidden="true"
               >
                 <path
                   fillRule={"evenodd" as const}
@@ -282,16 +286,14 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                 Operation Failed
-              </h3>
+              <h3 className="text-sm font-medium">Operation failed.</h3>
             </div>
           </div>
         </div>
       )}
 
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 className="text-lg font-semibold text-dark-400 sm:text-xl">
+        <h2 className="text-lg font-semibold text-slate-900 sm:text-xl">
           Borrow Requests ({requests.length})
         </h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -309,16 +311,16 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
               placeholder="Search by book, author, user..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300"
+              className="admin-field w-full"
             />
           </form>
           {/* Filter Dropdown */}
           <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-            <span className="text-sm text-dark-400">Status:</span>
+            <span className="text-sm font-medium text-slate-700">Status</span>
             <select
               value={currentStatus}
               onChange={(e) => handleFilterChange("status", e.target.value)}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:min-w-[170px]"
+              className="admin-field w-full sm:min-w-[170px]"
             >
               <option value="all">All</option>
               <option value="PENDING">Pending</option>
@@ -333,7 +335,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
         <div className="space-y-3 sm:space-y-4">
           {requests.length === 0 ? (
             <div className="py-6 text-center sm:py-8">
-              <p className="mb-4 text-base font-medium text-gray-600 sm:text-lg">
+              <p className="mb-4 text-base font-medium text-slate-600 sm:text-lg">
                 {hasActiveFilters
                   ? "No borrow requests found matching your criteria."
                   : "No borrow requests found."}
@@ -342,9 +344,9 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                 <Button
                   variant="outline"
                   onClick={clearFilters}
-                  className="mt-2 border-gray-300 text-dark-400 hover:bg-gray-100"
+                  className="mt-2 border-[var(--mundia-line)] text-slate-700 hover:bg-[var(--mundia-panel)]"
                 >
-                  Clear All Filters
+                  Clear filters
                 </Button>
               )}
             </div>
@@ -352,7 +354,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
             requests.map((request) => (
               <div
                 key={request.id}
-                className="rounded-lg border border-gray-200 p-3 hover:bg-gray-50 sm:p-4"
+                className="rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-3 shadow-sm transition hover:border-[var(--mundia-teal)] sm:p-4"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                   {/* Book Cover */}
@@ -368,30 +370,36 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                   <div className="flex-1">
                     <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
                       <div>
-                        <h3 className="text-base font-semibold sm:text-lg">
+                        <h3 className="text-base font-semibold text-slate-900 sm:text-lg">
                           {request.bookTitle}
                         </h3>
-                        <p className="text-gray-600">by {request.bookAuthor}</p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-slate-600">
+                          by {request.bookAuthor}
+                        </p>
+                        <p className="text-sm text-slate-500">
                           {request.bookGenre}
                         </p>
                       </div>
 
                       <div>
-                        <h4 className="font-medium">Borrower Details</h4>
-                        <p className="text-sm">{request.userName}</p>
-                        <p className="text-sm text-gray-600">
+                        <h4 className="font-medium text-slate-900">
+                          Borrower Details
+                        </h4>
+                        <p className="text-sm text-slate-800">
+                          {request.userName}
+                        </p>
+                        <p className="break-all text-sm text-slate-600">
                           {request.userEmail}
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-slate-500">
                           ID: {request.userUniversityId}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-1 gap-3 text-xs sm:mt-4 sm:gap-4 sm:text-sm md:grid-cols-3">
+                    <div className="mt-3 grid grid-cols-1 gap-3 text-xs text-slate-600 sm:mt-4 sm:gap-4 sm:text-sm md:grid-cols-3">
                       <div>
-                        <span className="font-medium">
+                        <span className="font-medium text-slate-800">
                           {request.status === "PENDING"
                             ? "Request Created At:"
                             : "Borrow Date:"}
@@ -403,7 +411,9 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                         </p>
                       </div>
                       <div>
-                        <span className="font-medium">Due Date:</span>
+                        <span className="font-medium text-slate-800">
+                          Due Date:
+                        </span>
                         <p>
                           {request.dueDate
                             ? new Date(request.dueDate).toLocaleDateString()
@@ -413,14 +423,16 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                         </p>
                       </div>
                       <div>
-                        <span className="font-medium">Status:</span>
+                        <span className="font-medium text-slate-800">
+                          Status:
+                        </span>
                         <span
-                          className={`ml-2 rounded-full px-2 py-1 text-xs font-medium ${
+                          className={`status-pill ml-2 ${
                             request.status === "PENDING"
-                              ? "bg-yellow-100 text-yellow-800"
+                              ? "status-warning"
                               : request.status === "BORROWED"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-green-100 text-green-800"
+                                ? "status-info"
+                                : "status-success"
                           }`}
                         >
                           {request.status}
@@ -434,7 +446,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                     {request.status === "PENDING" && (
                       <div className="flex flex-col gap-2 sm:flex-row">
                         <Button
-                          className="bg-green-600 hover:bg-green-700"
+                          className="min-h-11 bg-[var(--mundia-success)] text-white hover:bg-[var(--mundia-success-strong)]"
                           onClick={() => handleApproveBorrow(request.id)}
                           disabled={
                             approveBorrowMutation.isPending ||
@@ -445,6 +457,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                         </Button>
                         <Button
                           variant="destructive"
+                          className="min-h-11"
                           onClick={() => handleRejectBorrow(request.id)}
                           disabled={
                             approveBorrowMutation.isPending ||
@@ -457,7 +470,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                     )}
                     {request.status === "BORROWED" && (
                       <Button
-                        className="bg-green-600 hover:bg-green-700"
+                        className="min-h-11 bg-[var(--mundia-success)] text-white hover:bg-[var(--mundia-success-strong)]"
                         onClick={() => handleReturnBook(request.id)}
                         disabled={returnBookMutation.isPending}
                       >
@@ -465,7 +478,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                       </Button>
                     )}
                     {request.status === "RETURNED" && (
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-slate-500">
                         Returned on:{" "}
                         {request.returnDate
                           ? new Date(request.returnDate).toLocaleDateString()

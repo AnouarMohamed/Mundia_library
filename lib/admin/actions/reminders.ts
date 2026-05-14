@@ -170,7 +170,7 @@ export async function getBooksDueSoon() {
       userEmail: users.email,
       borrowDate: borrowRecords.borrowDate,
       dueDate: borrowRecords.dueDate,
-      daysUntilDue: sql<number>`DATEDIFF(${borrowRecords.dueDate}, DATE(${startOfToday}))`,
+      daysUntilDue: sql<number>`(${borrowRecords.dueDate} - CAST(${startOfToday} AS date))`,
     })
     .from(borrowRecords)
     .innerJoin(books, eq(borrowRecords.bookId, books.id))
@@ -209,7 +209,7 @@ export async function getOverdueBooks() {
       userEmail: users.email,
       borrowDate: borrowRecords.borrowDate,
       dueDate: borrowRecords.dueDate,
-      daysOverdue: sql<number>`DATEDIFF(DATE(${startOfToday}), ${borrowRecords.dueDate})`,
+      daysOverdue: sql<number>`(CAST(${startOfToday} AS date) - ${borrowRecords.dueDate})`,
       fineAmount: borrowRecords.fineAmount,
     })
     .from(borrowRecords)

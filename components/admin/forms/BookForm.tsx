@@ -87,7 +87,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
             // Toast is already shown by the mutation hook
             router.push(`/admin/books`);
           },
-        }
+        },
       );
     } else {
       // Use React Query mutation for updating book
@@ -102,7 +102,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
             // Toast is already shown by the mutation hook
             router.push(`/admin/books`);
           },
-        }
+        },
       );
     }
   };
@@ -402,7 +402,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
                       onChange={(e) => {
                         const value = e.target.value;
                         field.onChange(
-                          value === "" ? undefined : Number(value)
+                          value === "" ? undefined : Number(value),
                         );
                       }}
                       className="book-form_input"
@@ -477,7 +477,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
                       onChange={(e) => {
                         const value = e.target.value;
                         field.onChange(
-                          value === "" ? undefined : Number(value)
+                          value === "" ? undefined : Number(value),
                         );
                       }}
                       className="book-form_input"
@@ -519,7 +519,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
                     type="checkbox"
                     checked={field.value}
                     onChange={field.onChange}
-                    className="size-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="size-4 rounded border-[var(--mundia-line)] text-[var(--mundia-teal-strong)] focus:ring-[var(--mundia-focus)]"
                   />
                 </FormControl>
                 <FormLabel className="text-base font-normal text-dark-500">
@@ -531,7 +531,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
           />
         </div>
 
-        <Button type="submit" className="book-form_btn text-white">
+        <Button type="submit" className="book-form_btn text-light-100">
           {type === "create" ? "Add Book to Library" : "Update Book"}
         </Button>
       </form>

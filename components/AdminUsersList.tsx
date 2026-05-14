@@ -85,7 +85,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== currentSearch) {
-        console.log("[AdminUsersList] Search changed:", localSearch);
         const params = new URLSearchParams(searchParamsHook.toString());
         const trimmedSearch = localSearch.trim();
 
@@ -100,7 +99,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
         }
 
         const newUrl = `/admin/users?${params.toString()}`;
-        console.log("[AdminUsersList] Instant search navigating to:", newUrl);
 
         // Update ref before navigation to prevent sync effect from overwriting
         lastSyncedSearchRef.current = trimmedSearch;
@@ -115,7 +113,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   // Build filters from URL params (default sort to "created" for most recent first)
   // Use useMemo to ensure filters object updates when URL params change
   const filters: UserFilters = React.useMemo(() => {
-    const filterObj = {
+    return {
       search: currentSearch || undefined,
       status:
         currentStatus !== "all"
@@ -127,8 +125,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
           : undefined,
       sort: (currentSort as UserFilters["sort"]) || "created",
     };
-    console.log("[AdminUsersList] Filters updated:", filterObj);
-    return filterObj;
   }, [currentSearch, currentStatus, currentRole, currentSort]);
 
   // Check if any filters are active (used for conditional initialData and empty state)
@@ -155,16 +151,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     error: usersErrorData,
   } = useAllUsers(filters, initialUsersData);
 
-  // Debug: Log users data
-  React.useEffect(() => {
-    console.log("[AdminUsersList] Users data:", {
-      usersCount: usersData?.users?.length || 0,
-      total: usersData?.total || 0,
-      filters,
-      isLoading: usersLoading,
-    });
-  }, [usersData, filters, usersLoading]);
-
   const {
     data: adminRequestsData,
     isLoading: adminRequestsLoading,
@@ -181,7 +167,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
   // Update search params in URL and trigger refetch
   const updateSearchParams = (newParams: Record<string, string>) => {
-    console.log("[AdminUsersList] updateSearchParams called with:", newParams);
     const params = new URLSearchParams(searchParamsHook.toString());
 
     Object.entries(newParams).forEach(([key, value]) => {
@@ -198,11 +183,9 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     }
 
     const newUrl = `/admin/users?${params.toString()}`;
-    console.log("[AdminUsersList] Navigating to:", newUrl);
 
     // Invalidate queries to force refetch with new params
     queryClient.invalidateQueries({ queryKey: ["all-users"] });
-    console.log("[AdminUsersList] Queries invalidated");
 
     // Use replace to avoid adding to history and ensure immediate update
     router.replace(newUrl, { scroll: false });
@@ -211,7 +194,6 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedSearch = localSearch.trim();
-    console.log("[AdminUsersList] Form submitted with search:", trimmedSearch);
     updateSearchParams({ search: trimmedSearch });
   };
 
@@ -263,7 +245,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   // Handler functions for mutations
   const handleUpdateUserRole = async (
     userId: string,
-    role: "USER" | "ADMIN"
+    role: "USER" | "ADMIN",
   ) => {
     const user = users.find((u) => u.id === userId);
     updateUserRoleMutation.mutate({
@@ -275,7 +257,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
   const handleUpdateUserStatus = async (
     userId: string,
-    status: "PENDING" | "APPROVED" | "REJECTED"
+    status: "PENDING" | "APPROVED" | "REJECTED",
   ) => {
     const user = users.find((u) => u.id === userId);
     updateUserStatusMutation.mutate({
@@ -332,14 +314,16 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       (!initialAdminRequests || initialAdminRequests.length === 0))
   ) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold sm:text-xl">All Users</h2>
         </div>
 
         {/* Admin Requests Skeleton */}
         <div className="mt-4 sm:mt-6">
-          <h3 className="mb-4 text-base font-semibold sm:text-lg">Pending Admin Requests</h3>
+          <h3 className="mb-4 text-base font-semibold sm:text-lg">
+            Pending Admin Requests
+          </h3>
           <div className="space-y-3 sm:space-y-4">
             {[...Array(2)].map((_, i) => (
               <UserSkeleton
@@ -354,14 +338,11 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
         {/* Users Table Skeleton */}
         <div className="mt-4 w-full overflow-hidden sm:mt-7">
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-200">
+            <table className="admin-table">
               <thead>
-                <tr className="bg-gray-50">
+                <tr>
                   {[...Array(7)].map((_, i) => (
-                    <th
-                      key={`header-${i}`}
-                      className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm"
-                    >
+                    <th key={`header-${i}`}>
                       <Skeleton className="h-4 w-24" />
                     </th>
                   ))}
@@ -386,7 +367,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       (!initialAdminRequests || initialAdminRequests.length === 0))
   ) {
     return (
-      <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+      <section className="admin-page-panel">
         <div className="py-6 text-center sm:py-8">
           <p className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
             Failed to load users
@@ -404,10 +385,10 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   }
 
   return (
-    <section className="w-full rounded-2xl bg-white p-4 sm:p-7">
+    <section className="admin-page-panel">
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 sm:p-4">
+        <div className="mb-4 rounded-xl border p-3 sm:p-4 status-success">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -425,17 +406,17 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
             <div className="ml-3">
               <h3 className="text-sm font-medium text-green-800">
                 {successMessage === "role-updated" &&
-                  " Role Updated Successfully!"}
+                  "Role updated successfully"}
                 {successMessage === "user-approved" &&
-                  " User Approved Successfully!"}
+                  "User approved successfully"}
                 {successMessage === "user-rejected" &&
-                  " User Rejected Successfully!"}
+                  "User rejected successfully"}
                 {successMessage === "admin-approved" &&
-                  " Admin Request Approved Successfully!"}
+                  "Admin request approved successfully"}
                 {successMessage === "admin-rejected" &&
-                  " Admin Request Rejected Successfully!"}
+                  "Admin request rejected successfully"}
                 {successMessage === "admin-removed" &&
-                  " Admin Privileges Removed Successfully!"}
+                  "Admin privileges removed successfully"}
               </h3>
             </div>
           </div>
@@ -443,7 +424,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       )}
 
       {errorMessage && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 sm:p-4">
+        <div className="mb-4 rounded-xl border p-3 sm:p-4 status-danger">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -459,9 +440,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                 Operation Failed
-              </h3>
+              <h3 className="text-sm font-medium">Operation failed</h3>
             </div>
           </div>
         </div>
@@ -480,10 +459,9 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
               value={localSearch}
               onChange={(e) => {
                 const newValue = e.target.value;
-                console.log("[AdminUsersList] Input changed:", newValue);
                 setLocalSearch(newValue);
               }}
-              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 placeholder:text-gray-500 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300"
+              className="admin-field w-full"
             />
           </form>
           {/* Filter Dropdowns */}
@@ -493,7 +471,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
               <select
                 value={currentStatus}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
-                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:min-w-[170px]"
+                className="admin-field w-full sm:min-w-[170px]"
               >
                 <option value="all">All</option>
                 <option value="APPROVED">Approved</option>
@@ -506,7 +484,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
               <select
                 value={currentRole}
                 onChange={(e) => handleFilterChange("role", e.target.value)}
-                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-dark-400 focus:border-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-300 sm:min-w-[170px]"
+                className="admin-field w-full sm:min-w-[170px]"
               >
                 <option value="all">All</option>
                 <option value="USER">Users</option>
@@ -527,22 +505,22 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
             {adminRequests.map((request) => (
               <div
                 key={request.id}
-                className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 sm:p-4"
+                className="rounded-xl border p-3 sm:p-4 status-warning"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1">
                     <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                      <h4 className="text-sm font-medium text-yellow-900 sm:text-base">
+                      <h4 className="text-sm font-medium sm:text-base">
                         {request.userFullName}
                       </h4>
-                      <span className="text-xs text-yellow-700 sm:text-sm">
+                      <span className="text-xs opacity-75 sm:text-sm">
                         ({request.userEmail})
                       </span>
                     </div>
-                    <p className="mb-2 text-xs text-yellow-800 sm:text-sm">
+                    <p className="mb-2 text-xs sm:text-sm">
                       <strong>Reason:</strong> {request.requestReason}
                     </p>
-                    <p className="text-xs text-yellow-600">
+                    <p className="text-xs opacity-70">
                       Requested on:{" "}
                       {request.createdAt
                         ? new Date(request.createdAt).toLocaleString()
@@ -552,7 +530,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                   <div className="flex flex-col gap-2 sm:ml-4 sm:flex-row">
                     <Button
                       size="sm"
-                      className="bg-green-600 hover:bg-green-700"
+                      className="min-h-11 bg-[var(--mundia-success)] text-white hover:opacity-90"
                       onClick={() => handleApproveAdminRequest(request.id)}
                       disabled={
                         approveAdminRequestMutation.isPending ||
@@ -563,7 +541,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                     </Button>
                     <Button
                       size="sm"
-                      className="bg-red-600 hover:bg-red-700"
+                      className="min-h-11 bg-[var(--mundia-danger)] text-white hover:opacity-90"
                       onClick={() => handleRejectAdminRequest(request.id)}
                       disabled={
                         approveAdminRequestMutation.isPending ||
@@ -582,36 +560,22 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
       <div className="mt-4 w-full overflow-hidden sm:mt-7">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-200">
+          <table className="admin-table">
             <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Name
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Email
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  University ID
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Role
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Status
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Joined
-                </th>
-                <th className="border border-gray-200 px-2 py-1.5 text-left text-xs sm:px-4 sm:py-2 sm:text-sm">
-                  Actions
-                </th>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>University ID</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="border border-gray-200 px-2 py-6 sm:px-4 sm:py-8">
+                  <td colSpan={7} className="px-2 py-6 sm:px-4 sm:py-8">
                     <div className="flex flex-col items-center justify-center text-center">
                       <p className="mb-4 text-base font-medium text-gray-600 sm:text-lg">
                         No users found matching your criteria.
@@ -630,53 +594,47 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-200 px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm">
-                      {user.fullName}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm">
-                      {user.email}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm">
-                      {user.universityId}
-                    </td>
-                    <td className="border border-gray-200 px-2 py-1.5 sm:px-4 sm:py-2">
+                  <tr key={user.id}>
+                    <td>{user.fullName}</td>
+                    <td>{user.email}</td>
+                    <td>{user.universityId}</td>
+                    <td>
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium sm:px-2 sm:py-1 sm:text-xs ${
+                        className={`status-pill ${
                           user.role === "ADMIN"
-                            ? "bg-purple-100 text-purple-800"
-                            : "bg-blue-100 text-blue-800"
+                            ? "status-warning"
+                            : "status-info"
                         }`}
                       >
                         {user.role}
                       </span>
                     </td>
-                    <td className="border border-gray-200 px-2 py-1.5 sm:px-4 sm:py-2">
+                    <td>
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium sm:px-2 sm:py-1 sm:text-xs ${
+                        className={`status-pill ${
                           user.status === "APPROVED"
-                            ? "bg-green-100 text-green-800"
+                            ? "status-success"
                             : user.status === "PENDING"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-red-100 text-red-800"
+                              ? "status-warning"
+                              : "status-danger"
                         }`}
                       >
                         {user.status}
                       </span>
                     </td>
-                    <td className="border border-gray-200 px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm">
+                    <td>
                       {user.createdAt
                         ? new Date(user.createdAt).toLocaleDateString()
                         : "N/A"}
                     </td>
-                    <td className="border border-gray-200 px-2 py-1.5 sm:px-4 sm:py-2">
+                    <td>
                       <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
                         {/* Show Remove Admin for existing admins (except current user) */}
                         {user.role === "ADMIN" &&
                           user.id !== (currentUserId || session?.user?.id) && (
                             <Button
                               size="sm"
-                              className="bg-red-600 text-white hover:bg-red-700"
+                              className="min-h-11 bg-[var(--mundia-danger)] text-white hover:opacity-90"
                               onClick={() =>
                                 handleRemoveAdminPrivileges(user.id)
                               }
@@ -690,7 +648,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                         {user.role === "USER" && (
                           <Button
                             size="sm"
-                            className="bg-purple-600 text-white hover:bg-purple-700"
+                            className="min-h-11 bg-[var(--mundia-burgundy)] text-white hover:opacity-90"
                             onClick={() =>
                               handleUpdateUserRole(user.id, "ADMIN")
                             }
@@ -705,7 +663,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                           <>
                             <Button
                               size="sm"
-                              className="bg-green-600 hover:bg-green-700"
+                              className="min-h-11 bg-[var(--mundia-success)] text-white hover:opacity-90"
                               onClick={() =>
                                 handleUpdateUserStatus(user.id, "APPROVED")
                               }
@@ -715,7 +673,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                             </Button>
                             <Button
                               size="sm"
-                              className="bg-red-600 hover:bg-red-700"
+                              className="min-h-11 bg-[var(--mundia-danger)] text-white hover:opacity-90"
                               onClick={() =>
                                 handleUpdateUserStatus(user.id, "REJECTED")
                               }
