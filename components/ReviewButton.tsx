@@ -74,7 +74,7 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
       >
         <MessageCircle className="size-4 text-white sm:size-5" />
         <span className="text-sm font-semibold text-white">
@@ -88,7 +88,7 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
       >
         <MessageCircle className="size-4 text-white sm:size-5" />
         <span className="text-sm font-semibold text-white">
@@ -104,7 +104,7 @@ export default function ReviewButton({
     <>
       <Button
         onClick={() => setShowDialog(true)}
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
       >
         <MessageCircle className="size-4 text-white sm:size-5" />
         <span className="text-sm font-semibold text-white">

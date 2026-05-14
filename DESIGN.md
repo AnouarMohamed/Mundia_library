@@ -1,71 +1,53 @@
-# Mundia Library Design System
+# Mundiapolis Library Design System
 
 ## Register And Direction
 
-The app uses the product register. The visual direction is Scholarly Product: prestigious, usable, quiet, and institutional. The interface should look like a serious university library product, not a marketing site.
+The app uses the product register. The visual direction is Printed University Catalog: calm, academic, legible, and operational. The interface should feel like the Mundiapolis identity became a digital library service, not a generic dashboard with library content.
 
-## Color Strategy
+## Palette
 
-Use a restrained product palette. Tinted neutrals carry most surfaces. Teal marks primary action, focus, and selected state. Gold marks institutional emphasis and high-value highlights. Burgundy is reserved for rare review or history accents. Use OKLCH tokens for new color work.
+Use official Mundiapolis navy as the primary product color. Gold is an institutional accent for ratings, featured picks, and rare emphasis. Status colors are reserved for status only.
 
 ```css
 :root {
-  --mundia-ink: oklch(18% 0.025 225);
-  --mundia-ink-strong: oklch(12% 0.028 225);
-  --mundia-paper: oklch(97% 0.008 218);
-  --mundia-paper-warm: oklch(95% 0.018 92);
-  --mundia-panel: oklch(23% 0.035 220);
-  --mundia-panel-raised: oklch(29% 0.04 218);
-  --mundia-line: oklch(76% 0.035 218 / 0.34);
-  --mundia-text: oklch(94% 0.012 215);
-  --mundia-muted: oklch(75% 0.03 215);
-  --mundia-teal: oklch(72% 0.08 212);
-  --mundia-teal-strong: oklch(56% 0.09 214);
-  --mundia-gold: oklch(78% 0.105 88);
-  --mundia-gold-strong: oklch(58% 0.09 82);
-  --mundia-burgundy: oklch(43% 0.11 8);
-  --mundia-danger: oklch(58% 0.18 28);
-  --mundia-warning: oklch(74% 0.13 70);
+  --mundia-paper: oklch(96% 0.014 84);
+  --mundia-surface: oklch(99% 0.006 84);
+  --mundia-ink: oklch(18% 0.014 72);
+  --mundia-muted: oklch(55% 0.016 78);
+  --mundia-line: oklch(84% 0.015 82);
+  --mundia-navy: oklch(32% 0.065 255);
+  --mundia-navy-strong: oklch(24% 0.07 255);
+  --mundia-gold: oklch(77% 0.12 82);
+  --mundia-gold-strong: oklch(58% 0.1 78);
   --mundia-success: oklch(63% 0.11 150);
+  --mundia-warning: oklch(74% 0.13 70);
+  --mundia-danger: oklch(58% 0.18 28);
 }
 ```
 
-Do not introduce pure black, pure white, decorative gradient text, or heavy saturated inactive states. Gradients are allowed only for large brand surfaces and should use tokenized colors.
+Do not use teal as a decorative accent. Do not use pure black or pure white. The page background is warm off-white; surfaces are quiet white; borders are warm gray.
 
 ## Typography
 
-- Use the app sans stack for product UI labels, controls, body copy, tables, and charts.
-- Use the display font only for brand mastheads and major page titles, never for form labels, table data, filter labels, or compact UI controls.
-- Body copy should stay between 45 and 75 characters where it is prose.
-- Avoid viewport-scaled type. Use fixed responsive steps.
-
-## Layout And Spacing
-
-- Use predictable product structure: root shell, header or sidebar, page header, filters, data region, and local actions.
-- Use the existing Tailwind spacing scale. Prefer `2`, `3`, `4`, `5`, `6`, `8`, `10`, and `12`.
-- Avoid nested cards. If a panel is already framed, inner groups should use separators, tints, or table rows.
-- Mobile layouts must avoid horizontal scroll and keep all touch targets at least 44px.
+- Headings use Georgia or a compatible serif.
+- Body, controls, labels, tables, and navigation use the system sans stack.
+- Page titles: 28 to 32px serif, weight 400.
+- Section titles: 20 to 24px serif, weight 400.
+- H3 and panel titles: 16 to 18px sans or serif depending on density.
+- Body: 14 to 16px sans, regular.
+- Labels and captions: 12 to 13px sans, normal case, muted. No all-caps field labels.
 
 ## Components
 
-- Buttons: one primary teal action, one quiet secondary action, one destructive action. Every button needs hover, focus, active, disabled, and loading states where async.
-- Inputs and selects: same radius, border, background, focus ring, placeholder tone, and height across auth, catalog, reviews, profile, and admin.
-- Cards and panels: use full borders or subtle surface changes, never colored side stripes.
-- Tables: dense but readable, with sticky or clear headers where useful, row hover state, empty state, and mobile fallback where tables become too wide.
-- Badges: semantic colors mean the same thing everywhere: pending, approved, borrowed, returned, overdue, rejected, admin.
-- Dialogs: use only when inline disclosure would make the page worse. Dialog copy should include the action and recovery path.
+- Primary button: filled navy, used once per view for the main task.
+- Secondary actions: text links or quiet ghost buttons.
+- Cards and panels: surface background, 1px warm border, 8px radius, no decorative shadow and no nested cards.
+- Tags: small warm borders. Gold only for ratings or featured material.
+- Sidebar active state: subtle leading rule and stronger text weight, no filled pill.
+- Tables: bottom borders between rows, normal-case headers, lightweight text actions for row-level actions.
+- Tabs: underline style, not filled pills.
+- Empty states: explain the empty state and offer a next action.
 
-## Motion
+## Voice
 
-- Use 150 to 250ms state transitions.
-- Use ease-out quart, quint, or expo style timing.
-- Motion should convey state change, reveal, or feedback. Do not animate layout properties.
-- Respect `prefers-reduced-motion`.
-
-## Accessibility
-
-- Text contrast must meet WCAG AA.
-- Focus indicators must remain visible on every interactive control.
-- Icons need accessible names when they are controls and hidden semantics when decorative.
-- Images require useful alt text. Book covers should use title-aware alt text when possible.
-- Forms require labels and helpful error messages.
+Copy should speak to the student, faculty member, or library staff member in the context of their task. Avoid labels that describe the UI itself. Avoid repeated all-caps micro-labels. Decorative metrics are not allowed unless the number is real and useful.

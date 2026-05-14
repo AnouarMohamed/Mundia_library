@@ -137,7 +137,7 @@ const BookSkeleton: React.FC<BookSkeletonProps> = ({
             <Skeleton
               className={cn(
                 "xs:w-[296px] w-[256px] xs:h-[404px] h-[354px]",
-                "z-10 shrink-0"
+                "z-10 shrink-0",
               )}
             />
 
@@ -145,7 +145,7 @@ const BookSkeleton: React.FC<BookSkeletonProps> = ({
             <Skeleton
               className={cn(
                 "absolute left-16 top-10 rotate-12 opacity-40 max-sm:hidden",
-                "xs:w-[296px] w-[256px] xs:h-[404px] h-[354px]"
+                "xs:w-[296px] w-[256px] xs:h-[404px] h-[354px]",
               )}
             />
           </div>
@@ -159,7 +159,7 @@ const BookSkeleton: React.FC<BookSkeletonProps> = ({
             {/* Video Section */}
             <section className="flex flex-col gap-7">
               <Skeleton className="h-7 w-24" />
-              <Skeleton className="h-64 w-full rounded-xl" />
+              <Skeleton className="h-64 w-full rounded-lg" />
             </section>
 
             {/* Summary Section */}
@@ -182,7 +182,7 @@ const BookSkeleton: React.FC<BookSkeletonProps> = ({
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="rounded-lg border border-gray-200 bg-gray-800/50 p-4 shadow-sm"
+                    className="rounded-lg border border-gray-200 bg-gray-800/50 p-4"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">

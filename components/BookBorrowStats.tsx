@@ -78,11 +78,9 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   // Show skeleton while loading (only if no initial data)
   if (isLoading && !initialStats) {
     return (
-      <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)] p-4 sm:p-5">
-        <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-sm">
-          Borrow Insights
-        </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="border-y border-[var(--mundia-line)] py-4">
+        <p className="mb-3 text-sm text-slate-600">Borrowing activity</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
           <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
           <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
           <Skeleton className="h-16 w-full rounded-lg bg-slate-200" />
@@ -95,8 +93,8 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   // Show error state (fallback to initial stats if available)
   if (isError && !initialStats) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-red-700 sm:text-sm">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-sm font-medium text-red-700">
           Failed to load borrow statistics
         </p>
       </div>
@@ -108,34 +106,28 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)] p-4 sm:p-5">
-      <div className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 sm:text-sm">
-        Borrow Insights
-      </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Total Borrows
-          </p>
-          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
+    <div className="border-y border-[var(--mundia-line)] py-4">
+      <p className="mb-3 text-sm text-[var(--mundia-muted)]">
+        Borrowing activity
+      </p>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        <div>
+          <dt className="text-sm text-[var(--mundia-muted)]">Total borrows</dt>
+          <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.totalBorrows || 0}
-          </p>
+          </dd>
         </div>
 
-        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Active Borrows
-          </p>
-          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
+        <div>
+          <dt className="text-sm text-[var(--mundia-muted)]">Active borrows</dt>
+          <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.activeBorrows || 0}
-          </p>
+          </dd>
         </div>
 
-        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Availability
-          </p>
-          <p
+        <div>
+          <dt className="text-sm text-[var(--mundia-muted)]">Availability</dt>
+          <dd
             className={`mt-1 text-lg font-semibold ${
               availableCopies > 0
                 ? "text-[var(--mundia-success-strong)]"
@@ -143,18 +135,16 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
             }`}
           >
             {availableCopies > 0 ? "Available" : "Unavailable"}
-          </p>
+          </dd>
         </div>
 
-        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-            Returned
-          </p>
-          <p className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
+        <div>
+          <dt className="text-sm text-[var(--mundia-muted)]">Returned</dt>
+          <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
             {statsData.returnedBorrows || 0}
-          </p>
+          </dd>
         </div>
-      </div>
+      </dl>
     </div>
   );
 };

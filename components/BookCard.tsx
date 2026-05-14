@@ -68,7 +68,7 @@ const BookCard = ({
           )}
         >
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="book-genre line-clamp-1 text-[10px] uppercase tracking-[0.14em] sm:text-xs">
+            <p className="book-genre line-clamp-1 text-xs sm:text-sm">
               {genre}
             </p>
             <span className="book-card-rating">

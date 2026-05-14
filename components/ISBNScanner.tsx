@@ -80,7 +80,7 @@ const ISBNScanner: React.FC<ISBNScannerProps> = ({
   }, [onScanSuccess]);
 
   return (
-    <div className="relative flex flex-col items-center gap-4 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-6">
+    <div className="relative flex flex-col items-center gap-4 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-6">
       <div className="flex w-full items-center justify-between mb-2">
         <h3 className="text-lg font-semibold tracking-tight text-[var(--mundia-ink)]">
           Scan Book ISBN
@@ -97,7 +97,7 @@ const ISBNScanner: React.FC<ISBNScannerProps> = ({
 
       <div
         id="reader"
-        className="w-full overflow-hidden rounded-xl bg-[var(--mundia-ink-strong)]"
+        className="w-full overflow-hidden rounded-lg bg-[var(--mundia-ink-strong)]"
       ></div>
 
       <p className="text-center text-xs text-slate-500">

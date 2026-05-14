@@ -280,7 +280,7 @@ const AccountRequestsClient = ({
 
         {/* Success/Error Messages */}
         {successMessage && (
-          <div className="status-success mb-4 rounded-xl border p-3 sm:mb-6 sm:p-4">
+          <div className="status-success mb-4 rounded-lg border p-3 sm:mb-6 sm:p-4">
             <div className="flex items-center">
               <CheckCircle className="size-4 sm:size-5" aria-hidden="true" />
               <div className="ml-2 sm:ml-3">
@@ -296,7 +296,7 @@ const AccountRequestsClient = ({
         )}
 
         {errorMessage && (
-          <div className="status-danger mb-4 rounded-xl border p-3 sm:mb-6 sm:p-4">
+          <div className="status-danger mb-4 rounded-lg border p-3 sm:mb-6 sm:p-4">
             <div className="flex items-center">
               <XCircle className="size-4 sm:size-5" aria-hidden="true" />
               <div className="ml-2 sm:ml-3">
@@ -402,7 +402,7 @@ const AccountRequestCard = ({
   };
 
   return (
-    <Card className="surface-panel-light group transition duration-300 hover:border-[var(--mundia-teal)]">
+    <Card className="surface-panel-light group transition duration-300 hover:border-[var(--mundia-navy)]">
       <CardHeader className="pb-3 sm:pb-4">
         <div className="space-y-2 sm:space-y-3">
           {/* Badge on its own row */}
@@ -419,7 +419,7 @@ const AccountRequestCard = ({
           <div className="flex items-center gap-2 sm:space-x-3">
             <Avatar className="size-10 sm:size-12">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-[var(--mundia-teal-strong)] text-xs font-semibold text-[var(--mundia-paper)] sm:text-sm">
+              <AvatarFallback className="bg-[var(--mundia-navy)] text-xs font-semibold text-[var(--mundia-paper)] sm:text-sm">
                 {getInitials(user.fullName)}
               </AvatarFallback>
             </Avatar>
@@ -443,7 +443,7 @@ const AccountRequestCard = ({
         {/* University ID */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs sm:space-x-2 sm:text-sm">
           <GraduationCap
-            className="size-3 shrink-0 text-[var(--mundia-teal-strong)] sm:size-4"
+            className="size-3 shrink-0 text-[var(--mundia-navy)] sm:size-4"
             aria-hidden="true"
           />
           <span className="text-slate-600">University ID:</span>
@@ -488,10 +488,10 @@ const AccountRequestCard = ({
                   <img
                     src={getImageUrl(user.universityCard)}
                     alt="University Card"
-                    className="h-24 w-full rounded-lg border border-[var(--mundia-line)] object-cover transition-colors group-hover:border-[var(--mundia-teal)] sm:h-32"
+                    className="h-24 w-full rounded-lg border border-[var(--mundia-line)] object-cover transition-colors group-hover:border-[var(--mundia-navy)] sm:h-32"
                   />
                   <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-transparent transition duration-200 group-hover:bg-[var(--mundia-veil)]">
-                    <div className="rounded-full bg-[var(--mundia-paper)] p-1.5 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 sm:p-2">
+                    <div className="rounded-full bg-[var(--mundia-paper)] p-1.5 opacity-0 transition-opacity group-hover:opacity-100 sm:p-2">
                       <Eye
                         className="size-3 text-slate-700 sm:size-4"
                         aria-hidden="true"

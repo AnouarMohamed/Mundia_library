@@ -82,7 +82,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-[var(--mundia-ink)] transition hover:border-[var(--mundia-teal-strong)] focus:outline-none md:hidden"
+        className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-[var(--mundia-ink)] transition hover:border-[var(--mundia-navy)] focus:outline-none md:hidden"
         aria-label="Toggle menu"
       >
         {isOpen ? (
@@ -103,7 +103,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
 
       {/* Mobile Menu Drawer */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full w-4/5 border-l border-[var(--mundia-line)] bg-[var(--surface-card-strong)] shadow-xl transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed right-0 top-0 z-50 h-full w-4/5 border-l border-[var(--mundia-line)] bg-[var(--surface-card-strong)] transition-transform duration-300 ease-in-out md:hidden ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -205,7 +205,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
             {isAdmin && (
               <>
                 <div className="my-2 border-t border-[var(--mundia-line)]"></div>
-                <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase text-slate-500 sm:px-3 sm:py-2 sm:text-xs">
+                <p className="px-2.5 py-1.5 text-[10px] font-medium text-slate-500 sm:px-3 sm:py-2 sm:text-xs">
                   Admin
                 </p>
                 <Link
@@ -268,7 +268,7 @@ const MobileMenu: React.FC<MobileMenuProps> = ({
             <button
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="w-full rounded-xl border border-red-300/30 bg-red-500/85 p-2.5 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50 sm:p-3 sm:text-base"
+              className="w-full rounded-lg border border-red-300/30 bg-red-500/85 p-2.5 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-50 sm:p-3 sm:text-base"
             >
               {isLoggingOut ? "Logging out..." : "Logout"}
             </button>

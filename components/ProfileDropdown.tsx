@@ -91,7 +91,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button className="relative size-8 overflow-hidden rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] transition-all hover:border-[var(--mundia-teal-strong)] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
+        <button className="relative size-8 overflow-hidden rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] transition-all hover:border-[var(--mundia-navy)] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
           {universityCard ? (
             universityCard.startsWith("http") ||
             universityCard.startsWith("data:") ? (
@@ -132,7 +132,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-56 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1 text-[var(--mundia-ink)] shadow-xl sm:w-64"
+        className="w-56 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1 text-[var(--mundia-ink)] sm:w-64"
       >
         <DropdownMenuLabel className="rounded-lg bg-[var(--surface-0)] px-2.5 py-1.5 sm:px-3 sm:py-2">
           <div className="space-y-0.5 sm:space-y-1">

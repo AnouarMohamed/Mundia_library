@@ -76,7 +76,7 @@ const HomeRecommendations: React.FC<HomeRecommendationsProps> = ({
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
           Book Recommendations
         </h2>
-        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 sm:mt-4 sm:p-4">
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-700 sm:mt-4 sm:p-4">
           <p className="text-sm font-semibold sm:text-base">
             Failed to load recommendations
           </p>

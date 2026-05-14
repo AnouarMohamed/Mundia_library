@@ -161,7 +161,7 @@ export default function ReviewFormDialog({
             <Button
               type="submit"
               disabled={createReviewMutation.isPending || !comment.trim()}
-              className="w-full bg-[var(--mundia-teal-strong)] text-xs text-white hover:opacity-95 sm:w-auto sm:text-sm"
+              className="w-full bg-[var(--mundia-navy)] text-xs text-white hover:bg-[var(--mundia-navy-strong)] sm:w-auto sm:text-sm"
             >
               {createReviewMutation.isPending
                 ? "Submitting..."

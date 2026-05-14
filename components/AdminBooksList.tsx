@@ -174,7 +174,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
             All Books
           </h2>
           <Button
-            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+            className="bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
             asChild
           >
             <Link href="/admin/books/new">Create book</Link>
@@ -201,7 +201,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
             All Books
           </h2>
           <Button
-            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+            className="bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
             asChild
           >
             <Link href="/admin/books/new">Create book</Link>
@@ -228,16 +228,16 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
     <section className="admin-page-panel">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
+          <p className="text-sm text-[var(--mundia-muted)]">
             Catalog management
           </p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--mundia-ink)]">
+          <h2 className="mt-1 font-serif text-2xl font-normal tracking-tight text-[var(--mundia-ink)]">
             Books ({allBooks.length})
           </h2>
         </div>
 
         <Button
-          className="w-full rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-90 sm:w-fit"
+          className="w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
           asChild
         >
           <Link href="/admin/books/new">Create book</Link>
@@ -301,7 +301,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
 
       <div className="mt-6 w-full overflow-hidden">
         {allBooks.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--mundia-line)] py-10 text-center">
+          <div className="rounded-lg border border-dashed border-[var(--mundia-line)] py-10 text-center">
             <p className="mb-4 text-base font-medium text-slate-600">
               {hasActiveFilters
                 ? "No books found matching your criteria."
@@ -318,8 +318,8 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
             )}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
-            <div className="hidden grid-cols-[minmax(18rem,1.4fr)_minmax(10rem,0.7fr)_minmax(12rem,0.8fr)_auto] gap-4 border-b border-[var(--mundia-line)] bg-[var(--mundia-panel)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600 lg:grid">
+          <div className="overflow-hidden rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="hidden grid-cols-[minmax(18rem,1.4fr)_minmax(10rem,0.7fr)_minmax(12rem,0.8fr)_auto] gap-4 border-b border-[var(--mundia-line)] bg-[var(--mundia-panel)] px-4 py-2 text-xs font-semibold text-slate-600 lg:grid">
               <span>Title</span>
               <span>Inventory</span>
               <span>Metadata</span>
@@ -415,7 +415,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                       </Button>
                       <Button
                         size="sm"
-                        className="rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-90"
+                        className="rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
                         asChild
                       >
                         <Link href={`/admin/books/${book.id}/edit`}>Edit</Link>

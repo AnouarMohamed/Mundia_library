@@ -282,7 +282,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
         <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+          <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
             Book Collection
           </h1>
           <p className="text-sm text-slate-600 sm:text-base">
@@ -303,11 +303,11 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
         <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+          <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
             Book Collection
           </h1>
         </div>
-        <Card className="rounded-xl border-red-200 bg-red-50">
+        <Card className="rounded-lg border-red-200 bg-red-50">
           <CardContent className="p-4 text-center sm:p-8">
             <p className="mb-2 text-base font-semibold text-red-700 sm:text-lg">
               Failed to load books
@@ -327,10 +327,10 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
       {/* Header */}
       <div className="catalog-header mb-4 p-5 sm:mb-6 sm:p-7">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)] sm:text-xs">
-          Explore the Catalog
+        <p className="text-sm text-[var(--mundia-muted)]">
+          Explore the catalog
         </p>
-        <h1 className="mb-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+        <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Book Collection
         </h1>
         <p className="text-sm text-slate-600 sm:text-base">
@@ -342,7 +342,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-6">
         {/* Filters Sidebar */}
         <div className="w-full">
-          <Card className="catalog-panel shadow-xl lg:sticky lg:top-28">
+          <Card className="catalog-panel lg:sticky lg:top-28">
             <CardHeader className="pb-2 sm:pb-3">
               <CardTitle className="text-lg font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
                 Filters
@@ -527,7 +527,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
           {/* Books Grid */}
           {books.length === 0 ? (
-            <Card className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)]">
+            <Card className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)]">
               <CardContent className="p-4 text-center sm:p-8">
                 <p className="text-sm text-slate-600 sm:text-base">
                   No books found matching your criteria.
@@ -579,9 +579,9 @@ const BookCollection: React.FC<BookCollectionProps> = ({
                             : "outline"
                         }
                         onClick={() => handlePageChange(pageNum)}
-                        className={`h-11 w-11 rounded-xl text-xs sm:text-sm ${
+                        className={`h-11 w-11 rounded-lg text-xs sm:text-sm ${
                           pageNum === pagination.currentPage
-                            ? "border border-[var(--mundia-teal-strong)] bg-[var(--mundia-teal-strong)] text-white hover:opacity-95"
+                            ? "border border-[var(--mundia-navy)] bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
                             : "border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
                         }`}
                       >

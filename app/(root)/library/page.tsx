@@ -48,6 +48,7 @@ const Page = async () => {
     redirect("/sign-in");
   }
   const userId = session.user.id;
+  const firstName = session.user.name?.split(" ")[0] || "reader";
 
   let topBooks: Book[] = [];
   try {
@@ -55,8 +56,8 @@ const Page = async () => {
   } catch (error) {
     console.error("Failed to fetch books for /library:", error);
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Library
         </h1>
         <p className="mt-3 text-sm text-slate-600 sm:text-base">
@@ -65,7 +66,7 @@ const Page = async () => {
         <div className="mt-4">
           <Button
             asChild
-            className="min-h-12 rounded-lg bg-[var(--mundia-teal-strong)] px-6 text-white hover:opacity-95"
+            className="min-h-12 rounded-lg bg-[var(--mundia-navy)] px-6 text-white hover:bg-[var(--mundia-navy-strong)]"
           >
             <Link href="/all-books">Try All Books</Link>
           </Button>
@@ -76,8 +77,8 @@ const Page = async () => {
 
   if (topBooks.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+      <section className="mx-auto w-full max-w-3xl rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
+        <h1 className="font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Library
         </h1>
         <p className="mt-3 text-sm text-slate-600 sm:text-base">
@@ -155,17 +156,17 @@ const Page = async () => {
       <section className="library-hero">
         <div className="library-hero-grid">
           <div className="library-hero-panel">
-            <p className="library-subtitle">University Catalog</p>
-            <h1 className="library-hero-title">Mundiapolis Library</h1>
+            <p className="library-subtitle">Mundiapolis Library</p>
+            <h1 className="library-hero-title">Welcome back, {firstName}</h1>
             <p className="library-hero-copy">
-              Search the academic collection, reserve books, and track your
-              reading activity with real-time availability.
+              Search the collection, check availability, and keep your borrowed
+              books in view before your next class.
             </p>
 
             <div className="library-hero-actions">
               <Button
                 asChild
-                className="min-h-12 rounded-lg bg-[var(--mundia-teal-strong)] px-6 text-white hover:opacity-95"
+                className="min-h-12 rounded-lg bg-[var(--mundia-navy)] px-6 text-white hover:bg-[var(--mundia-navy-strong)]"
               >
                 <Link href="/all-books">Browse All Books</Link>
               </Button>
@@ -174,26 +175,21 @@ const Page = async () => {
               </Link>
             </div>
 
-            <div className="library-hero-stats">
-              <div className="library-stat">
-                <p className="library-stat-label">Top Picks</p>
-                <p className="library-stat-value">{topBooks.length}</p>
-              </div>
-              <div className="library-stat">
-                <p className="library-stat-label">Featured Rating</p>
-                <p className="library-stat-value">{featuredRating}</p>
-              </div>
-              <div className="library-stat">
-                <p className="library-stat-label">Available Copies</p>
-                <p className="library-stat-value">
-                  {featuredBook.availableCopies}
-                </p>
-              </div>
+            <div className="mt-8 max-w-2xl border-t border-[var(--mundia-line)] pt-4 text-sm text-[var(--mundia-muted)]">
+              Today’s featured title is rated{" "}
+              <span className="font-semibold text-[var(--mundia-ink)]">
+                {featuredRating}
+              </span>{" "}
+              and has{" "}
+              <span className="font-semibold text-[var(--mundia-ink)]">
+                {featuredBook.availableCopies}
+              </span>{" "}
+              copies available.
             </div>
           </div>
 
           <div className="library-hero-aside">
-            <p className="library-featured-label">Featured Picks</p>
+            <p className="library-featured-label">Featured picks</p>
             <ul className="library-featured-list">
               {topBooks.slice(0, 3).map((book) => {
                 const rating =

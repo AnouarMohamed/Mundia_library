@@ -156,8 +156,8 @@ const AuthForm = <T extends FieldValues>({
           {/* Role Based Test Account Selector - Only for Sign In */}
           {isSignIn && (
             <div className="auth-selector-panel space-y-1.5 sm:space-y-2">
-              <FormLabel className="text-xs uppercase tracking-[0.16em] text-light-100/75 sm:text-sm">
-                Select Test Account
+              <FormLabel className="text-xs text-light-100/75 sm:text-sm">
+                Select test account
               </FormLabel>
               <Select
                 key={`select-${selectedRole || "empty"}`}
@@ -167,7 +167,7 @@ const AuthForm = <T extends FieldValues>({
                 <SelectTrigger className="form-input text-white">
                   <SelectValue placeholder="Select Role Based Test Account" />
                 </SelectTrigger>
-                <SelectContent className="rounded-2xl border border-white/15 bg-[var(--surface-card-strong)] text-light-100">
+                <SelectContent className="rounded-lg border border-white/15 bg-[var(--surface-card-strong)] text-light-100">
                   <SelectItem
                     value="guest-user"
                     className="cursor-pointer rounded-lg text-white focus:bg-white/10 focus:text-white"
@@ -200,7 +200,7 @@ const AuthForm = <T extends FieldValues>({
               name={field as Path<T>}
               render={({ field }) => (
                 <FormItem className="auth-field-row">
-                  <FormLabel className="text-xs uppercase tracking-[0.15em] text-light-100/75 sm:text-sm">
+                  <FormLabel className="text-xs text-light-100/75 sm:text-sm">
                     {FIELD_NAMES[field.name as keyof typeof FIELD_NAMES]}
                   </FormLabel>
                   <FormControl>

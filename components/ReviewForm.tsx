@@ -86,7 +86,7 @@ export default function ReviewForm({
   );
 
   return (
-    <div className="surface-panel p-4 shadow-sm sm:p-6">
+    <div className="surface-panel p-4 sm:p-6">
       <h3 className="mb-3 text-base font-semibold text-[var(--mundia-ink)] sm:mb-4 sm:text-lg">
         Write a review
       </h3>
@@ -129,7 +129,7 @@ export default function ReviewForm({
           <Button
             type="submit"
             disabled={createReviewMutation.isPending || !comment.trim()}
-            className="w-full bg-[var(--mundia-teal-strong)] text-xs text-white hover:opacity-95 sm:w-auto sm:text-sm"
+            className="w-full bg-[var(--mundia-navy)] text-xs text-white hover:bg-[var(--mundia-navy-strong)] sm:w-auto sm:text-sm"
           >
             {createReviewMutation.isPending ? "Submitting..." : "Submit review"}
           </Button>

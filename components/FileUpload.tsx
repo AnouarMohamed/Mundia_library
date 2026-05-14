@@ -263,7 +263,7 @@ const FileUpload = ({
             alt="Uploaded image"
             width={500}
             height={300}
-            className="h-auto w-full max-w-full rounded-xl"
+            className="h-auto w-full max-w-full rounded-lg"
           />
         ) : isImageKitConfigured ? (
           <IKImage
@@ -280,13 +280,13 @@ const FileUpload = ({
           <video
             src={file.filePath}
             controls={true}
-            className="h-64 w-full rounded-xl sm:h-96"
+            className="h-64 w-full rounded-lg sm:h-96"
           />
         ) : isImageKitConfigured ? (
           <IKVideo
             path={file.filePath}
             controls={true}
-            className="h-64 w-full rounded-xl sm:h-96"
+            className="h-64 w-full rounded-lg sm:h-96"
           />
         ) : null
       ) : null}
