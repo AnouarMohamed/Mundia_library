@@ -22,18 +22,19 @@ jobs:
       postgres:
         image: postgres:15
         env:
+          POSTGRES_USER: postgres
           POSTGRES_DB: library_management
           POSTGRES_PASSWORD: rootpassword
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd="pg_isready -U postgres -d library_management"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://root:rootpassword@127.0.0.1:5432/library_management
+      DATABASE_URL: postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
       NEXTAUTH_SECRET: ci-load-secret
       NEXTAUTH_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3000

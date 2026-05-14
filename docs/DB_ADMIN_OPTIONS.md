@@ -1,6 +1,6 @@
 # Better Database Admin Options Than phpMyAdmin + XAMPP
 
-For this MySQL project, use one of these options depending on workflow:
+For this PostgreSQL project, use one of these options depending on workflow:
 
 ## Recommended primary option: DBeaver
 
@@ -41,11 +41,11 @@ Open:
 
 Connection values:
 
-- System: MySQL
+- System: PostgreSQL
 - Server: db
-- Username: root
-- Password: value from MYSQL_ROOT_PASSWORD
-- Database: value from MYSQL_DATABASE
+- Username: value from POSTGRES_USER
+- Password: value from POSTGRES_PASSWORD
+- Database: value from POSTGRES_DB
 
 ## Recommendation by use case
 

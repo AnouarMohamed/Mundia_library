@@ -2,15 +2,12 @@ import dummyBooks from "../dummybooks.json";
 import { books, users } from "@/database/schema";
 import { sha256 } from "@noble/hashes/sha256";
 import { randomBytes } from "@noble/hashes/utils";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
 
-const sql = neon(process.env.DATABASE_URL!);
-export const db = drizzle({ client: sql });
+type Db = typeof import("@/database/drizzle").db;
 
 const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
   const c = new Uint8Array(a.length + b.length);
@@ -27,7 +24,7 @@ const hashPassword = (password: string) => {
   return `${Buffer.from(salt).toString("base64")}:${Buffer.from(hashBuffer).toString("base64")}`;
 };
 
-const seedGuestUsers = async () => {
+const seedGuestUsers = async (db: Db) => {
   const guestPassword = hashPassword("12345678");
   const guestUsers = [
     {
@@ -57,21 +54,21 @@ const seedGuestUsers = async () => {
       .onConflictDoUpdate({
         target: users.email,
         set: {
-        fullName: guestUser.fullName,
-        password: guestUser.password,
-        universityCard: guestUser.universityCard,
-        status: guestUser.status,
-        role: guestUser.role,
+          fullName: guestUser.fullName,
+          password: guestUser.password,
+          universityCard: guestUser.universityCard,
+          status: guestUser.status,
+          role: guestUser.role,
         },
       });
   }
 };
 
-const seed = async () => {
+const seed = async (db: Db) => {
   console.log("Seeding data...");
 
   try {
-    await seedGuestUsers();
+    await seedGuestUsers(db);
 
     for (const book of dummyBooks) {
       await db
@@ -87,10 +84,21 @@ const seed = async () => {
     console.log("Data seeded successfully!");
   } catch (error) {
     console.error("Error seeding data:", error);
+    throw error;
   }
 };
 
-seed()
+const main = async () => {
+  const { closeDb, db } = await import("@/database/drizzle");
+
+  try {
+    await seed(db);
+  } finally {
+    await closeDb();
+  }
+};
+
+main()
   .catch((error) => {
     console.error("Seeding failed:", error);
     process.exitCode = 1;

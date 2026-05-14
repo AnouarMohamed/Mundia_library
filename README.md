@@ -2,14 +2,14 @@
 
 <p align="center">
   <strong>Full-stack university library platform with student and admin portals</strong><br/>
-  Next.js 15 - React 19 - TypeScript - Drizzle ORM - MySQL - NextAuth - Upstash
+  Next.js 15 - React 19 - TypeScript - Drizzle ORM - PostgreSQL - NextAuth - Upstash
 </p>
 
 <p align="center">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?logo=next.js" />
   <img alt="React" src="https://img.shields.io/badge/React-19-149ECA?logo=react" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" />
-  <img alt="MySQL" src="https://img.shields.io/badge/MySQL-Database-336791?logo=MySQL&logoColor=white" />
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-Database-336791?logo=postgresql&logoColor=white" />
   <img alt="Drizzle" src="https://img.shields.io/badge/Drizzle-ORM-C5F74F" />
   <img alt="Auth" src="https://img.shields.io/badge/Auth-NextAuth_v5-4B5563" />
 </p>
@@ -55,7 +55,7 @@ The project is implemented with Next.js App Router and combines Server Component
 | Admin Dashboard | KPI cards, circulation trends, borrow mix, genre performance, top-rated books, activity feeds |
 | Admin Operations | Borrow request approvals, account/admin requests, user management, catalog management |
 | Automation | Fine config, due-soon and overdue reminders, overdue fine updates, recommendation generation + cache refresh |
-| Integrations | MySQL + Drizzle, Upstash Redis/QStash, ImageKit, Brevo + Resend fallback |
+| Integrations | PostgreSQL + Drizzle, Upstash Redis/QStash, ImageKit, Brevo + Resend fallback |
 | Reliability | DB retry helper for transient failures, API rate limits (dev bypass), admin route guards |
 
 ## UI Preview
@@ -121,7 +121,7 @@ flowchart TB
     MW[Middleware /admin/*]
   end
 
-  DB[(MySQL + Drizzle)]
+  DB[(PostgreSQL + Drizzle)]
   REDIS[(Upstash Redis)]
   QSTASH[(Upstash QStash and Workflow)]
   IMG[ImageKit]
@@ -153,7 +153,7 @@ sequenceDiagram
   participant U as User
   participant UI as Next.js UI
   participant NA as NextAuth
-  participant DB as MySQL
+  participant DB as PostgreSQL
   participant MW as Middleware
 
   U->>UI: Sign in with email/password
@@ -187,7 +187,7 @@ stateDiagram-v2
 sequenceDiagram
   participant S as Student
   participant SA as borrowBook action
-  participant DB as MySQL
+  participant DB as PostgreSQL
   participant A as Admin
   participant ASA as Admin borrow actions
 
@@ -209,7 +209,7 @@ sequenceDiagram
   participant A as Admin
   participant UI as Automation UI
   participant API as Admin API Routes
-  participant DB as MySQL
+  participant DB as PostgreSQL
   participant M as Email Provider
 
   A->>UI: Trigger due/overdue reminder action
@@ -331,7 +331,7 @@ erDiagram
 | Data Fetching | TanStack Query |
 | Backend | Next.js Route Handlers + Server Actions |
 | Auth | NextAuth v5 (Credentials provider, JWT sessions) |
-| Database | MySQL + Drizzle ORM |
+| Database | PostgreSQL + Drizzle ORM |
 | Caching and Rate Limits | Upstash Redis + `@upstash/ratelimit` |
 | Background Jobs | Upstash Workflow / QStash |
 | Media | ImageKit |
@@ -368,7 +368,7 @@ screenshots/              # Project UI screenshots used in this README
 
 - Node.js 20+
 - npm
-- MySQL database
+- PostgreSQL database
 - Upstash Redis + QStash credentials
 - ImageKit credentials
 - Brevo and/or Resend email credentials
@@ -384,7 +384,7 @@ npm install
 Create `.env.local` in the project root:
 
 ```env
-DATABASE_URL=mysql://user:password@host:3306/dbname
+DATABASE_URL=postgresql://user:password@host:5432/dbname
 NEXTAUTH_SECRET=replace_with_secure_secret
 NEXTAUTH_URL=http://localhost:3000
 
@@ -442,9 +442,9 @@ Open `http://localhost:3000`.
 ### 1. Keep `.env.local` configured
 
 - Docker uses your existing `.env.local` for app secrets and integration keys.
-- `DATABASE_URL` is overridden in Compose to point to the MySQL container (`db`).
+- `DATABASE_URL` is overridden in Compose to point to the PostgreSQL container (`db`).
 
-### 2. Build and run app + MySQL
+### 2. Build and run app + PostgreSQL
 
 ```bash
 docker compose up --build
@@ -452,7 +452,7 @@ docker compose up --build
 
 What this does:
 
-- Starts `db` (MySQL 8) with a persistent volume.
+- Starts `db` (PostgreSQL 15) with a persistent volume.
 - Runs `migrate` once from a DB tooling image before the app starts.
 - Starts `app` (Next.js production server) on `http://localhost:3000`.
 - Starts `adminer` (lightweight browser DB admin) on `http://localhost:8080`.
@@ -483,8 +483,9 @@ docker compose down -v
 Optional overrides in `.env` (Compose-level):
 
 ```env
-MYSQL_DATABASE=library_management
-MYSQL_ROOT_PASSWORD=rootpassword
+POSTGRES_DB=library_management
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=rootpassword
 ADMINER_PORT=8080
 ```
 
@@ -494,7 +495,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | Yes | MySQL connection string |
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `NEXTAUTH_SECRET` | Yes | NextAuth secret for JWT/cookies |
 | `NEXTAUTH_URL` | Yes | Base URL for auth callbacks |
 | `AUTH_TRUST_HOST` | No | Trust local/proxy host headers for Auth.js in Docker |
@@ -528,7 +529,7 @@ For standalone DB tooling recommendations (including DBeaver and Drizzle Studio)
 | `npm run explain:hot-queries` | Run EXPLAIN plans for the hottest API query shapes |
 | `npm run loadtest:nightly` | Run higher-concurrency load test with regression checks |
 | `npm run db:generate` | Generate Drizzle migration files |
-| `npm run db:migrate` | Push schema to MySQL |
+| `npm run db:migrate` | Push schema to PostgreSQL |
 | `npm run db:studio` | Open Drizzle Studio |
 | `npm run seed` | Seed books from `dummybooks.json` |
 | `npm run db:migrate-csv` | Run CSV migration helper |
