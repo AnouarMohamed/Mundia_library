@@ -144,7 +144,7 @@ const Panel = ({
   subtitle?: string;
   children: React.ReactNode;
 }) => (
-  <article className="surface-panel-light min-w-0 p-5 sm:p-6">
+  <article className="surface-panel-light min-w-0 rounded-xl p-5 sm:p-6">
     <div className="mb-5">
       <h3 className="text-lg font-bold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
         {title}
@@ -196,7 +196,7 @@ const MetricCard = ({
 
   return (
     <article
-      className={`rounded-2xl border border-[var(--mundia-line)] bg-white p-4 shadow-sm ring-1 ${styles.ring} sm:p-5`}
+      className={`min-w-0 border-b border-[var(--mundia-line)] p-4 ring-1 last:border-b-0 sm:border-b-0 sm:border-r sm:p-5 sm:[&:nth-child(2)]:border-r-0 xl:[&:nth-child(2)]:border-r xl:last:border-r-0 ${styles.ring}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -213,7 +213,7 @@ const MetricCard = ({
           <Icon className="size-5" />
         </span>
       </div>
-      <p className="mt-4 text-xs font-medium text-[var(--mundia-ink)]/65">
+      <p className="mt-3 text-xs font-medium text-[var(--mundia-ink)]/65">
         {subtitle}
       </p>
     </article>
@@ -342,14 +342,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
       <header className="mb-8 space-y-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-[var(--mundia-teal-strong)]">
-              <div className="h-4 w-1 rounded-full bg-current" />
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em]">
-                System Administration
-              </p>
-            </div>
-            <h2 className="text-3xl font-bold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
-              Dashboard Overview
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
+              System administration
+            </p>
+            <h2 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+              Operations overview
             </h2>
             <p className="max-w-2xl text-sm text-[var(--mundia-ink)]/70 sm:text-base">
               Operational overview of library circulation, catalog metadata, and
@@ -357,28 +354,28 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-[var(--mundia-line)] bg-white px-4 py-2 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/50">
+          <dl className="grid min-w-[260px] grid-cols-2 overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="border-r border-[var(--mundia-line)] px-4 py-3">
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/55">
                 Borrow Utilization
-              </p>
-              <p className="text-lg font-bold text-[var(--mundia-teal-strong)]">
+              </dt>
+              <dd className="mt-1 text-lg font-semibold text-[var(--mundia-teal-strong)]">
                 {utilizationRate}%
-              </p>
+              </dd>
             </div>
-            <div className="rounded-xl border border-[var(--mundia-line)] bg-white px-4 py-2 shadow-sm">
-              <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/50">
+            <div className="px-4 py-3">
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/55">
                 User Approval
-              </p>
-              <p className="text-lg font-bold text-[var(--mundia-gold-strong)]">
+              </dt>
+              <dd className="mt-1 text-lg font-semibold text-[var(--mundia-gold-strong)]">
                 {approvalRate}%
-              </p>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] shadow-sm sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Users"
           value={compact(totalUsers)}
@@ -417,11 +414,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {recentBorrows.length === 0 ? (
             <EmptyState label="No borrow records found yet." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {recentBorrows.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col gap-2 rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
@@ -472,11 +469,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {recentUsers.length === 0 ? (
             <EmptyState label="No recent user signups found yet." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {recentUsers.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col gap-2 rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
@@ -690,12 +687,9 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {categoryStats.length === 0 ? (
             <EmptyState label="No genre analytics available yet." />
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {categoryStats.map((item) => (
-                <div
-                  key={item.genre}
-                  className="rounded-xl border border-[var(--mundia-line)] bg-white p-3 shadow-sm"
-                >
+                <div key={item.genre} className="p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-bold text-[var(--mundia-ink)]">
                       {item.genre}
@@ -732,11 +726,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {topRatedBooks.length === 0 ? (
             <EmptyState label="No top-rated books available yet." />
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {topRatedBooks.map((book) => (
                 <div
                   key={book.id}
-                  className="flex items-center justify-between rounded-xl border border-[var(--mundia-line)] bg-white px-3 py-3 shadow-sm"
+                  className="flex items-center justify-between px-3 py-3"
                 >
                   <div className="min-w-0 pr-3">
                     <p className="truncate text-sm font-bold text-[var(--mundia-ink)]">
@@ -751,7 +745,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                   </div>
                 </div>
               ))}
-              <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-2 text-xs text-[var(--mundia-ink)]/60">
+              <div className="border-t border-[var(--mundia-line)] px-3 py-2 text-xs text-[var(--mundia-ink)]/60">
                 Avg pages per book:{" "}
                 <span className="font-bold text-[var(--mundia-ink)]">
                   {Math.round(averagePageCount)}
@@ -762,48 +756,50 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </Panel>
       </section>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
-            <ArrowDownToLine className="size-4" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">
-              Borrow Pressure
+      <section className="overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] shadow-sm">
+        <div className="grid grid-cols-1 divide-y divide-[var(--mundia-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <div className="p-5">
+            <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
+              <ArrowDownToLine className="size-4" />
+              <p className="text-[10px] font-bold uppercase tracking-wider">
+                Borrow Pressure
+              </p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
+              {activeBorrows + pendingBorrows}
+            </p>
+            <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+              Pending and active borrow flows requiring attention
             </p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
-            {activeBorrows + pendingBorrows}
-          </p>
-          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
-            Pending and active borrow flows requiring attention
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
-            <ArrowUpFromLine className="size-4" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">
-              Return Velocity
+          <div className="p-5">
+            <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
+              <ArrowUpFromLine className="size-4" />
+              <p className="text-[10px] font-bold uppercase tracking-wider">
+                Return Velocity
+              </p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
+              {compact(returnedBooks)}
+            </p>
+            <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+              Total number of successfully returned books
             </p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
-            {compact(returnedBooks)}
-          </p>
-          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
-            Total number of successfully returned books
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--mundia-line)] bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
-            <ChartColumnIncreasing className="size-4" />
-            <p className="text-[10px] font-bold uppercase tracking-wider">
-              Catalog Utilization
+          <div className="p-5">
+            <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
+              <ChartColumnIncreasing className="size-4" />
+              <p className="text-[10px] font-bold uppercase tracking-wider">
+                Catalog Utilization
+              </p>
+            </div>
+            <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
+              {utilizationRate}%
+            </p>
+            <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
+              Percentage of total book copies currently in circulation
             </p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
-            {utilizationRate}%
-          </p>
-          <p className="mt-1 text-xs font-medium text-[var(--mundia-ink)]/55">
-            Percentage of total book copies currently in circulation
-          </p>
         </div>
       </section>
     </div>

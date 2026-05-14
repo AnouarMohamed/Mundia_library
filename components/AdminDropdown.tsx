@@ -16,7 +16,7 @@ const AdminDropdown = () => {
       <div className="px-1 py-1 sm:px-2">
         <Link
           href="/admin"
-          className="rounded-full px-3 py-2 text-sm font-medium text-light-100/85 transition hover:bg-white/10 hover:text-white"
+          className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--mundia-ink)]/72 transition hover:bg-[var(--mundia-panel)] hover:text-[var(--mundia-ink)]"
         >
           Admin
         </Link>
@@ -24,43 +24,43 @@ const AdminDropdown = () => {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-2xl border border-white/10 bg-[var(--surface-card-strong)] p-1.5 shadow-2xl sm:w-52">
+        <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1.5 shadow-xl sm:w-52">
           {/* Add a small invisible bridge to prevent hover gap */}
           <div className="absolute inset-x-0 -top-2 h-2"></div>
           <div className="py-1 sm:py-1.5">
             <Link
               href="/admin"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Dashboard Overview
             </Link>
             <Link
               href="/admin/automation"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Automation
             </Link>
             <Link
               href="/admin/users"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Users
             </Link>
             <Link
               href="/admin/books"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Books
             </Link>
             <Link
               href="/admin/book-requests"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Borrow Requests
             </Link>
             <Link
               href="/admin/account-requests"
-              className="block rounded-xl px-3 py-2 text-xs text-light-100/90 transition-colors hover:bg-white/10 hover:text-white sm:px-4 sm:text-sm"
+              className="block rounded-lg px-3 py-2 text-xs text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] sm:px-4 sm:text-sm"
             >
               Account Requests
             </Link>

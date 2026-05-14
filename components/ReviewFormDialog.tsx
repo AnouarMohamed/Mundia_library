@@ -100,12 +100,12 @@ export default function ReviewFormDialog({
             className={`size-5 sm:size-6 ${
               star <= rating
                 ? "fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
-                : "fill-light-100/20 text-light-100/20"
+                : "fill-slate-200 text-slate-200"
             }`}
           />
         </button>
       ))}
-      <span className="ml-1.5 text-xs text-light-200/70 sm:ml-2 sm:text-sm">
+      <span className="ml-1.5 text-xs text-slate-600 sm:ml-2 sm:text-sm">
         {rating} star{rating !== 1 ? "s" : ""}
       </span>
     </div>
@@ -113,26 +113,26 @@ export default function ReviewFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="surface-panel border-white/10 sm:max-w-md [&>button]:text-light-100 [&>button]:hover:text-light-100">
+      <DialogContent className="surface-panel sm:max-w-md [&>button]:text-[var(--mundia-ink)] [&>button]:hover:text-[var(--mundia-ink)]">
         <DialogHeader>
-          <DialogTitle className="text-base text-light-100 sm:text-lg">
+          <DialogTitle className="text-base text-[var(--mundia-ink)] sm:text-lg">
             Write a review
           </DialogTitle>
-          <DialogDescription className="text-xs text-light-200/70 sm:text-sm">
+          <DialogDescription className="text-xs text-slate-600 sm:text-sm">
             Rate the book and leave a short note for other readers.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           <div className="space-y-1.5 sm:space-y-2">
-            <label className="text-xs font-medium text-light-200 sm:text-sm">
+            <label className="text-xs font-medium text-slate-600 sm:text-sm">
               Rating
             </label>
             <StarRating />
           </div>
 
           <div className="space-y-1.5 sm:space-y-2">
-            <label className="text-xs font-medium text-light-200 sm:text-sm">
+            <label className="text-xs font-medium text-slate-600 sm:text-sm">
               Your Review
             </label>
             <textarea
@@ -143,7 +143,7 @@ export default function ReviewFormDialog({
               rows={4}
               required
             />
-            <p className="text-[10px] text-light-200/70 sm:text-xs">
+            <p className="text-[10px] text-slate-500 sm:text-xs">
               {comment.length}/500 characters
             </p>
           </div>
@@ -154,14 +154,14 @@ export default function ReviewFormDialog({
               variant="outline"
               onClick={handleClose}
               disabled={createReviewMutation.isPending}
-              className="w-full border-white/15 bg-white/5 text-xs text-light-100 hover:bg-white/10 hover:text-light-100 sm:w-auto sm:text-sm"
+              className="w-full border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:w-auto sm:text-sm"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={createReviewMutation.isPending || !comment.trim()}
-              className="w-full bg-primary text-xs text-dark-100 hover:bg-primary/90 sm:w-auto sm:text-sm"
+              className="w-full bg-[var(--mundia-teal-strong)] text-xs text-white hover:opacity-95 sm:w-auto sm:text-sm"
             >
               {createReviewMutation.isPending
                 ? "Submitting..."

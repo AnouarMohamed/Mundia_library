@@ -41,8 +41,8 @@ const BookList = ({
           ))}
         </ul>
       ) : (
-        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
-          <p className="text-base text-light-100/85 sm:text-lg">
+        <div className="mt-6 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center">
+          <p className="text-base text-slate-600 sm:text-lg">
             No books available.
           </p>
         </div>

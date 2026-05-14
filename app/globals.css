@@ -9,11 +9,11 @@
     --mundia-ink-strong: oklch(12% 0.028 225);
     --mundia-paper: oklch(97% 0.008 218);
     --mundia-paper-warm: oklch(95% 0.018 92);
-    --mundia-panel: oklch(23% 0.035 220);
-    --mundia-panel-raised: oklch(29% 0.04 218);
+    --mundia-panel: oklch(94% 0.014 218);
+    --mundia-panel-raised: oklch(98% 0.006 218);
     --mundia-line: oklch(76% 0.035 218 / 0.34);
-    --mundia-text: oklch(94% 0.012 215);
-    --mundia-muted: oklch(75% 0.03 215);
+    --mundia-text: var(--mundia-ink);
+    --mundia-muted: oklch(45% 0.026 225);
     --mundia-teal: oklch(72% 0.08 212);
     --mundia-teal-strong: oklch(56% 0.09 214);
     --mundia-gold: oklch(78% 0.105 88);
@@ -25,13 +25,13 @@
     --mundia-success-strong: oklch(48% 0.11 150);
     --mundia-veil: oklch(18% 0.025 225 / 0.28);
     --mundia-focus: oklch(78% 0.1 212);
-    --surface-0: var(--mundia-ink-strong);
-    --surface-1: var(--mundia-ink);
-    --surface-2: var(--mundia-panel-raised);
-    --surface-card: oklch(23% 0.035 220 / 0.86);
-    --surface-card-strong: oklch(16% 0.025 225 / 0.94);
-    --text-main: var(--mundia-text);
-    --text-muted: var(--mundia-muted);
+    --surface-0: oklch(98% 0.006 218);
+    --surface-1: var(--mundia-paper);
+    --surface-2: oklch(94% 0.014 218);
+    --surface-card: oklch(98% 0.006 218 / 0.96);
+    --surface-card-strong: oklch(95% 0.012 218 / 0.98);
+    --text-main: var(--mundia-ink);
+    --text-muted: oklch(44% 0.026 225);
     --accent-gold: var(--mundia-gold);
     --accent-gold-strong: var(--mundia-gold-strong);
     --accent-sea: var(--mundia-teal);
@@ -42,18 +42,12 @@
   body {
     @apply overflow-x-hidden;
     min-height: 100%;
-    background:
-      linear-gradient(
-        110deg,
-        oklch(78% 0.105 88 / 0.07) 0 1px,
-        transparent 1px 140px
-      ),
-      linear-gradient(
-        160deg,
-        oklch(31% 0.055 218) 0%,
-        var(--surface-0) 45%,
-        oklch(10% 0.02 225) 100%
-      );
+    background: linear-gradient(
+      180deg,
+      oklch(98% 0.006 218) 0%,
+      oklch(96% 0.01 218) 56%,
+      oklch(94% 0.016 92) 100%
+    );
     color: var(--text-main);
   }
 
@@ -64,18 +58,8 @@
     z-index: -1;
     pointer-events: none;
     background:
-      linear-gradient(
-        90deg,
-        oklch(97% 0.008 218 / 0.035),
-        transparent 22%,
-        oklch(78% 0.105 88 / 0.04),
-        transparent 72%
-      ),
-      repeating-linear-gradient(
-        0deg,
-        oklch(97% 0.008 218 / 0.028) 0 1px,
-        transparent 1px 72px
-      );
+      linear-gradient(90deg, oklch(56% 0.09 214 / 0.05), transparent 36%),
+      linear-gradient(180deg, transparent, oklch(78% 0.105 88 / 0.055));
   }
 
   ::selection {
@@ -106,32 +90,28 @@
 @layer components {
   .form-btn {
     @apply inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold text-base transition-all duration-300 !important;
-    color: var(--mundia-ink-strong);
-    letter-spacing: 0.02em;
-    background: linear-gradient(
-      96deg,
-      var(--mundia-teal) 0%,
-      var(--accent-gold) 42%,
-      var(--accent-gold-strong) 100%
-    );
-    box-shadow:
-      0 10px 24px oklch(44% 0.06 214 / 0.34),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.55);
+    color: var(--mundia-paper);
+    background: var(--mundia-teal-strong);
+    box-shadow: 0 10px 20px oklch(44% 0.06 214 / 0.18);
   }
 
   .form-btn:hover {
     transform: translateY(-1px);
-    box-shadow:
-      0 16px 34px oklch(44% 0.06 214 / 0.4),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.6);
+    background: oklch(49% 0.088 214);
+    box-shadow: 0 14px 26px oklch(44% 0.06 214 / 0.22);
   }
 
   .form-input {
-    @apply w-full min-h-12 rounded-xl border px-4 text-base font-normal text-light-100 placeholder:font-normal placeholder:text-light-100/55 transition-all !important;
+    @apply w-full min-h-12 rounded-xl border px-4 text-base font-normal transition-all !important;
     border-color: var(--mundia-line);
-    background: oklch(29% 0.04 218 / 0.42);
-    box-shadow: inset 0 1px 0 oklch(97% 0.008 218 / 0.08);
+    background: oklch(98% 0.006 218);
+    color: var(--mundia-ink);
+    box-shadow: inset 0 1px 0 oklch(18% 0.025 225 / 0.03);
     @apply focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0;
+  }
+
+  .form-input::placeholder {
+    color: oklch(48% 0.026 225 / 0.7);
   }
 
   .focus-ring {
@@ -140,29 +120,27 @@
 
   .surface-panel {
     @apply rounded-2xl border;
-    border-color: var(--mundia-line);
+    border-color: oklch(76% 0.035 218 / 0.5);
     background: var(--surface-card);
-    box-shadow:
-      0 18px 48px oklch(10% 0.02 225 / 0.28),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.06);
+    box-shadow: 0 14px 34px oklch(18% 0.025 225 / 0.07);
   }
 
   .surface-panel-light {
-    @apply rounded-2xl border;
+    @apply rounded-xl border;
     border-color: oklch(76% 0.035 218 / 0.55);
-    background: var(--mundia-paper);
-    box-shadow: 0 12px 34px oklch(18% 0.025 225 / 0.08);
+    background: oklch(98% 0.006 218);
+    box-shadow: 0 10px 28px oklch(18% 0.025 225 / 0.06);
   }
 
   .app-control {
     @apply min-h-11 rounded-xl border px-3 text-sm transition;
     border-color: var(--mundia-line);
-    background: oklch(29% 0.04 218 / 0.42);
-    color: var(--mundia-text);
+    background: oklch(98% 0.006 218);
+    color: var(--mundia-ink);
   }
 
   .app-control::placeholder {
-    color: oklch(75% 0.03 215 / 0.68);
+    color: oklch(48% 0.026 225 / 0.7);
   }
 
   .app-control:focus {
@@ -172,8 +150,8 @@
   }
 
   .app-control option {
-    background: var(--mundia-ink);
-    color: var(--mundia-text);
+    background: var(--mundia-paper);
+    color: var(--mundia-ink);
   }
 
   .admin-field {
@@ -253,67 +231,52 @@
 
   /* Book Card */
   .book-card-link {
-    @apply block h-full rounded-[1.4rem] border border-white/10 p-3 transition duration-300 sm:p-4;
-    background:
-      linear-gradient(180deg, oklch(97% 0.008 218 / 0.06), transparent 38%),
-      linear-gradient(
-        155deg,
-        oklch(23% 0.035 220 / 0.92),
-        oklch(16% 0.025 225 / 0.82)
-      );
-    box-shadow:
-      0 18px 44px oklch(10% 0.02 225 / 0.28),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.06);
+    @apply block h-full rounded-xl border p-3 transition duration-200 sm:p-4;
+    border-color: oklch(76% 0.035 218 / 0.48);
+    background: oklch(98% 0.006 218 / 0.96);
+    box-shadow: 0 10px 28px oklch(18% 0.025 225 / 0.07);
   }
 
   .book-card-link:hover {
-    transform: translateY(-4px);
-    border-color: oklch(78% 0.105 88 / 0.42);
-    background:
-      linear-gradient(180deg, oklch(78% 0.105 88 / 0.08), transparent 42%),
-      linear-gradient(
-        155deg,
-        oklch(28% 0.045 218 / 0.96),
-        oklch(16% 0.025 225 / 0.9)
-      );
-    box-shadow:
-      0 24px 58px oklch(10% 0.02 225 / 0.36),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.08);
+    transform: translateY(-2px);
+    border-color: oklch(56% 0.09 214 / 0.5);
+    background: oklch(99% 0.004 218);
+    box-shadow: 0 16px 34px oklch(18% 0.025 225 / 0.1);
   }
 
   .book-card-cover {
-    @apply flex justify-center rounded-[1.1rem] border border-white/10 py-4;
-    background:
-      linear-gradient(
-        120deg,
-        oklch(78% 0.105 88 / 0.08) 0 1px,
-        transparent 1px 42px
-      ),
-      linear-gradient(
-        180deg,
-        oklch(97% 0.008 218 / 0.08),
-        oklch(97% 0.008 218 / 0.03)
-      );
+    @apply flex justify-center rounded-lg border py-4;
+    border-color: oklch(76% 0.035 218 / 0.38);
+    background: oklch(94% 0.014 218);
   }
 
   .book-card-rating {
-    @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[11px] font-semibold text-light-100;
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold;
+    border-color: oklch(78% 0.105 88 / 0.38);
+    background: oklch(94% 0.055 80);
+    color: var(--mundia-gold-strong);
   }
 
   .book-card-copy {
-    @apply inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-light-100/70;
+    @apply inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em];
+    border-color: oklch(76% 0.035 218 / 0.5);
+    background: oklch(94% 0.012 218);
+    color: oklch(42% 0.026 225);
   }
 
   .book-title {
-    @apply mt-3 line-clamp-2 text-base font-semibold leading-tight text-light-100 xs:text-lg;
+    @apply mt-3 line-clamp-2 text-base font-semibold leading-tight xs:text-lg;
+    color: var(--mundia-ink);
   }
 
   .book-author {
-    @apply mt-2 line-clamp-1 text-sm text-light-100/80 xs:text-base;
+    @apply mt-2 line-clamp-1 text-sm xs:text-base;
+    color: oklch(42% 0.026 225);
   }
 
   .book-genre {
-    @apply mt-1 line-clamp-1 text-xs uppercase tracking-[0.16em] text-light-200/85 xs:text-sm;
+    @apply mt-1 line-clamp-1 text-xs font-semibold uppercase tracking-[0.08em] xs:text-sm;
+    color: var(--mundia-teal-strong);
   }
 
   .book-loaned {
@@ -321,7 +284,10 @@
   }
 
   .book-btn {
-    @apply mt-3 min-h-12 w-full rounded-xl border border-white/20 bg-white/5 font-bebas-neue text-base tracking-[0.08em] text-light-100 transition hover:border-primary hover:bg-primary;
+    @apply mt-3 min-h-12 w-full rounded-lg border text-sm font-semibold transition;
+    border-color: oklch(56% 0.09 214 / 0.42);
+    color: var(--mundia-teal-strong);
+    background: oklch(93% 0.035 212);
   }
 
   /* Borrowed Book */
@@ -356,101 +322,80 @@
 
   /* Book List */
   .book-list {
-    @apply mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6;
+    @apply mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5;
   }
 
   .book-section-heading {
-    @apply flex flex-col gap-2 border-t border-white/10 pt-5 sm:flex-row sm:items-end sm:justify-between sm:pt-7;
+    @apply flex flex-col gap-2 border-t pt-5 sm:flex-row sm:items-end sm:justify-between sm:pt-7;
+    border-color: oklch(76% 0.035 218 / 0.46);
   }
 
   .book-section-kicker {
-    @apply text-[11px] uppercase tracking-[0.26em] text-light-200/70 sm:text-xs;
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] sm:text-xs;
+    color: var(--mundia-teal-strong);
   }
 
   .book-section-title {
-    @apply font-bebas-neue text-3xl tracking-[0.08em] text-light-100 sm:text-5xl;
+    @apply text-2xl font-semibold tracking-tight sm:text-3xl;
+    color: var(--mundia-ink);
   }
 
   .book-section-cta {
-    @apply min-h-12 rounded-xl border border-white/10 px-6 py-3 font-bebas-neue text-base tracking-[0.08em] text-dark-100 transition hover:opacity-95 sm:text-xl;
-    background: linear-gradient(
-      135deg,
-      var(--mundia-gold) 0%,
-      var(--mundia-teal) 100%
-    );
-    box-shadow: 0 14px 34px oklch(18% 0.025 225 / 0.24);
+    @apply min-h-11 rounded-lg border px-5 py-2 text-sm font-semibold transition;
+    border-color: oklch(56% 0.09 214 / 0.42);
+    background: var(--mundia-teal-strong);
+    color: var(--mundia-paper);
+    box-shadow: 0 10px 24px oklch(18% 0.025 225 / 0.1);
   }
 
   .catalog-header,
   .catalog-panel,
   .catalog-toolbar {
-    @apply rounded-[1.5rem] border border-white/10;
-    background:
-      linear-gradient(
-        135deg,
-        oklch(78% 0.105 88 / 0.06) 0 1px,
-        transparent 1px 100px
-      ),
-      linear-gradient(
-        155deg,
-        oklch(23% 0.035 220 / 0.82),
-        oklch(16% 0.025 225 / 0.72)
-      );
-    box-shadow:
-      0 20px 52px oklch(10% 0.02 225 / 0.24),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.06);
+    @apply rounded-xl border;
+    border-color: oklch(76% 0.035 218 / 0.5);
+    background: oklch(98% 0.006 218 / 0.96);
+    box-shadow: 0 12px 30px oklch(18% 0.025 225 / 0.07);
   }
 
   .catalog-field {
-    @apply h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-xs text-light-100 outline-none transition focus:border-primary focus:ring-1 focus:ring-primary sm:text-sm;
+    @apply h-11 w-full rounded-lg border px-3 text-xs outline-none transition focus:ring-2 sm:text-sm;
+    border-color: oklch(76% 0.035 218 / 0.6);
+    background: oklch(99% 0.004 218);
+    color: var(--mundia-ink);
+    --tw-ring-color: oklch(72% 0.08 212 / 0.22);
   }
 
   .catalog-field option {
-    background: var(--mundia-ink-strong);
-    color: var(--mundia-text);
+    background: var(--mundia-paper);
+    color: var(--mundia-ink);
   }
 
   .catalog-action {
-    @apply h-11 rounded-xl border border-white/10 text-dark-100 transition hover:opacity-95;
-    background: linear-gradient(
-      135deg,
-      var(--mundia-gold) 0%,
-      var(--mundia-teal) 100%
-    );
+    @apply h-11 rounded-lg border text-sm font-semibold transition hover:opacity-95;
+    border-color: oklch(56% 0.09 214 / 0.42);
+    background: var(--mundia-teal-strong);
+    color: var(--mundia-paper);
   }
 
   /* Book Overview */
   .book-overview {
-    @apply relative flex w-full max-w-full flex-col-reverse gap-8 overflow-hidden rounded-[2rem] border border-white/10 p-5 sm:gap-10 sm:p-8 xl:flex-row xl:items-start xl:gap-12 xl:p-10;
-    background:
-      linear-gradient(
-        115deg,
-        oklch(78% 0.105 88 / 0.08) 0 1px,
-        transparent 1px 120px
-      ),
-      linear-gradient(
-        145deg,
-        oklch(23% 0.035 220 / 0.94) 0%,
-        oklch(16% 0.025 225 / 0.88) 100%
-      );
-    box-shadow:
-      0 28px 70px oklch(10% 0.02 225 / 0.5),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.08);
+    @apply relative flex w-full max-w-full flex-col-reverse gap-8 overflow-hidden rounded-xl border p-5 sm:gap-10 sm:p-8 xl:flex-row xl:items-start xl:gap-12 xl:p-10;
+    border-color: oklch(76% 0.035 218 / 0.52);
+    background: oklch(98% 0.006 218 / 0.96);
+    box-shadow: 0 18px 44px oklch(18% 0.025 225 / 0.08);
   }
 
   .book-overview h1 {
-    @apply text-4xl font-semibold sm:text-6xl;
+    @apply text-3xl font-semibold tracking-tight sm:text-5xl;
     @apply break-words;
-    font-family: var(--bebas-neue), "IBM Plex Sans", sans-serif;
-    letter-spacing: 0.05em;
-    line-height: 0.96;
-    color: var(--mundia-text);
-    text-shadow: 0 14px 34px oklch(10% 0.02 225 / 0.28);
+    line-height: 1.03;
+    color: var(--mundia-ink);
   }
 
   .book-info {
-    @apply flex flex-row flex-wrap gap-2 text-sm text-light-100/85 sm:gap-3 sm:text-base;
+    @apply flex flex-row flex-wrap gap-2 text-sm sm:gap-3 sm:text-base;
     @apply w-full max-w-full;
+    color: oklch(40% 0.026 225);
   }
 
   .book-copies {
@@ -458,7 +403,8 @@
   }
 
   .book-copies p {
-    @apply text-xl text-light-100;
+    @apply text-xl;
+    color: var(--mundia-ink);
   }
 
   .book-copies p span {
@@ -466,18 +412,16 @@
   }
 
   .book-description {
-    @apply text-pretty text-base leading-relaxed text-light-100/90 sm:text-lg;
+    @apply text-pretty text-base leading-relaxed sm:text-lg;
     @apply break-words;
+    color: oklch(34% 0.026 225);
   }
 
   .book-overview_btn {
-    @apply mt-4 min-h-12 w-fit rounded-xl text-dark-100 hover:opacity-95 max-md:w-full !important;
-    background: linear-gradient(
-      135deg,
-      var(--mundia-gold) 0%,
-      var(--mundia-teal) 100%
-    );
-    box-shadow: 0 14px 34px oklch(78% 0.105 88 / 0.16);
+    @apply mt-4 min-h-12 w-fit rounded-lg hover:opacity-95 max-md:w-full !important;
+    background: var(--mundia-teal-strong);
+    color: var(--mundia-paper);
+    box-shadow: 0 12px 24px oklch(44% 0.06 214 / 0.18);
   }
 
   /* File Upload */
@@ -616,6 +560,8 @@
   /* Auth */
   .auth-container {
     @apply relative grid min-h-screen overflow-hidden text-light-100 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)];
+    --surface-card: oklch(23% 0.035 220 / 0.84);
+    --surface-card-strong: oklch(23% 0.035 220 / 0.96);
     background:
       linear-gradient(
         112deg,
@@ -628,6 +574,17 @@
         var(--mundia-ink) 44%,
         var(--mundia-ink-strong) 100%
       );
+  }
+
+  .auth-container .form-input {
+    border-color: oklch(97% 0.008 218 / 0.16);
+    background: oklch(29% 0.04 218 / 0.42);
+    color: oklch(97% 0.008 218);
+    box-shadow: inset 0 1px 0 oklch(97% 0.008 218 / 0.08);
+  }
+
+  .auth-container .form-input::placeholder {
+    color: oklch(90% 0.01 218 / 0.58);
   }
 
   .auth-noise {
@@ -834,8 +791,9 @@
 
   /* Book Details */
   .book-details {
-    @apply mt-8 flex w-full max-w-full flex-col gap-8 overflow-hidden rounded-[1.5rem] border border-white/10 p-5 sm:mt-10 sm:gap-10 sm:p-8 lg:flex-row lg:gap-14;
-    background: oklch(18% 0.028 225 / 0.68);
+    @apply mt-8 flex w-full max-w-full flex-col gap-8 overflow-hidden rounded-xl border p-5 sm:mt-10 sm:gap-10 sm:p-8 lg:flex-row lg:gap-14;
+    border-color: oklch(76% 0.035 218 / 0.48);
+    background: oklch(98% 0.006 218 / 0.9);
     @apply w-full max-w-full overflow-hidden;
   }
 
@@ -849,62 +807,50 @@
   }
 
   .library-subtitle {
-    @apply text-xs font-semibold uppercase tracking-[0.3em] text-light-200/80 sm:text-sm;
+    @apply text-xs font-semibold uppercase tracking-[0.12em] sm:text-sm;
+    color: var(--mundia-teal-strong);
   }
 
   .library-title {
-    @apply mt-3 text-4xl font-semibold text-white xs:text-5xl sm:text-6xl;
-    font-family: var(--bebas-neue), "IBM Plex Sans", sans-serif;
-    letter-spacing: 0.06em;
+    @apply mt-3 text-4xl font-semibold tracking-tight xs:text-5xl sm:text-6xl;
+    color: var(--mundia-ink);
   }
 
   .library-hero {
-    @apply relative overflow-hidden rounded-[2.25rem] border border-white/10 p-4 shadow-2xl sm:p-5 lg:p-6;
-    background:
-      linear-gradient(
-        115deg,
-        oklch(97% 0.008 218 / 0.06) 0 1px,
-        transparent 1px 118px
-      ),
-      linear-gradient(
-        135deg,
-        oklch(28% 0.055 218 / 0.96),
-        oklch(16% 0.025 225 / 0.92)
-      );
-    box-shadow:
-      0 34px 90px oklch(10% 0.02 225 / 0.52),
-      inset 0 1px 0 oklch(97% 0.008 218 / 0.09);
+    @apply relative overflow-hidden rounded-xl border p-4 sm:p-5 lg:p-6;
+    border-color: oklch(76% 0.035 218 / 0.52);
+    background: oklch(98% 0.006 218 / 0.95);
+    box-shadow: 0 18px 44px oklch(18% 0.025 225 / 0.08);
   }
 
   .library-hero::before {
     content: "";
     @apply pointer-events-none absolute inset-0;
     background: linear-gradient(
-      120deg,
-      oklch(78% 0.105 88 / 0.16),
-      transparent 22%,
-      oklch(72% 0.08 212 / 0.1) 64%,
-      transparent 100%
+      90deg,
+      oklch(56% 0.09 214 / 0.055),
+      transparent 44%
     );
   }
 
   .library-hero-grid {
-    @apply relative z-10 grid min-h-[28rem] gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)] lg:items-stretch;
+    @apply relative z-10 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)] lg:items-stretch;
   }
 
   .library-hero-panel {
-    @apply flex min-w-0 flex-col justify-between rounded-[1.65rem] border border-white/10 p-5 sm:p-7 lg:p-8;
-    background: oklch(16% 0.025 225 / 0.56);
+    @apply flex min-w-0 flex-col justify-between rounded-lg border p-5 sm:p-7 lg:p-8;
+    border-color: oklch(76% 0.035 218 / 0.42);
+    background: oklch(97% 0.008 218 / 0.72);
   }
 
   .library-hero-title {
-    @apply mt-3 max-w-4xl break-words font-bebas-neue text-5xl leading-none text-white sm:text-7xl lg:text-7xl xl:text-8xl;
-    letter-spacing: 0.06em;
-    text-shadow: 0 18px 42px oklch(10% 0.02 225 / 0.32);
+    @apply mt-3 max-w-4xl break-words text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl;
+    color: var(--mundia-ink);
   }
 
   .library-hero-copy {
-    @apply mt-4 max-w-2xl text-base leading-7 text-light-100/80 sm:text-lg;
+    @apply mt-4 max-w-2xl text-base leading-7 sm:text-lg;
+    color: oklch(40% 0.026 225);
   }
 
   .library-hero-actions {
@@ -912,7 +858,10 @@
   }
 
   .library-hero-link {
-    @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-white/10 px-5 text-sm font-semibold text-light-100 transition hover:border-primary hover:bg-white/10 hover:text-white;
+    @apply inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-semibold transition;
+    border-color: oklch(76% 0.035 218 / 0.62);
+    color: var(--mundia-ink);
+    background: oklch(98% 0.006 218);
   }
 
   .library-hero-stats {
@@ -920,27 +869,30 @@
   }
 
   .library-stat {
-    @apply rounded-2xl border border-white/10 bg-white/5 p-4;
-    box-shadow: inset 0 1px 0 oklch(97% 0.008 218 / 0.06);
+    @apply rounded-lg border p-4;
+    border-color: oklch(76% 0.035 218 / 0.5);
+    background: oklch(99% 0.004 218);
   }
 
   .library-stat-label {
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-light-200/70;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em];
+    color: oklch(42% 0.026 225);
   }
 
   .library-stat-value {
-    @apply mt-2 font-bebas-neue text-4xl leading-none text-white;
-    letter-spacing: 0.04em;
+    @apply mt-2 text-3xl font-semibold leading-none;
+    color: var(--mundia-ink);
   }
 
   .library-hero-aside {
-    @apply flex min-w-0 flex-col justify-between rounded-[1.65rem] border border-white/10 p-5 sm:p-6;
-    background: oklch(94% 0.012 218 / 0.08);
+    @apply flex min-w-0 flex-col justify-between rounded-lg border p-5 sm:p-6;
+    border-color: oklch(76% 0.035 218 / 0.5);
+    background: oklch(95% 0.018 92 / 0.62);
   }
 
   .library-featured-label {
-    @apply text-xs font-semibold uppercase tracking-[0.24em];
-    color: var(--mundia-gold);
+    @apply text-xs font-semibold uppercase tracking-[0.1em];
+    color: var(--mundia-gold-strong);
   }
 
   .library-featured-list {
@@ -948,21 +900,26 @@
   }
 
   .library-featured-item {
-    @apply flex min-h-24 items-center justify-between gap-4 rounded-2xl border border-white/10 p-4 transition hover:border-primary hover:bg-white/10;
-    background: oklch(16% 0.025 225 / 0.42);
-    box-shadow: inset 0 1px 0 oklch(97% 0.008 218 / 0.05);
+    @apply flex min-h-24 items-center justify-between gap-4 rounded-lg border p-4 transition hover:border-primary;
+    border-color: oklch(76% 0.035 218 / 0.48);
+    background: oklch(98% 0.006 218 / 0.78);
   }
 
   .library-featured-title {
-    @apply line-clamp-2 text-base font-semibold leading-snug text-white;
+    @apply line-clamp-2 text-base font-semibold leading-snug;
+    color: var(--mundia-ink);
   }
 
   .library-featured-author {
-    @apply mt-1 line-clamp-1 text-sm text-light-100/70;
+    @apply mt-1 line-clamp-1 text-sm;
+    color: oklch(42% 0.026 225);
   }
 
   .library-featured-rating {
-    @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-sm font-semibold text-light-100;
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-sm font-semibold;
+    border-color: oklch(78% 0.105 88 / 0.38);
+    background: oklch(94% 0.055 80);
+    color: var(--mundia-gold-strong);
   }
 
   .fade-in-up {
@@ -983,24 +940,24 @@
 
 @layer base {
   :root {
-    --background: var(--mundia-ink);
-    --foreground: var(--mundia-text);
-    --card: oklch(23% 0.035 220 / 0.84);
-    --card-foreground: var(--mundia-text);
-    --popover: oklch(23% 0.035 220 / 0.96);
-    --popover-foreground: var(--mundia-text);
-    --primary: var(--mundia-teal);
-    --primary-foreground: var(--mundia-ink-strong);
-    --secondary: oklch(37% 0.05 218);
-    --secondary-foreground: var(--mundia-text);
-    --muted: oklch(31% 0.045 218);
+    --background: var(--surface-0);
+    --foreground: var(--mundia-ink);
+    --card: oklch(98% 0.006 218);
+    --card-foreground: var(--mundia-ink);
+    --popover: oklch(98% 0.006 218);
+    --popover-foreground: var(--mundia-ink);
+    --primary: var(--mundia-teal-strong);
+    --primary-foreground: var(--mundia-paper);
+    --secondary: oklch(93% 0.014 218);
+    --secondary-foreground: var(--mundia-ink);
+    --muted: oklch(94% 0.012 218);
     --muted-foreground: var(--mundia-muted);
-    --accent: oklch(40% 0.055 218);
-    --accent-foreground: var(--mundia-text);
+    --accent: oklch(92% 0.028 212);
+    --accent-foreground: var(--mundia-ink);
     --destructive: var(--mundia-danger);
     --destructive-foreground: var(--mundia-paper);
     --border: var(--mundia-line);
-    --input: oklch(72% 0.08 212 / 0.32);
+    --input: oklch(76% 0.035 218 / 0.62);
     --ring: var(--mundia-focus);
     --chart-1: var(--mundia-teal-strong);
     --chart-2: var(--mundia-success);

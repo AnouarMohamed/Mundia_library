@@ -55,17 +55,17 @@ const Page = async () => {
   } catch (error) {
     console.error("Failed to fetch books for /library:", error);
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
-        <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+      <section className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Library
         </h1>
-        <p className="mt-3 text-sm text-light-200/80 sm:text-base">
+        <p className="mt-3 text-sm text-slate-600 sm:text-base">
           We could not reach the database right now. Please retry in a moment.
         </p>
         <div className="mt-4">
           <Button
             asChild
-            className="min-h-12 rounded-xl border border-primary/50 bg-primary px-6 text-dark-100 hover:bg-primary/95"
+            className="min-h-12 rounded-lg bg-[var(--mundia-teal-strong)] px-6 text-white hover:opacity-95"
           >
             <Link href="/all-books">Try All Books</Link>
           </Button>
@@ -76,11 +76,11 @@ const Page = async () => {
 
   if (topBooks.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-[var(--surface-card)] p-6 text-center sm:p-8">
-        <h1 className="font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+      <section className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card)] p-6 text-center sm:p-8">
+        <h1 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Library
         </h1>
-        <p className="mt-3 text-sm text-light-200/80 sm:text-base">
+        <p className="mt-3 text-sm text-slate-600 sm:text-base">
           No books are currently available in the catalog.
         </p>
       </section>
@@ -165,7 +165,7 @@ const Page = async () => {
             <div className="library-hero-actions">
               <Button
                 asChild
-                className="min-h-12 rounded-xl border border-primary/50 bg-primary px-6 text-dark-100 hover:bg-primary/95"
+                className="min-h-12 rounded-lg bg-[var(--mundia-teal-strong)] px-6 text-white hover:opacity-95"
               >
                 <Link href="/all-books">Browse All Books</Link>
               </Button>

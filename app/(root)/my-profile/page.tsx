@@ -125,13 +125,13 @@ const Page = async () => {
   return (
     <section className="space-y-6">
       <div className="catalog-header p-5 sm:p-7">
-        <p className="text-[11px] uppercase tracking-[0.24em] text-light-200/70 sm:text-xs">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)] sm:text-xs">
           Account
         </p>
-        <h1 className="mt-2 font-bebas-neue text-4xl tracking-[0.08em] text-light-100 sm:text-5xl">
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           My Profile
         </h1>
-        <p className="mt-2 text-sm text-light-200/80 sm:text-base">
+        <p className="mt-2 text-sm text-slate-600 sm:text-base">
           {currentUser.fullName} ({currentUser.email})
         </p>
       </div>

@@ -62,12 +62,10 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="flex items-center gap-1.5 border-white/15 bg-white/5 text-light-200/50 sm:gap-2"
+        className="flex items-center gap-1.5 border-[var(--mundia-line)] bg-[var(--surface-0)] text-slate-500 sm:gap-2"
       >
-        <MessageCircle className="size-4 text-light-200/50 sm:size-5" />
-        <span className="text-sm font-semibold text-light-200/50">
-          Loading...
-        </span>
+        <MessageCircle className="size-4 text-slate-500 sm:size-5" />
+        <span className="text-sm font-semibold text-slate-500">Loading...</span>
       </Button>
     );
   }
@@ -76,10 +74,10 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
-        <span className="text-sm font-semibold text-dark-100">
+        <MessageCircle className="size-4 text-white sm:size-5" />
+        <span className="text-sm font-semibold text-white">
           Review submitted
         </span>
       </Button>
@@ -90,10 +88,10 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
-        <span className="text-sm font-semibold text-dark-100">
+        <MessageCircle className="size-4 text-white sm:size-5" />
+        <span className="text-sm font-semibold text-white">
           {isCurrentlyBorrowed
             ? "Return borrowed book to review"
             : "Borrow Book to Review"}
@@ -106,10 +104,10 @@ export default function ReviewButton({
     <>
       <Button
         onClick={() => setShowDialog(true)}
-        className="mt-3 min-h-12 w-full bg-primary text-dark-100 hover:bg-primary/90 sm:mt-4 sm:w-fit"
+        className="mt-3 min-h-12 w-full bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:mt-4 sm:w-fit"
       >
-        <MessageCircle className="size-4 text-dark-100 sm:size-5" />
-        <span className="text-sm font-semibold text-dark-100">
+        <MessageCircle className="size-4 text-white sm:size-5" />
+        <span className="text-sm font-semibold text-white">
           Review this book
         </span>
       </Button>

@@ -34,17 +34,15 @@ const Sidebar = ({ session }: { session: Session }) => {
 
             return (
               <Link href={link.route} key={link.route}>
-                <div
-                  className={cn(
-                    "link",
-                    isSelected && "bg-primary shadow-sm"
-                  )}
-                >
+                <div className={cn("link", isSelected && "is-active")}>
                   <div className="relative size-4 sm:size-5">
                     <img
                       src={link.img}
                       alt="icon"
-                      className={`${isSelected ? "brightness-0 invert" : ""}  object-contain`}
+                      className={cn(
+                        "object-contain opacity-75",
+                        isSelected && "opacity-100",
+                      )}
                       style={{ width: "100%", height: "100%" }} // Assuming fill means it should take full size
                     />
                   </div>
@@ -52,7 +50,9 @@ const Sidebar = ({ session }: { session: Session }) => {
                   <p
                     className={cn(
                       "hidden sm:block",
-                      isSelected ? "text-white" : "text-slate-700"
+                      isSelected
+                        ? "text-[var(--mundia-teal-strong)]"
+                        : "text-slate-700",
                     )}
                   >
                     {link.text}
