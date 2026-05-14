@@ -1,25 +1,27 @@
 import { z } from "zod";
 
 /**
- * Application configuration schema.
- * Validates environment variables at runtime.
+ * Application configuration schema using Zod for runtime validation.
+ * This ensures that the application fails fast if critical environment
+ * variables are missing or misconfigured.
  */
 const envSchema = z.object({
-  // API Endpoints
+  /** Base URL for the API (used in client-side requests). */
   apiEndpoint: z.string().url().default("http://localhost:3000"),
+  /** Production-grade API endpoint (often the same as apiEndpoint). */
   prodApiEndpoint: z.string().url().default("http://localhost:3000"),
   
-  // ImageKit
+  /** ImageKit configuration for image hosting and optimization. */
   imagekit: z.object({
     publicKey: z.string().default(""),
     urlEndpoint: z.union([z.string().url(), z.literal("")]).default(""),
     privateKey: z.string().default(""),
   }),
   
-  // Database
+  /** Primary database connection string (PostgreSQL). */
   databaseUrl: z.string().default(""),
   
-  // Upstash (Redis + QStash)
+  /** Upstash services for caching (Redis) and background task orchestration (QStash). */
   upstash: z.object({
     redisUrl: z.union([z.string().url(), z.literal("")]).default(""),
     redisToken: z.string().default(""),
@@ -27,21 +29,27 @@ const envSchema = z.object({
     qstashToken: z.string().default(""),
   }),
   
-  // Email (Brevo)
+  /** Brevo (formerly Sendinblue) configuration for transactional emails. */
   brevo: z.object({
     apiKey: z.string().default(""),
     senderEmail: z.string().email("Brevo Sender Email must be a valid email").default("noreply@example.com"),
     senderName: z.string().default("Mundiapolis Library"),
   }),
   
-  // Email (Resend)
+  /** Resend configuration used as a fallback or secondary email provider. */
   resendToken: z.string().default(""),
 
-  // Feature Flags
+  /** 
+   * Global toggle for background workflows (onboarding, reminders). 
+   * Useful for disabling automation in restricted local environments.
+   */
   enableWorkflows: z.string().default("false").transform((v) => v === "true"),
 });
 
-// Map process.env to the schema structure
+/**
+ * Maps environment variables to the structured schema.
+ * Note: Only variables prefixed with NEXT_PUBLIC_ are accessible in the browser.
+ */
 const envData = {
   apiEndpoint: process.env.NEXT_PUBLIC_API_ENDPOINT,
   prodApiEndpoint: process.env.NEXT_PUBLIC_PROD_API_ENDPOINT,
@@ -66,6 +74,10 @@ const envData = {
   enableWorkflows: process.env.ENABLE_WORKFLOWS,
 };
 
+/**
+ * Recursively removes undefined values from an object to prevent Zod validation
+ * from failing on missing optional fields that have defaults.
+ */
 const scrubUndefined = <T extends Record<string, unknown>>(value: T): T => {
   for (const key of Object.keys(value)) {
     const item = value[key];
@@ -98,7 +110,8 @@ if (!parsedEnv.success) {
 }
 
 /**
- * Normalized config with validated env values.
+ * Exported application configuration.
+ * Provides type-safe access to environment variables.
  */
 const config = {
   env: parsedEnv.success
