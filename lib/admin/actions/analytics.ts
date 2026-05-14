@@ -1,10 +1,21 @@
+/**
+ * Administrative Analytics Server Actions
+ * 
+ * This file provides data aggregation and analysis functions for the admin dashboard.
+ * It uses complex SQL fragments and joins to provide high-level insights into 
+ * library usage, inventory performance, and student behavior.
+ */
+
 import { db } from "@/database/drizzle";
 import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
 
-// Get borrowing trends over time (last 30 days)
 /**
- * Fetch borrowing trends over the last 30 days.
+ * Calculates borrowing and return trends over the last 30 days.
+ * 
+ * Use Case: Powering the "Borrowing Trends" line chart in the dashboard.
+ * 
+ * @returns Array of daily aggregates (date, borrow count, return count).
  */
 export async function getBorrowingTrends() {
   const thirtyDaysAgo = new Date();
@@ -12,8 +23,11 @@ export async function getBorrowingTrends() {
 
   const trends = await db
     .select({
+      /** Formatted date (YYYY-MM-DD). */
       date: sql<string>`DATE(${borrowRecords.createdAt})`,
+      /** Total borrow requests created on this day. */
       borrows: count(),
+      /** Number of books returned on this day. */
       returns: sql<number>`count(case when ${borrowRecords.status} = 'RETURNED' then 1 end)`,
     })
     .from(borrowRecords)
@@ -24,9 +38,11 @@ export async function getBorrowingTrends() {
   return trends;
 }
 
-// Get most popular books/genres
 /**
- * Fetch most borrowed books.
+ * Identifies the most frequently borrowed books.
+ * 
+ * @param limit - Maximum number of books to return (default: 10).
+ * @returns Array of books with lifetime and active borrow counts.
  */
 export async function getPopularBooks(limit = 10) {
   const popularBooks = await db
@@ -35,8 +51,11 @@ export async function getPopularBooks(limit = 10) {
       bookTitle: books.title,
       bookAuthor: books.author,
       bookGenre: books.genre,
+      /** Lifetime borrow count. */
       totalBorrows: count(),
+      /** Number of copies currently out with students. */
       activeBorrows: sql<number>`count(case when ${borrowRecords.status} = 'BORROWED' then 1 end)`,
+      /** Total number of successful returns. */
       returnedBorrows: sql<number>`count(case when ${borrowRecords.status} = 'RETURNED' then 1 end)`,
     })
     .from(borrowRecords)
@@ -49,13 +68,17 @@ export async function getPopularBooks(limit = 10) {
 }
 
 /**
- * Fetch most borrowed genres.
+ * Aggregates borrow counts by genre to identify high-interest categories.
+ * 
+ * @returns Top 10 genres by borrow volume.
  */
 export async function getPopularGenres() {
   const popularGenres = await db
     .select({
       genre: books.genre,
+      /** Total borrows across all books in this genre. */
       totalBorrows: count(),
+      /** Number of distinct book titles borrowed in this genre. */
       uniqueBooks: sql<number>`count(distinct ${borrowRecords.bookId})`,
     })
     .from(borrowRecords)
@@ -67,9 +90,10 @@ export async function getPopularGenres() {
   return popularGenres;
 }
 
-// Get user activity patterns
 /**
- * Fetch user activity aggregates.
+ * Analyzes student interaction patterns with the library.
+ * 
+ * @returns Top 20 most active students by borrow volume.
  */
 export async function getUserActivityPatterns() {
   const userActivity = await db
@@ -81,6 +105,7 @@ export async function getUserActivityPatterns() {
       activeBorrows: sql<number>`count(case when ${borrowRecords.status} = 'BORROWED' then 1 end)`,
       returnedBorrows: sql<number>`count(case when ${borrowRecords.status} = 'RETURNED' then 1 end)`,
       pendingBorrows: sql<number>`count(case when ${borrowRecords.status} = 'PENDING' then 1 end)`,
+      /** Most recent interaction timestamp. */
       lastActivity: sql<Date>`max(${borrowRecords.createdAt})`,
     })
     .from(borrowRecords)
@@ -92,14 +117,18 @@ export async function getUserActivityPatterns() {
   return userActivity;
 }
 
-// Get overdue book analysis
 /**
- * Fetch overdue analysis details.
+ * Provides a granular view of all currently overdue books.
+ * 
+ * Logic:
+ * - Joins users and books to provide contact and catalog info.
+ * - Calculates `daysOverdue` and `fineAmount` on-the-fly for real-time accuracy.
+ * 
+ * @returns Detailed list of overdue records.
  */
 export async function getOverdueAnalysis() {
   const now = new Date();
 
-  // Get current daily fine amount from system config
   const { getDailyFineAmount } = await import("./config");
   const dailyFineAmount = await getDailyFineAmount();
 
@@ -112,11 +141,13 @@ export async function getOverdueAnalysis() {
       userEmail: users.email,
       borrowDate: borrowRecords.borrowDate,
       dueDate: borrowRecords.dueDate,
+      /** Difference between today and due date in days. */
       daysOverdue: sql<number>`CASE 
         WHEN ${borrowRecords.dueDate} IS NOT NULL 
         THEN (CAST(${now} AS date) - ${borrowRecords.dueDate})
         ELSE 0 
       END`,
+      /** Projected fine if book was returned today. */
       fineAmount: sql<string>`CASE 
         WHEN ${borrowRecords.dueDate} IS NOT NULL AND ${borrowRecords.dueDate} < ${now}
         THEN CAST(((CAST(${now} AS date) - ${borrowRecords.dueDate}) * ${dailyFineAmount}) AS text)
@@ -137,21 +168,24 @@ export async function getOverdueAnalysis() {
   return overdueBooks;
 }
 
-// Get overdue statistics
 /**
- * Fetch aggregate overdue statistics.
+ * Calculates high-level overdue KPIs for the dashboard cards.
+ * 
+ * @returns Aggregate counts and sums for overdue loans.
  */
 export async function getOverdueStats() {
   const now = new Date();
 
-  // Get current daily fine amount from system config
   const { getDailyFineAmount } = await import("./config");
   const dailyFineAmount = await getDailyFineAmount();
 
   const stats = await db
     .select({
+      /** Total count of active, overdue loans. */
       totalOverdue: sql<number>`count(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then 1 end)`,
+      /** Total projected revenue from active overdue fines. */
       totalFines: sql<number>`COALESCE(sum(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then ((CAST(${now} AS date) - ${borrowRecords.dueDate}) * ${dailyFineAmount}) end), 0)`,
+      /** Average delay (in days) across all overdue loans. */
       avgDaysOverdue: sql<number>`COALESCE(AVG(case when ${borrowRecords.dueDate} < ${now} and ${borrowRecords.status} = 'BORROWED' then (CAST(${now} AS date) - ${borrowRecords.dueDate}) end), 0)`,
     })
     .from(borrowRecords);
@@ -163,16 +197,18 @@ export async function getOverdueStats() {
   };
 }
 
-// Get monthly borrowing statistics
 /**
- * Fetch current vs last month borrow stats.
+ * Compares borrowing volume between the current and previous month.
+ * 
+ * Used for "Month-over-Month" growth indicators.
+ * 
+ * @returns Object with current and last month stats.
  */
 export async function getMonthlyStats() {
   const currentMonth = new Date();
   const lastMonth = new Date();
   lastMonth.setMonth(lastMonth.getMonth() - 1);
 
-  // Construct month strings in JavaScript
   const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, "0")}`;
   const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}`;
 
@@ -204,12 +240,14 @@ export async function getMonthlyStats() {
     .where(
       and(
         gte(
-          borrowRecords.createdAt,
-          new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1)
+          lastMonth.getFullYear(),
+          lastMonth.getMonth(),
+          1
         ),
         lt(
-          borrowRecords.createdAt,
-          new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 1)
+          lastMonth.getFullYear(),
+          lastMonth.getMonth() + 1,
+          1
         )
       )
     );
@@ -220,15 +258,15 @@ export async function getMonthlyStats() {
   };
 }
 
-// Get system health metrics
 /**
- * Fetch system health metrics.
+ * Provides basic system-wide counters for inventory and user base.
+ * 
+ * @returns Snapshot of total counts (books, users, active loans, etc.).
  */
 export async function getSystemHealth() {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  // Get individual metrics
   const [
     totalBooksResult,
     totalUsersResult,
@@ -273,9 +311,11 @@ export async function getSystemHealth() {
 }
 
 /**
- * Get genre performance broken down by month.
+ * Tracks genre popularity trends over a 6-month period.
  * 
- * Returns the top genres for each of the last 6 months.
+ * Use Case: Powering the "Genre Performance" multi-line chart.
+ * 
+ * @returns Grouped counts by month and genre.
  */
 export async function getGenrePerformanceByMonth() {
   const sixMonthsAgo = new Date();
