@@ -5,12 +5,26 @@ import { cn } from "@/lib/utils";
 // import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Properties for the BookCard component.
+ * Extends the base Book type and adds UI-specific flags.
+ */
 interface BookCardProps extends Book {
+  /** 
+   * If true, renders additional information relevant to a borrowed book 
+   * (e.g., return countdown, receipt download). 
+   */
   isLoanedBook?: boolean;
 }
 
 /**
- * Compact book card with optional loaned state.
+ * A compact, visually rich card representing a book in the library.
+ * 
+ * Features:
+ * - Displays book cover using the `BookCover` component.
+ * - Shows genre, rating, title, and author.
+ * - Conditionally displays availability stats if provided.
+ * - Supports an "isLoanedBook" mode for the student's personal profile view.
  */
 const BookCard = ({
   id,
@@ -24,8 +38,11 @@ const BookCard = ({
   coverUrl,
   isLoanedBook = false,
 }: BookCardProps) => {
+  // Safe formatting for the star rating
   const formattedRating =
     typeof rating === "number" ? rating.toFixed(1) : String(rating ?? "N/A");
+  
+  // Logic to determine if inventory details should be shown
   const hasCopyData =
     typeof availableCopies === "number" && typeof totalCopies === "number";
 
@@ -38,10 +55,12 @@ const BookCard = ({
           isLoanedBook && "flex w-full flex-col items-center",
         )}
       >
+        {/* Visual Cover Section */}
         <div className="book-card-cover">
           <BookCover coverColor={coverColor} coverImage={coverUrl} />
         </div>
 
+        {/* Metadata Section */}
         <div
           className={cn(
             "mt-3 sm:mt-4",
@@ -69,6 +88,8 @@ const BookCard = ({
           <p className="mt-1.5 line-clamp-1 text-xs text-light-100/70 sm:text-sm">
             {author}
           </p>
+          
+          {/* Inventory Stats (Hidden on loaned books to save space) */}
           {hasCopyData && (
             <p className="book-card-copy mt-3">
               {availableCopies} of {totalCopies} available
@@ -76,6 +97,7 @@ const BookCard = ({
           )}
         </div>
 
+        {/* Loaned Book Specific Actions */}
         {isLoanedBook && (
           <div className="mt-2.5 w-full sm:mt-3">
             <div className="book-loaned rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
