@@ -94,7 +94,6 @@ const chartGrid = "var(--mundia-line)";
 const chartAxis = "var(--mundia-ink)";
 const chartBorrow = "var(--mundia-teal-strong)";
 const chartReturn = "var(--mundia-success)";
-const chartGold = "var(--mundia-gold)";
 const chartTooltipStyle = {
   borderRadius: "0.75rem",
   border: "1px solid var(--mundia-line)",
