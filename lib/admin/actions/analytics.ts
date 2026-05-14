@@ -240,14 +240,12 @@ export async function getMonthlyStats() {
     .where(
       and(
         gte(
-          lastMonth.getFullYear(),
-          lastMonth.getMonth(),
-          1
+          borrowRecords.createdAt,
+          new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1)
         ),
         lt(
-          lastMonth.getFullYear(),
-          lastMonth.getMonth() + 1,
-          1
+          borrowRecords.createdAt,
+          new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 1)
         )
       )
     );
