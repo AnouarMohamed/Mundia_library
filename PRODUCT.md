@@ -20,7 +20,7 @@ A student checks book availability between classes on a phone in a bright campus
 
 - Scholarly, precise, modern, and institutional.
 - Confident but not grandiose.
-- Warm Mundiapolis character through restrained teal and gold accents.
+- Warm Mundiapolis character through restrained navy and gold accents.
 - Copy should be direct, helpful, and task-focused.
 
 ## Strategic Principles

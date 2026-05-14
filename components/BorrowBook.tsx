@@ -70,7 +70,7 @@ const BorrowBook = ({
 
   return (
     <Button
-      className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:w-fit"
+      className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
       onClick={handleBorrowBook}
       disabled={borrowBookMutation.isPending || !isEligible}
     >

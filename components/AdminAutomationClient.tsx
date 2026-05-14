@@ -60,10 +60,10 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
   const refreshCacheMutation = useRefreshRecommendationCache();
 
   const [fineAmountInput, setFineAmountInput] = React.useState<string>(
-    (initialFineConfig?.fineAmount ?? 1).toFixed(2)
+    (initialFineConfig?.fineAmount ?? 1).toFixed(2),
   );
   const [exportingType, setExportingType] = React.useState<ExportKind | null>(
-    null
+    null,
   );
 
   React.useEffect(() => {
@@ -91,7 +91,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
     if (!Number.isFinite(parsedFineAmount) || parsedFineAmount < 0) {
       showToast.error(
         "Invalid Fine Amount",
-        "Please enter a valid number greater than or equal to 0."
+        "Please enter a valid number greater than or equal to 0.",
       );
       return;
     }
@@ -116,7 +116,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
 
       showToast.success(
         "Export Completed",
-        `${type.charAt(0).toUpperCase() + type.slice(1)} export downloaded.`
+        `${type.charAt(0).toUpperCase() + type.slice(1)} export downloaded.`,
       );
     } catch (error) {
       const message =
@@ -139,7 +139,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
 
   return (
     <section className="space-y-5 sm:space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 sm:p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         <h1 className="text-xl font-semibold text-slate-800 sm:text-2xl">
           Automation
         </h1>
@@ -203,8 +203,8 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
               onSubmit={handleFineConfigSubmit}
             >
               <div className="w-full space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Daily Fine Amount (USD)
+                <p className="text-xs font-medium text-slate-500">
+                  Daily fine amount (USD)
                 </p>
                 <Input
                   type="number"

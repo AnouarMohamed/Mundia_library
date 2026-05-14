@@ -19,6 +19,12 @@ interface AdminRenewalRequestsListProps {
   initialRequests?: RenewalRequestWithDetails[];
 }
 
+const formatStatusLabel = (status: string): string =>
+  status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
   initialRequests,
 }) => {
@@ -40,7 +46,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
 
   if (isError) {
     return (
-      <div className="status-danger rounded-xl border p-4 text-center">
+      <div className="status-danger rounded-lg border p-4 text-center">
         Failed to load renewal requests.
       </div>
     );
@@ -53,14 +59,14 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
       </h2>
 
       {requests.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] py-8 text-center text-slate-500">
+        <div className="rounded-lg border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] py-8 text-center text-slate-500">
           No pending renewal requests found.
         </div>
       ) : (
         requests.map((request) => (
           <div
             key={request.id}
-            className="flex flex-col gap-4 rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-4 shadow-sm transition hover:border-[var(--mundia-teal)] sm:flex-row sm:items-center"
+            className="flex flex-col gap-4 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-4 transition hover:border-[var(--mundia-navy)] sm:flex-row sm:items-center"
           >
             <div className="flex-1">
               <div className="mb-1 flex items-center gap-2">
@@ -76,7 +82,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
                         : "status-danger"
                   }`}
                 >
-                  {request.status}
+                  {formatStatusLabel(request.status)}
                 </span>
               </div>
 
@@ -106,7 +112,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
               </div>
 
               {request.requestReason && (
-                <p className="mt-2 rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper-warm)] p-2 text-xs italic text-slate-600">
+                <p className="mt-2 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper-warm)] p-2 text-xs italic text-slate-600">
                   &quot;{request.requestReason}&quot;
                 </p>
               )}

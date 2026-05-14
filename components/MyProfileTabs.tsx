@@ -15,9 +15,10 @@
  */
 
 import React from "react";
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import BookCover from "@/components/BookCover";
 import CountdownTimer from "@/components/CountdownTimer";
 import BorrowSkeleton from "@/components/skeletons/BorrowSkeleton";
@@ -713,7 +714,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
 
       return (
         <Card
-          className={`mb-4 overflow-hidden rounded-xl border transition-colors duration-200 hover:border-[var(--mundia-teal-strong)] ${
+          className={`mb-4 overflow-hidden rounded-lg border transition-colors duration-200 hover:border-[var(--mundia-navy)] ${
             record.status === "PENDING"
               ? "border-[var(--mundia-gold)] bg-[var(--surface-card)]"
               : record.status === "BORROWED" && isOverdue
@@ -723,7 +724,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                     !isOverdue
                   ? "border-orange-200 bg-orange-50"
                   : record.status === "BORROWED"
-                    ? "border-[var(--mundia-teal)] bg-[var(--surface-card)]"
+                    ? "border-[var(--mundia-navy)] bg-[var(--surface-card)]"
                     : record.status === "RETURNED"
                       ? "border-emerald-200 bg-emerald-50"
                       : "border-[var(--mundia-line)] bg-[var(--surface-card)]"
@@ -780,7 +781,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                 {/* Compact Information */}
                 <div className="mb-3 flex flex-col gap-2 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 sm:text-sm">
                   <div className="flex items-center gap-1">
-                    <Calendar className="size-3 text-[var(--mundia-teal-strong)] sm:size-4" />
+                    <Calendar className="size-3 text-[var(--mundia-navy)] sm:size-4" />
                     <span className="font-medium text-[var(--mundia-ink)]">
                       Borrowed:
                     </span>
@@ -862,9 +863,9 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
                         }`}
                       >
                         {isOverdue
-                          ? `OVERDUE! ${daysOverdue} days late`
+                          ? `Overdue: ${daysOverdue} days late`
                           : daysRemaining <= 2
-                            ? `Due Soon! ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`
+                            ? `Due soon: ${daysRemaining} day${daysRemaining === 1 ? "" : "s"} left`
                             : `Due on ${formatDate(record.dueDate)}`}
                       </span>
                     </div>
@@ -1025,10 +1026,10 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
         className="w-full"
         suppressHydrationWarning
       >
-        <TabsList className="catalog-toolbar flex h-auto w-full flex-wrap gap-2 p-2 sm:grid sm:grid-cols-3">
+        <TabsList className="flex h-auto w-full flex-wrap gap-6 border-b border-[var(--mundia-line)] bg-transparent p-0">
           <TabsTrigger
             value="active"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-teal-strong)] data-[state=active]:bg-[var(--mundia-teal-strong)] data-[state=active]:text-white sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-sm text-[var(--mundia-muted)] shadow-none data-[state=active]:border-[var(--mundia-navy)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--mundia-navy)] data-[state=active]:shadow-none"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Active</span>
@@ -1042,7 +1043,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="pending"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-gold)] data-[state=active]:bg-[var(--mundia-gold)] data-[state=active]:text-[var(--mundia-ink)] sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-sm text-[var(--mundia-muted)] shadow-none data-[state=active]:border-[var(--mundia-navy)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--mundia-navy)] data-[state=active]:shadow-none"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Pending</span>
@@ -1056,7 +1057,7 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
           </TabsTrigger>
           <TabsTrigger
             value="history"
-            className="min-w-[calc(33.333%-0.5rem)] flex-1 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 text-center text-xs text-[var(--mundia-ink)] data-[state=active]:border-[var(--mundia-burgundy)] data-[state=active]:bg-[var(--mundia-burgundy)] data-[state=active]:text-white sm:min-w-0 sm:px-4 sm:py-3 sm:text-sm"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-0 py-3 text-sm text-[var(--mundia-muted)] shadow-none data-[state=active]:border-[var(--mundia-navy)] data-[state=active]:bg-transparent data-[state=active]:text-[var(--mundia-navy)] data-[state=active]:shadow-none"
           >
             <span className="block sm:inline">
               <span className="block sm:inline">Borrow</span>
@@ -1076,13 +1077,18 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
               Currently Borrowed Books
             </h2>
             {activeBorrows.length === 0 ? (
-              <Card className="catalog-panel">
-                <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-slate-600 sm:text-base">
-                    No active borrows
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-5">
+                <p className="text-sm text-slate-700 sm:text-base">
+                  No active borrows. Start with the collection and request a
+                  book when you find the right copy.
+                </p>
+                <Link
+                  href="/all-books"
+                  className="mt-3 inline-flex text-sm font-semibold text-[var(--mundia-navy)] hover:underline"
+                >
+                  Browse the collection
+                </Link>
+              </div>
             ) : (
               activeBorrows.map((record) => (
                 <BorrowCard
@@ -1101,13 +1107,18 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
               Pending Approval
             </h2>
             {pendingRequests.length === 0 ? (
-              <Card className="catalog-panel">
-                <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-slate-600 sm:text-base">
-                    No pending requests
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-5">
+                <p className="text-sm text-slate-700 sm:text-base">
+                  No pending requests. Books you ask to borrow will appear here
+                  while the library reviews them.
+                </p>
+                <Link
+                  href="/all-books"
+                  className="mt-3 inline-flex text-sm font-semibold text-[var(--mundia-navy)] hover:underline"
+                >
+                  Find a book to request
+                </Link>
+              </div>
             ) : (
               pendingRequests.map((record) => (
                 <BorrowCard key={record.id} record={record} />
@@ -1122,191 +1133,170 @@ const MyProfileTabs: React.FC<MyProfileTabsProps> = ({
               Complete Borrow History
             </h2>
             {borrowHistory.length === 0 ? (
-              <Card className="catalog-panel">
-                <CardContent className="p-4 text-center sm:p-6">
-                  <p className="text-sm text-slate-600 sm:text-base">
-                    No borrow history
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-5">
+                <p className="text-sm text-slate-700 sm:text-base">
+                  No borrow history yet. Returned books and review prompts will
+                  collect here after your first loan.
+                </p>
+                <Link
+                  href="/all-books"
+                  className="mt-3 inline-flex text-sm font-semibold text-[var(--mundia-navy)] hover:underline"
+                >
+                  Browse available books
+                </Link>
+              </div>
             ) : (
               <>
-                {/* Statistics */}
-                <Card className="catalog-panel mb-4">
-                  <CardHeader className="pb-2 sm:pb-3">
-                    <CardTitle className="text-base text-[var(--mundia-ink)] sm:text-lg">
-                      Borrow Statistics
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
-                      <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-2 text-center">
-                        <p className="text-lg font-bold text-[var(--mundia-ink)] sm:text-xl">
-                          {allBorrows.length}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Total Borrows
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[var(--mundia-teal)] bg-[var(--surface-0)] p-2 text-center">
-                        <p className="text-lg font-bold text-[var(--mundia-teal-strong)] sm:text-xl">
-                          {pendingRequests.length}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Pending
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[var(--mundia-gold)] bg-[var(--surface-0)] p-2 text-center">
-                        <p className="text-lg font-bold text-[var(--mundia-gold-strong)] sm:text-xl">
-                          {activeBorrows.length}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Active
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-center">
-                        <p className="text-lg font-bold text-emerald-700 sm:text-xl">
-                          {borrowHistory.length}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Book Returned
-                        </p>
-                      </div>
+                <section className="mb-4 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)] p-4">
+                  <h3 className="text-base font-semibold text-[var(--mundia-ink)] sm:text-lg">
+                    Borrow statistics
+                  </h3>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm md:grid-cols-4">
+                    <div>
+                      <dt className="text-slate-500">Total borrows</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[var(--mundia-ink)]">
+                        {allBorrows.length}
+                      </dd>
                     </div>
-
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:mt-3 sm:gap-3 md:grid-cols-4">
-                      <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-2 text-center">
-                        <p className="text-base font-bold text-red-200 sm:text-lg">
-                          {
-                            allBorrows.filter((r) => {
-                              // Use same logic as individual cards for consistency
-                              const today = new Date();
-                              const todayUTC = new Date(
-                                today.getTime() +
-                                  today.getTimezoneOffset() * 60000,
-                              );
-                              const dueDateUTC = r.dueDate
-                                ? new Date(r.dueDate)
-                                : null;
-
-                              const isOverdue =
-                                r.status === "BORROWED" &&
-                                dueDateUTC &&
-                                todayUTC > dueDateUTC;
-
-                              if (isOverdue && dueDateUTC) {
-                                const todayDateUTC = new Date(
-                                  Date.UTC(
-                                    todayUTC.getUTCFullYear(),
-                                    todayUTC.getUTCMonth(),
-                                    todayUTC.getUTCDate(),
-                                  ),
-                                );
-                                const dueDateOnlyUTC = new Date(
-                                  Date.UTC(
-                                    dueDateUTC.getUTCFullYear(),
-                                    dueDateUTC.getUTCMonth(),
-                                    dueDateUTC.getUTCDate(),
-                                  ),
-                                );
-                                const daysOverdue = Math.floor(
-                                  (todayDateUTC.getTime() -
-                                    dueDateOnlyUTC.getTime()) /
-                                    (1000 * 60 * 60 * 24),
-                                );
-                                return daysOverdue > 0;
-                              }
-
-                              return (
-                                (typeof r.fineAmount === "number"
-                                  ? r.fineAmount
-                                  : parseFloat(String(r.fineAmount)) || 0) > 0
-                              ); // Use stored fine for returned books
-                            }).length
-                          }
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          With Fines
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-2 text-center">
-                        <p className="text-base font-bold text-red-200 sm:text-lg">
-                          $
-                          {allBorrows
-                            .reduce((sum, r) => {
-                              // Calculate fine using same logic as individual cards
-                              const today = new Date();
-                              const todayUTC = new Date(
-                                today.getTime() +
-                                  today.getTimezoneOffset() * 60000,
-                              );
-                              const dueDateUTC = r.dueDate
-                                ? new Date(r.dueDate)
-                                : null;
-
-                              const isOverdue =
-                                r.status === "BORROWED" &&
-                                dueDateUTC &&
-                                todayUTC > dueDateUTC;
-
-                              if (isOverdue && dueDateUTC) {
-                                const todayDateUTC = new Date(
-                                  Date.UTC(
-                                    todayUTC.getUTCFullYear(),
-                                    todayUTC.getUTCMonth(),
-                                    todayUTC.getUTCDate(),
-                                  ),
-                                );
-                                const dueDateOnlyUTC = new Date(
-                                  Date.UTC(
-                                    dueDateUTC.getUTCFullYear(),
-                                    dueDateUTC.getUTCMonth(),
-                                    dueDateUTC.getUTCDate(),
-                                  ),
-                                );
-                                const daysOverdue = Math.floor(
-                                  (todayDateUTC.getTime() -
-                                    dueDateOnlyUTC.getTime()) /
-                                    (1000 * 60 * 60 * 24),
-                                );
-                                return sum + daysOverdue * 1.0;
-                              }
-
-                              return (
-                                sum +
-                                (typeof r.fineAmount === "number"
-                                  ? r.fineAmount
-                                  : parseFloat(String(r.fineAmount)) || 0)
-                              ); // Use stored fine for returned books
-                            }, 0)
-                            .toFixed(2)}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Total Fines
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[var(--mundia-burgundy)] bg-[var(--surface-0)] p-2 text-center">
-                        <p className="text-base font-bold text-[var(--mundia-burgundy)] sm:text-lg">
-                          {allBorrows.reduce(
-                            (sum, r) => sum + (r.renewalCount || 0),
-                            0,
-                          )}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Total Renewals
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] p-2 text-center">
-                        <p className="text-base font-bold text-[var(--mundia-ink)] sm:text-lg">
-                          {totalReviews}
-                        </p>
-                        <p className="text-[10px] text-slate-500 sm:text-xs">
-                          Total Reviews
-                        </p>
-                      </div>
+                    <div>
+                      <dt className="text-slate-500">Pending</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[var(--mundia-navy)]">
+                        {pendingRequests.length}
+                      </dd>
                     </div>
-                  </CardContent>
-                </Card>
+                    <div>
+                      <dt className="text-slate-500">Active</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[var(--mundia-gold-strong)]">
+                        {activeBorrows.length}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Returned</dt>
+                      <dd className="mt-1 text-xl font-semibold text-emerald-700">
+                        {borrowHistory.length}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">With fines</dt>
+                      <dd className="mt-1 text-xl font-semibold text-red-700">
+                        {
+                          allBorrows.filter((r) => {
+                            const today = new Date();
+                            const todayUTC = new Date(
+                              today.getTime() +
+                                today.getTimezoneOffset() * 60000,
+                            );
+                            const dueDateUTC = r.dueDate
+                              ? new Date(r.dueDate)
+                              : null;
+
+                            const isOverdue =
+                              r.status === "BORROWED" &&
+                              dueDateUTC &&
+                              todayUTC > dueDateUTC;
+
+                            if (isOverdue && dueDateUTC) {
+                              const todayDateUTC = new Date(
+                                Date.UTC(
+                                  todayUTC.getUTCFullYear(),
+                                  todayUTC.getUTCMonth(),
+                                  todayUTC.getUTCDate(),
+                                ),
+                              );
+                              const dueDateOnlyUTC = new Date(
+                                Date.UTC(
+                                  dueDateUTC.getUTCFullYear(),
+                                  dueDateUTC.getUTCMonth(),
+                                  dueDateUTC.getUTCDate(),
+                                ),
+                              );
+                              const daysOverdue = Math.floor(
+                                (todayDateUTC.getTime() -
+                                  dueDateOnlyUTC.getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              );
+                              return daysOverdue > 0;
+                            }
+
+                            return (
+                              (typeof r.fineAmount === "number"
+                                ? r.fineAmount
+                                : parseFloat(String(r.fineAmount)) || 0) > 0
+                            );
+                          }).length
+                        }
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Total fines</dt>
+                      <dd className="mt-1 text-xl font-semibold text-red-700">
+                        $
+                        {allBorrows
+                          .reduce((sum, r) => {
+                            const today = new Date();
+                            const todayUTC = new Date(
+                              today.getTime() +
+                                today.getTimezoneOffset() * 60000,
+                            );
+                            const dueDateUTC = r.dueDate
+                              ? new Date(r.dueDate)
+                              : null;
+
+                            const isOverdue =
+                              r.status === "BORROWED" &&
+                              dueDateUTC &&
+                              todayUTC > dueDateUTC;
+
+                            if (isOverdue && dueDateUTC) {
+                              const todayDateUTC = new Date(
+                                Date.UTC(
+                                  todayUTC.getUTCFullYear(),
+                                  todayUTC.getUTCMonth(),
+                                  todayUTC.getUTCDate(),
+                                ),
+                              );
+                              const dueDateOnlyUTC = new Date(
+                                Date.UTC(
+                                  dueDateUTC.getUTCFullYear(),
+                                  dueDateUTC.getUTCMonth(),
+                                  dueDateUTC.getUTCDate(),
+                                ),
+                              );
+                              const daysOverdue = Math.floor(
+                                (todayDateUTC.getTime() -
+                                  dueDateOnlyUTC.getTime()) /
+                                  (1000 * 60 * 60 * 24),
+                              );
+                              return sum + daysOverdue * 1.0;
+                            }
+
+                            return (
+                              sum +
+                              (typeof r.fineAmount === "number"
+                                ? r.fineAmount
+                                : parseFloat(String(r.fineAmount)) || 0)
+                            );
+                          }, 0)
+                          .toFixed(2)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Renewals</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[var(--mundia-burgundy)]">
+                        {allBorrows.reduce(
+                          (sum, r) => sum + (r.renewalCount || 0),
+                          0,
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-500">Reviews</dt>
+                      <dd className="mt-1 text-xl font-semibold text-[var(--mundia-ink)]">
+                        {totalReviews}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
 
                 {/* History List */}
                 {borrowHistory

@@ -109,7 +109,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
       <div className="flex-[1.5] w-full min-w-0 max-w-full overflow-hidden">
         {/* Video Section */}
         <section className="flex flex-col gap-4 sm:gap-7">
-          <h3 className="text-base font-semibold text-primary sm:text-lg">
+          <h3 className="text-base font-semibold text-[var(--mundia-navy)] sm:text-lg">
             Video
           </h3>
           <BookVideo videoUrl={bookData.videoUrl} />
@@ -117,7 +117,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
 
         {/* Summary Section */}
         <section className="mt-6 flex flex-col gap-4 sm:mt-10 sm:gap-7">
-          <h3 className="text-base font-semibold text-primary sm:text-lg">
+          <h3 className="text-base font-semibold text-[var(--mundia-navy)] sm:text-lg">
             Summary
           </h3>
           <div className="space-y-3 break-words text-base text-slate-700 sm:space-y-5 sm:text-xl">

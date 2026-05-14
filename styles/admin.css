@@ -4,25 +4,25 @@
 
 @layer base {
   .admin-theme {
-    --background: oklch(97% 0.008 218);
-    --foreground: oklch(18% 0.025 225);
-    --card: oklch(98% 0.006 218);
-    --card-foreground: oklch(18% 0.025 225);
-    --popover: oklch(98% 0.006 218);
-    --popover-foreground: oklch(18% 0.025 225);
-    --primary: oklch(56% 0.09 214);
-    --primary-foreground: oklch(97% 0.008 218);
-    --secondary: oklch(94% 0.02 218);
-    --secondary-foreground: oklch(24% 0.035 225);
-    --muted: oklch(95% 0.012 218);
-    --muted-foreground: oklch(45% 0.03 225);
-    --accent: oklch(93% 0.035 212);
-    --accent-foreground: oklch(24% 0.035 225);
-    --border: oklch(76% 0.035 218);
-    --input: oklch(80% 0.035 218);
-    --ring: oklch(56% 0.09 214);
+    --background: var(--mundia-paper);
+    --foreground: var(--mundia-ink);
+    --card: var(--mundia-surface);
+    --card-foreground: var(--mundia-ink);
+    --popover: var(--mundia-surface);
+    --popover-foreground: var(--mundia-ink);
+    --primary: var(--mundia-navy);
+    --primary-foreground: var(--mundia-paper);
+    --secondary: var(--mundia-panel);
+    --secondary-foreground: var(--mundia-ink);
+    --muted: var(--mundia-panel);
+    --muted-foreground: var(--mundia-muted);
+    --accent: oklch(92% 0.02 255);
+    --accent-foreground: var(--mundia-ink);
+    --border: var(--mundia-line);
+    --input: var(--mundia-line);
+    --ring: var(--mundia-navy);
 
-    background: oklch(97% 0.008 218);
+    background: var(--mundia-paper);
     @apply text-slate-900;
   }
 }
@@ -30,7 +30,7 @@
 @layer components {
   .admin-container {
     @apply flex min-w-0 flex-1 flex-col p-4 sm:p-6 lg:px-10 lg:py-8 xl:px-12 2xl:px-16;
-    background: oklch(97% 0.008 218);
+    background: var(--mundia-paper);
   }
 
   .back-btn {
@@ -68,7 +68,7 @@
   }
 
   .confirm-btn {
-    @apply w-full min-h-14 rounded-xl font-bold text-base text-light-800 !important;
+    @apply w-full min-h-14 rounded-lg font-bold text-base text-light-800 !important;
   }
 
   /* Book Form */
@@ -81,7 +81,7 @@
 
   .book-form_btn {
     @apply min-h-14 w-full text-white hover:opacity-95 !important;
-    background: var(--mundia-teal-strong);
+    background: var(--mundia-navy);
   }
 
   /* Home Page */
@@ -93,7 +93,7 @@
   }
 
   .add-new-book_btn {
-    @apply mt-7 mb-3 border py-4 px-3 flex flex-row items-center rounded-xl gap-4;
+    @apply mt-7 mb-3 border py-4 px-3 flex flex-row items-center rounded-lg gap-4;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
   }
@@ -110,7 +110,7 @@
 
   /* Statistics */
   .stat {
-    @apply border rounded-xl p-4 sm:p-6 space-y-5 flex-1;
+    @apply border rounded-lg p-4 sm:p-6 space-y-5 flex-1;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
   }
@@ -212,10 +212,10 @@
 
   /* Header */
   .admin-header {
-    @apply flex lg:items-end items-start justify-between lg:flex-row flex-col gap-5 sm:mb-10 mb-5 rounded-xl border px-4 py-4 sm:px-6 sm:py-5;
+    @apply flex lg:items-end items-start justify-between lg:flex-row flex-col gap-5 sm:mb-10 mb-5 rounded-lg border px-4 py-4 sm:px-6 sm:py-5;
     border-color: var(--mundia-line);
-    background: var(--mundia-paper);
-    box-shadow: 0 10px 28px oklch(18% 0.025 225 / 0.06);
+    background: var(--mundia-surface);
+    box-shadow: none;
   }
 
   /* Search */
@@ -232,26 +232,28 @@
   /* Sidebar */
   .admin-sidebar {
     @apply sticky top-0 z-40 flex h-screen w-[82px] shrink-0 flex-col justify-between overflow-y-auto border-r px-2 pb-5 pt-8 sm:w-[248px] sm:px-5 sm:pt-10 lg:w-[264px];
-    border-color: oklch(76% 0.035 218 / 0.72);
-    background: oklch(98% 0.006 218 / 0.94);
-    box-shadow: inset -1px 0 0 oklch(60% 0.025 225 / 0.08);
+    border-color: var(--mundia-line);
+    background: var(--mundia-surface);
+    box-shadow: none;
   }
 
   .admin-sidebar .logo {
-    @apply flex cursor-pointer flex-row items-center justify-center gap-2 border-b border-dashed border-slate-200 pb-8 transition-all duration-200 hover:opacity-80 sm:justify-start sm:pb-10;
+    @apply flex cursor-pointer flex-row items-center justify-center gap-2 border-b pb-8 transition-all duration-200 hover:opacity-80 sm:justify-start sm:pb-10;
+    border-color: var(--mundia-line);
   }
 
   .admin-sidebar .logo h1 {
-    @apply text-2xl font-semibold text-slate-900 max-md:hidden;
+    @apply text-xl font-normal text-[var(--mundia-ink)] max-md:hidden;
+    font-family: var(--font-heading);
   }
 
   .admin-sidebar .link {
-    @apply flex w-full flex-row items-center justify-center gap-2 rounded-lg px-2 py-3.5 transition-colors hover:bg-slate-100/80 sm:justify-start sm:px-5;
+    @apply flex w-full flex-row items-center justify-center gap-2 rounded-none border-l border-transparent px-2 py-3.5 transition-colors hover:bg-transparent sm:justify-start sm:px-4;
   }
 
   .admin-sidebar .link.is-active {
-    background: oklch(91% 0.035 212);
-    color: var(--mundia-teal-strong);
+    border-left-color: var(--mundia-navy);
+    color: var(--mundia-navy);
   }
 
   .admin-sidebar .link p {
@@ -261,12 +263,12 @@
   .admin-sidebar .user {
     @apply my-6 flex w-full flex-row items-center justify-center gap-2 rounded-lg border px-2 py-2 sm:my-8 sm:justify-start sm:px-4;
     border-color: var(--mundia-line);
-    background: oklch(95% 0.012 218);
+    background: var(--mundia-paper);
   }
 
   /* User Card */
   .user-card {
-    @apply w-40 border py-4 px-3 flex justify-center items-center flex-col rounded-xl text-center;
+    @apply w-40 border py-4 px-3 flex justify-center items-center flex-col rounded-lg text-center;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
   }

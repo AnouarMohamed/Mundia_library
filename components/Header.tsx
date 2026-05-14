@@ -33,20 +33,20 @@ const Header = async ({ session }: HeaderProps) => {
             href="/"
             className="group inline-flex min-w-0 items-center gap-2 sm:gap-3"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] sm:size-11">
+            <span className="flex size-10 shrink-0 items-center justify-center sm:size-11">
               <img
-                src="/icons/logo.svg"
+                src="/icons/admin/logo.svg"
                 alt="Mundiapolis Library"
                 width={40}
                 height={40}
-                className="size-7 sm:size-8"
+                className="size-9 sm:size-10"
               />
             </span>
             <div className="min-w-0">
               <p className="truncate text-base font-semibold leading-tight tracking-tight text-[var(--mundia-ink)] sm:text-lg">
                 Mundiapolis
               </p>
-              <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--mundia-gold-strong)] sm:text-xs">
+              <p className="truncate text-xs font-normal text-[var(--mundia-muted)]">
                 University Library
               </p>
             </div>

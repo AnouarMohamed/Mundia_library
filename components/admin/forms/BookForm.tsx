@@ -519,7 +519,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
                     type="checkbox"
                     checked={field.value}
                     onChange={field.onChange}
-                    className="size-4 rounded border-[var(--mundia-line)] text-[var(--mundia-teal-strong)] focus:ring-[var(--mundia-focus)]"
+                    className="size-4 rounded border-[var(--mundia-line)] text-[var(--mundia-navy)] focus:ring-[var(--mundia-focus)]"
                   />
                 </FormControl>
                 <FormLabel className="text-base font-normal text-dark-500">
@@ -531,7 +531,7 @@ const BookForm = ({ type = "create", ...book }: Props) => {
           />
         </div>
 
-        <Button type="submit" className="book-form_btn text-light-100">
+        <Button type="submit" className="book-form_btn text-white">
           {type === "create" ? "Add Book to Library" : "Update Book"}
         </Button>
       </form>

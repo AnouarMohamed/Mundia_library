@@ -51,7 +51,7 @@ const Sidebar = ({ session }: { session: Session }) => {
                     className={cn(
                       "hidden sm:block",
                       isSelected
-                        ? "text-[var(--mundia-teal-strong)]"
+                        ? "font-semibold text-[var(--mundia-navy)]"
                         : "text-slate-700",
                     )}
                   >

@@ -29,11 +29,11 @@ const Layout = async ({ children }: { children: ReactNode }) => {
                 className="auth-logo size-7 sm:size-[37px]"
               />
               <div>
-                <h1 className="font-bebas-neue text-3xl tracking-[0.08em] text-white sm:text-4xl">
+                <h1 className="font-serif text-3xl font-normal text-white sm:text-4xl">
                   Mundiapolis Library
                 </h1>
-                <p className="text-[11px] uppercase tracking-[0.24em] text-light-200/80 sm:text-xs">
-                  Student Access Portal
+                <p className="text-[11px] text-light-200/80 sm:text-xs">
+                  Student access portal
                 </p>
               </div>
             </div>
@@ -67,11 +67,9 @@ const Layout = async ({ children }: { children: ReactNode }) => {
           className="auth-illustration-image"
         />
         <div className="auth-illustration-overlay">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-light-200/75">
-            Premium Experience
-          </p>
-          <h2 className="mt-2 font-bebas-neue text-4xl tracking-[0.08em] text-white sm:text-5xl">
-            Built For Focused Study
+          <p className="text-[11px] text-light-200/75">Student study access</p>
+          <h2 className="mt-2 font-serif text-4xl font-normal text-white sm:text-5xl">
+            Built for focused study
           </h2>
           <p className="mt-2 text-sm text-light-100/80 sm:text-base">
             Discover stronger recommendations, streamlined approvals, and clear
@@ -93,8 +91,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
             </article>
           </div>
           <p className="auth-photo-credit">
-            Campus photo:
-            {" "}
+            Campus photo:{" "}
             <a
               href="https://commons.wikimedia.org/wiki/File:Campus-mundiapolis.jpg"
               target="_blank"

@@ -60,6 +60,15 @@ interface AdminUsersListProps {
   currentUserId?: string;
 }
 
+const formatStatusLabel = (status: string | null | undefined): string =>
+  (status ?? "Unknown")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const formatRoleLabel = (role: string | null | undefined): string =>
+  role === "ADMIN" ? "Admin" : "Student";
+
 const AdminUsersList: React.FC<AdminUsersListProps> = ({
   initialUsers,
   initialAdminRequests,
@@ -388,7 +397,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     <section className="admin-page-panel">
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="mb-4 rounded-xl border p-3 sm:p-4 status-success">
+        <div className="mb-4 rounded-lg border p-3 sm:p-4 status-success">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -424,7 +433,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       )}
 
       {errorMessage && (
-        <div className="mb-4 rounded-xl border p-3 sm:p-4 status-danger">
+        <div className="mb-4 rounded-lg border p-3 sm:p-4 status-danger">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -447,7 +456,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       )}
 
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <h2 className="text-lg font-semibold text-dark-400 sm:text-xl">
+        <h2 className="font-serif text-2xl font-normal tracking-tight text-[var(--mundia-ink)]">
           All Users ({users.length})
         </h2>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -467,7 +476,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
           {/* Filter Dropdowns */}
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm text-dark-400">Status:</span>
+              <span className="text-sm text-[var(--mundia-muted)]">Status</span>
               <select
                 value={currentStatus}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
@@ -480,7 +489,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
               </select>
             </div>
             <div className="flex w-full flex-col gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
-              <span className="text-sm text-dark-400">Role:</span>
+              <span className="text-sm text-[var(--mundia-muted)]">Role</span>
               <select
                 value={currentRole}
                 onChange={(e) => handleFilterChange("role", e.target.value)}
@@ -505,7 +514,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
             {adminRequests.map((request) => (
               <div
                 key={request.id}
-                className="rounded-xl border p-3 sm:p-4 status-warning"
+                className="rounded-lg border p-3 sm:p-4 status-warning"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1">
@@ -606,7 +615,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                             : "status-info"
                         }`}
                       >
-                        {user.role}
+                        {formatRoleLabel(user.role)}
                       </span>
                     </td>
                     <td>
@@ -619,7 +628,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                               : "status-danger"
                         }`}
                       >
-                        {user.status}
+                        {formatStatusLabel(user.status)}
                       </span>
                     </td>
                     <td>
@@ -632,30 +641,30 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                         {/* Show Remove Admin for existing admins (except current user) */}
                         {user.role === "ADMIN" &&
                           user.id !== (currentUserId || session?.user?.id) && (
-                            <Button
-                              size="sm"
-                              className="min-h-11 bg-[var(--mundia-danger)] text-white hover:opacity-90"
+                            <button
+                              type="button"
+                              className="min-h-9 text-left text-sm font-medium text-[var(--mundia-danger)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                               onClick={() =>
                                 handleRemoveAdminPrivileges(user.id)
                               }
                               disabled={removeAdminPrivilegesMutation.isPending}
                             >
-                              Remove Admin
-                            </Button>
+                              Remove admin
+                            </button>
                           )}
 
                         {/* Show Make Admin for regular users */}
                         {user.role === "USER" && (
-                          <Button
-                            size="sm"
-                            className="min-h-11 bg-[var(--mundia-burgundy)] text-white hover:opacity-90"
+                          <button
+                            type="button"
+                            className="min-h-9 text-left text-sm font-medium text-[var(--mundia-navy)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() =>
                               handleUpdateUserRole(user.id, "ADMIN")
                             }
                             disabled={updateUserRoleMutation.isPending}
                           >
-                            Make Admin
-                          </Button>
+                            Make admin
+                          </button>
                         )}
 
                         {/* Show Approve/Reject for pending users */}

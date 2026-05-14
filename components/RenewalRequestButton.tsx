@@ -96,7 +96,7 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
         <Button
           variant="outline"
           size="sm"
-          className="flex min-h-11 items-center gap-1 border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:border-primary hover:bg-[var(--mundia-panel)]"
+          className="flex min-h-11 items-center gap-1 border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:border-[var(--mundia-navy)] hover:bg-[var(--mundia-panel)]"
         >
           <RotateCcw className="size-3 sm:size-4" />
           <span>Request renewal</span>
@@ -139,7 +139,7 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="bg-[var(--mundia-teal-strong)] text-white hover:opacity-95"
+            className="bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
           >
             {isLoading ? (
               <>

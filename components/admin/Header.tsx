@@ -4,10 +4,7 @@ const Header = ({ session }: { session: Session }) => {
   return (
     <header className="admin-header">
       <div className="space-y-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
-          Library operations
-        </p>
-        <h2 className="text-xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-2xl">
+        <h2 className="font-serif text-2xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
           Circulation desk
         </h2>
         <p className="text-sm text-slate-600 sm:text-base">

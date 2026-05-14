@@ -36,7 +36,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
  * ```
  *
  * Dimensions matched:
- * - Stat: bg-white rounded-xl p-5 space-y-5 flex-1
+ * - Stat: bg-white rounded-lg p-5 space-y-5 flex-1
  * - Stat info: flex justify-between items-center gap-5
  * - Stat label: font-medium text-base
  * - Stat number: text-2xl font-bold
@@ -83,7 +83,7 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[var(--mundia-line)] bg-white p-4 shadow-sm sm:p-5",
+        "rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-surface)] p-4 sm:p-5",
         className,
       )}
     >
@@ -92,7 +92,7 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
           <Skeleton className="h-4 w-20" />
           <Skeleton className="h-8 w-16" />
         </div>
-        <Skeleton className="size-10 rounded-xl" />
+        <Skeleton className="size-10 rounded-lg" />
       </div>
       <Skeleton className="mt-4 h-3.5 w-40" />
     </div>

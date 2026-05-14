@@ -24,7 +24,7 @@ const AdminDropdown = () => {
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1.5 shadow-xl sm:w-52">
+        <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1.5 sm:w-52">
           {/* Add a small invisible bridge to prevent hover gap */}
           <div className="absolute inset-x-0 -top-2 h-2"></div>
           <div className="py-1 sm:py-1.5">

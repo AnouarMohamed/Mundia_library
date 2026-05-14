@@ -50,7 +50,7 @@ const UserSkeleton: React.FC<UserSkeletonProps> = ({
 }) => {
   if (variant === "card") {
     return (
-      <Card className={cn("border-0 shadow-md", className)}>
+      <Card className={cn("border-[var(--mundia-line)]", className)}>
         <CardHeader className="pb-4">
           <div className="flex items-start">
             <div className="flex flex-1 items-center space-x-3">
@@ -156,4 +156,3 @@ const UserSkeleton: React.FC<UserSkeletonProps> = ({
 };
 
 export default UserSkeleton;
-

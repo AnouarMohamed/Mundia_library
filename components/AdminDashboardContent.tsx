@@ -86,13 +86,13 @@ interface AdminDashboardContentProps {
 }
 
 const chartColors = [
-  "var(--mundia-teal-strong)",
+  "var(--mundia-navy)",
   "var(--mundia-success)",
   "var(--mundia-gold)",
 ];
 const chartGrid = "var(--mundia-line)";
 const chartAxis = "var(--mundia-ink)";
-const chartBorrow = "var(--mundia-teal-strong)";
+const chartBorrow = "var(--mundia-navy)";
 const chartReturn = "var(--mundia-success)";
 const chartTooltipStyle = {
   borderRadius: "0.75rem",
@@ -135,6 +135,12 @@ const getStatusClasses = (status: string): string => {
   }
 };
 
+const formatStatusLabel = (status: string): string =>
+  status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 const Panel = ({
   title,
   subtitle,
@@ -144,7 +150,7 @@ const Panel = ({
   subtitle?: string;
   children: React.ReactNode;
 }) => (
-  <article className="surface-panel-light min-w-0 rounded-xl p-5 sm:p-6">
+  <article className="surface-panel-light min-w-0 p-5 sm:p-6">
     <div className="mb-5">
       <h3 className="text-lg font-bold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
         {title}
@@ -168,39 +174,33 @@ const MetricCard = ({
   value: string;
   subtitle: string;
   icon: React.ComponentType<{ className?: string }>;
-  tone: "blue" | "teal" | "amber" | "slate";
+  tone: "blue" | "navy" | "amber" | "slate";
 }) => {
   const toneStyles: Record<
-    "blue" | "teal" | "amber" | "slate",
-    { badge: string; ring: string }
+    "blue" | "navy" | "amber" | "slate",
+    { badge: string }
   > = {
     blue: {
       badge: "bg-[var(--mundia-ink)]/10 text-[var(--mundia-ink)]",
-      ring: "ring-[var(--mundia-line)]/50",
     },
-    teal: {
-      badge: "bg-[var(--mundia-teal)]/20 text-[var(--mundia-teal-strong)]",
-      ring: "ring-[var(--mundia-teal)]/30",
+    navy: {
+      badge: "bg-[var(--mundia-navy)]/10 text-[var(--mundia-navy)]",
     },
     amber: {
       badge: "bg-[var(--mundia-gold)]/20 text-[var(--mundia-gold-strong)]",
-      ring: "ring-[var(--mundia-gold)]/30",
     },
     slate: {
       badge: "bg-[var(--mundia-muted)]/20 text-[var(--mundia-ink)]",
-      ring: "ring-[var(--mundia-line)]/50",
     },
   };
 
   const styles = toneStyles[tone];
 
   return (
-    <article
-      className={`min-w-0 border-b border-[var(--mundia-line)] p-4 ring-1 last:border-b-0 sm:border-b-0 sm:border-r sm:p-5 sm:[&:nth-child(2)]:border-r-0 xl:[&:nth-child(2)]:border-r xl:last:border-r-0 ${styles.ring}`}
-    >
+    <article className="min-w-0 border-b border-[var(--mundia-line)] p-4 last:border-b-0 sm:border-b-0 sm:border-r sm:p-5 sm:[&:nth-child(2)]:border-r-0 xl:[&:nth-child(2)]:border-r xl:last:border-r-0">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/60">
+          <p className="text-sm font-medium text-[var(--mundia-muted)]">
             {title}
           </p>
           <p className="mt-2 text-2xl font-bold tracking-tight text-[var(--mundia-ink)] sm:text-3xl">
@@ -208,7 +208,7 @@ const MetricCard = ({
           </p>
         </div>
         <span
-          className={`inline-flex size-10 items-center justify-center rounded-xl ${styles.badge}`}
+          className={`inline-flex size-10 items-center justify-center rounded-lg ${styles.badge}`}
         >
           <Icon className="size-5" />
         </span>
@@ -221,7 +221,7 @@ const MetricCard = ({
 };
 
 const EmptyState = ({ label }: { label: string }) => (
-  <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 text-center text-sm font-medium text-[var(--mundia-ink)]/50">
+  <div className="flex h-44 items-center justify-center rounded-lg border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-4 text-center text-sm font-medium text-[var(--mundia-ink)]/50">
     {label}
   </div>
 );
@@ -260,7 +260,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
 
   if (isError && !initialStats) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700">
         <p className="text-base font-semibold">Failed to load dashboard data</p>
         <p className="mt-1 text-sm">
           {error instanceof Error ? error.message : "Unknown error"}
@@ -331,7 +331,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-6 pr-1 sm:space-y-8 sm:pr-2 lg:pr-4">
       {successMessage === "admin-granted" && (
-        <div className="status-success rounded-2xl border px-4 py-3">
+        <div className="status-success rounded-lg border px-4 py-3">
           <p className="text-sm font-semibold">Admin access granted</p>
           <p className="text-sm">
             You now have access to dashboard analytics and management actions.
@@ -342,30 +342,27 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
       <header className="mb-8 space-y-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)]">
-              System administration
-            </p>
-            <h2 className="text-3xl font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
-              Operations overview
+            <h2 className="font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+              Circulation desk
             </h2>
             <p className="max-w-2xl text-sm text-[var(--mundia-ink)]/70 sm:text-base">
-              Operational overview of library circulation, catalog metadata, and
-              user activity.
+              Review active requests, circulation trends, and catalog health
+              from one staff view.
             </p>
           </div>
 
-          <dl className="grid min-w-[260px] grid-cols-2 overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+          <dl className="grid min-w-[260px] grid-cols-2 overflow-hidden rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-surface)]">
             <div className="border-r border-[var(--mundia-line)] px-4 py-3">
-              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/55">
-                Borrow Utilization
+              <dt className="text-sm text-[var(--mundia-muted)]">
+                Borrow utilization
               </dt>
-              <dd className="mt-1 text-lg font-semibold text-[var(--mundia-teal-strong)]">
+              <dd className="mt-1 text-lg font-semibold text-[var(--mundia-navy)]">
                 {utilizationRate}%
               </dd>
             </div>
             <div className="px-4 py-3">
-              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--mundia-ink)]/55">
-                User Approval
+              <dt className="text-sm text-[var(--mundia-muted)]">
+                User approval
               </dt>
               <dd className="mt-1 text-lg font-semibold text-[var(--mundia-gold-strong)]">
                 {approvalRate}%
@@ -375,7 +372,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </div>
       </header>
 
-      <section className="grid grid-cols-1 overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-1 overflow-hidden rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-surface)] sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           title="Users"
           value={compact(totalUsers)}
@@ -388,7 +385,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           value={compact(totalBooks)}
           subtitle={`${activeBooks} active, ${inactiveBooks} inactive`}
           icon={BookOpen}
-          tone="teal"
+          tone="navy"
         />
         <MetricCard
           title="Copies"
@@ -414,7 +411,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {recentBorrows.length === 0 ? (
             <EmptyState label="No borrow records found yet." />
           ) : (
-            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {recentBorrows.map((item) => (
                 <div
                   key={item.id}
@@ -430,9 +427,9 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusClasses(item.status)}`}
+                      className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusClasses(item.status)}`}
                     >
-                      {item.status}
+                      {formatStatusLabel(item.status)}
                     </span>
                     {item.status === "PENDING" && (
                       <div className="flex items-center gap-2">
@@ -469,7 +466,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {recentUsers.length === 0 ? (
             <EmptyState label="No recent user signups found yet." />
           ) : (
-            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {recentUsers.map((item) => (
                 <div
                   key={item.id}
@@ -484,9 +481,9 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                     </p>
                   </div>
                   <span
-                    className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusClasses(item.status)}`}
+                    className={`inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusClasses(item.status)}`}
                   >
-                    {item.status}
+                    {formatStatusLabel(item.status)}
                   </span>
                 </div>
               ))}
@@ -596,14 +593,14 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             {borrowMixData.map((item) => (
               <div
                 key={item.name}
-                className="rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-2 shadow-sm"
+                className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-2"
               >
                 <div className="flex items-center gap-2">
                   <span
                     className="inline-block size-2 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--mundia-ink)]/50">
+                  <p className="text-xs font-medium text-[var(--mundia-muted)]">
                     {item.name}
                   </p>
                 </div>
@@ -664,7 +661,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                     <div
                       className="h-2 rounded-full"
                       style={{
-                        background: `linear-gradient(90deg, var(--mundia-teal-strong), var(--mundia-success))`,
+                        background: `linear-gradient(90deg, var(--mundia-navy), var(--mundia-success))`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxLanguageCount) * 100),
@@ -687,14 +684,14 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {categoryStats.length === 0 ? (
             <EmptyState label="No genre analytics available yet." />
           ) : (
-            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {categoryStats.map((item) => (
                 <div key={item.genre} className="p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-bold text-[var(--mundia-ink)]">
                       {item.genre}
                     </p>
-                    <p className="text-xs font-bold text-[var(--mundia-teal-strong)]">
+                    <p className="text-xs font-bold text-[var(--mundia-navy)]">
                       {item.count} titles
                     </p>
                   </div>
@@ -702,7 +699,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                     <div
                       className="h-1.5 rounded-full"
                       style={{
-                        background: `linear-gradient(90deg, var(--mundia-teal-strong), var(--mundia-gold))`,
+                        background: `linear-gradient(90deg, var(--mundia-navy), var(--mundia-gold))`,
                         width: `${Math.max(
                           8,
                           Math.round((item.count / maxGenreCount) * 100),
@@ -710,7 +707,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                       }}
                     />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--mundia-ink)]/50">
+                  <div className="mt-2 flex items-center justify-between text-xs font-medium text-[var(--mundia-muted)]">
                     <span>
                       {item.availableCopies}/{item.totalCopies} available
                     </span>
@@ -726,7 +723,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           {topRatedBooks.length === 0 ? (
             <EmptyState label="No top-rated books available yet." />
           ) : (
-            <div className="divide-y divide-[var(--mundia-line)] rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
+            <div className="divide-y divide-[var(--mundia-line)] rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)]">
               {topRatedBooks.map((book) => (
                 <div
                   key={book.id}
@@ -756,14 +753,12 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
         </Panel>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] shadow-sm">
+      <section className="overflow-hidden rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-surface)]">
         <div className="grid grid-cols-1 divide-y divide-[var(--mundia-line)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <div className="p-5">
             <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
               <ArrowDownToLine className="size-4" />
-              <p className="text-[10px] font-bold uppercase tracking-wider">
-                Borrow Pressure
-              </p>
+              <p className="text-sm font-medium">Borrow pressure</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
               {activeBorrows + pendingBorrows}
@@ -775,9 +770,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           <div className="p-5">
             <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
               <ArrowUpFromLine className="size-4" />
-              <p className="text-[10px] font-bold uppercase tracking-wider">
-                Return Velocity
-              </p>
+              <p className="text-sm font-medium">Return velocity</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
               {compact(returnedBooks)}
@@ -789,9 +782,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
           <div className="p-5">
             <div className="flex items-center gap-2 text-[var(--mundia-ink)]/60">
               <ChartColumnIncreasing className="size-4" />
-              <p className="text-[10px] font-bold uppercase tracking-wider">
-                Catalog Utilization
-              </p>
+              <p className="text-sm font-medium">Catalog utilization</p>
             </div>
             <p className="mt-2 text-2xl font-bold text-[var(--mundia-ink)]">
               {utilizationRate}%

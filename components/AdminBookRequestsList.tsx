@@ -46,6 +46,12 @@ interface AdminBookRequestsListProps {
   errorMessage?: string;
 }
 
+const formatStatusLabel = (status: string): string =>
+  status
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
   initialRequests,
   successMessage,
@@ -238,7 +244,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
     <section className="admin-page-panel">
       {/* Success/Error Messages */}
       {successMessage && (
-        <div className="status-success mb-4 rounded-xl border p-3 sm:p-4">
+        <div className="status-success mb-4 rounded-lg border p-3 sm:p-4">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -269,7 +275,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
       )}
 
       {errorMessage && (
-        <div className="status-danger mb-4 rounded-xl border p-3 sm:p-4">
+        <div className="status-danger mb-4 rounded-lg border p-3 sm:p-4">
           <div className="flex items-center">
             <div className="shrink-0">
               <svg
@@ -354,7 +360,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
             requests.map((request) => (
               <div
                 key={request.id}
-                className="rounded-2xl border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-3 shadow-sm transition hover:border-[var(--mundia-teal)] sm:p-4"
+                className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-3 transition hover:border-[var(--mundia-navy)] sm:p-4"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
                   {/* Book Cover */}
@@ -435,7 +441,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                                 : "status-success"
                           }`}
                         >
-                          {request.status}
+                          {formatStatusLabel(request.status)}
                         </span>
                       </div>
                     </div>

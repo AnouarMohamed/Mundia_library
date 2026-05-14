@@ -150,7 +150,7 @@ function ReviewCard({
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-10 z-10 w-32 rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] py-1 shadow-lg">
+              <div className="absolute right-0 top-10 z-10 w-32 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] py-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -388,7 +388,7 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
           <Button
             type="submit"
             disabled={updateReviewMutation.isPending || !comment.trim()}
-            className="w-full bg-[var(--mundia-teal-strong)] text-xs text-white hover:opacity-95 sm:w-auto sm:text-sm"
+            className="w-full bg-[var(--mundia-navy)] text-xs text-white hover:bg-[var(--mundia-navy-strong)] sm:w-auto sm:text-sm"
           >
             {updateReviewMutation.isPending ? "Updating..." : "Update Review"}
           </Button>

@@ -140,14 +140,12 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
   } = bookData;
 
   const detailFields = [
-    { label: "ISBN", value: isbn || "N/A" },
-    { label: "Published", value: publicationYear || "N/A" },
-    { label: "Publisher", value: publisher || "N/A" },
-    { label: "Language", value: language || "N/A" },
-    { label: "Pages", value: pageCount || "N/A" },
-    { label: "Edition", value: edition || "N/A" },
-    { label: "Total Copies", value: totalCopies || "N/A" },
-    { label: "Available", value: availableCopies || "N/A" },
+    { label: "Published", value: publicationYear ?? "Not listed" },
+    { label: "Publisher", value: publisher || "Not listed" },
+    { label: "Language", value: language || "Not listed" },
+    { label: "Pages", value: pageCount ?? "Not listed" },
+    { label: "Edition", value: edition || "Not listed" },
+    { label: "ISBN", value: isbn || "Not listed" },
   ];
 
   const formattedRating =
@@ -173,13 +171,13 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     <section className="book-overview motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500">
       <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-5 sm:gap-6">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-[var(--mundia-teal)]/40 bg-[var(--mundia-teal)]/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--mundia-teal-strong)] sm:text-xs">
-            Featured Book
+          <span className="rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-1 text-sm text-[var(--mundia-muted)]">
+            {genre}
           </span>
           {!isActive && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700 sm:text-xs">
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm text-red-700">
               <AlertCircle className="size-3.5" />
-              Currently Unavailable
+              Currently unavailable
             </span>
           )}
         </div>
@@ -195,12 +193,6 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
         <div className="flex flex-wrap gap-2 sm:gap-3">
           <span className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] px-3 py-1.5 text-xs text-slate-700 sm:text-sm">
-            Category:{" "}
-            <span className="font-semibold text-[var(--mundia-ink)]">
-              {genre}
-            </span>
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] px-3 py-1.5 text-xs text-slate-700 sm:text-sm">
             <img
               src="/icons/star.svg"
               alt="star"
@@ -215,40 +207,28 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+        <dl className="grid gap-x-8 gap-y-3 border-y border-[var(--mundia-line)] py-4 text-sm sm:grid-cols-2">
           {detailFields.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-3"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                {item.label}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-[var(--mundia-ink)] sm:text-base">
+            <div key={item.label} className="flex justify-between gap-4">
+              <dt className="text-[var(--mundia-muted)]">{item.label}</dt>
+              <dd className="max-w-[14rem] truncate text-right font-medium text-[var(--mundia-ink)]">
                 {item.value}
-              </p>
+              </dd>
             </div>
           ))}
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-          <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              Added to Library
-            </p>
-            <p className="mt-1 text-sm font-semibold text-[var(--mundia-ink)] sm:text-base">
-              {formattedCreatedAt}
-            </p>
+          <div className="flex justify-between gap-4">
+            <dt className="text-[var(--mundia-muted)]">Catalog record</dt>
+            <dd className="text-right font-medium text-[var(--mundia-ink)]">
+              Added {formattedCreatedAt}
+            </dd>
           </div>
-          <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              Last Updated
-            </p>
-            <p className="mt-1 text-sm font-semibold text-[var(--mundia-ink)] sm:text-base">
+          <div className="flex justify-between gap-4">
+            <dt className="text-[var(--mundia-muted)]">Last update</dt>
+            <dd className="text-right font-medium text-[var(--mundia-ink)]">
               {formattedUpdatedAt}
-            </p>
+            </dd>
           </div>
-        </div>
+        </dl>
 
         <BookBorrowStats
           bookId={id}
@@ -256,7 +236,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
           initialStats={initialStats}
         />
 
-        <div className="rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-4 sm:px-5">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-4 sm:px-5">
           <p className="book-description">{description}</p>
         </div>
 
@@ -289,7 +269,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
                 />
                 <Button
                   asChild
-                  className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-teal-strong)] text-white hover:opacity-95 sm:w-fit"
+                  className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
                 >
                   <Link href={`/books/${id}`}>
                     <BookOpen className="size-4 text-white sm:size-5" />
@@ -304,10 +284,10 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
 
       <div className="relative z-10 flex flex-1 items-center justify-center">
         <div className="relative">
-          <div className="pointer-events-none absolute -left-5 -top-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] rounded-xl border border-[var(--mundia-line)] bg-[var(--surface-0)]" />
+          <div className="pointer-events-none absolute -left-5 -top-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)]" />
           <BookCover
             variant="wide"
-            className="z-10 drop-shadow-2xl"
+            className="z-10"
             coverColor={coverColor}
             coverImage={coverUrl}
           />
