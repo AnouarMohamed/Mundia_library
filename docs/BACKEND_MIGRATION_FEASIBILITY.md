@@ -11,7 +11,7 @@ The current performance profile is more likely constrained by query/index design
 ## Current architecture constraints
 
 - Next.js App Router with Node.js runtime for API routes
-- Drizzle ORM on MySQL
+- Drizzle ORM on PostgreSQL
 - Significant query load in these route families:
   - Books listing/filter/search and recommendations
   - Borrow records filtering and history joins

@@ -73,7 +73,7 @@ What it does:
 
 Existing index pass (already shipped):
 
-- `migrations/mysql/0003_hot_query_indexes.sql`
+- `migrations/mysql/0003_hot_query_indexes.sql` (historical migration artifact)
 - `scripts/add-performance-indexes.ts`
 
 These are designed to support the query predicates and sort patterns used in this phase.

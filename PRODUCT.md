@@ -1,10 +1,10 @@
-# Mundia Library Product Context
+# Mundiapolis Library Product Context
 
 register: product
 
 ## Product Purpose
 
-Mundia Library is an authenticated university library system for Mundiapolis students, librarians, and admins. It helps students discover books, request borrows, manage active loans, review returned books, and track account status. It helps admins manage catalog quality, account approvals, borrow requests, renewals, fines, reminders, and operating analytics.
+Mundiapolis Library is an authenticated university library system for Mundiapolis students, faculty, librarians, and admins. It helps students discover books, request borrows, manage active loans, review returned books, and track account status. It helps admins manage catalog quality, account approvals, borrow requests, renewals, fines, reminders, and operating analytics.
 
 ## Users
 
