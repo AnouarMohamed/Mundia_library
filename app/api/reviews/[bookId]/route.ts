@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { auth } from "@/auth";
 import { db } from "@/database/drizzle";
 import { bookReviews, users, borrowRecords } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
 import {
   guardToResponse,
   requireApprovedUser,
 } from "@/lib/security/auth-guards";
+import { enforceRateLimit, isUuid } from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
+import { validateReviewPayload } from "@/lib/services/review-validation";
 
 /**
  * Use Node.js runtime for DB access.
@@ -27,61 +34,52 @@ export async function GET(
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     // This endpoint returns public book reviews (reviews are public data, not user-specific)
     // Rate limiting provides protection against abuse while keeping it accessible for public book pages
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     const { bookId } = await params;
 
     if (!bookId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Book ID is required");
     }
 
-    const reviews = await db
+    if (!isUuid(bookId)) {
+      return badRequestResponse("Invalid book ID");
+    }
+
+    const session = await auth();
+    const currentUserId = session?.user?.id;
+
+    const reviewsResult = await db
       .select({
         id: bookReviews.id,
+        userId: bookReviews.userId,
         rating: bookReviews.rating,
         comment: bookReviews.comment,
         createdAt: bookReviews.createdAt,
         updatedAt: bookReviews.updatedAt,
         userFullName: users.fullName,
-        userEmail: users.email,
       })
       .from(bookReviews)
       .innerJoin(users, eq(bookReviews.userId, users.id))
       .where(eq(bookReviews.bookId, bookId))
       .orderBy(desc(bookReviews.createdAt));
 
+    const reviews = reviewsResult.map(({ userId, ...review }) => ({
+      ...review,
+      isOwner: Boolean(currentUserId && userId === currentUserId),
+    }));
+
     return NextResponse.json({
       success: true,
       reviews,
     });
   } catch (error) {
-    console.error("Error fetching reviews:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch reviews",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("reviews.fetch_failed", error);
+    return internalServerErrorResponse();
   }
 }
 
@@ -95,18 +93,10 @@ export async function POST(
 ) {
   try {
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     // CRITICAL: Authentication required for creating reviews
@@ -117,30 +107,19 @@ export async function POST(
     const { bookId } = await params;
 
     if (!bookId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Book ID is required");
     }
 
-    const { rating, comment } = await request.json();
-
-    // Validate input
-    if (!rating || rating < 1 || rating > 5) {
-      return NextResponse.json(
-        { success: false, error: "Rating must be between 1 and 5" },
-        { status: 400 }
-      );
+    if (!isUuid(bookId)) {
+      return badRequestResponse("Invalid book ID");
     }
 
-    if (!comment || comment.trim().length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Comment is required" },
-        { status: 400 }
-      );
+    const reviewPayload = validateReviewPayload(
+      await request.json().catch(() => null)
+    );
+
+    if (!reviewPayload.ok) {
+      return badRequestResponse(reviewPayload.message);
     }
 
     // Check if user has borrowed this book before (for eligibility)
@@ -193,8 +172,8 @@ export async function POST(
         id: reviewId,
         bookId,
         userId: guard.user.id,
-        rating,
-        comment: comment.trim(),
+        rating: reviewPayload.rating,
+        comment: reviewPayload.comment,
       });
 
     const [newReview] = await db
@@ -203,6 +182,7 @@ export async function POST(
         rating: bookReviews.rating,
         comment: bookReviews.comment,
         createdAt: bookReviews.createdAt,
+        updatedAt: bookReviews.updatedAt,
       })
       .from(bookReviews)
       .where(eq(bookReviews.id, reviewId))
@@ -210,18 +190,17 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      review: newReview,
+      review: newReview
+        ? {
+            ...newReview,
+            userFullName: guard.user.name || "You",
+            isOwner: true,
+          }
+        : newReview,
       message: "Review submitted successfully",
     });
   } catch (error) {
-    console.error("Error creating review:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create review",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("reviews.create_failed", error);
+    return internalServerErrorResponse();
   }
 }

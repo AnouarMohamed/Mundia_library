@@ -23,9 +23,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { bookReviews, borrowRecords } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
 import { requireApprovedUser } from "@/lib/security/auth-guards";
+import { enforceRateLimit, isUuid } from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Explicitly set runtime to Node.js
@@ -57,30 +62,20 @@ export async function GET(
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     // This endpoint returns review eligibility status (public information, not sensitive)
     // Rate limiting provides protection against abuse while keeping it accessible for public book pages
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     const { bookId } = await params;
 
     if (!bookId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Book ID is required");
+    }
+
+    if (!isUuid(bookId)) {
+      return badRequestResponse("Invalid book ID");
     }
 
     // Check authentication (optional - works for both authenticated and unauthenticated users)
@@ -167,14 +162,7 @@ export async function GET(
           : "You can review this book",
     });
   } catch (error) {
-    console.error("Error checking review eligibility:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to check review eligibility",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("reviews.eligibility_failed", error);
+    return internalServerErrorResponse();
   }
 }

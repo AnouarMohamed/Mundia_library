@@ -29,10 +29,6 @@ interface BookDetailContentProps {
    */
   userId?: string;
   /**
-   * User email for reviews section
-   */
-  userEmail?: string;
-  /**
    * Initial book data from SSR (prevents duplicate fetch)
    */
   initialBook?: Book;
@@ -46,7 +42,7 @@ interface BookDetailContentProps {
     createdAt: Date | null;
     updatedAt: Date | null;
     userFullName: string;
-    userEmail: string;
+    isOwner: boolean;
   }>;
 }
 
@@ -56,7 +52,6 @@ interface BookDetailContentProps {
 const BookDetailContent: React.FC<BookDetailContentProps> = ({
   bookId,
   userId: _userId,
-  userEmail,
   initialBook,
   initialReviews,
 }) => {
@@ -137,7 +132,6 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
           <ReviewsSection
             bookId={bookId}
             reviews={reviews ?? initialReviews ?? []}
-            currentUserEmail={userEmail}
           />
           {/* Show error message for reviews if failed but book loaded */}
           {isErrorReviews && (

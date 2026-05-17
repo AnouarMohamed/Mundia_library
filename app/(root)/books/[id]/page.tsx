@@ -26,11 +26,10 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     redirect("/sign-in");
   }
   const userId = session.user.id;
-  const userEmail = session.user.email || undefined;
 
   const { id } = await params;
 
-  const [book, reviewRows, rawUserBorrows] = await Promise.all([
+  const [book, rawReviewRows, rawUserBorrows] = await Promise.all([
     db
       .select()
       .from(books)
@@ -44,8 +43,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
         comment: bookReviews.comment,
         createdAt: bookReviews.createdAt,
         updatedAt: bookReviews.updatedAt,
+        userId: bookReviews.userId,
         userFullName: users.fullName,
-        userEmail: users.email,
       })
       .from(bookReviews)
       .innerJoin(users, eq(bookReviews.userId, users.id))
@@ -84,6 +83,11 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     notFound();
   }
 
+  const reviewRows = rawReviewRows.map(({ userId: reviewUserId, ...review }) => ({
+    ...review,
+    isOwner: reviewUserId === userId,
+  }));
+
   // Normalize date/fine fields for client consumption.
   const initialUserBorrows = rawUserBorrows.map((record) => ({
     id: record.id,
@@ -104,9 +108,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     createdAt: record.createdAt,
   }));
 
-  const hasExistingReview = reviewRows.some((review) =>
-    userEmail ? review.userEmail === userEmail : false
-  );
+  const hasExistingReview = reviewRows.some((review) => review.isOwner);
   const hasReturnedBorrow = rawUserBorrows.some(
     (record) => record.status === "RETURNED"
   );
@@ -140,7 +142,6 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
       <BookDetailContent
         bookId={id}
         userId={userId}
-        userEmail={userEmail}
         initialBook={book as Book}
         initialReviews={reviewRows}
       />

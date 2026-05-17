@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { bookReviews } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
 import {
   guardToResponse,
   requireApprovedUser,
 } from "@/lib/security/auth-guards";
+import { enforceRateLimit, isUuid } from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  jsonError,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -24,18 +30,10 @@ export async function DELETE(
 ) {
   try {
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     // CRITICAL: Authentication required for deleting reviews
@@ -46,13 +44,11 @@ export async function DELETE(
     const { reviewId } = await params;
 
     if (!reviewId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Review ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Review ID is required");
+    }
+
+    if (!isUuid(reviewId)) {
+      return badRequestResponse("Invalid review ID");
     }
 
     // CRITICAL: Authorization check - user must own the review to delete it
@@ -69,32 +65,25 @@ export async function DELETE(
       .limit(1);
 
     if (existingReview.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Review not found or you don't have permission to delete it",
-          message: "Review not found or you don't have permission to delete it",
-        },
-        { status: 404 }
-      );
+      return jsonError("Not Found", "Review not found", 404);
     }
 
     // Delete the review
-    await db.delete(bookReviews).where(eq(bookReviews.id, reviewId));
+    await db
+      .delete(bookReviews)
+      .where(
+        and(
+          eq(bookReviews.id, reviewId),
+          eq(bookReviews.userId, guard.user.id)
+        )
+      );
 
     return NextResponse.json({
       success: true,
       message: "Review deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting review:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to delete review",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("reviews.delete_failed", error);
+    return internalServerErrorResponse();
   }
 }

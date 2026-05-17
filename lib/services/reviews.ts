@@ -30,10 +30,8 @@ export interface Review {
   updatedAt: Date | null;
   /** Full name of the user who wrote the review. */
   userFullName: string;
-  /** Email address of the user who wrote the review. */
-  userEmail: string;
-  /** Unique identifier of the user (optional). */
-  userId?: string;
+  /** Whether the authenticated user owns this review. */
+  isOwner: boolean;
   /** Unique identifier of the book being reviewed (optional). */
   bookId?: string;
 }

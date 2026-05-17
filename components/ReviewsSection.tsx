@@ -36,12 +36,11 @@ interface Review {
   createdAt: Date | null;
   updatedAt: Date | null;
   userFullName: string;
-  userEmail: string;
+  isOwner: boolean;
 }
 
 interface ReviewCardProps {
   review: Review;
-  currentUserEmail?: string;
   onEdit: (review: Review) => void;
   onDelete: (reviewId: string) => void;
 }
@@ -51,7 +50,6 @@ interface ReviewCardProps {
  */
 function ReviewCard({
   review,
-  currentUserEmail,
   onEdit,
   onDelete,
 }: ReviewCardProps) {
@@ -60,7 +58,7 @@ function ReviewCard({
   // Use React Query mutation for deleting review
   const deleteReviewMutation = useDeleteReview();
 
-  const isOwner = currentUserEmail === review.userEmail;
+  const isOwner = review.isOwner;
   const isEdited =
     review.createdAt &&
     review.updatedAt &&
@@ -212,7 +210,6 @@ function ReviewCard({
 interface ReviewsSectionProps {
   bookId: string;
   reviews: Review[];
-  currentUserEmail?: string | null;
 }
 
 /**
@@ -221,7 +218,6 @@ interface ReviewsSectionProps {
 export default function ReviewsSection({
   bookId: _bookId,
   reviews,
-  currentUserEmail,
 }: ReviewsSectionProps) {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
 
@@ -272,7 +268,6 @@ export default function ReviewsSection({
             <ReviewCard
               key={review.id}
               review={review}
-              currentUserEmail={currentUserEmail || undefined}
               onEdit={handleReviewEdit}
               onDelete={handleReviewDelete}
             />
