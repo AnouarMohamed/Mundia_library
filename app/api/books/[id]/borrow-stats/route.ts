@@ -18,10 +18,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
-import { borrowRecords } from "@/database/schema";
-import { eq, count, sql } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
+import { books, borrowRecords } from "@/database/schema";
+import { and, eq, count, sql } from "drizzle-orm";
+import { enforceRateLimit, isUuid } from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  jsonError,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -43,30 +49,30 @@ export async function GET(
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     // This endpoint returns public book statistics (aggregate data, not user-specific)
     // Rate limiting provides protection against abuse while keeping it accessible for public book pages
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Book ID is required");
+    }
+
+    if (!isUuid(id)) {
+      return badRequestResponse("Invalid book ID");
+    }
+
+    const [book] = await db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(eq(books.id, id), eq(books.isActive, true)))
+      .limit(1);
+
+    if (!book) {
+      return jsonError("Not Found", "Book not found", 404);
     }
 
     // Get borrow records statistics for this book
@@ -95,14 +101,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Error fetching book borrow statistics:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch book borrow statistics",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("books.borrow_stats_failed", error);
+    return internalServerErrorResponse();
   }
 }

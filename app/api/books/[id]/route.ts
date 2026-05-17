@@ -15,8 +15,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { and, eq } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
+import { enforceRateLimit, isUuid } from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  jsonError,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -38,30 +44,20 @@ export async function GET(
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     // This endpoint returns public book data (book details, not user-specific)
     // Rate limiting provides protection against abuse while keeping it accessible for public book pages
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     const { id } = await params;
 
     if (!id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book ID is required",
-        },
-        { status: 400 }
-      );
+      return badRequestResponse("Book ID is required");
+    }
+
+    if (!isUuid(id)) {
+      return badRequestResponse("Invalid book ID");
     }
 
     // Fetch book by ID
@@ -72,13 +68,7 @@ export async function GET(
       .limit(1);
 
     if (!book) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Book not found",
-        },
-        { status: 404 }
-      );
+      return jsonError("Not Found", "Book not found", 404);
     }
 
     return NextResponse.json({
@@ -86,14 +76,7 @@ export async function GET(
       book,
     });
   } catch (error) {
-    console.error("Error fetching book:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch book",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("books.detail_failed", error);
+    return internalServerErrorResponse();
   }
 }

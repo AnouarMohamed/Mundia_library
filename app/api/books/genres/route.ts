@@ -15,8 +15,12 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { asc, eq } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
+import { enforceRateLimit } from "@/lib/security/api-request";
+import {
+  internalServerErrorResponse,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -47,18 +51,10 @@ const getCachedGenres = unstable_cache(
 export async function GET(_request: NextRequest) {
   try {
     // Rate limiting to prevent abuse
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     // Get unique genres from all books
@@ -71,15 +67,7 @@ export async function GET(_request: NextRequest) {
       genres,
     });
   } catch (error) {
-    console.error("Error fetching genres:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch genres",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("books.genres_failed", error);
+    return internalServerErrorResponse();
   }
 }
-

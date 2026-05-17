@@ -22,15 +22,28 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { desc, asc, eq, and, sql } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
 import { performAdvancedSearch } from "@/lib/services/search-service";
 import { getCachedData, setCachedData } from "@/lib/cache/redis-cache";
+import {
+  enforceRateLimit,
+  normalizeTextParam,
+} from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access and Redis caching.
  */
 export const runtime = "nodejs";
+
+const MAX_SEARCH_LENGTH = 100;
+const MAX_GENRE_LENGTH = 120;
+const SORT_OPTIONS = new Set(["title", "author", "rating", "date"]);
+const AVAILABILITY_OPTIONS = new Set(["", "available", "unavailable"]);
 
 type BooksQueryInput = {
   search: string;
@@ -196,30 +209,43 @@ export async function GET(request: NextRequest) {
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     // This endpoint returns public book data (book list with filters, not user-specific)
     // Rate limiting provides protection against abuse while keeping it accessible for public book pages
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    const success = await enforceRateLimit();
 
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
     const { searchParams } = new URL(request.url);
 
     // Parse query parameters
-    const search = searchParams.get("search") || "";
-    const genre = searchParams.get("genre") || "";
-    const availability = searchParams.get("availability") || "";
-    const rating = searchParams.get("rating") || "";
-    const sort = searchParams.get("sort") || "title";
+    const search = normalizeTextParam(
+      searchParams.get("search"),
+      MAX_SEARCH_LENGTH
+    );
+    const genre = normalizeTextParam(searchParams.get("genre"), MAX_GENRE_LENGTH);
+    const availability = normalizeTextParam(
+      searchParams.get("availability"),
+      20
+    ).toLowerCase();
+    const rating = normalizeTextParam(searchParams.get("rating"), 2);
+    const sort = normalizeTextParam(searchParams.get("sort"), 20) || "title";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limitParam = parseInt(searchParams.get("limit") || "12", 10);
+
+    if (!SORT_OPTIONS.has(sort)) {
+      return badRequestResponse("Invalid sort option");
+    }
+
+    if (!AVAILABILITY_OPTIONS.has(availability)) {
+      return badRequestResponse("Invalid availability filter");
+    }
+
+    if (rating) {
+      const minRating = Number(rating);
+      if (!Number.isInteger(minRating) || minRating < 1 || minRating > 5) {
+        return badRequestResponse("Rating must be an integer from 1 to 5");
+      }
+    }
 
     const safePage = Number.isNaN(page) ? 1 : Math.max(1, page);
     const safeLimit = Number.isNaN(limitParam)
@@ -242,14 +268,7 @@ export async function GET(request: NextRequest) {
       pagination: result.pagination,
     });
   } catch (error) {
-    console.error("Error fetching books:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch books",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("books.list_failed", error);
+    return internalServerErrorResponse();
   }
 }
