@@ -1,5 +1,6 @@
 import { db } from "@/database/drizzle";
 import { systemConfig } from "@/database/schema";
+import { requireAdmin } from "@/lib/security/auth-guards";
 import { eq } from "drizzle-orm";
 
 // Configuration keys
@@ -7,14 +8,23 @@ export const CONFIG_KEYS = {
   DAILY_FINE_AMOUNT: "daily_fine_amount",
 } as const;
 
+const assertAdmin = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
+
 // Get configuration value
 /**
  * Read a config value from storage.
  */
-export async function getConfigValue(
+const getConfigValueFromStorage = async (
   key: string,
   defaultValue?: string
-): Promise<string> {
+): Promise<string> => {
   try {
     const result = await db
       .select({ value: systemConfig.value })
@@ -27,18 +37,27 @@ export async function getConfigValue(
     console.error(`Error getting config value for key ${key}:`, error);
     return defaultValue || "";
   }
+};
+
+export async function getConfigValue(
+  key: string,
+  defaultValue?: string
+): Promise<string> {
+  await assertAdmin();
+
+  return getConfigValueFromStorage(key, defaultValue);
 }
 
 // Set configuration value
 /**
  * Write or update a config value.
  */
-export async function setConfigValue(
+const setConfigValueInStorage = async (
   key: string,
   value: string,
   description?: string,
   updatedBy?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string }> => {
   try {
     // Check if config exists
     const existing = await db
@@ -78,6 +97,22 @@ export async function setConfigValue(
       error: "Unable to persist configuration",
     };
   }
+};
+
+export async function setConfigValue(
+  key: string,
+  value: string,
+  description?: string,
+  updatedBy?: string
+): Promise<{ success: boolean; error?: string }> {
+  const guard = await assertAdmin();
+
+  return setConfigValueInStorage(
+    key,
+    value,
+    description,
+    updatedBy || guard.user.id
+  );
 }
 
 // Get daily fine amount with default
@@ -85,7 +120,12 @@ export async function setConfigValue(
  * Read the daily fine amount with a default fallback.
  */
 export async function getDailyFineAmount(): Promise<number> {
-  const value = await getConfigValue(CONFIG_KEYS.DAILY_FINE_AMOUNT, "1.00");
+  await assertAdmin();
+
+  const value = await getConfigValueFromStorage(
+    CONFIG_KEYS.DAILY_FINE_AMOUNT,
+    "1.00"
+  );
   return parseFloat(value) || 1.0;
 }
 
@@ -97,11 +137,13 @@ export async function setDailyFineAmount(
   amount: number,
   updatedBy?: string
 ): Promise<{ success: boolean; error?: string }> {
-  return setConfigValue(
+  const guard = await assertAdmin();
+
+  return setConfigValueInStorage(
     CONFIG_KEYS.DAILY_FINE_AMOUNT,
     amount.toString(),
     "Daily fine amount for overdue books",
-    updatedBy
+    updatedBy || guard.user.id
   );
 }
 
