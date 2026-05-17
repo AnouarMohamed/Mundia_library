@@ -46,6 +46,23 @@ Examples:
 - `lib/admin/actions/recommendations.test.ts`
 - `tests/e2e/security.spec.ts`
 
+## Playwright Auth Checks
+
+The base Playwright suite always runs unauthenticated redirect checks, sign-in
+page rendering, and the health endpoint safety check.
+
+Authenticated role checks run when seeded test credentials are available:
+
+| Variable | Purpose |
+| --- | --- |
+| `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` | Approved non-admin user. |
+| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | Approved admin user. |
+| `E2E_PENDING_EMAIL` / `E2E_PENDING_PASSWORD` | Pending user for status enforcement. |
+| `E2E_OTHER_USER_ID` | Different user ID used to verify borrow-record isolation. |
+
+Leave these unset for local smoke testing. Set them in a seeded CI or preview
+environment to exercise the full authenticated security path.
+
 ## What To Test
 
 Prioritize tests for:
