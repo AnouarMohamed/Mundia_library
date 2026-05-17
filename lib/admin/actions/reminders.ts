@@ -160,7 +160,7 @@ export type ReminderType = "due_soon" | "overdue" | "return_reminder";
 /**
  * Fetch borrows due within the next two days.
  */
-export async function getBooksDueSoon() {
+const getBooksDueSoonForAdmin = async () => {
   const twoDaysFromNow = new Date();
   twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);
 
@@ -196,13 +196,19 @@ export async function getBooksDueSoon() {
     );
 
   return dueSoonBooks;
+};
+
+export async function getBooksDueSoon() {
+  await assertAdmin();
+
+  return getBooksDueSoonForAdmin();
 }
 
 // Get overdue books
 /**
  * Fetch borrows past due date.
  */
-export async function getOverdueBooks() {
+const getOverdueBooksForAdmin = async () => {
   const now = new Date();
   // Set to start of today to exclude books due today from overdue
   const startOfToday = new Date(
@@ -235,6 +241,12 @@ export async function getOverdueBooks() {
     );
 
   return overdueBooks;
+};
+
+export async function getOverdueBooks() {
+  await assertAdmin();
+
+  return getOverdueBooksForAdmin();
 }
 
 // Send due soon reminders
@@ -244,7 +256,7 @@ export async function getOverdueBooks() {
 export async function sendDueSoonReminders() {
   await assertAdmin();
 
-  const dueSoonBooks = await getBooksDueSoon();
+  const dueSoonBooks = await getBooksDueSoonForAdmin();
   const results = [];
 
   for (const book of dueSoonBooks) {
@@ -301,7 +313,7 @@ This is an automated reminder. For assistance, please contact us at support@mund
       }
 
       // Update the lastReminderSent timestamp after successful email
-      await updateLastReminderSent(book.recordId);
+      await updateLastReminderSentForAdmin(book.recordId);
       results.push({
         recordId: book.recordId,
         userEmail: book.userEmail,
@@ -333,7 +345,7 @@ This is an automated reminder. For assistance, please contact us at support@mund
 export async function sendOverdueReminders() {
   await assertAdmin();
 
-  const overdueBooks = await getOverdueBooks();
+  const overdueBooks = await getOverdueBooksForAdmin();
   const results = [];
 
   for (const book of overdueBooks) {
@@ -394,7 +406,7 @@ This is an automated notice. For assistance, please contact us at support@mundia
       }
 
       // Update the lastReminderSent timestamp after successful email
-      await updateLastReminderSent(book.recordId);
+      await updateLastReminderSentForAdmin(book.recordId);
       results.push({
         recordId: book.recordId,
         userEmail: book.userEmail,
@@ -423,9 +435,7 @@ This is an automated notice. For assistance, please contact us at support@mundia
 /**
  * Update last reminder timestamp for a borrow record.
  */
-export async function updateLastReminderSent(recordId: string) {
-  await assertAdmin();
-
+const updateLastReminderSentForAdmin = async (recordId: string) => {
   await db
     .update(borrowRecords)
     .set({
@@ -433,6 +443,12 @@ export async function updateLastReminderSent(recordId: string) {
       updatedAt: new Date(),
     })
     .where(eq(borrowRecords.id, recordId));
+};
+
+export async function updateLastReminderSent(recordId: string) {
+  await assertAdmin();
+
+  await updateLastReminderSentForAdmin(recordId);
 }
 
 // Get reminder statistics
