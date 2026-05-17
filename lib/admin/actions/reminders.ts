@@ -2,6 +2,17 @@ import { db } from "@/database/drizzle";
 import { borrowRecords, users, books } from "@/database/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sendEmailWithFallback } from "@/lib/services/email-service";
+import { requireAdmin } from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
+
+const assertAdmin = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
 
 // Email service for sending reminders
 export class EmailService {
@@ -231,6 +242,8 @@ export async function getOverdueBooks() {
  * Send reminder emails for upcoming due dates.
  */
 export async function sendDueSoonReminders() {
+  await assertAdmin();
+
   const dueSoonBooks = await getBooksDueSoon();
   const results = [];
 
@@ -275,6 +288,18 @@ This is an automated reminder. For assistance, please contact us at support@mund
         subject,
         body
       );
+
+      if (!result.success) {
+        results.push({
+          recordId: book.recordId,
+          userEmail: book.userEmail,
+          bookTitle: book.bookTitle,
+          status: "failed",
+          error: "Delivery failed",
+        });
+        continue;
+      }
+
       // Update the lastReminderSent timestamp after successful email
       await updateLastReminderSent(book.recordId);
       results.push({
@@ -285,12 +310,15 @@ This is an automated reminder. For assistance, please contact us at support@mund
         result,
       });
     } catch (error) {
+      logError("admin.due_reminder_failed", error, {
+        recordId: book.recordId,
+      });
       results.push({
         recordId: book.recordId,
         userEmail: book.userEmail,
         bookTitle: book.bookTitle,
         status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Delivery failed",
       });
     }
   }
@@ -303,6 +331,8 @@ This is an automated reminder. For assistance, please contact us at support@mund
  * Send reminder emails for overdue borrows.
  */
 export async function sendOverdueReminders() {
+  await assertAdmin();
+
   const overdueBooks = await getOverdueBooks();
   const results = [];
 
@@ -351,6 +381,18 @@ This is an automated notice. For assistance, please contact us at support@mundia
         subject,
         body
       );
+
+      if (!result.success) {
+        results.push({
+          recordId: book.recordId,
+          userEmail: book.userEmail,
+          bookTitle: book.bookTitle,
+          status: "failed",
+          error: "Delivery failed",
+        });
+        continue;
+      }
+
       // Update the lastReminderSent timestamp after successful email
       await updateLastReminderSent(book.recordId);
       results.push({
@@ -361,12 +403,15 @@ This is an automated notice. For assistance, please contact us at support@mundia
         result,
       });
     } catch (error) {
+      logError("admin.overdue_reminder_failed", error, {
+        recordId: book.recordId,
+      });
       results.push({
         recordId: book.recordId,
         userEmail: book.userEmail,
         bookTitle: book.bookTitle,
         status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Delivery failed",
       });
     }
   }
@@ -379,6 +424,8 @@ This is an automated notice. For assistance, please contact us at support@mundia
  * Update last reminder timestamp for a borrow record.
  */
 export async function updateLastReminderSent(recordId: string) {
+  await assertAdmin();
+
   await db
     .update(borrowRecords)
     .set({
@@ -393,6 +440,8 @@ export async function updateLastReminderSent(recordId: string) {
  * Aggregate reminder stats for admin dashboards.
  */
 export async function getReminderStats() {
+  await assertAdmin();
+
   const now = new Date();
   const twoDaysFromNow = new Date();
   twoDaysFromNow.setDate(twoDaysFromNow.getDate() + 2);

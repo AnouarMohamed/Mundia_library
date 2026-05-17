@@ -9,6 +9,16 @@
 import { db } from "@/database/drizzle";
 import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
+import { requireAdmin } from "@/lib/security/auth-guards";
+
+const assertAdmin = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
 
 /**
  * Calculates borrowing and return trends over the last 30 days.
@@ -18,6 +28,8 @@ import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
  * @returns Array of daily aggregates (date, borrow count, return count).
  */
 export async function getBorrowingTrends() {
+  await assertAdmin();
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -45,6 +57,8 @@ export async function getBorrowingTrends() {
  * @returns Array of books with lifetime and active borrow counts.
  */
 export async function getPopularBooks(limit = 10) {
+  await assertAdmin();
+
   const popularBooks = await db
     .select({
       bookId: borrowRecords.bookId,
@@ -73,6 +87,8 @@ export async function getPopularBooks(limit = 10) {
  * @returns Top 10 genres by borrow volume.
  */
 export async function getPopularGenres() {
+  await assertAdmin();
+
   const popularGenres = await db
     .select({
       genre: books.genre,
@@ -96,6 +112,8 @@ export async function getPopularGenres() {
  * @returns Top 20 most active students by borrow volume.
  */
 export async function getUserActivityPatterns() {
+  await assertAdmin();
+
   const userActivity = await db
     .select({
       userId: borrowRecords.userId,
@@ -127,6 +145,8 @@ export async function getUserActivityPatterns() {
  * @returns Detailed list of overdue records.
  */
 export async function getOverdueAnalysis() {
+  await assertAdmin();
+
   const now = new Date();
 
   const { getDailyFineAmount } = await import("./config");
@@ -174,6 +194,8 @@ export async function getOverdueAnalysis() {
  * @returns Aggregate counts and sums for overdue loans.
  */
 export async function getOverdueStats() {
+  await assertAdmin();
+
   const now = new Date();
 
   const { getDailyFineAmount } = await import("./config");
@@ -205,6 +227,8 @@ export async function getOverdueStats() {
  * @returns Object with current and last month stats.
  */
 export async function getMonthlyStats() {
+  await assertAdmin();
+
   const currentMonth = new Date();
   const lastMonth = new Date();
   lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -262,6 +286,8 @@ export async function getMonthlyStats() {
  * @returns Snapshot of total counts (books, users, active loans, etc.).
  */
 export async function getSystemHealth() {
+  await assertAdmin();
+
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -316,6 +342,8 @@ export async function getSystemHealth() {
  * @returns Grouped counts by month and genre.
  */
 export async function getGenrePerformanceByMonth() {
+  await assertAdmin();
+
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 

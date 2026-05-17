@@ -15,6 +15,17 @@ vi.mock("@/database/drizzle", () => ({
   },
 }));
 
+vi.mock("@/lib/security/auth-guards", () => ({
+  requireAdmin: vi.fn(async () => ({
+    ok: true,
+    user: { id: "admin-1", role: "ADMIN", status: "APPROVED" },
+  })),
+}));
+
+vi.mock("@/lib/security/logger", () => ({
+  logError: vi.fn(),
+}));
+
 describe("generateCollaborativeRecommendations", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -1,6 +1,8 @@
 import { db } from "@/database/drizzle";
 import { books, borrowRecords, users } from "@/database/schema";
 import { eq, desc, sql, and, inArray, notInArray } from "drizzle-orm";
+import { requireAdmin } from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
 
 // Types for recommendations
 export interface Recommendation {
@@ -21,6 +23,15 @@ export interface RecommendationStats {
   trendingCount: number;
   lastUpdated: Date;
 }
+
+const assertAdmin = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
 
 // Get user's borrowing history for recommendation algorithms
 /**
@@ -353,6 +364,8 @@ export async function generateUserRecommendations(
 export async function generateAllUserRecommendations(): Promise<
   { userId: string; recommendations: Recommendation[] }[]
 > {
+  await assertAdmin();
+
   const allUsers = await db
     .select({ id: users.id })
     .from(users)
@@ -367,10 +380,9 @@ export async function generateAllUserRecommendations(): Promise<
         recommendations,
       });
     } catch (error: unknown) {
-      console.error(
-        `Error generating recommendations for user ${user.id}:`,
-        error
-      );
+      logError("admin.recommendation_user_generation_failed", error, {
+        userId: user.id,
+      });
     }
   }
 
@@ -385,6 +397,8 @@ export async function updateTrendingBooks(): Promise<{
   message: string;
   trendingCount: number;
 }> {
+  await assertAdmin();
+
   // This function refreshes the trending data by recalculating recent borrows
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -421,6 +435,8 @@ export async function refreshRecommendationCache(): Promise<{
   message: string;
   cacheCleared: boolean;
 }> {
+  await assertAdmin();
+
   // In a real application, this would clear Redis cache or similar
   // For now, we'll just simulate the operation
 
@@ -438,6 +454,8 @@ export async function refreshRecommendationCache(): Promise<{
 
 // Get recommendation statistics
 export async function getRecommendationStats(): Promise<RecommendationStats> {
+  await assertAdmin();
+
   const allUsers = await db
     .select({ id: users.id })
     .from(users)
@@ -467,7 +485,9 @@ export async function getRecommendationStats(): Promise<RecommendationStats> {
         }
       });
     } catch (error: unknown) {
-      console.error(`Error getting stats for user ${user.id}:`, error);
+      logError("admin.recommendation_stats_user_failed", error, {
+        userId: user.id,
+      });
     }
   }
 

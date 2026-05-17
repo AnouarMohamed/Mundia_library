@@ -1,10 +1,20 @@
 import { db } from "@/database/drizzle";
 import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
+import { requireAdmin } from "@/lib/security/auth-guards";
 
 // Export types
 export type ExportFormat = "csv" | "json" | "pdf";
 export type ExportType = "books" | "users" | "borrows" | "analytics";
+
+const assertAdmin = async () => {
+  const guard = await requireAdmin();
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
 
 // CSV export utilities
 /**
@@ -47,6 +57,8 @@ export class CSVExporter {
  * Export book catalog data.
  */
 export async function exportBooks(format: ExportFormat = "csv") {
+  await assertAdmin();
+
   const booksData = await db
     .select({
       id: books.id,
@@ -112,6 +124,8 @@ export async function exportBooks(format: ExportFormat = "csv") {
  * Export user data.
  */
 export async function exportUsers(format: ExportFormat = "csv") {
+  await assertAdmin();
+
   const usersData = await db
     .select({
       id: users.id,
@@ -162,6 +176,8 @@ export async function exportBorrows(
   format: ExportFormat = "csv",
   dateRange?: { start: Date; end: Date }
 ) {
+  await assertAdmin();
+
   const baseQuery = db
     .select({
       id: borrowRecords.id,
@@ -235,6 +251,8 @@ export async function exportBorrows(
  * Export analytics data.
  */
 export async function exportAnalytics(format: ExportFormat = "csv") {
+  await assertAdmin();
+
   const now = new Date();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -375,6 +393,8 @@ export function generateExportFilename(
  * Aggregate export counters for admin display.
  */
 export async function getExportStats() {
+  await assertAdmin();
+
   const [booksCount, usersCount, borrowsCount] = await Promise.all([
     db.select({ count: count() }).from(books),
     db.select({ count: count() }).from(users),

@@ -10,6 +10,8 @@ import { db } from "@/database/drizzle";
 import { books, borrowRecords, users } from "@/database/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
+import { requireAdmin } from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Utility to safely normalize numeric database aggregates into finite JavaScript numbers.
@@ -257,6 +259,14 @@ const getCachedAdminDashboardStats = unstable_cache(
  */
 export const getAdminDashboardStats = async () => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) {
+      return {
+        success: false as const,
+        error: guard.message,
+      };
+    }
+
     const data = await getCachedAdminDashboardStats();
 
     return {
@@ -264,7 +274,7 @@ export const getAdminDashboardStats = async () => {
       data,
     };
   } catch (error) {
-    console.error("Error fetching admin dashboard stats:", error);
+    logError("admin.dashboard_stats_failed", error);
     return {
       success: false as const,
       error: "Failed to fetch admin dashboard stats",
