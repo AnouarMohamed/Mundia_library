@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generateCollaborativeRecommendations } from "./recommendations";
 import { db } from "@/database/drizzle";
 
+const requireSelfOrAdminMock = vi.hoisted(() => vi.fn());
+
 // Mock dependencies
 vi.mock("@/database/drizzle", () => ({
   db: {
@@ -20,6 +22,7 @@ vi.mock("@/lib/security/auth-guards", () => ({
     ok: true,
     user: { id: "admin-1", role: "ADMIN", status: "APPROVED" },
   })),
+  requireSelfOrAdmin: requireSelfOrAdminMock,
 }));
 
 vi.mock("@/lib/security/logger", () => ({
@@ -29,6 +32,25 @@ vi.mock("@/lib/security/logger", () => ({
 describe("generateCollaborativeRecommendations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireSelfOrAdminMock.mockResolvedValue({
+      ok: true,
+      user: { id: "user-1", role: "USER", status: "APPROVED" },
+    });
+  });
+
+  it("should reject access before querying if the caller is not self or admin", async () => {
+    requireSelfOrAdminMock.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      message: "You can only access your own data",
+    });
+
+    await expect(
+      generateCollaborativeRecommendations("user-2")
+    ).rejects.toThrow("You can only access your own data");
+
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it("should return empty array if user has no borrow history", async () => {

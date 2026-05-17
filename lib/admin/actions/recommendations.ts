@@ -1,7 +1,10 @@
 import { db } from "@/database/drizzle";
 import { books, borrowRecords, users } from "@/database/schema";
 import { eq, desc, sql, and, inArray, notInArray } from "drizzle-orm";
-import { requireAdmin } from "@/lib/security/auth-guards";
+import {
+  requireAdmin,
+  requireSelfOrAdmin,
+} from "@/lib/security/auth-guards";
 import { logError } from "@/lib/security/logger";
 
 // Types for recommendations
@@ -33,11 +36,22 @@ const assertAdmin = async () => {
   return guard;
 };
 
+const assertSelfOrAdmin = async (userId: string) => {
+  const guard = await requireSelfOrAdmin(userId);
+  if (!guard.ok) {
+    throw new Error(guard.message);
+  }
+
+  return guard;
+};
+
 // Get user's borrowing history for recommendation algorithms
 /**
  * Fetch a user's borrow history for recommendation models.
  */
-export async function getUserBorrowHistory(userId: string): Promise<
+const getUserBorrowHistoryForRecommendations = async (
+  userId: string
+): Promise<
   Array<{
     bookId: string;
     bookTitle: string;
@@ -46,7 +60,7 @@ export async function getUserBorrowHistory(userId: string): Promise<
     borrowDate: Date | null;
     status: "PENDING" | "BORROWED" | "RETURNED";
   }>
-> {
+> => {
   const history = await db
     .select({
       bookId: borrowRecords.bookId,
@@ -67,17 +81,32 @@ export async function getUserBorrowHistory(userId: string): Promise<
     .orderBy(desc(borrowRecords.borrowDate));
 
   return history;
+};
+
+export async function getUserBorrowHistory(userId: string): Promise<
+  Array<{
+    bookId: string;
+    bookTitle: string;
+    bookAuthor: string;
+    bookGenre: string;
+    borrowDate: Date | null;
+    status: "PENDING" | "BORROWED" | "RETURNED";
+  }>
+> {
+  await assertSelfOrAdmin(userId);
+
+  return getUserBorrowHistoryForRecommendations(userId);
 }
 
 // Genre-based recommendations
 /**
  * Generate recommendations based on favorite genres.
  */
-export async function generateGenreBasedRecommendations(
+const generateGenreBasedRecommendationsForUser = async (
   userId: string,
   limit: number = 5
-): Promise<Recommendation[]> {
-  const userHistory = await getUserBorrowHistory(userId);
+): Promise<Recommendation[]> => {
+  const userHistory = await getUserBorrowHistoryForRecommendations(userId);
 
   if (userHistory.length === 0) {
     return [];
@@ -135,17 +164,26 @@ export async function generateGenreBasedRecommendations(
     score: book.rating || 0,
     algorithm: "genre-based" as const,
   }));
+};
+
+export async function generateGenreBasedRecommendations(
+  userId: string,
+  limit: number = 5
+): Promise<Recommendation[]> {
+  await assertSelfOrAdmin(userId);
+
+  return generateGenreBasedRecommendationsForUser(userId, limit);
 }
 
 // Author-based recommendations
 /**
  * Generate recommendations based on favorite authors.
  */
-export async function generateAuthorBasedRecommendations(
+const generateAuthorBasedRecommendationsForUser = async (
   userId: string,
   limit: number = 5
-): Promise<Recommendation[]> {
-  const userHistory = await getUserBorrowHistory(userId);
+): Promise<Recommendation[]> => {
+  const userHistory = await getUserBorrowHistoryForRecommendations(userId);
 
   if (userHistory.length === 0) {
     return [];
@@ -203,21 +241,30 @@ export async function generateAuthorBasedRecommendations(
     score: book.rating || 0,
     algorithm: "author-based" as const,
   }));
+};
+
+export async function generateAuthorBasedRecommendations(
+  userId: string,
+  limit: number = 5
+): Promise<Recommendation[]> {
+  await assertSelfOrAdmin(userId);
+
+  return generateAuthorBasedRecommendationsForUser(userId, limit);
 }
 
 // Trending recommendations (most borrowed books recently)
 /**
  * Generate recommendations from trending borrows.
  */
-export async function generateTrendingRecommendations(
+const generateTrendingRecommendationsForUser = async (
   userId: string,
   limit: number = 5
-): Promise<Recommendation[]> {
+): Promise<Recommendation[]> => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   // Get user's borrowing history to exclude already borrowed books
-  const userHistory = await getUserBorrowHistory(userId);
+  const userHistory = await getUserBorrowHistoryForRecommendations(userId);
   const borrowedBookIds = userHistory.map((book) => book.bookId);
 
   // Get most borrowed books in the last 30 days
@@ -255,6 +302,15 @@ export async function generateTrendingRecommendations(
     score: book.borrowCount,
     algorithm: "trending" as const,
   }));
+};
+
+export async function generateTrendingRecommendations(
+  userId: string,
+  limit: number = 5
+): Promise<Recommendation[]> {
+  await assertSelfOrAdmin(userId);
+
+  return generateTrendingRecommendationsForUser(userId, limit);
 }
 
 /**
@@ -269,10 +325,10 @@ export async function generateTrendingRecommendations(
 /**
  * Generate recommendations using collaborative filtering.
  */
-export async function generateCollaborativeRecommendations(
+const generateCollaborativeRecommendationsForUser = async (
   userId: string,
   limit: number = 5
-): Promise<Recommendation[]> {
+): Promise<Recommendation[]> => {
   // 1. Get user's borrow history
   const userHistory = await db
     .select({ bookId: borrowRecords.bookId })
@@ -330,20 +386,29 @@ export async function generateCollaborativeRecommendations(
     score: (book.matchCount * 2) + (book.rating || 0), // Weight matches more than rating
     algorithm: "collaborative" as const,
   }));
+};
+
+export async function generateCollaborativeRecommendations(
+  userId: string,
+  limit: number = 5
+): Promise<Recommendation[]> {
+  await assertSelfOrAdmin(userId);
+
+  return generateCollaborativeRecommendationsForUser(userId, limit);
 }
 
 // Generate all recommendations for a user
 /**
  * Generate a combined recommendation list for a user.
  */
-export async function generateUserRecommendations(
+const generateUserRecommendationsForUser = async (
   userId: string
-): Promise<Recommendation[]> {
+): Promise<Recommendation[]> => {
   const [genreRecs, authorRecs, trendingRecs, collabRecs] = await Promise.all([
-    generateGenreBasedRecommendations(userId, 3),
-    generateAuthorBasedRecommendations(userId, 3),
-    generateTrendingRecommendations(userId, 4),
-    generateCollaborativeRecommendations(userId, 4),
+    generateGenreBasedRecommendationsForUser(userId, 3),
+    generateAuthorBasedRecommendationsForUser(userId, 3),
+    generateTrendingRecommendationsForUser(userId, 4),
+    generateCollaborativeRecommendationsForUser(userId, 4),
   ]);
 
   // Combine and deduplicate recommendations
@@ -355,6 +420,14 @@ export async function generateUserRecommendations(
 
   // Sort by score and return top 10
   return uniqueRecs.sort((a, b) => b.score - a.score).slice(0, 10);
+};
+
+export async function generateUserRecommendations(
+  userId: string
+): Promise<Recommendation[]> {
+  await assertSelfOrAdmin(userId);
+
+  return generateUserRecommendationsForUser(userId);
 }
 
 // Generate recommendations for all users
@@ -374,7 +447,7 @@ export async function generateAllUserRecommendations(): Promise<
   const results = [];
   for (const user of allUsers) {
     try {
-      const recommendations = await generateUserRecommendations(user.id);
+      const recommendations = await generateUserRecommendationsForUser(user.id);
       results.push({
         userId: user.id,
         recommendations,
@@ -468,7 +541,7 @@ export async function getRecommendationStats(): Promise<RecommendationStats> {
 
   for (const user of allUsers) {
     try {
-      const recommendations = await generateUserRecommendations(user.id);
+      const recommendations = await generateUserRecommendationsForUser(user.id);
       totalRecommendations += recommendations.length;
 
       recommendations.forEach((rec) => {
