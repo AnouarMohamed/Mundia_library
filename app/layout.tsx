@@ -59,7 +59,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+    apple: "/images/mundiapolis-mark.png",
   },
   openGraph: {
     title: "Mundiapolis Library | University Library Management",

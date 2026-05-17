@@ -15,13 +15,20 @@ const Sidebar = ({ session }: { session: Session }) => {
       <div>
         <Link href="/" className="logo">
           <img
-            src="/icons/admin/logo.svg"
-            alt="logo"
-            height={37}
-            width={37}
-            className="size-7 sm:size-[37px]"
+            src="/images/mundiapolis-mark.png"
+            alt="Mundiapolis Library"
+            height={40}
+            width={40}
+            className="h-10 w-10 object-contain sm:hidden"
           />
-          <h1>Mundiapolis Library</h1>
+          <img
+            src="/images/mundiapolis-logo-transparent.png"
+            alt=""
+            height={50}
+            width={161}
+            className="hidden h-auto w-[161px] object-contain sm:block"
+          />
+          <h1 className="sr-only">Mundiapolis Library</h1>
         </Link>
 
         <div className="my-2 flex flex-col gap-1.5 sm:gap-2">

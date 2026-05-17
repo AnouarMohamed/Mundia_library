@@ -31,25 +31,15 @@ const Header = async ({ session }: HeaderProps) => {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/"
-            className="group inline-flex min-w-0 items-center gap-2 sm:gap-3"
+            className="group inline-flex min-w-0 items-center"
           >
-            <span className="flex size-10 shrink-0 items-center justify-center sm:size-11">
-              <img
-                src="/icons/admin/logo.svg"
-                alt="Mundiapolis Library"
-                width={40}
-                height={40}
-                className="size-9 sm:size-10"
-              />
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold leading-tight tracking-tight text-[var(--mundia-ink)] sm:text-lg">
-                Mundiapolis
-              </p>
-              <p className="truncate text-xs font-normal text-[var(--mundia-muted)]">
-                University Library
-              </p>
-            </div>
+            <img
+              src="/images/mundiapolis-logo-transparent.png"
+              alt="Mundiapolis Library"
+              width={161}
+              height={50}
+              className="h-auto w-[132px] shrink-0 sm:w-[161px]"
+            />
           </Link>
 
           {/* Desktop Navigation */}
