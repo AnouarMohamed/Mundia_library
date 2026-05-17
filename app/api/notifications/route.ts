@@ -41,7 +41,13 @@ export async function POST(request: NextRequest) {
     const guard = await requireApprovedUser();
     if (!guard.ok) return guardToResponse(guard);
 
-    const { action } = await request.json();
+    const body = await request.json().catch(() => null);
+
+    if (!body || typeof body.action !== "string") {
+      return badRequestResponse("Invalid action");
+    }
+
+    const { action } = body;
 
     if (action === "markAllAsRead") {
       const success = await markAllAsRead(guard.user.id);

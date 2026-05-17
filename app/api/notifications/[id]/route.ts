@@ -4,7 +4,11 @@ import {
   guardToResponse,
   requireApprovedUser,
 } from "@/lib/security/auth-guards";
-import { internalServerErrorResponse } from "@/lib/security/api-response";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+} from "@/lib/security/api-response";
+import { isUuid } from "@/lib/security/api-request";
 import { logError } from "@/lib/security/logger";
 
 /**
@@ -25,6 +29,10 @@ export async function PATCH(
     if (!guard.ok) return guardToResponse(guard);
 
     const { id } = await params;
+    if (!isUuid(id)) {
+      return badRequestResponse("Invalid notification ID");
+    }
+
     // markAsRead enforces ownership for the current user.
     const success = await markAsRead(id, guard.user.id);
 

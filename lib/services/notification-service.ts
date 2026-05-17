@@ -15,7 +15,10 @@
 
 import { db } from "@/database/drizzle";
 import { notifications } from "@/database/schema";
+import { logError } from "@/lib/security/logger";
 import { eq, desc, and } from "drizzle-orm";
+
+const MAX_NOTIFICATION_LIMIT = 50;
 
 /**
  * Categorization for notifications to drive UI styling and severity levels.
@@ -61,7 +64,7 @@ export async function createNotification(params: CreateNotificationParams) {
     return result;
   } catch (error) {
     // We catch and log here to prevent notification failures from crashing the caller's main transaction
-    console.error("Failed to create notification:", error);
+    logError("notifications.create_failed", error, { userId });
     return null;
   }
 }
@@ -75,15 +78,17 @@ export async function createNotification(params: CreateNotificationParams) {
  * @returns A promise resolving to an array of notification objects.
  */
 export async function getUserNotifications(userId: string, limit: number = 20) {
+  const safeLimit = Math.min(MAX_NOTIFICATION_LIMIT, Math.max(1, limit));
+
   try {
     return await db
       .select()
       .from(notifications)
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
-      .limit(limit);
+      .limit(safeLimit);
   } catch (error) {
-    console.error("Error fetching user notifications:", error);
+    logError("notifications.fetch_user_failed", error, { userId });
     return [];
   }
 }
@@ -98,19 +103,23 @@ export async function getUserNotifications(userId: string, limit: number = 20) {
  */
 export async function markAsRead(notificationId: string, userId: string) {
   try {
-    const result = await db
+    const updatedNotifications = await db
       .update(notifications)
       .set({ isRead: true })
-      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId)
+        )
+      )
+      .returning({ id: notifications.id });
 
-    // Handle database-specific result objects (e.g., MySQL affectedRows)
-    if (typeof result === "object" && result !== null && "affectedRows" in result) {
-      const { affectedRows } = result as { affectedRows: number };
-      return affectedRows > 0;
-    }
-    return false;
+    return updatedNotifications.length > 0;
   } catch (error) {
-    console.error("Error marking notification as read:", error);
+    logError("notifications.mark_read_failed", error, {
+      notificationId,
+      userId,
+    });
     return false;
   }
 }
@@ -127,10 +136,12 @@ export async function markAllAsRead(userId: string) {
     await db
       .update(notifications)
       .set({ isRead: true })
-      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+      .where(
+        and(eq(notifications.userId, userId), eq(notifications.isRead, false))
+      );
     return true;
   } catch (error) {
-    console.error("Error marking all notifications as read:", error);
+    logError("notifications.mark_all_read_failed", error, { userId });
     return false;
   }
 }
