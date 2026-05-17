@@ -1,3 +1,17 @@
+/**
+ * Application Configuration Module
+ * 
+ * This module centralizes all environment-based configuration for the application.
+ * It uses Zod for runtime validation, ensuring that missing or invalid environment
+ * variables are caught early in the development and deployment lifecycle.
+ * 
+ * Key configuration areas:
+ * - Database & Caching (PostgreSQL, Upstash Redis)
+ * - File Storage (ImageKit)
+ * - Communication (Brevo, Resend)
+ * - Background Workflows (QStash)
+ */
+
 import { z } from "zod";
 
 /**
@@ -27,6 +41,8 @@ const envSchema = z.object({
     redisToken: z.string().default(""),
     qstashUrl: z.union([z.string().url(), z.literal("")]).default(""),
     qstashToken: z.string().default(""),
+    qstashCurrentSigningKey: z.string().default(""),
+    qstashNextSigningKey: z.string().default(""),
   }),
   
   /** Brevo (formerly Sendinblue) configuration for transactional emails. */
@@ -64,6 +80,8 @@ const envData = {
     redisToken: process.env.UPSTASH_REDIS_TOKEN,
     qstashUrl: process.env.QSTASH_URL,
     qstashToken: process.env.QSTASH_TOKEN,
+    qstashCurrentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY,
+    qstashNextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY,
   },
   brevo: {
     apiKey: process.env.BREVO_API_KEY,

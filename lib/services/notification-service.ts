@@ -1,14 +1,16 @@
 /**
  * Notification Service
  * 
- * This service handles the creation and management of user notifications.
- * It is designed to be a central hub for all notification logic, making it
- * easy to add new notification channels (e.g., Email, SMS, Web Push) in the future.
+ * This module provides a centralized API for managing in-app user notifications.
+ * It serves as the primary interface for creating, retrieving, and updating the 
+ * read status of notifications within the Mundia Library system.
  * 
- * Current Capabilities:
- * - Persisting notifications to the database.
- * - Marking notifications as read.
- * - Fetching user notifications.
+ * Design Principles:
+ * - Centralized logic: All notification persistence and state changes flow through this service.
+ * - Extensibility: Structured to support future notification channels (e.g., Push, SMS).
+ * - Security: Read operations are scoped by `userId` to prevent cross-user data leakage.
+ * 
+ * This service interacts directly with the `notifications` table in the database.
  */
 
 import { db } from "@/database/drizzle";
@@ -16,25 +18,33 @@ import { notifications } from "@/database/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 /**
- * Types of notifications supported by the system.
+ * Categorization for notifications to drive UI styling and severity levels.
+ * - INFO: General updates or informational messages.
+ * - SUCCESS: Confirmation of successful actions (e.g., book returned).
+ * - WARNING: Urgent notices requiring attention (e.g., due date approaching).
+ * - ERROR: Critical issues or failures (e.g., payment failure).
  */
 export type NotificationType = "INFO" | "SUCCESS" | "WARNING" | "ERROR";
 
 /**
- * Interface for creating a new notification.
+ * Data required to create a new notification.
  */
 export interface CreateNotificationParams {
+  /** The unique identifier of the recipient user. */
   userId: string;
+  /** Short, descriptive title of the notification. */
   title: string;
+  /** Detailed content of the notification message. */
   message: string;
+  /** Optional severity type (defaults to INFO). */
   type?: NotificationType;
 }
 
 /**
- * Create and persist a new notification for a user.
+ * Creates and persists a new notification record in the database.
  * 
  * @param params - The notification details (userId, title, message, type).
- * @returns A promise resolving to the created notification record or null on failure.
+ * @returns A promise resolving to the database insertion result or null on failure.
  */
 export async function createNotification(params: CreateNotificationParams) {
   const { userId, title, message, type = "INFO" } = params;
@@ -50,16 +60,18 @@ export async function createNotification(params: CreateNotificationParams) {
 
     return result;
   } catch (error) {
+    // We catch and log here to prevent notification failures from crashing the caller's main transaction
     console.error("Failed to create notification:", error);
     return null;
   }
 }
 
 /**
- * Fetch all notifications for a specific user, ordered by most recent first.
+ * Fetches a list of notifications for a specific user.
+ * Results are sorted in reverse chronological order (newest first).
  * 
  * @param userId - The ID of the user whose notifications to fetch.
- * @param limit - Optional limit on the number of notifications to return.
+ * @param limit - Maximum number of notifications to retrieve (defaults to 20).
  * @returns A promise resolving to an array of notification objects.
  */
 export async function getUserNotifications(userId: string, limit: number = 20) {
@@ -77,11 +89,12 @@ export async function getUserNotifications(userId: string, limit: number = 20) {
 }
 
 /**
- * Mark a specific notification as read.
+ * Updates the status of a specific notification to 'read'.
+ * Verification of user ownership is enforced to ensure security.
  * 
- * @param notificationId - The ID of the notification to update.
- * @param userId - The ID of the user who must own the notification.
- * @returns A promise resolving to a boolean indicating success.
+ * @param notificationId - The unique identifier of the notification to update.
+ * @param userId - The ID of the user performing the action (must own the notification).
+ * @returns A promise resolving to a boolean indicating if the update was successful.
  */
 export async function markAsRead(notificationId: string, userId: string) {
   try {
@@ -90,7 +103,7 @@ export async function markAsRead(notificationId: string, userId: string) {
       .set({ isRead: true })
       .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
 
-    // For MySQL, check affectedRows from the result.
+    // Handle database-specific result objects (e.g., MySQL affectedRows)
     if (typeof result === "object" && result !== null && "affectedRows" in result) {
       const { affectedRows } = result as { affectedRows: number };
       return affectedRows > 0;
@@ -103,10 +116,11 @@ export async function markAsRead(notificationId: string, userId: string) {
 }
 
 /**
- * Mark all notifications as read for a specific user.
+ * Marks all unread notifications for a specific user as 'read'.
+ * Useful for "Mark all as read" UI functionality.
  * 
  * @param userId - The ID of the user whose notifications should be updated.
- * @returns A promise resolving to a boolean indicating success.
+ * @returns A promise resolving to a boolean indicating if the operation was successful.
  */
 export async function markAllAsRead(userId: string) {
   try {

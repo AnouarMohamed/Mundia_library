@@ -3,7 +3,7 @@
  *
  * This file handles user authentication using NextAuth.js with:
  * - Credentials-based authentication (email/password)
- * - SHA-256 password hashing with salt
+ * - bcrypt password hashing with legacy SHA-256 verification
  * - JWT session strategy
  * - Lazy imports to support Edge runtime (middleware compatibility)
  *
@@ -14,22 +14,13 @@
  */
 
 import NextAuth, { User } from "next-auth";
-import { sha256 } from "@noble/hashes/sha256";
 import CredentialsProvider from "next-auth/providers/credentials";
-
-/**
- * Helper function to concatenate two Uint8Arrays
- * Used for password hashing: combines password bytes with salt
- * @param a - First array (password bytes)
- * @param b - Second array (salt)
- * @returns Combined Uint8Array
- */
-function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const c = new Uint8Array(a.length + b.length);
-  c.set(a, 0);
-  c.set(b, a.length);
-  return c;
-}
+import {
+  hashPassword,
+  shouldRehashPassword,
+  verifyPassword,
+} from "@/lib/security/password";
+import { logWarn } from "@/lib/security/logger";
 
 /**
  * Lazy import pattern for database connection
@@ -72,7 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
      * Flow:
      * 1. User submits email/password
      * 2. Look up user in database by email
-     * 3. Verify password using SHA-256 with salt
+   * 3. Verify password using the current bcrypt hash or legacy SHA-256 fallback
      * 4. Return user object if valid, null if invalid
      */
     CredentialsProvider({
@@ -95,49 +86,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const user = await db
           .select()
           .from(users)
-          .where(eq(users.email, credentials.email.toString()))
+          .where(eq(users.email, credentials.email.toString().toLowerCase()))
           .limit(1);
 
         if (user.length === 0) return null;
 
-        /**
-         * Password Verification Process:
-         *
-         * Stored format: "salt:hash" (both base64 encoded)
-         * 1. Split stored password into salt and hash
-         * 2. Decode both from base64
-         * 3. Hash the provided password with the stored salt
-         * 4. Compare computed hash with stored hash
-         *
-         * This uses SHA-256 with salt for security:
-         * - Salt prevents rainbow table attacks
-         * - Each password has unique salt
-         * - Even same passwords have different hashes
-         */
-        const [saltB64, hashB64] = user[0].password.split(":");
-        const salt = Uint8Array.from(Buffer.from(saltB64, "base64"));
-        const expectedHash = Buffer.from(hashB64, "base64");
-
-        // Hash the provided password with the stored salt
-        const passwordBytes = new TextEncoder().encode(
-          credentials.password.toString()
-        );
-        const hashBuffer = sha256(concatUint8Arrays(passwordBytes, salt));
-        const isPasswordValid = Buffer.from(hashBuffer).equals(expectedHash);
+        const storedPassword = user[0].password;
+        const password = credentials.password.toString();
+        const isPasswordValid = await verifyPassword(password, storedPassword);
 
         if (!isPasswordValid) return null;
 
+        if (user[0].status !== "APPROVED") {
+          logWarn("auth.signin_unapproved_account", {
+            userId: user[0].id,
+            status: user[0].status,
+          });
+          return null;
+        }
+
+        if (shouldRehashPassword(storedPassword)) {
+          await db
+            .update(users)
+            .set({ password: await hashPassword(password) })
+            .where(eq(users.id, user[0].id));
+        }
+
+        await db
+          .update(users)
+          .set({ lastLogin: new Date() })
+          .where(eq(users.id, user[0].id));
+
         // Return user object for NextAuth (will be stored in JWT token)
-        // CRITICAL: Include role for admin authorization checks
+        // CRITICAL: Include role/status for authorization checks
         return {
           id: user[0].id.toString(),
           email: user[0].email,
           name: user[0].fullName,
-          role: user[0].role, // Include role for authorization
+          role: user[0].role,
+          status: user[0].status,
           universityId: user[0].universityId,
           universityCard: user[0].universityCard,
         } as User & {
           role: string;
+          status: string;
           universityId: number;
           universityCard: string;
         };
@@ -156,8 +148,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
      * Flow:
      * 1. When user signs in, 'user' object is provided
      * 2. Store user.id and user.name in JWT token
-     * 3. Update last_login timestamp in database
-     * 4. Return token (will be sent to client as cookie)
+     * 3. Return token (will be sent to client as cookie)
      */
     async jwt({ token, user }) {
       // Only runs on initial sign-in (when 'user' is provided)
@@ -165,37 +156,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Store user data in JWT token
         token.id = user.id;
         token.name = user.name;
-        // CRITICAL: Store role in JWT token for authorization checks
+        // CRITICAL: Store role/status in JWT token for authorization checks
         token.role = (user as User & { role?: string }).role;
+        token.status = (user as User & { status?: string }).status;
         token.universityId = (user as User & { universityId?: number })
           .universityId;
         token.universityCard = (user as User & { universityCard?: string })
           .universityCard;
-
-        /**
-         * Update last_login timestamp when user signs in
-         * This helps track user activity for analytics and security
-         */
-        try {
-          /**
-           * Lazy load database only when jwt callback is called (Node.js runtime)
-           * Safe because this callback only runs in API routes, not middleware
-           */
-          const db = await getDb();
-          const users = await getUsersSchema();
-          const eq = await getEq();
-
-          // Type guard: user.id is guaranteed to exist here (from authorize callback)
-          if (user.id) {
-            await db
-              .update(users)
-              .set({ lastLogin: new Date() })
-              .where(eq(users.id, user.id));
-          }
-        } catch (error) {
-          // Don't fail authentication if last_login update fails
-          console.error("Failed to update last_login:", error);
-        }
       }
 
       return token;
@@ -216,13 +183,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Add user ID and name from JWT token to session
         session.user.id = token.id as string;
         session.user.name = token.name as string;
-        // CRITICAL: Add role to session for authorization checks
+        // CRITICAL: Add role/status to session for authorization checks
         // Type assertion needed because NextAuth types don't include role by default
         (session.user as {
           role?: string;
+          status?: string;
           universityId?: number;
           universityCard?: string;
         }).role = token.role as string;
+        (session.user as { status?: string }).status = token.status as string;
         (session.user as { universityId?: number }).universityId =
           token.universityId as number | undefined;
         (session.user as { universityCard?: string }).universityCard =

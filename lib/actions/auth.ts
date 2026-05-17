@@ -1,26 +1,22 @@
+/**
+ * Authentication Server Actions
+ * 
+ * This module provides server-side logic for student authentication and registration.
+ * It integrates with NextAuth for session management, handles secure password hashing,
+ * implements rate limiting to prevent abuse, and manages onboarding workflows.
+ * 
+ * Key Features:
+ * - Credentials-based sign in.
+ * - Secure student registration with bcrypt password hashing.
+ * - Integration with Upstash QStash for background onboarding workflows.
+ * - Robust error handling including transient database error retries and field-specific validation.
+ */
+
 "use server";
 
 import { eq } from "drizzle-orm";
 import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { sha256 } from "@noble/hashes/sha256";
-import { randomBytes } from "@noble/hashes/utils";
-
-/**
- * Concatenates two Uint8Array buffers into a single buffer.
- * Used primarily for combining password bytes with salt bytes before hashing.
- * 
- * @param a - First buffer.
- * @param b - Second buffer.
- * @returns Combined buffer.
- */
-function concatUint8Arrays(a: Uint8Array, b: Uint8Array): Uint8Array {
-  const c = new Uint8Array(a.length + b.length);
-  c.set(a, 0);
-  c.set(b, a.length);
-  return c;
-}
 import { signIn } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
@@ -28,23 +24,25 @@ import { redirect } from "next/navigation";
 import { workflowClient } from "@/lib/workflow";
 import config from "@/lib/config";
 import { isTransientDbError, withDbRetry } from "@/lib/db/retry";
+import { hashPassword } from "@/lib/security/password";
+import { logError, logInfo } from "@/lib/security/logger";
 
 /**
- * Server action to authenticate a user using email and password credentials.
+ * Authenticates a user using email and password credentials.
  * 
- * Flow:
- * 1. Enforces rate limiting based on the client IP.
- * 2. Invokes NextAuth `signIn` with the 'credentials' provider.
- * 3. Returns success status or an error message.
+ * This action handles the standard sign-in flow, including rate limiting
+ * based on the requester's IP address.
  * 
  * @param params - Object containing user email and password.
- * @returns Success status or error object.
+ * @returns A promise resolving to a success flag and an optional error message.
  */
 export const signInWithCredentials = async (
   params: Pick<AuthCredentials, "email" | "password">
 ) => {
   const { email, password } = params;
+  const normalizedEmail = email.toLowerCase();
 
+  // Identify client IP for rate limiting
   const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
   const { success } = await ratelimit.limit(ip);
 
@@ -52,7 +50,7 @@ export const signInWithCredentials = async (
 
   try {
     const result = await signIn("credentials", {
-      email,
+      email: normalizedEmail,
       password,
       redirect: false,
     });
@@ -63,42 +61,40 @@ export const signInWithCredentials = async (
 
     return { success: true };
   } catch (error) {
-    console.log(error, "Signin error");
-    return { success: false, error: "Signin error" };
+    logError("auth.signin_failed", error, { email: normalizedEmail });
+    return {
+      success: false,
+      error:
+        "Sign in failed. Confirm your account is approved and your credentials are correct.",
+    };
   }
 };
 
 /**
- * Server action to register a new student account.
- * 
- * Security Features:
- * - Rate limiting by IP to prevent registration spam.
- * - Password hashing using SHA-256 with a unique 16-byte random salt per user.
- * - Database retry logic for transient connectivity issues.
- * - Explicit validation of University ID ranges and uniqueness.
+ * Registers a new student account in the system.
  * 
  * Flow:
- * 1. Validates University ID constraints (8-digit limit).
- * 2. Checks for existing users with the same email or University ID.
- * 3. Generates salt and hashes the password.
- * 4. Inserts the new user into the database.
- * 5. Optionally triggers an onboarding workflow via Upstash QStash.
- * 6. Automatically signs the user in upon successful registration.
+ * 1. Validates the University ID (must be a positive 8-digit integer).
+ * 2. Hashes the password using bcrypt.
+ * 3. Checks for duplicate emails or University IDs in the database.
+ * 4. Inserts the new user record with transient error retries.
+ * 5. Triggers an onboarding workflow if enabled.
+ * 6. Leaves the account pending until admin approval.
  * 
- * @param params - Full student registration details.
- * @returns Success status or field-specific error messages.
+ * @param params - The full registration data for the student.
+ * @returns A promise resolving to a success flag, or an error object with field-specific feedback.
  */
 export const signUp = async (params: AuthCredentials) => {
   const { fullName, email, universityId, password, universityCard } = params;
+  const normalizedEmail = email.toLowerCase();
 
+  // Apply rate limiting based on IP address
   const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
   const { success } = await ratelimit.limit(ip);
 
   if (!success) return redirect("/too-fast");
 
   // Validate universityId is within PostgreSQL integer range
-  // PostgreSQL integer range: -2,147,483,648 to 2,147,483,647
-  // But we'll limit to 8-digit numbers (1 to 99,999,999) for better UX
   const MAX_INTEGER = 2147483647;
   const MAX_8_DIGIT = 99999999;
 
@@ -138,19 +134,18 @@ export const signUp = async (params: AuthCredentials) => {
     };
   }
 
-  // Generate a random salt for password hashing.
-  const salt = randomBytes(16);
-  // Hash the password with the salt.
-  const passwordBytes = new TextEncoder().encode(password);
-  const hashBuffer = sha256(concatUint8Arrays(passwordBytes, salt));
-  // Store salt and hash as base64
-  const hashedPassword = `${Buffer.from(salt).toString("base64")}:${Buffer.from(hashBuffer).toString("base64")}`;
+  const hashedPassword = await hashPassword(password);
 
   try {
+    // Check for existing users with the same email or ID
     const [existingUser, existingUniversityId] = await withDbRetry(
       () =>
         Promise.all([
-          db.select().from(users).where(eq(users.email, email)).limit(1),
+          db
+            .select()
+            .from(users)
+            .where(eq(users.email, normalizedEmail))
+            .limit(1),
           db
             .select()
             .from(users)
@@ -178,11 +173,12 @@ export const signUp = async (params: AuthCredentials) => {
       };
     }
 
+    // Insert new user into the database
     await withDbRetry(
       () =>
         db.insert(users).values({
           fullName,
-          email,
+          email: normalizedEmail,
           universityId,
           password: hashedPassword,
           universityCard,
@@ -200,7 +196,7 @@ export const signUp = async (params: AuthCredentials) => {
       await workflowClient.trigger({
         url: `${config.env.prodApiEndpoint}/api/workflows/onboarding`,
         body: {
-          email,
+          email: normalizedEmail,
           fullName,
         },
       });
@@ -208,11 +204,13 @@ export const signUp = async (params: AuthCredentials) => {
       console.log("Skipping workflow trigger in development mode");
     }
 
-    await signInWithCredentials({ email, password });
+    logInfo("auth.signup_pending_account_created", {
+      email: normalizedEmail,
+    });
 
     return { success: true };
   } catch (error) {
-    // Check if error is related to integer range
+    // Handle PostgreSQL integer range errors
     if (
       error instanceof Error &&
       (error.message.includes("out of range") ||
@@ -226,6 +224,7 @@ export const signUp = async (params: AuthCredentials) => {
       };
     }
 
+    // Handle transient database errors
     if (isTransientDbError(error)) {
       return {
         success: false,
@@ -234,14 +233,13 @@ export const signUp = async (params: AuthCredentials) => {
       };
     }
 
-    // Check if error is related to duplicate email
+    // Handle database-level unique constraint violations
     if (
       error instanceof Error &&
       (error.message.includes("unique") ||
         error.message.includes("duplicate") ||
         error.message.includes("23505"))
     ) {
-      // Check if it's email or universityId duplicate
       if (error.message.includes("email")) {
         return {
           success: false,
@@ -257,10 +255,10 @@ export const signUp = async (params: AuthCredentials) => {
       }
     }
 
-    console.log(error, "Signup error");
+    logError("auth.signup_failed", error, { email: normalizedEmail });
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Signup error. Please check your information and try again.",
+      error: "Signup error. Please check your information and try again.",
     };
   }
 };

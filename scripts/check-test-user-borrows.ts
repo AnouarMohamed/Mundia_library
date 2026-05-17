@@ -4,27 +4,9 @@
  * Usage: npx tsx scripts/check-test-user-borrows.ts
  */
 
-// Load environment variables FIRST before importing anything that uses them
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { borrowRecords, users } from "@/database/schema";
 import { eq, sql } from "drizzle-orm";
-
-config({ path: ".env.local" });
-config({ path: ".env" });
-
-// Create database connection directly
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function checkTestUserBorrows() {
   try {
@@ -105,9 +87,11 @@ async function checkTestUserBorrows() {
       console.log(`\n✅ Borrow History count matches database (${returnedCount} records)`);
     }
 
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("Error checking borrow records:", error);
+    await closePostgresPool();
     process.exit(1);
   }
 }

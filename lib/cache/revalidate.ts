@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { invalidatePattern } from "@/lib/cache/redis-cache";
 
 /**
  * Revalidate cached book data.
@@ -20,4 +21,5 @@ export function revalidateRecommendationsTag() {
 export function revalidateCatalogTags() {
   revalidateBooksTag();
   revalidateRecommendationsTag();
+  void invalidatePattern("books:*");
 }

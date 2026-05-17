@@ -13,12 +13,9 @@
  * It will update existing records or create new ones.
  */
 
-import { config } from "dotenv";
 import { parse } from "csv-parse/sync";
 import * as fs from "fs";
 import * as path from "path";
-import mysql from "mysql2/promise";
-import { drizzle } from "drizzle-orm/mysql2";
 import {
   users,
   books,
@@ -28,15 +25,7 @@ import {
   systemConfig,
 } from "@/database/schema";
 import { eq } from "drizzle-orm";
-
-config({ path: ".env" });
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL!,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 // CSV file paths
 const CSV_DIR =
@@ -585,11 +574,11 @@ async function main() {
 main()
   .then(async () => {
     console.log("\n✅ Migration script completed");
-    await pool.end();
+    await closePostgresPool();
     process.exit(0);
   })
   .catch(async (error) => {
     console.error("\n❌ Migration script failed:", error);
-    await pool.end();
+    await closePostgresPool();
     process.exit(1);
   });

@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { bookReviews } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
 
 /**
  * Use Node.js runtime for DB access.
@@ -37,17 +40,8 @@ export async function DELETE(
 
     // CRITICAL: Authentication required for deleting reviews
     // Reviews can only be deleted by authenticated users who own the review
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-          message: "Authentication required",
-        },
-        { status: 401 }
-      );
-    }
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return guardToResponse(guard);
 
     const { reviewId } = await params;
 
@@ -69,7 +63,7 @@ export async function DELETE(
       .where(
         and(
           eq(bookReviews.id, reviewId),
-          eq(bookReviews.userId, session.user.id)
+          eq(bookReviews.userId, guard.user.id)
         )
       )
       .limit(1);
@@ -98,8 +92,7 @@ export async function DELETE(
       {
         success: false,
         error: "Failed to delete review",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

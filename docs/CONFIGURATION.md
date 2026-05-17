@@ -49,6 +49,8 @@ Production should set all local required variables plus the service integrations
 | `UPSTASH_REDIS_TOKEN` | Rate limiting, cache | Upstash Redis token. |
 | `QSTASH_URL` | Workflows enabled | Upstash Workflow base URL. |
 | `QSTASH_TOKEN` | Workflows enabled | Upstash QStash token. |
+| `QSTASH_CURRENT_SIGNING_KEY` | Workflows enabled in production | Current signing key used to verify workflow requests. |
+| `QSTASH_NEXT_SIGNING_KEY` | Workflows enabled in production | Next signing key used during QStash key rotation. |
 | `BREVO_API_KEY` | Brevo email enabled | Primary transactional email provider key. |
 | `BREVO_SENDER_EMAIL` | Brevo email enabled | Verified sender address. |
 | `BREVO_SENDER_NAME` | Brevo email enabled | Sender display name. |
@@ -109,7 +111,7 @@ The app intentionally fails fast for some missing production settings and degrad
 | Database | Database access throws a clear `DATABASE_URL` error. Production server config validation should prevent this. |
 | Redis | Redis access throws when used, but rate limiting bypasses in development or when disabled. |
 | ImageKit | `/api/auth/imagekit` returns an error if ImageKit keys are missing. |
-| QStash | Workflow calls throw a clear QStash configuration error. |
+| QStash | Workflow calls throw a clear QStash configuration error; production workflow endpoints require signing keys. |
 | Brevo | Email send fails over to Resend when configured. |
 | Resend | Fallback email send fails when token is missing. |
 
@@ -130,6 +132,7 @@ Before enabling a production deployment:
 2. Confirm both API endpoint variables point at the intended host.
 3. Confirm `DATABASE_URL` points at the production database, not local Docker.
 4. Confirm `ENABLE_WORKFLOWS` is only `true` when QStash and email providers are configured.
-5. Confirm ImageKit upload endpoints and keys are from the production ImageKit project.
-6. Confirm sender email is verified in the email provider.
-7. Confirm Redis credentials are active and scoped to the intended Upstash database.
+5. Confirm `QSTASH_CURRENT_SIGNING_KEY` and `QSTASH_NEXT_SIGNING_KEY` are set before enabling workflows in production.
+6. Confirm ImageKit upload endpoints and keys are from the production ImageKit project.
+7. Confirm sender email is verified in the email provider.
+8. Confirm Redis credentials are active and scoped to the intended Upstash database.

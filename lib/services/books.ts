@@ -1,17 +1,23 @@
 /**
  * Books Service - Pure API Functions
  *
- * This module contains pure API functions for book-related operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
+ * This module provides pure API functions for book catalog management and retrieval.
+ * It serves as the primary interface for interacting with book-related API routes,
+ * covering metadata retrieval, search functionality, and personalized recommendations.
  *
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
+ * Core Functionalities:
+ * - Catalog Retrieval: Fetching paginated and filtered lists of books.
+ * - Single Book Access: Detailed metadata retrieval for specific titles.
+ * - Discovery Features: Personalized recommendations and featured/trending book lists.
+ * - Inventory Insights: Retrieving availability and borrow statistics for specific books.
+ * - Taxonomy Services: Fetching unique genres and categories from the catalog.
  *
- * Note: API routes for books need to be created if they don't exist yet.
- * These service functions are ready to use once API routes are available.
+ * Architectural Principles:
+ * - Pure API Logic: Contains only fetch calls and data transformation logic.
+ * - Framework Agnostic: NO React Query or UI-specific logic is included here.
+ * - Reusable: Designed for use across Client Components (via hooks), Server Components, and Server Actions.
+ *
+ * @module lib/services/books
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";
@@ -65,9 +71,6 @@ export interface BookResponse {
  * ```typescript
  * const books = await getBooksList({ search: "react", genre: "Technology" });
  * ```
- */
-/**
- * Fetch a page of books with optional filters.
  */
 export async function getBooksList(
   filters: BookFilters = {}
@@ -149,9 +152,6 @@ export async function getBooksList(
  * ```typescript
  * const book = await getBook("123e4567-e89b-12d3-a456-426614174000");
  * ```
- */
-/**
- * Fetch a single book by id.
  */
 export async function getBook(bookId: string): Promise<Book> {
   if (!bookId) {

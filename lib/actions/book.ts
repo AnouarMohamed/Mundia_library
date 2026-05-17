@@ -1,3 +1,11 @@
+/**
+ * Book Management Server Actions
+ * 
+ * This module handles server-side operations related to books, such as initiating 
+ * borrow requests. It ensures business rules are followed (e.g., availability checks)
+ * and manages cache revalidation to keep the UI in sync.
+ */
+
 "use server";
 
 import { randomUUID } from "crypto";
@@ -5,6 +13,11 @@ import { db } from "@/database/drizzle";
 import { books, borrowRecords } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
+import {
+  guardToActionError,
+  requireSelfOrAdmin,
+} from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Parameters required to initiate a book borrow request.
@@ -21,6 +34,7 @@ export interface BorrowBookParams {
  */
 export type BorrowBookResponse =
   | {
+      /** Indicates the operation was successful. */
       success: true;
       /** The newly created borrow record(s). */
       data: Array<{
@@ -43,6 +57,7 @@ export type BorrowBookResponse =
       }>;
     }
   | {
+      /** Indicates the operation failed. */
       success: false;
       /** Error message describing why the request failed. */
       error: string;
@@ -68,6 +83,11 @@ export const borrowBook = async (
   const { userId, bookId } = params;
 
   try {
+    const guard = await requireSelfOrAdmin(userId);
+    if (!guard.ok) {
+      return guardToActionError(guard);
+    }
+
     // 1. Availability check
     const book = await db
       .select({ availableCopies: books.availableCopies })
@@ -116,7 +136,7 @@ export const borrowBook = async (
       data: [record],
     };
   } catch (error: unknown) {
-    console.error("Borrow operation failed:", error);
+    logError("borrow.request_failed", error, { userId, bookId });
 
     return {
       success: false,

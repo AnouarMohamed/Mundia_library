@@ -5,24 +5,9 @@
  * Should be fixed to 21 available copies (or less if there are borrowed copies)
  */
 
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { books, borrowRecords } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-
-config({ path: ".env" });
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function fixCodingInterview() {
   console.log("🔧 Fixing 'Cracking the Coding Interview' Data Issue\n");
@@ -37,7 +22,7 @@ async function fixCodingInterview() {
 
     if (book.length === 0) {
       console.log("❌ Book not found");
-      await pool.end();
+      await closePostgresPool();
       process.exit(1);
     }
 
@@ -104,11 +89,11 @@ async function fixCodingInterview() {
     console.log("✅ Fix Complete!");
     console.log("=".repeat(80));
 
-    await pool.end();
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error:", error);
-    await pool.end();
+    await closePostgresPool();
     process.exit(1);
   }
 }

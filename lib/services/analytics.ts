@@ -1,18 +1,22 @@
 /**
  * Analytics Service - Pure API Functions
- * 
- * This module contains pure API functions for analytics and business insights operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
- * 
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
- * 
- * Note: API routes for analytics need to be created if they don't exist yet.
- * Currently, analytics are fetched via server actions in Server Components.
- * These service functions are ready to use once API routes are available.
+ *
+ * This module provides pure API functions for analytics and business insights operations.
+ * It facilitates the retrieval of data-driven insights to help library administrators 
+ * understand system performance, user behavior, and collection trends.
+ *
+ * Key Analytics Areas:
+ * - Borrowing Trends: Time-series analysis of borrow and return activities.
+ * - Collection Insights: Identification of popular books and trending genres.
+ * - User Activity: Analysis of borrowing patterns and engagement levels.
+ * - Operational Metrics: Overdue book analysis, fine statistics, and system health.
+ *
+ * Architectural Principles:
+ * - Pure API Logic: Contains only fetch calls and data transformation logic.
+ * - Framework Agnostic: NO React Query or UI-specific logic is included here.
+ * - Reusable: Designed for use across Client Components (via hooks), Server Components, and Server Actions.
+ *
+ * @module lib/services/analytics
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";

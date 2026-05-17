@@ -23,9 +23,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { bookReviews, borrowRecords } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
+import { requireApprovedUser } from "@/lib/security/auth-guards";
 
 /**
  * Explicitly set runtime to Node.js
@@ -85,14 +85,14 @@ export async function GET(
 
     // Check authentication (optional - works for both authenticated and unauthenticated users)
     // If user is not authenticated, return eligibility as false with appropriate reason
-    const session = await auth();
-    if (!session?.user?.id) {
+    const guard = await requireApprovedUser();
+    if (!guard.ok) {
       return NextResponse.json({
         success: true,
         canReview: false,
         hasExistingReview: false,
         isCurrentlyBorrowed: false,
-        reason: "Please log in to review books",
+        reason: "Please sign in with an approved account to review books",
       });
     }
 
@@ -108,7 +108,7 @@ export async function GET(
       .from(borrowRecords)
       .where(
         and(
-          eq(borrowRecords.userId, session.user.id),
+          eq(borrowRecords.userId, guard.user.id),
           eq(borrowRecords.bookId, bookId),
           eq(borrowRecords.status, "RETURNED") // Must have returned the book
         )
@@ -126,7 +126,7 @@ export async function GET(
       .from(borrowRecords)
       .where(
         and(
-          eq(borrowRecords.userId, session.user.id),
+          eq(borrowRecords.userId, guard.user.id),
           eq(borrowRecords.bookId, bookId),
           eq(borrowRecords.status, "BORROWED") // Currently borrowed
         )
@@ -144,7 +144,7 @@ export async function GET(
       .from(bookReviews)
       .where(
         and(
-          eq(bookReviews.userId, session.user.id),
+          eq(bookReviews.userId, guard.user.id),
           eq(bookReviews.bookId, bookId)
         )
       )
@@ -172,8 +172,7 @@ export async function GET(
       {
         success: false,
         error: "Failed to check review eligibility",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

@@ -3,6 +3,12 @@
 import { db } from "@/database/drizzle";
 import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, inArray, and } from "drizzle-orm";
+import {
+  guardToActionError,
+  requireAdmin,
+} from "@/lib/security/auth-guards";
+import { logAdminAction } from "@/lib/admin/audit";
+import { approveBorrowRequest, rejectBorrowRequest } from "@/lib/admin/actions/borrow";
 
 // Bulk book operations
 /**
@@ -12,6 +18,9 @@ export async function bulkUpdateBooks(
   bookIds: string[],
   updates: Partial<typeof books.$inferInsert>
 ) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   if (bookIds.length === 0) {
     return { success: false, message: "No books selected" };
   }
@@ -24,15 +33,20 @@ export async function bulkUpdateBooks(
         updatedAt: new Date(),
       })
       .where(inArray(books.id, bookIds));
+    await logAdminAction(guard.user.id, "BULK_UPDATE_BOOKS", undefined, "BOOK", {
+      bookIds,
+      updates,
+    });
 
     return {
       success: true,
       message: `Successfully updated ${bookIds.length} book(s)`,
     };
   } catch (error) {
+    console.error("Failed to update books:", error);
     return {
       success: false,
-      message: `Failed to update books: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: "Failed to update books",
     };
   }
 }
@@ -41,6 +55,9 @@ export async function bulkUpdateBooks(
  * Bulk delete books after validation.
  */
 export async function bulkDeleteBooks(bookIds: string[]) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   if (bookIds.length === 0) {
     return { success: false, message: "No books selected" };
   }
@@ -71,15 +88,19 @@ export async function bulkDeleteBooks(bookIds: string[]) {
 
     // Delete books
     await db.delete(books).where(inArray(books.id, bookIds));
+    await logAdminAction(guard.user.id, "BULK_DELETE_BOOKS", undefined, "BOOK", {
+      bookIds,
+    }, { mandatory: true });
 
     return {
       success: true,
       message: `Successfully deleted ${bookIds.length} book(s)`,
     };
   } catch (error) {
+    console.error("Failed to delete books:", error);
     return {
       success: false,
-      message: `Failed to delete books: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: "Failed to delete books",
     };
   }
 }
@@ -106,6 +127,9 @@ export async function bulkUpdateUsers(
   userIds: string[],
   updates: Partial<typeof users.$inferInsert>
 ) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   if (userIds.length === 0) {
     return { success: false, message: "No users selected" };
   }
@@ -117,15 +141,20 @@ export async function bulkUpdateUsers(
         ...updates,
       })
       .where(inArray(users.id, userIds));
+    await logAdminAction(guard.user.id, "BULK_UPDATE_USERS", undefined, "USER", {
+      userIds,
+      updates,
+    });
 
     return {
       success: true,
       message: `Successfully updated ${userIds.length} user(s)`,
     };
   } catch (error) {
+    console.error("Failed to update users:", error);
     return {
       success: false,
-      message: `Failed to update users: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: "Failed to update users",
     };
   }
 }
@@ -163,32 +192,43 @@ export async function bulkRemoveAdminUsers(userIds: string[]) {
  * Bulk approve borrow requests.
  */
 export async function bulkApproveBorrowRequests(recordIds: string[]) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   if (recordIds.length === 0) {
     return { success: false, message: "No requests selected" };
   }
 
   try {
-    const sevenDaysFromNow = new Date();
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-    sevenDaysFromNow.setHours(23, 59, 59, 999); // Set to end of day
+    const results = await Promise.all(
+      recordIds.map((recordId) => approveBorrowRequest(recordId)),
+    );
+    const failures = results.filter((result) => !result.success);
 
-    await db
-      .update(borrowRecords)
-      .set({
-        status: "BORROWED",
-        dueDate: sevenDaysFromNow.toISOString(),
-        updatedAt: new Date(),
-      })
-      .where(inArray(borrowRecords.id, recordIds));
+    if (failures.length > 0) {
+      return {
+        success: false,
+        message: `${failures.length} borrow request(s) could not be approved`,
+      };
+    }
+
+    await logAdminAction(
+      guard.user.id,
+      "BULK_APPROVE_BORROW_REQUESTS",
+      undefined,
+      "BORROW_RECORD",
+      { recordIds },
+    );
 
     return {
       success: true,
       message: `Successfully approved ${recordIds.length} borrow request(s)`,
     };
   } catch (error) {
+    console.error("Failed to approve requests:", error);
     return {
       success: false,
-      message: `Failed to approve requests: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: "Failed to approve requests",
     };
   }
 }
@@ -197,27 +237,43 @@ export async function bulkApproveBorrowRequests(recordIds: string[]) {
  * Bulk reject borrow requests.
  */
 export async function bulkRejectBorrowRequests(recordIds: string[]) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   if (recordIds.length === 0) {
     return { success: false, message: "No requests selected" };
   }
 
   try {
-    await db
-      .update(borrowRecords)
-      .set({
-        status: "RETURNED",
-        updatedAt: new Date(),
-      })
-      .where(inArray(borrowRecords.id, recordIds));
+    const results = await Promise.all(
+      recordIds.map((recordId) => rejectBorrowRequest(recordId)),
+    );
+    const failures = results.filter((result) => !result.success);
+
+    if (failures.length > 0) {
+      return {
+        success: false,
+        message: `${failures.length} borrow request(s) could not be rejected`,
+      };
+    }
+
+    await logAdminAction(
+      guard.user.id,
+      "BULK_REJECT_BORROW_REQUESTS",
+      undefined,
+      "BORROW_RECORD",
+      { recordIds },
+    );
 
     return {
       success: true,
       message: `Successfully rejected ${recordIds.length} borrow request(s)`,
     };
   } catch (error) {
+    console.error("Failed to reject requests:", error);
     return {
       success: false,
-      message: `Failed to reject requests: ${error instanceof Error ? error.message : "Unknown error"}`,
+      message: "Failed to reject requests",
     };
   }
 }
@@ -227,6 +283,9 @@ export async function bulkRejectBorrowRequests(recordIds: string[]) {
  * Fetch aggregate stats for bulk operations.
  */
 export async function getBulkOperationStats() {
+  const guard = await requireAdmin();
+  if (!guard.ok) return guardToActionError(guard);
+
   const [totalBooks, totalUsers, pendingRequests, activeBorrows] =
     await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(books),
@@ -257,6 +316,9 @@ export async function validateBulkBookOperation(
   bookIds: string[],
   operation: string
 ) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { valid: false, message: guard.message };
+
   if (bookIds.length === 0) {
     return { valid: false, message: "No books selected" };
   }
@@ -291,6 +353,9 @@ export async function validateBulkUserOperation(
   userIds: string[],
   operation: string
 ) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { valid: false, message: guard.message };
+
   if (userIds.length === 0) {
     return { valid: false, message: "No users selected" };
   }

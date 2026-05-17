@@ -4,6 +4,13 @@ import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { adminRequests, users } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
+import {
+  guardToActionError,
+  requireAdmin,
+  requireSelfOrAdmin,
+} from "@/lib/security/auth-guards";
+import { logAdminAction } from "@/lib/admin/audit";
+import { logError } from "@/lib/security/logger";
 
 export interface AdminRequest {
   id: string;
@@ -46,6 +53,9 @@ export async function createAdminRequest(
   requestReason: string
 ): Promise<CreateAdminRequestResult> {
   try {
+    const guard = await requireSelfOrAdmin(userId);
+    if (!guard.ok) return guardToActionError(guard);
+
     // Check if user already has a pending admin request
     const existingRequest = await db
       .select()
@@ -123,7 +133,7 @@ export async function createAdminRequest(
       data: fullRequest[0],
     };
   } catch (error) {
-    console.error("Error creating admin request:", error);
+    logError("admin_request.create_failed", error, { userId });
     return {
       success: false,
       error: "Failed to create admin request",
@@ -137,6 +147,9 @@ export async function createAdminRequest(
  */
 export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const requests = await db
       .select({
         id: adminRequests.id,
@@ -160,7 +173,7 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
       data: requests,
     };
   } catch (error) {
-    console.error("Error fetching admin requests:", error);
+    logError("admin_request.fetch_all_failed", error);
     return {
       success: false,
       error: "Failed to fetch admin requests",
@@ -174,6 +187,9 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
  */
 export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const requests = await db
       .select({
         id: adminRequests.id,
@@ -198,7 +214,7 @@ export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult>
       data: requests,
     };
   } catch (error) {
-    console.error("Error fetching pending admin requests:", error);
+    logError("admin_request.fetch_pending_failed", error);
     return {
       success: false,
       error: "Failed to fetch pending admin requests",
@@ -212,9 +228,12 @@ export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult>
  */
 export async function approveAdminRequest(
   requestId: string,
-  reviewedBy: string
+  _reviewedBy: string
 ): Promise<UpdateAdminRequestResult> {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     // Get the request
     const request = await db
       .select()
@@ -247,7 +266,7 @@ export async function approveAdminRequest(
       .update(adminRequests)
       .set({
         status: "APPROVED",
-        reviewedBy,
+        reviewedBy: guard.user.id,
         reviewedAt: new Date(),
       })
       .where(eq(adminRequests.id, requestId));
@@ -272,12 +291,20 @@ export async function approveAdminRequest(
       .where(eq(adminRequests.id, requestId))
       .limit(1);
 
+    await logAdminAction(
+      guard.user.id,
+      "APPROVE_ADMIN_REQUEST",
+      requestId,
+      "ADMIN_REQUEST",
+      { userId: request[0].userId },
+    );
+
     return {
       success: true,
       data: fullRequest[0],
     };
   } catch (error) {
-    console.error("Error approving admin request:", error);
+    logError("admin_request.approve_failed", error, { requestId });
     return {
       success: false,
       error: "Failed to approve admin request",
@@ -291,10 +318,13 @@ export async function approveAdminRequest(
  */
 export async function rejectAdminRequest(
   requestId: string,
-  reviewedBy: string,
+  _reviewedBy: string,
   rejectionReason?: string
 ): Promise<UpdateAdminRequestResult> {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     // Get the request
     const request = await db
       .select()
@@ -321,7 +351,7 @@ export async function rejectAdminRequest(
       .update(adminRequests)
       .set({
         status: "REJECTED",
-        reviewedBy,
+        reviewedBy: guard.user.id,
         reviewedAt: new Date(),
         rejectionReason,
       })
@@ -347,12 +377,20 @@ export async function rejectAdminRequest(
       .where(eq(adminRequests.id, requestId))
       .limit(1);
 
+    await logAdminAction(
+      guard.user.id,
+      "REJECT_ADMIN_REQUEST",
+      requestId,
+      "ADMIN_REQUEST",
+      { reason: rejectionReason },
+    );
+
     return {
       success: true,
       data: fullRequest[0],
     };
   } catch (error) {
-    console.error("Error rejecting admin request:", error);
+    logError("admin_request.reject_failed", error, { requestId });
     return {
       success: false,
       error: "Failed to reject admin request",
@@ -369,6 +407,9 @@ export async function removeAdminPrivileges(
   _removedBy: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     // Check if user exists and is an admin
     const user = await db
       .select()
@@ -392,12 +433,18 @@ export async function removeAdminPrivileges(
 
     // Update the user's role to USER
     await db.update(users).set({ role: "USER" }).where(eq(users.id, userId));
+    await logAdminAction(
+      guard.user.id,
+      "REMOVE_ADMIN_PRIVILEGES",
+      userId,
+      "USER",
+    );
 
     return {
       success: true,
     };
   } catch (error) {
-    console.error("Error removing admin privileges:", error);
+    logError("admin_request.remove_admin_failed", error, { userId });
     return {
       success: false,
       error: "Failed to remove admin privileges",

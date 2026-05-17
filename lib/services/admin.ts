@@ -1,17 +1,20 @@
 /**
  * Admin Service - Pure API Functions
  *
- * This module contains pure API functions for admin-related operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
+ * This module provides a set of pure API functions for administrative operations within the library system.
+ * These functions facilitate interactions with admin-related API routes, handling tasks such as:
+ * - Fetching comprehensive dashboard statistics
+ * - Managing fine configurations and overdue book fines
+ * - Coordinating automated email reminders for due and overdue books
+ * - Exporting system data (books, users, borrows, analytics) in various formats
+ * - Managing personalized book recommendations and trending book data
  *
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
+ * Architectural Principles:
+ * - Pure API Logic: Contains only fetch calls and data transformation logic.
+ * - Framework Agnostic: NO React Query or UI-specific logic is included here.
+ * - Reusable: Designed for use across Client Components (via hooks), Server Components, and Server Actions.
  *
- * Note: Some API routes for admin operations already exist and are being used.
- * These service functions wrap those existing routes.
+ * @module lib/services/admin
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";

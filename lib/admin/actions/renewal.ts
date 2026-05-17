@@ -19,10 +19,14 @@
 import { db } from "@/database/drizzle";
 import { renewalRequests, borrowRecords, users, books } from "@/database/schema";
 import { eq, desc } from "drizzle-orm";
-import { auth } from "@/auth";
 import { logAdminAction } from "@/lib/admin/audit";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 import { createNotification } from "@/lib/services/notification-service";
+import {
+  guardToActionError,
+  requireAdmin,
+} from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Fetch all renewal requests with associated user and book information
@@ -31,11 +35,8 @@ import { createNotification } from "@/lib/services/notification-service";
  */
 export async function getAllRenewalRequests() {
   try {
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized access." };
-    }
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
     const requests = await db
       .select({
@@ -60,7 +61,7 @@ export async function getAllRenewalRequests() {
 
     return { success: true, data: requests };
   } catch (error) {
-    console.error("Error fetching renewal requests:", error);
+    logError("admin.renewal_requests_fetch_failed", error);
     return { success: false, error: "Failed to load renewal requests." };
   }
 }
@@ -82,13 +83,10 @@ export async function getAllRenewalRequests() {
 export async function approveRenewal(requestId: string) {
   try {
     // 1. Validate admin session
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized action." };
-    }
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
-    const adminId = user.id;
+    const adminId = guard.user.id;
 
     // 2. Fetch request and record
     const [request] = await db
@@ -161,7 +159,7 @@ export async function approveRenewal(requestId: string) {
 
     return { success: true, message: "Renewal approved and due date extended." };
   } catch (error) {
-    console.error("Error approving renewal:", error);
+    logError("admin.renewal_approve_failed", error, { requestId });
     return { success: false, error: "Failed to approve renewal request." };
   }
 }
@@ -175,13 +173,10 @@ export async function approveRenewal(requestId: string) {
  */
 export async function rejectRenewal(requestId: string, reason?: string) {
   try {
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized action." };
-    }
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
-    const adminId = user.id;
+    const adminId = guard.user.id;
 
     const [request] = await db
       .select({
@@ -224,7 +219,7 @@ export async function rejectRenewal(requestId: string, reason?: string) {
 
     return { success: true, message: "Renewal request rejected." };
   } catch (error) {
-    console.error("Error rejecting renewal:", error);
+    logError("admin.renewal_reject_failed", error, { requestId });
     return { success: false, error: "Failed to reject renewal request." };
   }
 }

@@ -15,9 +15,18 @@ const {
 } = config;
 const isImageKitConfigured = Boolean(publicKey && urlEndpoint);
 
-const authenticator = async () => {
+const getUploadIntent = (type: Props["type"], folder: string) => {
+  if (folder === "ids") return "signup-card";
+  if (folder === "books/covers" && type === "image") return "book-cover";
+  if (folder === "books/videos" && type === "video") return "book-video";
+  return null;
+};
+
+const createAuthenticator = (intent: string) => async () => {
   try {
-    const response = await fetch("/api/auth/imagekit");
+    const response = await fetch(
+      `/api/auth/imagekit?intent=${encodeURIComponent(intent)}`,
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -70,6 +79,7 @@ const FileUpload = ({
     filePath: value ?? null,
   });
   const [progress, setProgress] = useState(0);
+  const uploadIntent = getUploadIntent(type, folder);
 
   // CRITICAL: Sync value prop with internal state
   // This ensures the component updates when SSR data is provided (e.g., when editing a book)
@@ -293,7 +303,7 @@ const FileUpload = ({
     </>
   ) : null;
 
-  if (!isImageKitConfigured) {
+  if (!isImageKitConfigured || !uploadIntent) {
     return (
       <>
         <input
@@ -314,7 +324,7 @@ const FileUpload = ({
     <ImageKitProvider
       publicKey={publicKey}
       urlEndpoint={urlEndpoint}
-      authenticator={authenticator}
+      authenticator={createAuthenticator(uploadIntent)}
     >
       <IKUpload
         ref={ikUploadRef}

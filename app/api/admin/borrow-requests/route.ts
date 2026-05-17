@@ -146,8 +146,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Failed to fetch borrow requests",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

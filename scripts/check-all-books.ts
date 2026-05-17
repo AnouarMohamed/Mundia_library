@@ -5,23 +5,8 @@
  * but individual books show 3 borrowed copies
  */
 
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { books } from "@/database/schema";
-
-config({ path: ".env" });
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function checkAllBooks() {
   console.log("🔍 Checking All Books for Calculation Issues\n");
@@ -86,11 +71,11 @@ async function checkAllBooks() {
     console.log("✅ Check Complete");
     console.log("=".repeat(80));
 
-    await pool.end();
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error:", error);
-    await pool.end();
+    await closePostgresPool();
     process.exit(1);
   }
 }

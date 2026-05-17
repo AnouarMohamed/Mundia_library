@@ -1,5 +1,10 @@
 import { db } from "@/database/drizzle";
 import { auditLogs } from "@/database/schema";
+import { logError } from "@/lib/security/logger";
+
+type AuditOptions = {
+  mandatory?: boolean;
+};
 
 /**
  * Log an admin action for auditing purposes
@@ -18,7 +23,8 @@ export async function logAdminAction(
   action: string,
   targetId?: string,
   targetType?: string,
-  details?: Record<string, unknown>
+  details?: Record<string, unknown>,
+  options: AuditOptions = {},
 ) {
   try {
     await db.insert(auditLogs).values({
@@ -29,8 +35,16 @@ export async function logAdminAction(
       details: details ? JSON.stringify(details) : null,
     });
   } catch (error) {
-    console.error("Failed to log admin action:", error);
-    // We don't want to throw here to avoid breaking the main operation,
-    // but in a production system we might want more robust error handling.
+    logError("admin.audit_log_failed", error, {
+      userId,
+      action,
+      targetId,
+      targetType,
+      mandatory: options.mandatory,
+    });
+
+    if (options.mandatory) {
+      throw error;
+    }
   }
 }

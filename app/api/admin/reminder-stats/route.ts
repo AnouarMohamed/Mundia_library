@@ -30,8 +30,7 @@ export async function GET(_request: NextRequest) {
       {
         success: false,
         error: "Failed to fetch reminder stats",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

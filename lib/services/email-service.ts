@@ -1,7 +1,18 @@
 /**
  * Multi-provider Email Service
- * Primary: Brevo (supports all email providers including Yahoo, Outlook, etc.)
- * Fallback: Resend (currently limited to Gmail)
+ *
+ * This module provides a robust email delivery system with built-in redundancy.
+ * It features a primary provider (Brevo) and a fallback provider (Resend) to ensure
+ * high deliverability even if one service is unavailable.
+ *
+ * Key features:
+ * - Automatic failover: If the primary provider fails, it seamlessly switches to the fallback.
+ * - Comprehensive logging: Tracks attempts, successes, and failures across all providers.
+ * - Provider-agnostic API: Consumers only interact with the `sendEmailWithFallback` function.
+ *
+ * Requirements:
+ * - BREVO_API_KEY and BREVO_SENDER_EMAIL must be set in environment variables.
+ * - RESEND_TOKEN (RESEND_API_KEY) should be set for fallback capability.
  */
 
 // Brevo Configuration
@@ -15,10 +26,15 @@ const RESEND_API_KEY = process.env.RESEND_TOKEN;
 const RESEND_SENDER_EMAIL = "Mundiapolis Library <onboarding@resend.dev>";
 
 /**
- * Send email via Brevo API (Primary Provider)
- */
-/**
- * Send email via Brevo (primary provider).
+ * Sends an email via the Brevo Transactional Email API.
+ * Brevo is our primary provider as it supports a wide range of recipient domains.
+ *
+ * @param to - Recipient email address.
+ * @param subject - Email subject line.
+ * @param htmlContent - Rich HTML content for the email body.
+ * @param textContent - Plain text version of the email body (for non-HTML clients).
+ * @returns Object containing the provider name and unique message identifier.
+ * @throws Error if the API key is missing or the request fails.
  */
 async function sendEmailViaBrevo(
   to: string,
@@ -30,6 +46,7 @@ async function sendEmailViaBrevo(
     throw new Error("BREVO_API_KEY not configured");
   }
 
+  // Construct the standardized Brevo API payload
   const emailData = {
     sender: {
       name: BREVO_SENDER_NAME,
@@ -71,10 +88,15 @@ async function sendEmailViaBrevo(
 }
 
 /**
- * Send email via Resend API (Fallback Provider)
- */
-/**
- * Send email via Resend (fallback provider).
+ * Sends an email via the Resend API.
+ * Resend serves as our fallback provider and is dynamically imported to reduce bundle size.
+ *
+ * @param to - Recipient email address.
+ * @param subject - Email subject line.
+ * @param htmlContent - Rich HTML content for the email body.
+ * @param textContent - Plain text version of the email body.
+ * @returns Object containing the provider name and unique message identifier.
+ * @throws Error if the API key is missing or the Resend SDK returns an error.
  */
 async function sendEmailViaResend(
   to: string,
@@ -86,6 +108,7 @@ async function sendEmailViaResend(
     throw new Error("RESEND_API_KEY not configured");
   }
 
+  // Lazy-load Resend SDK to avoid unnecessary overhead when Brevo is working
   const { Resend } = await import("resend");
   const resend = new Resend(RESEND_API_KEY);
 
@@ -108,17 +131,24 @@ async function sendEmailViaResend(
 }
 
 /**
- * Send email with automatic fallback
- * Tries: Brevo → Resend
+ * High-level orchestration function to send an email with automatic provider fallback.
+ * It attempts to send via Brevo first, and if that fails, it tries Resend.
  *
- * @param to - Recipient email address
- * @param subject - Email subject
- * @param htmlContent - Email HTML content
- * @param textContent - Email plain text content
- * @returns Email send result with provider info
- */
-/**
- * Send email with provider fallback.
+ * @param to - Recipient email address.
+ * @param subject - Email subject line.
+ * @param htmlContent - HTML content of the email.
+ * @param textContent - Plain text content of the email.
+ * @returns An object indicating success, the provider used, and any errors encountered.
+ * 
+ * @example
+ * ```typescript
+ * const result = await sendEmailWithFallback(
+ *   "student@example.com",
+ *   "Book Overdue",
+ *   "<h1>Please return your book</h1>",
+ *   "Please return your book"
+ * );
+ * ```
  */
 export async function sendEmailWithFallback(
   to: string,
@@ -126,6 +156,7 @@ export async function sendEmailWithFallback(
   htmlContent: string,
   textContent: string
 ): Promise<{ success: boolean; messageId?: string; provider?: string; error?: string }> {
+  // Define the chain of providers to attempt
   const providers = [
     {
       name: "Brevo",
@@ -139,6 +170,7 @@ export async function sendEmailWithFallback(
 
   let lastError: Error | null = null;
 
+  // Iterate through providers until one succeeds or all fail
   for (const provider of providers) {
     try {
       console.log(` Attempting to send email via ${provider.name}...`);
@@ -152,15 +184,14 @@ export async function sendEmailWithFallback(
     } catch (error) {
       console.warn(` ${provider.name} failed:`, error instanceof Error ? error.message : "Unknown error");
       lastError = error instanceof Error ? error : new Error("Unknown error");
-      // Continue to next provider
+      // Fall through to the next provider in the loop
     }
   }
 
-  // All providers failed
+  // Final exit point if no providers successfully sent the email
   console.error(" All email providers failed");
   return {
     success: false,
     error: `Failed to send email via all providers. Last error: ${lastError?.message || "Unknown error"}`,
   };
 }
-

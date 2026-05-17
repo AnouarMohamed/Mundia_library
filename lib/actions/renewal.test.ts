@@ -1,7 +1,16 @@
+/**
+ * Renewal Actions Unit Tests
+ * 
+ * This suite provides comprehensive testing for the renewal request server actions.
+ * It covers authentication checks, ownership validation, eligibility criteria,
+ * and successful record creation, ensuring the business logic remains robust.
+ */
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { requestRenewal } from "./renewal";
 import { db } from "@/database/drizzle";
-import { auth } from "@/auth";
+
+const requireApprovedUserMock = vi.hoisted(() => vi.fn());
 
 // Mock dependencies
 vi.mock("@/database/drizzle", () => ({
@@ -14,8 +23,8 @@ vi.mock("@/database/drizzle", () => ({
   },
 }));
 
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
+vi.mock("@/lib/security/auth-guards", () => ({
+  requireApprovedUser: requireApprovedUserMock,
 }));
 
 vi.mock("@/lib/cache/revalidate", () => ({
@@ -25,19 +34,27 @@ vi.mock("@/lib/cache/revalidate", () => ({
 describe("requestRenewal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireApprovedUserMock.mockResolvedValue({
+      ok: true,
+      user: { id: "user-1", role: "USER", status: "APPROVED" },
+    });
   });
 
-  it("should fail if user is not authenticated", async () => {
-    (auth as any).mockResolvedValue(null);
+  it("should fail if user is not authenticated or approved", async () => {
+    requireApprovedUserMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      message: "Authentication required",
+    });
 
     const result = await requestRenewal({ borrowRecordId: "record-1" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("You must be logged in to request a renewal.");
+    expect(result.error).toBe("Authentication required");
   });
 
   it("should fail if borrow record does not exist", async () => {
-    (auth as any).mockResolvedValue({ user: { id: "user-1" } });
     (db.select as any).mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -53,7 +70,6 @@ describe("requestRenewal", () => {
   });
 
   it("should fail if borrow record belongs to another user", async () => {
-    (auth as any).mockResolvedValue({ user: { id: "user-1" } });
     (db.select as any).mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -69,7 +85,6 @@ describe("requestRenewal", () => {
   });
 
   it("should fail if book is not currently borrowed", async () => {
-    (auth as any).mockResolvedValue({ user: { id: "user-1" } });
     (db.select as any).mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -85,8 +100,6 @@ describe("requestRenewal", () => {
   });
 
   it("should successfully create a renewal request", async () => {
-    (auth as any).mockResolvedValue({ user: { id: "user-1" } });
-    
     // Mock borrow record check
     (db.select as any).mockReturnValueOnce({
       from: vi.fn().mockReturnValue({

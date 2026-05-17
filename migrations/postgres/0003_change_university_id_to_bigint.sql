@@ -1,0 +1,5 @@
+-- Archived journal compatibility migration.
+-- The current schema keeps university_id as integer, matching the application
+-- validation limit for 8-digit university IDs. This no-op file preserves the
+-- existing Drizzle journal entry so `drizzle-kit migrate` has a complete
+-- canonical PostgreSQL path.

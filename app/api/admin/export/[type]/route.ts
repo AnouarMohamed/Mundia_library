@@ -7,6 +7,8 @@ import {
   type ExportFormat,
 } from "@/lib/admin/actions/data-export";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { logAdminAction } from "@/lib/admin/audit";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for export generation.
@@ -114,6 +116,14 @@ export async function POST(
       });
     }
 
+    await logAdminAction(
+      guard.user.id,
+      "EXPORT_ADMIN_DATA",
+      type,
+      "EXPORT",
+      { type, format },
+    );
+
     return new NextResponse(exportResult.data, {
       status: 200,
       headers: {
@@ -123,13 +133,12 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error("Error exporting admin data:", error);
+    logError("admin.export_failed", error);
     return NextResponse.json(
       {
         success: false,
         error: "Failed to export data",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

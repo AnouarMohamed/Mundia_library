@@ -100,8 +100,7 @@ export async function GET(
       {
         success: false,
         error: "Failed to fetch book borrow statistics",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

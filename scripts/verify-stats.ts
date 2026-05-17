@@ -5,26 +5,9 @@
  * to ensure the admin dashboard statistics are correct.
  */
 
-// Load environment variables FIRST before importing anything that uses them
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { users, books, borrowRecords } from "@/database/schema";
 import { sql } from "drizzle-orm";
-
-config({ path: ".env" });
-
-// Create database connection directly
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function verifyStatistics() {
   console.log("🔍 Verifying Database Statistics...\n");
@@ -195,10 +178,11 @@ async function verifyStatistics() {
     }
     console.log("=".repeat(60));
 
-    // Close database connection
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error verifying statistics:", error);
+    await closePostgresPool();
     process.exit(1);
   }
 }

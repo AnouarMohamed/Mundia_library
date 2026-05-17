@@ -187,8 +187,7 @@ This supports:
 
 Track these before calling the product mature at institutional scale:
 
-- Password hashing should move from salted SHA-256 to a dedicated password hashing algorithm such as Argon2id or bcrypt with appropriate cost.
+- Legacy salted SHA-256 password hashes are still supported for verification, but successful logins are lazily rehashed to the current bcrypt format.
 - Some workflows use multiple email abstractions. Standardize ownership before expanding notification volume.
-- `next.config.mjs` has `eslint.ignoreDuringBuilds: true`; CI still runs lint separately, but production builds alone will not catch lint failures.
-- Admin and student authorization checks are spread across layouts, middleware, route handlers, and actions. New routes must explicitly choose the correct guard.
-- The schema has generated migrations in several folders. Confirm the canonical PostgreSQL migration path before a production database change.
+- Admin and student authorization should use the centralized guards in `lib/security/auth-guards.ts`; new routes must explicitly choose the correct guard.
+- `migrations/postgres` is the canonical migration path. `migrations/legacy-mysql` is archived reference only.

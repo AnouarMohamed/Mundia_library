@@ -1,7 +1,7 @@
 import { config } from "dotenv";
-import mysql from "mysql2/promise";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Pool } from "pg";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -19,10 +19,11 @@ type QueryPlan = {
 
 type TableAccessSummary = {
   endpoint: string;
-  tableName: string;
-  accessType?: string;
-  key?: string;
-  rowsExaminedPerScan?: number;
+  nodeType?: string;
+  relationName?: string;
+  indexName?: string;
+  planRows?: number;
+  totalCost?: number;
 };
 
 const plans: QueryPlan[] = [
@@ -30,10 +31,10 @@ const plans: QueryPlan[] = [
     endpoint: "GET /api/books",
     description: "Public books list ordered by rating/date with active-only filter",
     sql: `
-      EXPLAIN FORMAT=JSON
+      EXPLAIN (FORMAT JSON)
       SELECT id, title, author, genre, rating, available_copies, created_at
       FROM books
-      WHERE is_active = 1
+      WHERE is_active = true
       ORDER BY rating DESC, created_at DESC
       LIMIT 12 OFFSET 0
     `,
@@ -42,10 +43,10 @@ const plans: QueryPlan[] = [
     endpoint: "GET /api/books/genres",
     description: "Distinct active genres",
     sql: `
-      EXPLAIN FORMAT=JSON
+      EXPLAIN (FORMAT JSON)
       SELECT DISTINCT genre
       FROM books
-      WHERE is_active = 1
+      WHERE is_active = true
       ORDER BY genre ASC
     `,
   },
@@ -53,10 +54,10 @@ const plans: QueryPlan[] = [
     endpoint: "GET /api/books/recommendations",
     description: "Genre-based active recommendations",
     sql: `
-      EXPLAIN FORMAT=JSON
+      EXPLAIN (FORMAT JSON)
       SELECT id, title, author, genre, rating, created_at
       FROM books
-      WHERE is_active = 1
+      WHERE is_active = true
         AND genre IN ('Science', 'History', 'Technology')
       ORDER BY rating DESC, created_at DESC
       LIMIT 10
@@ -66,11 +67,11 @@ const plans: QueryPlan[] = [
     endpoint: "GET /api/borrow-records",
     description: "User borrow history with status/date ordering",
     sql: `
-      EXPLAIN FORMAT=JSON
+      EXPLAIN (FORMAT JSON)
       SELECT br.id, br.user_id, br.book_id, br.status, br.created_at, b.title
       FROM borrow_records br
       INNER JOIN books b ON br.book_id = b.id
-      WHERE br.user_id = ? AND br.status = 'BORROWED'
+      WHERE br.user_id = $1 AND br.status = 'BORROWED'
       ORDER BY br.created_at DESC
       LIMIT 50 OFFSET 0
     `,
@@ -80,10 +81,10 @@ const plans: QueryPlan[] = [
     endpoint: "GET /api/reviews/[bookId]",
     description: "Book review timeline ordered by created_at",
     sql: `
-      EXPLAIN FORMAT=JSON
+      EXPLAIN (FORMAT JSON)
       SELECT br.id, br.book_id, br.user_id, br.rating, br.created_at
       FROM book_reviews br
-      WHERE br.book_id = ?
+      WHERE br.book_id = $1
       ORDER BY br.created_at DESC
     `,
     params: ["00000000-0000-0000-0000-000000000000"],
@@ -106,26 +107,29 @@ function extractTableAccesses(node: unknown, endpoint: string): TableAccessSumma
     }
 
     const record = value as Record<string, unknown>;
-    const tableNode = record.table;
-    if (tableNode && typeof tableNode === "object") {
-      const table = tableNode as Record<string, unknown>;
-      const tableName = table.table_name;
+    const relationName = record["Relation Name"];
 
-      if (typeof tableName === "string") {
-        summaries.push({
-          endpoint,
-          tableName,
-          accessType:
-            typeof table.access_type === "string"
-              ? table.access_type
-              : undefined,
-          key: typeof table.key === "string" ? table.key : undefined,
-          rowsExaminedPerScan:
-            typeof table.rows_examined_per_scan === "number"
-              ? table.rows_examined_per_scan
-              : undefined,
-        });
-      }
+    if (typeof relationName === "string") {
+      summaries.push({
+        endpoint,
+        nodeType:
+          typeof record["Node Type"] === "string"
+            ? record["Node Type"]
+            : undefined,
+        relationName,
+        indexName:
+          typeof record["Index Name"] === "string"
+            ? record["Index Name"]
+            : undefined,
+        planRows:
+          typeof record["Plan Rows"] === "number"
+            ? record["Plan Rows"]
+            : undefined,
+        totalCost:
+          typeof record["Total Cost"] === "number"
+            ? record["Total Cost"]
+            : undefined,
+      });
     }
 
     for (const nested of Object.values(record)) {
@@ -141,13 +145,13 @@ function buildMarkdown(summary: TableAccessSummary[]) {
   const lines = [
     "## Hot query index hit report",
     "",
-    "| Endpoint | Table | Access type | Index key | Rows/scan |",
-    "| --- | --- | --- | --- | ---: |",
+    "| Endpoint | Relation | Plan node | Index | Planned rows | Total cost |",
+    "| --- | --- | --- | --- | ---: | ---: |",
   ];
 
   for (const item of summary) {
     lines.push(
-      `| ${item.endpoint} | ${item.tableName} | ${item.accessType || "n/a"} | ${item.key || "(none)"} | ${item.rowsExaminedPerScan ?? 0} |`
+      `| ${item.endpoint} | ${item.relationName || "n/a"} | ${item.nodeType || "n/a"} | ${item.indexName || "(none)"} | ${item.planRows ?? 0} | ${item.totalCost ?? 0} |`,
     );
   }
 
@@ -158,60 +162,44 @@ async function run() {
   const artifactDir = path.resolve(process.cwd(), "artifacts/perf");
   await fs.mkdir(artifactDir, { recursive: true });
 
-  const pool = mysql.createPool({
-    uri: process.env.DATABASE_URL,
-    connectionLimit: 5,
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: 5,
   });
 
   try {
-    console.log("Running EXPLAIN plans for hot API queries...\n");
+    console.log("Running PostgreSQL EXPLAIN plans for hot API queries...\n");
 
     const summaryRows: TableAccessSummary[] = [];
     const planDump: Array<{
       endpoint: string;
       description: string;
-      queryCost: string | number;
       plan: unknown;
     }> = [];
 
     for (const plan of plans) {
-      const [rows] = await pool.execute(plan.sql, plan.params ?? []);
-      const explainRows = rows as Array<{ EXPLAIN: string }>;
+      const result = await pool.query(plan.sql, plan.params ?? []);
+      const parsed = result.rows[0]?.["QUERY PLAN"]?.[0];
 
       console.log("=".repeat(88));
       console.log(`${plan.endpoint}`);
       console.log(`- ${plan.description}`);
       console.log("=".repeat(88));
 
-      if (explainRows.length === 0) {
+      if (!parsed) {
         console.log("No EXPLAIN output returned.\n");
         continue;
       }
 
-      const explainJson = explainRows[0]?.EXPLAIN;
-      if (!explainJson) {
-        console.log("EXPLAIN output format unexpected.\n");
-        continue;
-      }
-
-      const parsed = JSON.parse(explainJson) as {
-        query_block?: {
-          cost_info?: { query_cost?: string };
-        };
-      };
-
-      const queryCost = parsed.query_block?.cost_info?.query_cost ?? "unknown";
       const accesses = extractTableAccesses(parsed, plan.endpoint);
       summaryRows.push(...accesses);
 
       planDump.push({
         endpoint: plan.endpoint,
         description: plan.description,
-        queryCost,
         plan: parsed,
       });
 
-      console.log(`Estimated query cost: ${queryCost}`);
       console.log(JSON.stringify(parsed, null, 2));
       console.log("");
     }
@@ -230,9 +218,9 @@ async function run() {
           summary: summaryRows,
         },
         null,
-        2
+        2,
       ),
-      "utf8"
+      "utf8",
     );
 
     if (process.env.GITHUB_STEP_SUMMARY) {

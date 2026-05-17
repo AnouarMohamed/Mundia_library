@@ -23,9 +23,14 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/database/drizzle";
 import { books, borrowRecords } from "@/database/schema";
 import { desc, eq, sql, and, inArray, notInArray } from "drizzle-orm";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
+import { forbiddenResponse } from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -158,10 +163,20 @@ export async function GET(request: NextRequest) {
       ? 10
       : Math.min(20, Math.max(1, limitParam));
 
-    // Get session to determine user if userId not provided
-    // Note: Authentication is optional - works for both authenticated and anonymous users
-    const session = await auth();
-    const finalUserId = userId || session?.user?.id;
+    let finalUserId: string | undefined;
+
+    if (userId) {
+      const guard = await requireApprovedUser();
+      if (!guard.ok) {
+        return guardToResponse(guard);
+      }
+
+      if (guard.user.role !== "ADMIN" && guard.user.id !== userId) {
+        return forbiddenResponse("You can only access your own recommendations");
+      }
+
+      finalUserId = userId;
+    }
 
     let recommendedBooks: Book[] = [];
 
@@ -178,13 +193,12 @@ export async function GET(request: NextRequest) {
       recommendations: recommendedBooks,
     });
   } catch (error) {
-    console.error("Error fetching book recommendations:", error);
+    logError("books.recommendations_failed", error);
     return NextResponse.json(
       {
         success: false,
         error: "Failed to fetch book recommendations",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

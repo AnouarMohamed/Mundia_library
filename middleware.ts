@@ -46,7 +46,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  if (token.role !== "ADMIN") {
+  if (token.status !== "APPROVED" || token.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

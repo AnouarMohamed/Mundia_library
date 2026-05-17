@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { getUserNotifications, markAllAsRead } from "@/lib/services/notification-service";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for auth/session access.
@@ -13,21 +21,14 @@ export const runtime = "nodejs";
  */
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return guardToResponse(guard);
 
-    const userId = session.user.id;
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found in session" }, { status: 400 });
-    }
-
-    const notifications = await getUserNotifications(userId);
+    const notifications = await getUserNotifications(guard.user.id);
     return NextResponse.json({ success: true, notifications });
   } catch (error) {
-    console.error("Error in notifications API:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    logError("notifications.fetch_failed", error);
+    return internalServerErrorResponse();
   }
 }
 
@@ -37,26 +38,19 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userId = session.user.id;
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found in session" }, { status: 400 });
-    }
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return guardToResponse(guard);
 
     const { action } = await request.json();
 
     if (action === "markAllAsRead") {
-      const success = await markAllAsRead(userId);
+      const success = await markAllAsRead(guard.user.id);
       return NextResponse.json({ success });
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    return badRequestResponse("Invalid action");
   } catch (error) {
-    console.error("Error in notifications POST API:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    logError("notifications.update_all_failed", error);
+    return internalServerErrorResponse();
   }
 }

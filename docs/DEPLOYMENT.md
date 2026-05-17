@@ -37,6 +37,8 @@ UPSTASH_REDIS_URL=
 UPSTASH_REDIS_TOKEN=
 QSTASH_URL=
 QSTASH_TOKEN=
+QSTASH_CURRENT_SIGNING_KEY=
+QSTASH_NEXT_SIGNING_KEY=
 BREVO_API_KEY=
 BREVO_SENDER_EMAIL=
 BREVO_SENDER_NAME=Mundiapolis Library
@@ -44,7 +46,7 @@ RESEND_TOKEN=
 ENABLE_WORKFLOWS=true
 ```
 
-Keep `ENABLE_WORKFLOWS=false` until QStash and email are verified.
+Keep `ENABLE_WORKFLOWS=false` until QStash signing keys and email are verified.
 
 ## Option 1: Vercel
 
@@ -74,7 +76,7 @@ Do not rely on Vercel app startup to mutate production schema.
 
 Preferred production migration flow:
 
-1. Review generated SQL or Drizzle schema diff.
+1. Review generated SQL or Drizzle schema diff from `migrations/postgres`.
 2. Take or confirm a database backup.
 3. Apply schema changes from a controlled environment:
 
@@ -82,8 +84,12 @@ Preferred production migration flow:
 DATABASE_URL="production-url" npm run db:migrate
 ```
 
-4. Deploy application code.
-5. Run smoke tests.
+4. Confirm `/api/health` reports database connectivity in preview.
+5. Deploy application code.
+6. Run smoke tests.
+
+Do not use `npm run db:push` for production. It is a local development escape
+hatch only; reviewed migrations are the production release path.
 
 ### Smoke Test
 
@@ -92,6 +98,7 @@ After deployment:
 ```bash
 curl -fsS "$NEXT_PUBLIC_PROD_API_ENDPOINT/api/books?limit=1"
 curl -fsS "$NEXT_PUBLIC_PROD_API_ENDPOINT/api/books/genres"
+curl -fsS "$NEXT_PUBLIC_PROD_API_ENDPOINT/api/health"
 ```
 
 Then verify in a browser:
@@ -233,12 +240,17 @@ For production, prefer additive schema changes and two-step releases:
 Basic read checks:
 
 ```bash
+curl -fsS "$BASE_URL/api/health"
 curl -fsS "$BASE_URL/api/books?limit=1"
 curl -fsS "$BASE_URL/api/books/genres"
 curl -fsS "$BASE_URL/api/books/recommendations?limit=3"
 ```
 
-Authenticated and admin checks currently require browser/session validation.
+`/api/health` intentionally returns only safe booleans and optional commit
+metadata. It must never expose connection strings, provider internals, tokens,
+or raw exception messages.
+
+Authenticated and admin checks require browser/session validation.
 
 ## Production Monitoring Expectations
 
@@ -252,6 +264,7 @@ At minimum, monitor:
 - Email provider failures.
 - QStash workflow failures.
 - Redis/rate-limit failures.
+- `/api/health` database status.
 - Vercel or container memory and cold-start behavior.
 
 ## Deployment Risks To Watch

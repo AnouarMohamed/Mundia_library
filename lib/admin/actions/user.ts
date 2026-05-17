@@ -3,6 +3,12 @@
 import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import { eq, desc } from "drizzle-orm";
+import {
+  guardToActionError,
+  requireAdmin,
+} from "@/lib/security/auth-guards";
+import { logAdminAction } from "@/lib/admin/audit";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Update a user's role.
@@ -12,11 +18,17 @@ export const updateUserRole = async (
   role: "USER" | "ADMIN"
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     await db.update(users).set({ role }).where(eq(users.id, userId));
+    await logAdminAction(guard.user.id, "UPDATE_USER_ROLE", userId, "USER", {
+      role,
+    });
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating user role:", error);
+    logError("admin.user_role_update_failed", error, { userId, role });
     return { success: false, error: "Failed to update user role" };
   }
 };
@@ -29,11 +41,17 @@ export const updateUserStatus = async (
   status: "PENDING" | "APPROVED" | "REJECTED"
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     await db.update(users).set({ status }).where(eq(users.id, userId));
+    await logAdminAction(guard.user.id, "UPDATE_USER_STATUS", userId, "USER", {
+      status,
+    });
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating user status:", error);
+    logError("admin.user_status_update_failed", error, { userId, status });
     return { success: false, error: "Failed to update user status" };
   }
 };
@@ -43,6 +61,9 @@ export const updateUserStatus = async (
  */
 export const getAllUsers = async () => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const allUsers = await db
       .select()
       .from(users)
@@ -50,7 +71,7 @@ export const getAllUsers = async () => {
 
     return { success: true, data: allUsers };
   } catch (error) {
-    console.error("Error fetching users:", error);
+    logError("admin.users_fetch_failed", error);
     return { success: false, error: "Failed to fetch users" };
   }
 };

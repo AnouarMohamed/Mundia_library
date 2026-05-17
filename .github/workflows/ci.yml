@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Quality (Lint, Typecheck, Build)
+    name: Quality (Lint, Typecheck, Test, E2E, Build)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -62,10 +62,28 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Playwright E2E
+        env:
+          DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'postgresql://build:build@localhost:5432/builddb' }}
+          NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
+          AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
+          NEXTAUTH_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3100
+          NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3100
+          NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
+          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ${{ secrets['NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY'] || 'ci-build-public-key' }}
+          IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
+          ENABLE_WORKFLOWS: "false"
+        run: npm run test:e2e
+
       - name: Build
         env:
           DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'postgresql://build:build@localhost:5432/builddb' }}
           NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
+          AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
           NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://localhost:3000

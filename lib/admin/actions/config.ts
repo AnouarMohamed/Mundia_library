@@ -75,7 +75,7 @@ export async function setConfigValue(
     console.error(`Error setting config value for key ${key}:`, error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: "Unable to persist configuration",
     };
   }
 }

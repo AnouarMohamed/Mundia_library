@@ -7,26 +7,9 @@
  * - Overdue books
  */
 
-// Load environment variables FIRST
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { users, books, borrowRecords } from "@/database/schema";
 import { eq } from "drizzle-orm";
-
-config({ path: ".env" });
-
-// Create database connection
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function verifyBorrowDetails() {
   console.log("🔍 Detailed Borrow Records Investigation\n");
@@ -226,11 +209,11 @@ async function verifyBorrowDetails() {
     console.log("=".repeat(80));
 
     // Close database connection
-    await pool.end();
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error:", error);
-    await pool.end();
+    await closePostgresPool();
     process.exit(1);
   }
 }

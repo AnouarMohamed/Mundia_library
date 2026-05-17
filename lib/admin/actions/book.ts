@@ -5,6 +5,12 @@ import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
 import { eq } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
+import {
+  guardToActionError,
+  requireAdmin,
+} from "@/lib/security/auth-guards";
+import { logAdminAction } from "@/lib/admin/audit";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Creates a new book record in the library catalog.
@@ -22,6 +28,9 @@ export const createBook = async (
   params: BookParams & { updatedBy?: string }
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const bookId = randomUUID();
 
     await db
@@ -30,7 +39,7 @@ export const createBook = async (
         id: bookId,
         ...params,
         availableCopies: params.totalCopies, // Initially all copies are available
-        updatedBy: params.updatedBy || undefined,
+        updatedBy: guard.user.id,
         isActive: params.isActive ?? true, // Default to true if not provided
       });
 
@@ -41,13 +50,16 @@ export const createBook = async (
       .limit(1);
 
     revalidateCatalogTags();
+    await logAdminAction(guard.user.id, "CREATE_BOOK", bookId, "BOOK", {
+      title: params.title,
+    });
 
     return {
       success: true,
       data: JSON.parse(JSON.stringify(newBook[0])),
     };
   } catch (error) {
-    console.error("Failed to create book:", error);
+    logError("admin.book_create_failed", error);
 
     return {
       success: false,
@@ -79,6 +91,9 @@ export const updateBook = async (
   params: Partial<BookParams> & { updatedBy?: string }
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     // Inventory Adjustment Logic
     if (params.totalCopies) {
       // 1. Get current inventory state
@@ -115,7 +130,7 @@ export const updateBook = async (
         .set({
           ...params,
           availableCopies: newAvailableCopies,
-          updatedBy: params.updatedBy || undefined,
+          updatedBy: guard.user.id,
           updatedAt: new Date(),
         })
         .where(eq(books.id, bookId));
@@ -127,6 +142,9 @@ export const updateBook = async (
         .limit(1);
 
       revalidateCatalogTags();
+      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
+        totalCopies: params.totalCopies,
+      });
 
       if (updatedBook.length === 0) {
         return {
@@ -145,7 +163,7 @@ export const updateBook = async (
         .update(books)
         .set({
           ...params,
-          updatedBy: params.updatedBy || undefined,
+          updatedBy: guard.user.id,
           updatedAt: new Date(),
         })
         .where(eq(books.id, bookId));
@@ -157,6 +175,9 @@ export const updateBook = async (
         .limit(1);
 
       revalidateCatalogTags();
+      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
+        fields: Object.keys(params),
+      });
 
       if (updatedBook.length === 0) {
         return {
@@ -171,7 +192,7 @@ export const updateBook = async (
       };
     }
   } catch (error) {
-    console.error("Failed to update book:", error);
+    logError("admin.book_update_failed", error, { bookId });
 
     return {
       success: false,
@@ -188,6 +209,9 @@ export const updateBook = async (
  */
 export const getBookById = async (bookId: string) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const book = await db
       .select()
       .from(books)
@@ -206,7 +230,7 @@ export const getBookById = async (bookId: string) => {
       data: JSON.parse(JSON.stringify(book[0])),
     };
   } catch (error) {
-    console.error("Failed to fetch book:", error);
+    logError("admin.book_fetch_failed", error, { bookId });
 
     return {
       success: false,

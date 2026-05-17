@@ -43,6 +43,10 @@ jobs:
       - name: Fail on critical production advisories
         run: npm audit --omit=dev --audit-level=critical
 
+      - name: Report moderate production advisories
+        if: always()
+        run: npm audit --omit=dev --audit-level=moderate || true
+
       - name: Generate full advisory report
         if: always()
         run: npm audit --omit=dev --json > npm-audit-report.json || true

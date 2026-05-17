@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Failed to update overdue fines",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

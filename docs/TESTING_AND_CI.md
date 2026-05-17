@@ -15,7 +15,8 @@ This runs:
 1. `npm run lint`
 2. `npm run typecheck`
 3. `npm run test`
-4. `npm run build`
+4. `npm run test:e2e`
+5. `npm run build`
 
 ## Individual Commands
 
@@ -24,6 +25,7 @@ This runs:
 | `npm run lint` | ESLint with zero-warning policy. |
 | `npm run typecheck` | TypeScript compile check without emitted files. |
 | `npm run test` | Vitest test suite. |
+| `npm run test:e2e` | Playwright smoke and security E2E suite. |
 | `npm run build` | Production Next.js build. |
 | `npm run benchmark:api` | Key API route benchmark. |
 | `npm run loadtest:nightly` | Heavier load test and baseline comparison. |
@@ -42,6 +44,7 @@ Examples:
 - `lib/actions/renewal.test.ts`
 - `lib/admin/actions/borrow.test.ts`
 - `lib/admin/actions/recommendations.test.ts`
+- `tests/e2e/security.spec.ts`
 
 ## What To Test
 
@@ -63,7 +66,7 @@ UI-only layout changes do not always need unit tests, but they should still be m
 
 | Workflow | File | Purpose |
 | --- | --- | --- |
-| CI | `.github/workflows/ci.yml` | Lint, typecheck, tests, production build, Docker image build on push. |
+| CI | `.github/workflows/ci.yml` | Lint, typecheck, tests, Playwright E2E, production build, Docker image build on push. |
 | API Performance Benchmarks | `.github/workflows/api-benchmarks.yml` | PR and main benchmark gate for key API routes. |
 | Nightly API Load Test | `.github/workflows/nightly-load-test.yml` | Scheduled load and regression trend checks. |
 | CodeQL | `.github/workflows/codeql.yml` | Static analysis for JavaScript/TypeScript security. |
@@ -85,7 +88,7 @@ More detail:
 
 Recommended required checks for `main`:
 
-- `CI / Quality (Lint, Typecheck, Build)`
+- `CI / Quality (Lint, Typecheck, Test, E2E, Build)`
 - `CI / Docker Image Build`
 - `API Performance Benchmarks / Benchmark key API routes`
 
@@ -211,6 +214,13 @@ Security automation includes:
 - OpenSSF Scorecard
 
 Do not bypass these checks for production-bound changes without documenting the risk and follow-up owner.
+
+The current moderate production audit finding is the nested
+`next/node_modules/postcss <8.5.10` advisory. The top-level PostCSS package is
+kept patched, but Next.js still vendors its own PostCSS copy. The npm audit
+workflow blocks critical advisories and reports moderate advisories until the
+upstream Next.js dependency can be upgraded safely or overridden without
+breaking installs.
 
 ## Fixing A Failing CI Run
 

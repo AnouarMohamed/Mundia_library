@@ -1,104 +1,117 @@
 /**
- * Users Service - Pure API Functions
+ * Users Service
  *
- * This module contains pure API functions for user-related operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
+ * This module centralizes all user-related API operations for the University Library System.
+ * It provides a consistent interface for managing student profiles, administrator accounts, 
+ * and access requests.
  *
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
- *
- * Note: API routes for users need to be created if they don't exist yet.
- * These service functions are ready to use once API routes are available.
+ * Architecture:
+ * - Pure Service: Contains only stateless fetch calls to the application's backend routes.
+ * - Decoupled: No React-specific dependencies, making it usable in both client and server contexts.
+ * - Secure: Adheres to the principle of least privilege; sensitive fields like passwords are 
+ *   never handled by this service (managed exclusively server-side).
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
- * User status type
+ * Valid approval statuses for a user account.
+ * - PENDING: Initial state after registration, awaiting admin verification.
+ * - APPROVED: Account is active and authorized to borrow books.
+ * - REJECTED: Account verification failed; access denied.
  */
 export type UserStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 /**
- * User role type
+ * System roles defining access levels.
+ * - USER: Standard student access (view catalog, borrow books, manage own profile).
+ * - ADMIN: Administrative access (manage catalog, approve requests, view analytics).
  */
 export type UserRole = "USER" | "ADMIN";
 
 /**
- * User interface matching the database schema
+ * Represents a user profile as exposed by the API.
+ * Sensitive data (e.g., password hashes) is omitted for security.
  */
 export interface User {
+  /** Unique identifier for the user (UUID). */
   id: string;
+  /** Full legal name of the user. */
   fullName: string;
+  /** Unique university email address. */
   email: string;
+  /** Unique university identification number. */
   universityId: number;
+  /** URL to the hosted image of the user's university ID card. */
   universityCard: string;
+  /** Current verification status of the account. */
   status: UserStatus | null;
+  /** Assigned system role. */
   role: UserRole | null;
+  /** Date of the user's last interaction with the platform (YYYY-MM-DD). */
   lastActivityDate: string | null;
+  /** Timestamp of the last successful login. */
   lastLogin: Date | null;
+  /** Timestamp when the account was created. */
   createdAt: Date | null;
-  // Note: password is excluded from API responses for security
 }
 
 /**
- * Filters for user list queries
+ * Configuration for filtering and searching the user database.
  */
 export interface UserFilters {
+  /** Search string matching name, email, or university ID. */
   search?: string;
+  /** Filter by verification status. */
   status?: UserStatus | "all";
+  /** Filter by system role. */
   role?: UserRole | "all";
+  /** Sorting criteria. */
   sort?: "name" | "email" | "created" | "status";
+  /** Page number for pagination. */
   page?: number;
+  /** Records per page. */
   limit?: number;
 }
 
 /**
- * Response type for user list queries
+ * Paginated response structure for user lists.
  */
 export interface UsersListResponse {
+  /** Array of user profiles. */
   users: User[];
+  /** Total matching records across all pages. */
   total: number;
+  /** Current page number. */
   page: number;
+  /** Total number of pages available. */
   totalPages: number;
+  /** Maximum records per page. */
   limit: number;
 }
 
 /**
- * Response type for single user queries
+ * Wrapper for a single user profile response.
  */
 export interface UserResponse {
   user: User;
 }
 
 /**
- * Get all users with optional search and filters
- *
- * Supports:
- * - Search by name/email/university ID
- * - Filter by status (PENDING/APPROVED/REJECTED)
- * - Filter by role (USER/ADMIN)
- * - Sort by name, email, created date, or status
- * - Pagination
- *
- * @param filters - Optional filters object
- * @returns Promise with users list, total count, and pagination info
- * @throws {ApiError} Error with message and status code
- *
+ * Fetches a filtered and paginated list of users from the API.
+ * 
+ * @param filters - Search, filter, and pagination options.
+ * @returns A promise resolving to the paginated user list.
+ * @throws {ApiError} If the API call fails or returns an invalid format.
+ * 
  * @example
  * ```typescript
- * const users = await getUsersList({ status: "APPROVED", role: "USER" });
+ * const { users } = await getUsersList({ status: "PENDING", sort: "created" });
  * ```
- */
-/**
- * Fetch users with optional filters.
  */
 export async function getUsersList(
   filters: UserFilters = {}
 ): Promise<UsersListResponse> {
-  // Build query parameters
   const params = new URLSearchParams();
 
   if (filters.search) params.append("search", filters.search);
@@ -128,7 +141,7 @@ export async function getUsersList(
 
   const data = await response.json();
 
-  // Handle different response formats
+  // Support multiple response formats (standard paginated, raw array, or wrapped data)
   if (data.users && Array.isArray(data.users)) {
     return {
       users: data.users,
@@ -139,7 +152,6 @@ export async function getUsersList(
     };
   }
 
-  // If response has data array (from server actions)
   if (data.data && Array.isArray(data.data)) {
     return {
       users: data.data,
@@ -150,7 +162,6 @@ export async function getUsersList(
     };
   }
 
-  // If response is just an array, wrap it
   if (Array.isArray(data)) {
     return {
       users: data,
@@ -165,19 +176,11 @@ export async function getUsersList(
 }
 
 /**
- * Get a single user by ID
- *
- * @param userId - User ID (UUID)
- * @returns Promise with user data
- * @throws {ApiError} Error with message and status code (404 if not found)
- *
- * @example
- * ```typescript
- * const user = await getUser("123e4567-e89b-12d3-a456-426614174000");
- * ```
- */
-/**
- * Fetch a single user by id.
+ * Fetches a single user profile by their unique ID.
+ * 
+ * @param userId - The UUID of the user.
+ * @returns A promise resolving to the user profile.
+ * @throws {ApiError} If the user is not found or the API fails.
  */
 export async function getUser(userId: string): Promise<User> {
   if (!userId) {
@@ -197,13 +200,11 @@ export async function getUser(userId: string): Promise<User> {
 
   const data = await response.json();
 
-  // Handle different response formats
   if (data.user) {
     return data.user;
   }
 
   if (data.id) {
-    // If response is the user object directly
     return data;
   }
 
@@ -211,20 +212,10 @@ export async function getUser(userId: string): Promise<User> {
 }
 
 /**
- * Get current authenticated user profile
- *
- * Fetches the profile of the currently authenticated user from the session.
- *
- * @returns Promise with current user data
- * @throws {ApiError} Error with message and status code (401 if not authenticated)
- *
- * @example
- * ```typescript
- * const currentUser = await getCurrentUser();
- * ```
- */
-/**
- * Fetch the current authenticated user.
+ * Fetches the currently authenticated user's profile.
+ * 
+ * @returns A promise resolving to the current user's data.
+ * @throws {ApiError} If no active session exists (401 Unauthorized).
  */
 export async function getCurrentUser(): Promise<User> {
   const response = await fetch("/api/users/me", {
@@ -240,13 +231,11 @@ export async function getCurrentUser(): Promise<User> {
 
   const data = await response.json();
 
-  // Handle different response formats
   if (data.user) {
     return data.user;
   }
 
   if (data.id) {
-    // If response is the user object directly
     return data;
   }
 
@@ -254,22 +243,11 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 /**
- * Get users by status
- *
- * Convenience function to get users filtered by approval status.
- *
- * @param status - User status (PENDING/APPROVED/REJECTED)
- * @param limit - Maximum number of users (optional)
- * @returns Promise with array of users
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const pendingUsers = await getUsersByStatus("PENDING");
- * ```
- */
-/**
- * Fetch users by status.
+ * Convenience function to fetch users by their approval status.
+ * 
+ * @param status - The status to filter by (e.g., "PENDING").
+ * @param limit - Optional maximum number of users to return.
+ * @returns A promise resolving to an array of matching user profiles.
  */
 export async function getUsersByStatus(
   status: UserStatus,
@@ -283,22 +261,11 @@ export async function getUsersByStatus(
 }
 
 /**
- * Get users by role
- *
- * Convenience function to get users filtered by role.
- *
- * @param role - User role (USER/ADMIN)
- * @param limit - Maximum number of users (optional)
- * @returns Promise with array of users
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const admins = await getUsersByRole("ADMIN");
- * ```
- */
-/**
- * Fetch users by role.
+ * Convenience function to fetch users by their system role.
+ * 
+ * @param role - The role to filter by (e.g., "ADMIN").
+ * @param limit - Optional maximum number of users to return.
+ * @returns A promise resolving to an array of matching user profiles.
  */
 export async function getUsersByRole(
   role: UserRole,
@@ -312,21 +279,11 @@ export async function getUsersByRole(
 }
 
 /**
- * Get pending user account requests
- *
- * Convenience function to get all users with PENDING status.
- * Useful for admin approval workflows.
- *
- * @returns Promise with array of pending users
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const pendingRequests = await getPendingUsers();
- * ```
- */
-/**
- * Fetch pending account requests.
+ * Fetches users awaiting account approval.
+ * Useful for administrator verification workflows.
+ * 
+ * @param search - Optional search string to filter pending requests.
+ * @returns A promise resolving to an array of pending users.
  */
 export async function getPendingUsers(search?: string): Promise<User[]> {
   const filters: UserFilters = { status: "PENDING" };
@@ -337,41 +294,37 @@ export async function getPendingUsers(search?: string): Promise<User[]> {
 }
 
 /**
- * Admin request interface
- */
-/**
- * Admin request interface matching the database schema
- * Note: Database fields can be null, but we convert them to undefined for consistency
+ * Represents a formal request for elevated (Admin) privileges.
  */
 export interface AdminRequest {
+  /** Unique identifier for the request. */
   id: string;
+  /** ID of the user making the request. */
   userId: string;
+  /** Email of the requesting user. */
   userEmail: string;
+  /** Full name of the requesting user. */
   userFullName: string;
+  /** Stated reason for needing administrative access. */
   requestReason: string;
+  /** Current status of the request. */
   status: "PENDING" | "APPROVED" | "REJECTED";
+  /** ID of the admin who reviewed the request. */
   reviewedBy: string | null | undefined;
+  /** Timestamp of the review. */
   reviewedAt: Date | null | undefined;
+  /** Feedback provided if the request was rejected. */
   rejectionReason: string | null | undefined;
+  /** Request creation timestamp. */
   createdAt: Date | null;
+  /** Last update timestamp. */
   updatedAt: Date | null;
 }
 
 /**
- * Get pending admin requests
- *
- * Fetches all pending admin requests for admin review.
- *
- * @returns Promise with array of pending admin requests
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const requests = await getPendingAdminRequests();
- * ```
- */
-/**
- * Fetch pending admin access requests.
+ * Fetches all pending requests for administrative access.
+ * 
+ * @returns A promise resolving to an array of pending admin requests.
  */
 export async function getPendingAdminRequests(): Promise<AdminRequest[]> {
   const response = await fetch("/api/admin/admin-requests", {
@@ -387,7 +340,6 @@ export async function getPendingAdminRequests(): Promise<AdminRequest[]> {
 
   const data = await response.json();
 
-  // Handle different response formats
   if (data.requests && Array.isArray(data.requests)) {
     return data.requests;
   }

@@ -31,8 +31,7 @@ export async function POST(_request: NextRequest) {
       {
         success: false,
         error: "Failed to update trending books",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

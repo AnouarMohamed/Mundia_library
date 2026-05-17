@@ -6,24 +6,9 @@
  * - "HTML and CSS: Design and Build Websites": Should be 24 available (was 23, now 25 - over by 1)
  */
 
-import { config } from "dotenv";
-import { drizzle } from "drizzle-orm/mysql2";
-import mysql from "mysql2/promise";
 import { books } from "@/database/schema";
 import { eq } from "drizzle-orm";
-
-config({ path: ".env" });
-
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
-}
-
-const pool = mysql.createPool({
-  uri: process.env.DATABASE_URL,
-  connectionLimit: 10,
-});
-
-const db = drizzle({ client: pool, casing: "snake_case" });
+import { closePostgresPool, db } from "@/scripts/postgres-db";
 
 async function fixOvercorrection() {
   console.log("🔧 Fixing Over-Correction\n");
@@ -112,11 +97,11 @@ async function fixOvercorrection() {
     console.log("✅ Fix Complete!");
     console.log("=".repeat(80));
 
-    await pool.end();
+    await closePostgresPool();
     process.exit(0);
   } catch (error) {
     console.error("❌ Error:", error);
-    await pool.end();
+    await closePostgresPool();
     process.exit(1);
   }
 }

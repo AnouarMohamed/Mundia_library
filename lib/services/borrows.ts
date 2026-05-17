@@ -1,126 +1,151 @@
 /**
- * Borrows Service - Pure API Functions
+ * Borrows Service
  *
- * This module contains pure API functions for borrow record operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
+ * This module provides a clean API for managing borrow record operations within the University Library System.
+ * It strictly adheres to the "Pure Service" pattern:
+ * - Contains only stateless fetch calls to the application's API routes.
+ * - Does NOT include React hooks, React Query logic, or side effects.
+ * - Centralizes data transformation and error handling for all borrow-related transactions.
  *
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
- *
- * Note: API routes for borrows need to be created if they don't exist yet.
- * These service functions are ready to use once API routes are available.
+ * This service is designed to be consumed by:
+ * 1. Custom React Query hooks (for client-side state management).
+ * 2. Server Components (for initial data fetching during SSR).
+ * 3. Testing suites (for API integration testing).
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
- * Borrow record status type
+ * Valid statuses for a borrow record.
+ * - PENDING: User has requested the book; awaiting admin approval.
+ * - BORROWED: Request approved; book is currently with the user.
+ * - RETURNED: Book has been returned to the library.
  */
 export type BorrowStatus = "PENDING" | "BORROWED" | "RETURNED";
 
 /**
- * Borrow record interface matching the database schema
+ * Represents a standard borrow record as stored in the database.
  */
 export interface BorrowRecord {
+  /** Unique identifier for the borrow record (UUID). */
   id: string;
+  /** Unique identifier of the user who borrowed the book. */
   userId: string;
+  /** Unique identifier of the book being borrowed. */
   bookId: string;
+  /** The date and time the borrow was initiated or approved. */
   borrowDate: Date | null;
-  dueDate: string | null; // Can be null for pending requests
+  /** The date the book is expected to be returned (YYYY-MM-DD). */
+  dueDate: string | null;
+  /** The actual date the book was returned (YYYY-MM-DD). */
   returnDate: string | null;
+  /** Current lifecycle status of the loan. */
   status: BorrowStatus;
-  // Enhanced tracking fields
+  /** ID or Name of the administrator who processed the borrow. */
   borrowedBy: string | null;
+  /** ID or Name of the administrator who processed the return. */
   returnedBy: string | null;
-  fineAmount: string | null; // Stored as decimal string in DB
+  /** Accumulated fine amount for late returns (stored as string to preserve precision). */
+  fineAmount: string | null;
+  /** Internal administrative or student notes. */
   notes: string | null;
+  /** Number of times the due date has been extended. */
   renewalCount: number;
+  /** Timestamp of the last automated reminder email. */
   lastReminderSent: Date | null;
+  /** Timestamp of the last record update. */
   updatedAt: Date | null;
+  /** ID of the entity that last updated the record. */
   updatedBy: string | null;
+  /** Record creation timestamp. */
   createdAt: Date | null;
 }
 
 /**
- * Borrow record with user and book details (for admin views)
+ * Extended borrow record including denormalized user and book metadata.
+ * Primarily used in administrative dashboards for improved readability.
  */
 export interface BorrowRecordWithDetails extends BorrowRecord {
-  // User details
+  /** User's full name. */
   userName: string;
+  /** User's university email address. */
   userEmail: string;
+  /** User's unique university identification number. */
   userUniversityId: number;
-  // Book details
+  /** Title of the borrowed book. */
   bookTitle: string;
+  /** Author of the borrowed book. */
   bookAuthor: string;
+  /** Genre of the borrowed book. */
   bookGenre: string;
+  /** URL to the book's cover image. */
   bookCoverUrl: string | null;
+  /** Dominant color of the book cover (for UI placeholders). */
   bookCoverColor: string | null;
 }
 
 /**
- * Filters for borrow record list queries
+ * Configuration options for filtering and paginating borrow records.
  */
 export interface BorrowFilters {
+  /** Filter by specific student. */
   userId?: string;
+  /** Filter by specific book. */
   bookId?: string;
+  /** Filter by loan status. */
   status?: BorrowStatus | "all";
-  dateFrom?: string; // YYYY-MM-DD format
-  dateTo?: string; // YYYY-MM-DD format
-  overdue?: boolean; // Only overdue records
+  /** Filter records starting from this date (inclusive). */
+  dateFrom?: string;
+  /** Filter records up to this date (inclusive). */
+  dateTo?: string;
+  /** If true, returns only records where the due date has passed. */
+  overdue?: boolean;
+  /** Sorting criteria. */
   sort?: "date" | "dueDate" | "status" | "user";
+  /** Page number for pagination. */
   page?: number;
+  /** Number of records per page. */
   limit?: number;
 }
 
 /**
- * Response type for borrow record list queries
+ * Standard paginated response for borrow record lists.
  */
 export interface BorrowsListResponse {
+  /** Array of borrow records (optionally with details). */
   borrows: BorrowRecord[] | BorrowRecordWithDetails[];
+  /** Total count of records matching the filters across all pages. */
   total: number;
+  /** Current page number. */
   page: number;
+  /** Total number of pages available. */
   totalPages: number;
+  /** Maximum records per page. */
   limit: number;
 }
 
 /**
- * Response type for single borrow record queries
+ * Wrapper for a single borrow record response.
  */
 export interface BorrowResponse {
   borrow: BorrowRecord | BorrowRecordWithDetails;
 }
 
 /**
- * Get all borrow records with optional filters
- *
- * Supports:
- * - Filter by user ID
- * - Filter by book ID
- * - Filter by status (PENDING/BORROWED/RETURNED)
- * - Filter by date range
- * - Filter by overdue status
- * - Sort by date, due date, status, or user
- * - Pagination
- *
- * @param filters - Optional filters object
- * @returns Promise with borrow records list, total count, and pagination info
- * @throws {ApiError} Error with message and status code
- *
+ * Fetches a paginated and filtered list of borrow records from the API.
+ * 
+ * @param filters - Options for filtering, sorting, and pagination.
+ * @returns A promise resolving to the paginated list of borrow records.
+ * @throws {ApiError} If the server returns a non-OK status or invalid format.
+ * 
  * @example
  * ```typescript
- * const borrows = await getBorrowsList({ status: "BORROWED", overdue: true });
+ * const { borrows } = await getBorrowsList({ status: "BORROWED", overdue: true });
  * ```
- */
-/**
- * Fetch borrow records with optional filters.
  */
 export async function getBorrowsList(
   filters: BorrowFilters = {}
 ): Promise<BorrowsListResponse> {
-  // Build query parameters
   const params = new URLSearchParams();
 
   if (filters.userId) params.append("userId", filters.userId);
@@ -155,7 +180,7 @@ export async function getBorrowsList(
 
   const data = await response.json();
 
-  // Handle different response formats
+  // Support multiple response formats to ensure backward compatibility and flexibility
   if (data.borrows && Array.isArray(data.borrows)) {
     return {
       borrows: data.borrows,
@@ -166,7 +191,6 @@ export async function getBorrowsList(
     };
   }
 
-  // If response has data array (from server actions)
   if (data.data && Array.isArray(data.data)) {
     return {
       borrows: data.data,
@@ -177,7 +201,6 @@ export async function getBorrowsList(
     };
   }
 
-  // If response is just an array, wrap it
   if (Array.isArray(data)) {
     return {
       borrows: data,
@@ -192,22 +215,14 @@ export async function getBorrowsList(
 }
 
 /**
- * Get borrow records for a specific user
- *
- * Convenience function to get all borrow records for a user.
- *
- * @param userId - User ID (UUID)
- * @param status - Optional status filter
- * @returns Promise with array of user's borrow records
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const userBorrows = await getUserBorrows(userId, "BORROWED");
- * ```
- */
-/**
- * Fetch all borrow records for a user.
+ * Fetches all borrow records associated with a specific user.
+ * 
+ * CRITICAL: This function disables standard pagination (limit=10000) 
+ * to ensure the UI has access to the user's complete history.
+ * 
+ * @param userId - Unique identifier of the user.
+ * @param status - Optional status to filter the user's records.
+ * @returns A promise resolving to an array of borrow records.
  */
 export async function getUserBorrows(
   userId: string,
@@ -217,8 +232,6 @@ export async function getUserBorrows(
     throw new ApiError("User ID is required", 400);
   }
 
-  // CRITICAL: Fetch ALL records (no pagination limit)
-  // This ensures we get all user's borrow records, not just the first 50
   const filters: BorrowFilters = { userId, limit: 10000 };
   if (status) filters.status = status;
 
@@ -227,28 +240,17 @@ export async function getUserBorrows(
 }
 
 /**
- * Get all borrow requests (admin view with user and book details)
- *
- * Fetches all borrow records with joined user and book information.
- * Used by admin pages to display borrow requests with full context.
- *
- * @param status - Optional status filter (default: all)
- * @returns Promise with array of borrow records with details
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const requests = await getBorrowRequests("PENDING");
- * ```
- */
-/**
- * Fetch borrow requests for admin views.
+ * Fetches borrow requests specifically formatted for administrative review.
+ * Includes joined user and book data.
+ * 
+ * @param status - Filter by request status (e.g., "PENDING").
+ * @param search - Optional search string for user or book titles.
+ * @returns A promise resolving to an array of detailed borrow records.
  */
 export async function getBorrowRequests(
   status?: BorrowStatus,
   search?: string
 ): Promise<BorrowRecordWithDetails[]> {
-  // Build URL with query params
   const params = new URLSearchParams();
   if (status) params.append("status", status);
   if (search) params.append("search", search);
@@ -271,7 +273,6 @@ export async function getBorrowRequests(
 
   const data = await response.json();
 
-  // Handle different response formats
   if (data.requests && Array.isArray(data.requests)) {
     return data.requests;
   }
@@ -288,20 +289,11 @@ export async function getBorrowRequests(
 }
 
 /**
- * Get a single borrow record by ID
- *
- * @param borrowId - Borrow record ID (UUID)
- * @param includeDetails - Whether to include user and book details (default: false)
- * @returns Promise with borrow record data
- * @throws {ApiError} Error with message and status code (404 if not found)
- *
- * @example
- * ```typescript
- * const borrow = await getBorrow("123e4567-e89b-12d3-a456-426614174000", true);
- * ```
- */
-/**
- * Fetch a single borrow record by id.
+ * Fetches a single borrow record by its unique identifier.
+ * 
+ * @param borrowId - The ID of the record to fetch.
+ * @param includeDetails - If true, joins user and book metadata into the response.
+ * @returns A promise resolving to the borrow record.
  */
 export async function getBorrow(
   borrowId: string,
@@ -332,13 +324,11 @@ export async function getBorrow(
 
   const data = await response.json();
 
-  // Handle different response formats
   if (data.borrow) {
     return data.borrow;
   }
 
   if (data.id) {
-    // If response is the borrow record object directly
     return data;
   }
 
@@ -346,21 +336,10 @@ export async function getBorrow(
 }
 
 /**
- * Get overdue borrow records
- *
- * Convenience function to get all borrow records that are overdue.
- *
- * @param userId - Optional user ID to filter by specific user
- * @returns Promise with array of overdue borrow records
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const overdue = await getOverdueBorrows();
- * ```
- */
-/**
- * Fetch overdue borrows, optionally for a user.
+ * Convenience function to fetch all currently overdue loans.
+ * 
+ * @param userId - Optional filter to check overdue records for a specific student.
+ * @returns A promise resolving to an array of overdue borrow records.
  */
 export async function getOverdueBorrows(
   userId?: string
@@ -377,22 +356,11 @@ export async function getOverdueBorrows(
 }
 
 /**
- * Get borrow records by status
- *
- * Convenience function to get borrow records filtered by status.
- *
- * @param status - Borrow status (PENDING/BORROWED/RETURNED)
- * @param limit - Maximum number of records (optional)
- * @returns Promise with array of borrow records
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const pending = await getBorrowsByStatus("PENDING");
- * ```
- */
-/**
- * Fetch borrow records by status.
+ * Convenience function to fetch borrow records by status with an optional limit.
+ * 
+ * @param status - The status to filter by.
+ * @param limit - Optional maximum number of records to return.
+ * @returns A promise resolving to an array of borrow records.
  */
 export async function getBorrowsByStatus(
   status: BorrowStatus,
@@ -406,23 +374,13 @@ export async function getBorrowsByStatus(
 }
 
 /**
- * Get borrow records within a date range
- *
- * Useful for generating reports and analytics.
- *
- * @param dateFrom - Start date (YYYY-MM-DD format)
- * @param dateTo - End date (YYYY-MM-DD format)
- * @param status - Optional status filter
- * @returns Promise with array of borrow records
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const januaryBorrows = await getBorrowsByDateRange("2024-01-01", "2024-01-31");
- * ```
- */
-/**
- * Fetch borrow records within a date range.
+ * Fetches borrow records created within a specific date range.
+ * Useful for reporting, auditing, and analytics.
+ * 
+ * @param dateFrom - Start date (YYYY-MM-DD).
+ * @param dateTo - End date (YYYY-MM-DD).
+ * @param status - Optional status filter.
+ * @returns A promise resolving to an array of borrow records.
  */
 export async function getBorrowsByDateRange(
   dateFrom: string,

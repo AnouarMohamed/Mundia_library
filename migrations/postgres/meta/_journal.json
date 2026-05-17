@@ -29,6 +29,13 @@
       "when": 1766587858850,
       "tag": "0003_change_university_id_to_bigint",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779016409806,
+      "tag": "0008_security_performance_hardening",
+      "breakpoints": true
     }
   ]
 }

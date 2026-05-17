@@ -3,9 +3,12 @@ import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { bookReviews, users, borrowRecords } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
 
 /**
  * Use Node.js runtime for DB access.
@@ -75,8 +78,7 @@ export async function GET(
       {
         success: false,
         error: "Failed to fetch reviews",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );
@@ -109,17 +111,8 @@ export async function POST(
 
     // CRITICAL: Authentication required for creating reviews
     // Reviews can only be created by authenticated users who have borrowed and returned the book
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-          message: "Authentication required",
-        },
-        { status: 401 }
-      );
-    }
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return guardToResponse(guard);
 
     const { bookId } = await params;
 
@@ -156,7 +149,7 @@ export async function POST(
       .from(borrowRecords)
       .where(
         and(
-          eq(borrowRecords.userId, session.user.id),
+          eq(borrowRecords.userId, guard.user.id),
           eq(borrowRecords.bookId, bookId),
           eq(borrowRecords.status, "RETURNED")
         )
@@ -179,7 +172,7 @@ export async function POST(
       .from(bookReviews)
       .where(
         and(
-          eq(bookReviews.userId, session.user.id),
+          eq(bookReviews.userId, guard.user.id),
           eq(bookReviews.bookId, bookId)
         )
       )
@@ -199,7 +192,7 @@ export async function POST(
       .values({
         id: reviewId,
         bookId,
-        userId: session.user.id,
+        userId: guard.user.id,
         rating,
         comment: comment.trim(),
       });
@@ -226,8 +219,7 @@ export async function POST(
       {
         success: false,
         error: "Failed to create review",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

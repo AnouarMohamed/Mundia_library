@@ -1,21 +1,25 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
-import { getSession } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/security/auth-guards";
 
 /**
  * Root layout that requires a valid session.
  */
 const Layout = async ({ children }: { children: ReactNode }) => {
-  const session = await getSession();
+  const guard = await requireApprovedUser();
 
-  if (!session?.user?.id) {
+  if (!guard.ok && guard.status === 401) {
+    redirect("/sign-in");
+  }
+
+  if (!guard.ok) {
     redirect("/sign-in");
   }
 
   return (
     <main className="root-container">
-      <Header session={session} />
+      <Header session={guard.session} />
       {children}
     </main>
   );

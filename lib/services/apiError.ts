@@ -1,17 +1,20 @@
 /**
- * API Error Utility
+ * API Error Service Utilities
  *
- * Custom error class for consistent error handling across all API service functions.
- * Provides structured error information including HTTP status codes and error messages.
+ * This module defines the standardized error handling mechanism for the library system's API services.
+ * It provides a custom `ApiError` class that encapsulates HTTP status codes and human-readable 
+ * error messages, ensuring consistent error propagation and handling from the API to the UI.
+ *
+ * Capabilities:
+ * - Structured Errors: Captures HTTP status codes (4xx, 5xx) for precise error handling.
+ * - User-Friendly Messages: Maps technical status codes to helpful messages for the end-user.
+ * - Error Extraction: Utilities to parse error payloads from API responses.
  *
  * Usage:
- * ```typescript
- * if (!response.ok) {
- *   throw new ApiError(response.statusText, response.status);
- * }
- * ```
+ * This service is utilized by all other service modules to throw standardized exceptions 
+ * that can be easily caught and processed by React Query hooks or other error handlers.
  *
- * This error can be caught in React Query hooks and mutations for proper error handling.
+ * @module lib/services/apiError
  */
 
 /**

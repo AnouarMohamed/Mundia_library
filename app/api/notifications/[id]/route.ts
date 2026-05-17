@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { markAsRead } from "@/lib/services/notification-service";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
+import { internalServerErrorResponse } from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for auth/session access.
@@ -16,18 +21,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return guardToResponse(guard);
 
     const { id } = await params;
     // markAsRead enforces ownership for the current user.
-    const success = await markAsRead(id, session.user.id);
+    const success = await markAsRead(id, guard.user.id);
 
     return NextResponse.json({ success });
   } catch (error) {
-    console.error("Error in notification update API:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    logError("notifications.mark_read_failed", error);
+    return internalServerErrorResponse();
   }
 }

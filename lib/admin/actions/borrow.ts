@@ -21,9 +21,25 @@ import { db } from "@/database/drizzle";
 import { borrowRecords, books, users } from "@/database/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
-import { auth } from "@/auth";
 import { logAdminAction } from "@/lib/admin/audit";
 import { createNotification } from "@/lib/services/notification-service";
+import {
+  guardToActionError,
+  requireAdmin,
+} from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
+
+const safeBorrowOperationError = (
+  error: unknown,
+  allowedMessages: string[],
+  fallback: string,
+) => {
+  if (error instanceof Error && allowedMessages.includes(error.message)) {
+    return error.message;
+  }
+
+  return fallback;
+};
 
 /**
  * Fetches all borrow records with associated student and book details.
@@ -35,6 +51,9 @@ import { createNotification } from "@/lib/services/notification-service";
  */
 export const getAllBorrowRequests = async () => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     const requests = await db
       .select({
         id: borrowRecords.id,
@@ -71,7 +90,7 @@ export const getAllBorrowRequests = async () => {
 
     return { success: true, data: requests };
   } catch (error) {
-    console.error("Error fetching borrow requests:", error);
+    logError("admin.borrow_requests_fetch_failed", error);
     return { success: false, error: "Failed to fetch borrow requests" };
   }
 };
@@ -88,14 +107,24 @@ export const updateBorrowStatus = async (
   status: "PENDING" | "BORROWED" | "RETURNED"
 ) => {
   try {
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
+
     await db
       .update(borrowRecords)
-      .set({ status })
+      .set({ status, updatedAt: new Date(), updatedBy: guard.user.id })
       .where(eq(borrowRecords.id, recordId));
+    await logAdminAction(
+      guard.user.id,
+      "UPDATE_BORROW_STATUS",
+      recordId,
+      "BORROW_RECORD",
+      { status },
+    );
 
     return { success: true };
   } catch (error) {
-    console.error("Error updating borrow status:", error);
+    logError("admin.borrow_status_update_failed", error, { recordId, status });
     return { success: false, error: "Failed to update borrow status" };
   }
 };
@@ -117,79 +146,104 @@ export const updateBorrowStatus = async (
  */
 export const approveBorrowRequest = async (recordId: string) => {
   try {
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const adminId = user.id;
-
-    const record = await db
-      .select({
-        bookId: borrowRecords.bookId,
-        userId: borrowRecords.userId,
-      })
-      .from(borrowRecords)
-      .where(eq(borrowRecords.id, recordId))
-      .limit(1);
-
-    if (record.length === 0) {
-      return { success: false, error: "Borrow record not found" };
-    }
-
-    const book = await db
-      .select({ 
-        availableCopies: books.availableCopies,
-        title: books.title
-      })
-      .from(books)
-      .where(eq(books.id, record[0].bookId))
-      .limit(1);
-
-    if (book.length === 0 || book[0].availableCopies <= 0) {
-      return { success: false, error: "Book is no longer available" };
-    }
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 7); // Standard 7-day loan period
     dueDate.setHours(23, 59, 59, 999); // Due by the end of the day
     const dueDateString = dueDate.toISOString().split("T")[0];
 
-    await db
-      .update(borrowRecords)
-      .set({
-        status: "BORROWED",
-        borrowedBy: adminId,
-        dueDate: dueDateString,
-        updatedAt: new Date(),
-        updatedBy: adminId,
-      })
-      .where(eq(borrowRecords.id, recordId));
+    const result = await db.transaction(async (tx) => {
+      const [record] = await tx
+        .select({
+          bookId: borrowRecords.bookId,
+          userId: borrowRecords.userId,
+          status: borrowRecords.status,
+        })
+        .from(borrowRecords)
+        .where(eq(borrowRecords.id, recordId))
+        .limit(1);
 
-    await db
-      .update(books)
-      .set({ availableCopies: book[0].availableCopies - 1 })
-      .where(eq(books.id, record[0].bookId));
+      if (!record) {
+        throw new Error("Borrow record not found");
+      }
+
+      if (record.status !== "PENDING") {
+        throw new Error("Only pending borrow requests can be approved");
+      }
+
+      const [book] = await tx
+        .update(books)
+        .set({ availableCopies: sql`${books.availableCopies} - 1` })
+        .where(
+          and(
+            eq(books.id, record.bookId),
+            sql`${books.availableCopies} > 0`,
+          ),
+        )
+        .returning({
+          id: books.id,
+          title: books.title,
+          availableCopies: books.availableCopies,
+        });
+
+      if (!book) {
+        throw new Error("Book is no longer available");
+      }
+
+      await tx
+        .update(borrowRecords)
+        .set({
+          status: "BORROWED",
+          borrowedBy: guard.user.id,
+          dueDate: dueDateString,
+          updatedAt: new Date(),
+          updatedBy: guard.user.id,
+        })
+        .where(
+          and(
+            eq(borrowRecords.id, recordId),
+            eq(borrowRecords.status, "PENDING"),
+          ),
+        );
+
+      return {
+        bookId: record.bookId,
+        bookTitle: book.title,
+        userId: record.userId,
+      };
+    });
 
     await createNotification({
-      userId: record[0].userId,
+      userId: result.userId,
       title: "Borrow Request Approved",
-      message: `Your request to borrow "${book[0].title}" has been approved. The due date is ${dueDateString}.`,
+      message: `Your request to borrow "${result.bookTitle}" has been approved. The due date is ${dueDateString}.`,
       type: "SUCCESS",
     });
 
-    await logAdminAction(adminId!, "APPROVE_BORROW", recordId, "BORROW_RECORD", {
-      bookId: record[0].bookId,
-      userId: record[0].userId,
+    await logAdminAction(guard.user.id, "APPROVE_BORROW", recordId, "BORROW_RECORD", {
+      bookId: result.bookId,
+      userId: result.userId,
     });
 
     revalidateCatalogTags();
 
     return { success: true };
   } catch (error) {
-    console.error("Error approving borrow request:", error);
-    return { success: false, error: "Failed to approve borrow request" };
+    logError("admin.borrow_approve_failed", error, { recordId });
+    return {
+      success: false,
+      error: safeBorrowOperationError(
+        error,
+        [
+          "Borrow record not found",
+          "Only pending borrow requests can be approved",
+          "Book is no longer available",
+        ],
+        "Failed to approve borrow request",
+      ),
+    };
   }
 };
 
@@ -204,13 +258,8 @@ export const approveBorrowRequest = async (recordId: string) => {
  */
 export const rejectBorrowRequest = async (recordId: string) => {
   try {
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized" };
-    }
-
-    const adminId = user.id;
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
     const record = await db
       .select({
@@ -227,7 +276,7 @@ export const rejectBorrowRequest = async (recordId: string) => {
 
     await db.delete(borrowRecords).where(eq(borrowRecords.id, recordId));
 
-    await logAdminAction(adminId!, "REJECT_BORROW", recordId, "BORROW_RECORD", {
+    await logAdminAction(guard.user.id, "REJECT_BORROW", recordId, "BORROW_RECORD", {
       bookId: record[0].bookId,
       userId: record[0].userId,
     });
@@ -236,7 +285,7 @@ export const rejectBorrowRequest = async (recordId: string) => {
 
     return { success: true };
   } catch (error) {
-    console.error("Error rejecting borrow request:", error);
+    logError("admin.borrow_reject_failed", error, { recordId });
     return { success: false, error: "Failed to reject borrow request" };
   }
 };
@@ -253,6 +302,9 @@ export const rejectBorrowRequest = async (recordId: string) => {
  * @returns List of updated records and their calculated fines.
  */
 export const updateOverdueFines = async (customFineAmount?: number) => {
+  const guard = await requireAdmin();
+  if (!guard.ok) return [guardToActionError(guard)];
+
   const today = new Date();
 
   // Dynamic import to resolve circular dependency with config.ts
@@ -295,7 +347,7 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
         .set({
           fineAmount: fineAmount,
           updatedAt: new Date(),
-          updatedBy: record.userId,
+          updatedBy: guard.user.id,
         })
         .where(eq(borrowRecords.id, record.id));
 
@@ -308,6 +360,14 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
     }
   }
 
+  await logAdminAction(
+    guard.user.id,
+    "UPDATE_OVERDUE_FINES",
+    undefined,
+    "BORROW_RECORD",
+    { updatedCount: results.length, customFineAmount },
+  );
+
   return results;
 };
 
@@ -319,6 +379,9 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
  * @returns Detailed results of the recalculation.
  */
 export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
+  const guard = await requireAdmin();
+  if (!guard.ok) return [guardToActionError(guard)];
+
   const today = new Date();
 
   const { getDailyFineAmount } = await import("./config");
@@ -359,7 +422,7 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
         .set({
           fineAmount: fineAmount,
           updatedAt: new Date(),
-          updatedBy: record.userId,
+          updatedBy: guard.user.id,
         })
         .where(eq(borrowRecords.id, record.id));
 
@@ -381,6 +444,13 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
   }
 
   await new Promise((resolve) => setTimeout(resolve, 100));
+  await logAdminAction(
+    guard.user.id,
+    "FORCE_UPDATE_OVERDUE_FINES",
+    undefined,
+    "BORROW_RECORD",
+    { updatedCount: results.length, customFineAmount },
+  );
 
   return results;
 };
@@ -400,75 +470,83 @@ export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
  */
 export const returnBook = async (recordId: string) => {
   try {
-    const session = await auth();
-    const user = session?.user as { id?: string; role?: string } | undefined;
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Unauthorized" };
-    }
+    const guard = await requireAdmin();
+    if (!guard.ok) return guardToActionError(guard);
 
-    const adminId = user.id;
     const today = new Date().toISOString().split("T")[0];
 
-    const record = await db
-      .select({
-        bookId: borrowRecords.bookId,
-        userId: borrowRecords.userId,
-        dueDate: borrowRecords.dueDate,
-        borrowedBy: borrowRecords.borrowedBy,
-      })
-      .from(borrowRecords)
-      .where(eq(borrowRecords.id, recordId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [record] = await tx
+        .select({
+          bookId: borrowRecords.bookId,
+          userId: borrowRecords.userId,
+          dueDate: borrowRecords.dueDate,
+          borrowedBy: borrowRecords.borrowedBy,
+          status: borrowRecords.status,
+        })
+        .from(borrowRecords)
+        .where(eq(borrowRecords.id, recordId))
+        .limit(1);
 
-    if (record.length === 0) {
-      return { success: false, error: "Borrow record not found" };
-    }
+      if (!record) {
+        throw new Error("Borrow record not found");
+      }
 
-    // Final Fine Calculation
-    const dueDate = record[0].dueDate ? new Date(record[0].dueDate) : null;
-    const returnDate = new Date(today);
-    const daysOverdue = dueDate
-      ? Math.max(
-          0,
-          Math.floor(
-            (returnDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)
+      if (record.status !== "BORROWED") {
+        throw new Error("Only borrowed books can be returned");
+      }
+
+      // Final Fine Calculation
+      const dueDate = record.dueDate ? new Date(record.dueDate) : null;
+      const returnDate = new Date(today);
+      const daysOverdue = dueDate
+        ? Math.max(
+            0,
+            Math.floor(
+              (returnDate.getTime() - dueDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
           )
-        )
-      : 0;
-    const fineAmount =
-      daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00"; // $1 per day overdue rate
+        : 0;
+      const fineAmount =
+        daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00";
 
-    await db
-      .update(borrowRecords)
-      .set({
-        status: "RETURNED",
-        returnDate: today,
-        returnedBy: adminId,
-        borrowedBy: record[0].borrowedBy || adminId,
-        fineAmount: fineAmount,
-        updatedAt: new Date(),
-        updatedBy: adminId,
-      })
-      .where(eq(borrowRecords.id, recordId));
+      await tx
+        .update(borrowRecords)
+        .set({
+          status: "RETURNED",
+          returnDate: today,
+          returnedBy: guard.user.id,
+          borrowedBy: record.borrowedBy || guard.user.id,
+          fineAmount: fineAmount,
+          updatedAt: new Date(),
+          updatedBy: guard.user.id,
+        })
+        .where(
+          and(
+            eq(borrowRecords.id, recordId),
+            eq(borrowRecords.status, "BORROWED"),
+          ),
+        );
 
-    const book = await db
-      .select({ availableCopies: books.availableCopies })
-      .from(books)
-      .where(eq(books.id, record[0].bookId))
-      .limit(1);
-
-    if (book.length > 0) {
-      await db
+      await tx
         .update(books)
-        .set({ availableCopies: book[0].availableCopies + 1 })
-        .where(eq(books.id, record[0].bookId));
-    }
+        .set({ availableCopies: sql`${books.availableCopies} + 1` })
+        .where(eq(books.id, record.bookId));
 
-    await logAdminAction(adminId!, "RETURN_BOOK", recordId, "BORROW_RECORD", {
-      bookId: record[0].bookId,
-      userId: record[0].userId,
-      fineAmount,
-      daysOverdue,
+      return {
+        bookId: record.bookId,
+        userId: record.userId,
+        fineAmount,
+        daysOverdue,
+      };
+    });
+
+    await logAdminAction(guard.user.id, "RETURN_BOOK", recordId, "BORROW_RECORD", {
+      bookId: result.bookId,
+      userId: result.userId,
+      fineAmount: result.fineAmount,
+      daysOverdue: result.daysOverdue,
     });
 
     revalidateCatalogTags();
@@ -476,13 +554,20 @@ export const returnBook = async (recordId: string) => {
     return {
       success: true,
       data: {
-        fineAmount: parseFloat(fineAmount),
-        daysOverdue,
-        isOverdue: daysOverdue > 0,
+        fineAmount: parseFloat(result.fineAmount),
+        daysOverdue: result.daysOverdue,
+        isOverdue: result.daysOverdue > 0,
       },
     };
   } catch (error) {
-    console.error("Error returning book:", error);
-    return { success: false, error: "Failed to return book" };
+    logError("admin.borrow_return_failed", error, { recordId });
+    return {
+      success: false,
+      error: safeBorrowOperationError(
+        error,
+        ["Borrow record not found", "Only borrowed books can be returned"],
+        "Failed to return book",
+      ),
+    };
   }
 };

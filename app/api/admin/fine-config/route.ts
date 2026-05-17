@@ -4,6 +4,7 @@ import {
   setDailyFineAmount,
 } from "@/lib/admin/actions/config";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { logAdminAction } from "@/lib/admin/audit";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -34,8 +35,7 @@ export async function GET(_request: NextRequest) {
       {
         success: false,
         error: "Failed to fetch fine configuration",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );
@@ -69,12 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updatedBy =
-      typeof body.updatedBy === "string" && body.updatedBy.trim().length > 0
-        ? body.updatedBy.trim()
-        : guard.session.user?.email || "admin";
-
-    const result = await setDailyFineAmount(fineAmount, updatedBy);
+    const result = await setDailyFineAmount(fineAmount, guard.user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -87,6 +82,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await logAdminAction(
+      guard.user.id,
+      "UPDATE_FINE_CONFIG",
+      "daily_fine_amount",
+      "SYSTEM_CONFIG",
+      { fineAmount },
+    );
+
     return NextResponse.json({
       success: true,
       fineAmount,
@@ -98,8 +101,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: "Failed to update fine configuration",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

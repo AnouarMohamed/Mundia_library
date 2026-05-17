@@ -23,9 +23,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { borrowRecords, books } from "@/database/schema";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
+import {
+  guardToResponse,
+  requireApprovedUser,
+} from "@/lib/security/auth-guards";
 
 /**
  * Use Node.js runtime for DB access.
@@ -55,7 +58,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const session = await auth();
+    const guard = await requireApprovedUser();
+    if (!guard.ok) {
+      return guardToResponse(guard);
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parse query parameters
@@ -78,29 +85,14 @@ export async function GET(request: NextRequest) {
       ? 50
       : Math.min(100, Math.max(1, limitParam));
 
-    // CRITICAL: Authentication required for accessing borrow records
-    // Borrow records contain sensitive user data and should only be accessible to authenticated users
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Unauthorized",
-          message: "Authentication required",
-        },
-        { status: 401 }
-      );
-    }
-
-    // Trust session role for performance on this high-traffic endpoint.
-    // If role is missing, default to non-admin.
-    const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+    const isAdmin = guard.user.role === "ADMIN";
 
     // CRITICAL: Authorization check
     // Users can only access their own records unless they're admin
     // If userId is provided in query params, verify it matches the authenticated user (unless admin)
-    const finalUserId = userId || session.user.id;
+    const finalUserId = userId || guard.user.id;
 
-    if (!isAdmin && userId && userId !== session.user.id) {
+    if (!isAdmin && userId && userId !== guard.user.id) {
       return NextResponse.json(
         {
           success: false,
@@ -246,8 +238,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "Failed to fetch borrow records",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );

@@ -1,12 +1,13 @@
 /**
- * Renewal Management Server Actions (Student)
+ * Renewal Management Server Actions
  * 
- * This file contains server actions for students to manage their book renewals.
- * It handles the lifecycle of a renewal request from the student's perspective.
+ * This module provides server actions for students to manage their book renewals.
+ * It handles the lifecycle of a renewal request, including eligibility checks,
+ * ownership verification, and persistence.
  * 
  * Key Operations:
- * - Requesting a book renewal
- * - Checking renewal eligibility
+ * - Submitting renewal requests for active borrowings.
+ * - Checking eligibility for renewals to control UI visibility.
  */
 
 "use server";
@@ -14,8 +15,9 @@
 import { db } from "@/database/drizzle";
 import { renewalRequests, borrowRecords } from "@/database/schema";
 import { eq, and } from "drizzle-orm";
-import { auth } from "@/auth";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
+import { requireApprovedUser } from "@/lib/security/auth-guards";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Parameters required to submit a renewal request.
@@ -62,12 +64,12 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
 
   try {
     // 1. Authenticate the user
-    const session = await auth();
-    if (!session?.user) {
-      return { success: false, error: "You must be logged in to request a renewal." };
+    const guard = await requireApprovedUser();
+    if (!guard.ok) {
+      return { success: false, error: guard.message };
     }
 
-    const userId = session.user.id;
+    const userId = guard.user.id;
 
     // 2. Validate the borrow record and ownership
     const [record] = await db
@@ -125,7 +127,7 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
     };
 
   } catch (error) {
-    console.error("Error requesting renewal:", error);
+    logError("renewal.request_failed", error, { borrowRecordId });
     return { 
       success: false, 
       error: "An unexpected error occurred while processing your renewal request." 
@@ -150,8 +152,8 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
  */
 export async function canRequestRenewal(borrowRecordId: string): Promise<boolean> {
   try {
-    const session = await auth();
-    if (!session?.user) return false;
+    const guard = await requireApprovedUser();
+    if (!guard.ok) return false;
 
     const [record] = await db
       .select({
@@ -163,7 +165,7 @@ export async function canRequestRenewal(borrowRecordId: string): Promise<boolean
       .limit(1);
 
     // Basic ownership and status check
-    if (!record || record.userId !== session.user.id || record.status !== "BORROWED") {
+    if (!record || record.userId !== guard.user.id || record.status !== "BORROWED") {
       return false;
     }
 
@@ -181,7 +183,7 @@ export async function canRequestRenewal(borrowRecordId: string): Promise<boolean
 
     return !pendingRequest;
   } catch (error) {
-    console.error("Error checking renewal eligibility:", error);
+    logError("renewal.eligibility_failed", error, { borrowRecordId });
     return false;
   }
 }

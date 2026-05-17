@@ -1,98 +1,107 @@
 /**
- * Reviews Service - Pure API Functions
+ * Reviews Service
  *
- * This module contains pure API functions for book review operations.
- * These functions make fetch calls to API routes and return data.
- * NO React Query logic here - just fetch calls.
+ * This module provides a clean API for managing book reviews.
+ * It strictly adheres to the "Pure Service" pattern:
+ * - Contains only stateless fetch calls to the application's review API routes.
+ * - Does NOT include React hooks or React Query logic.
+ * - Centralizes data transformation and error handling for all review-related operations.
  *
- * These functions are reusable across:
- * - Client Components (via React Query hooks)
- * - Server Components (direct API calls)
- * - Server Actions (if needed)
- *
- * Note: API routes for reviews already exist and are being used.
- * These service functions wrap those existing routes.
+ * This service is designed to be consumed by:
+ * 1. Custom React Query hooks (for client-side state management).
+ * 2. Server Components (for initial data fetching).
  */
 
 import { ApiError, getApiErrorMessage } from "./apiError";
 
 /**
- * Review interface matching the API response
+ * Represents a book review as returned by the API.
  */
 export interface Review {
+  /** Unique identifier for the review. */
   id: string;
-  rating: number; // 1-5 stars
+  /** Numerical rating given by the user (1-5). */
+  rating: number;
+  /** The text content of the review. */
   comment: string;
+  /** Timestamp of when the review was originally created. */
   createdAt: Date | null;
+  /** Timestamp of the last update to the review. */
   updatedAt: Date | null;
+  /** Full name of the user who wrote the review. */
   userFullName: string;
+  /** Email address of the user who wrote the review. */
   userEmail: string;
-  // Optional fields that may be included
+  /** Unique identifier of the user (optional). */
   userId?: string;
+  /** Unique identifier of the book being reviewed (optional). */
   bookId?: string;
 }
 
 /**
- * Review eligibility response
+ * Detailed eligibility status for a user attempting to review a book.
  */
 export interface ReviewEligibility {
+  /** Overall success of the eligibility check request. */
   success: boolean;
+  /** Whether the user is allowed to submit a review. */
   canReview: boolean;
+  /** True if the user has already reviewed this book. */
   hasExistingReview: boolean;
+  /** True if the user currently has the book borrowed. */
   isCurrentlyBorrowed: boolean;
+  /** Descriptive reason if the user is not eligible. */
   reason: string;
 }
 
 /**
- * Create review input
+ * Data payload for creating a new review.
  */
 export interface CreateReviewInput {
-  rating: number; // 1-5
+  /** Numerical rating (1-5). */
+  rating: number;
+  /** Review text. */
   comment: string;
 }
 
 /**
- * Update review input
+ * Data payload for updating an existing review.
  */
 export interface UpdateReviewInput {
-  rating: number; // 1-5
+  /** Updated numerical rating (1-5). */
+  rating: number;
+  /** Updated review text. */
   comment: string;
 }
 
 /**
- * Response type for review list queries
+ * Standard response format for list-based review queries.
  */
 export interface ReviewsListResponse {
+  /** Indicates if the request was successful. */
   success: boolean;
+  /** Array of review objects. */
   reviews: Review[];
 }
 
 /**
- * Response type for single review operations
+ * Standard response format for single-review operations.
  */
 export interface ReviewResponse {
+  /** Indicates if the operation was successful. */
   success: boolean;
+  /** The review object (if applicable). */
   review: Review;
+  /** Optional success or error message. */
   message?: string;
 }
 
 /**
- * Get all reviews for a specific book
- *
- * Returns reviews ordered by creation date (newest first).
- * Includes user information (name, email) for display.
- *
- * @param bookId - Book ID (UUID)
- * @returns Promise with array of reviews
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const reviews = await getBookReviews("123e4567-e89b-12d3-a456-426614174000");
- * ```
- */
-/**
- * Fetch reviews for a book.
+ * Fetches all reviews associated with a specific book.
+ * 
+ * @param bookId - Unique identifier of the book.
+ * @returns A promise resolving to an array of reviews.
+ * @throws {ApiError} If the API request fails or returns an invalid format.
  */
 export async function getBookReviews(bookId: string): Promise<Review[]> {
   if (!bookId) {
@@ -112,12 +121,11 @@ export async function getBookReviews(bookId: string): Promise<Review[]> {
 
   const data = await response.json();
 
-  // Handle API response format
+  // Support both wrapped and unwrapped response formats
   if (data.success && data.reviews && Array.isArray(data.reviews)) {
     return data.reviews;
   }
 
-  // Fallback: if response is just an array
   if (Array.isArray(data)) {
     return data;
   }
@@ -126,27 +134,14 @@ export async function getBookReviews(bookId: string): Promise<Review[]> {
 }
 
 /**
- * Check if the current user is eligible to review a book
- *
- * Eligibility Rules:
- * 1. User must be logged in
- * 2. User must have previously borrowed AND returned the book
- * 3. User must NOT have an existing review for the book
- *
- * @param bookId - Book ID (UUID)
- * @returns Promise with eligibility status and reason
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const eligibility = await getReviewEligibility(bookId);
- * if (eligibility.canReview) {
- *   // Show review form
- * }
- * ```
- */
-/**
- * Fetch review eligibility for a book.
+ * Checks if the authenticated user is allowed to review a specific book.
+ * 
+ * Eligibility Criteria:
+ * 1. User must have previously borrowed and returned the book.
+ * 2. User must not have an existing review for this book.
+ * 
+ * @param bookId - Unique identifier of the book.
+ * @returns A promise resolving to the user's eligibility status.
  */
 export async function getReviewEligibility(
   bookId: string
@@ -168,7 +163,6 @@ export async function getReviewEligibility(
 
   const data = await response.json();
 
-  // Handle API response format
   if (data.success !== undefined) {
     return {
       success: data.success,
@@ -186,30 +180,12 @@ export async function getReviewEligibility(
 }
 
 /**
- * Create a new review for a book
- *
- * Business Rules:
- * - User must be authenticated
- * - User must have borrowed and returned the book
- * - User cannot have an existing review for the book
- * - Rating must be between 1 and 5
- * - Comment is required
- *
- * @param bookId - Book ID (UUID)
- * @param reviewData - Review data (rating and comment)
- * @returns Promise with created review
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const review = await createReview(bookId, {
- *   rating: 5,
- *   comment: "Great book! Highly recommend."
- * });
- * ```
- */
-/**
- * Create a new book review.
+ * Submits a new review for a book.
+ * 
+ * @param bookId - Unique identifier of the book.
+ * @param reviewData - The rating and comment for the new review.
+ * @returns A promise resolving to the newly created review object.
+ * @throws {ApiError} If validation fails or the user is ineligible.
  */
 export async function createReview(
   bookId: string,
@@ -219,6 +195,7 @@ export async function createReview(
     throw new ApiError("Book ID is required", 400);
   }
 
+  // Client-side validation before sending the request
   if (!reviewData.rating || reviewData.rating < 1 || reviewData.rating > 5) {
     throw new ApiError("Rating must be between 1 and 5", 400);
   }
@@ -244,7 +221,6 @@ export async function createReview(
 
   const data = await response.json();
 
-  // Handle API response format
   if (data.success && data.review) {
     return data.review;
   }
@@ -253,29 +229,11 @@ export async function createReview(
 }
 
 /**
- * Update an existing review
- *
- * Business Rules:
- * - User must be authenticated
- * - User must own the review
- * - Rating must be between 1 and 5
- * - Comment is required
- *
- * @param reviewId - Review ID (UUID)
- * @param reviewData - Updated review data (rating and comment)
- * @returns Promise with updated review
- * @throws {ApiError} Error with message and status code (404 if not found or not owned)
- *
- * @example
- * ```typescript
- * const updated = await updateReview(reviewId, {
- *   rating: 4,
- *   comment: "Updated my review - still great!"
- * });
- * ```
- */
-/**
- * Update an existing review.
+ * Updates an existing review written by the authenticated user.
+ * 
+ * @param reviewId - Unique identifier of the review to update.
+ * @param reviewData - The new rating and comment.
+ * @returns A promise resolving to the updated review object.
  */
 export async function updateReview(
   reviewId: string,
@@ -310,7 +268,6 @@ export async function updateReview(
 
   const data = await response.json();
 
-  // Handle API response format
   if (data.success && data.review) {
     return data.review;
   }
@@ -319,23 +276,10 @@ export async function updateReview(
 }
 
 /**
- * Delete a review
- *
- * Business Rules:
- * - User must be authenticated
- * - User must own the review
- *
- * @param reviewId - Review ID (UUID)
- * @returns Promise with success message
- * @throws {ApiError} Error with message and status code (404 if not found or not owned)
- *
- * @example
- * ```typescript
- * await deleteReview(reviewId);
- * ```
- */
-/**
- * Delete a review by id.
+ * Deletes a specific review.
+ * 
+ * @param reviewId - Unique identifier of the review to delete.
+ * @returns A promise that resolves when the deletion is confirmed.
  */
 export async function deleteReview(reviewId: string): Promise<void> {
   if (!reviewId) {
@@ -355,7 +299,6 @@ export async function deleteReview(reviewId: string): Promise<void> {
 
   const data = await response.json();
 
-  // Verify success
   if (!data.success) {
     throw new ApiError(
       data.message || "Failed to delete review",
@@ -365,22 +308,11 @@ export async function deleteReview(reviewId: string): Promise<void> {
 }
 
 /**
- * Get average rating for a book
- *
- * Calculates the average rating from all reviews for a book.
- *
- * @param bookId - Book ID (UUID)
- * @returns Promise with average rating (0-5) and total review count
- * @throws {ApiError} Error with message and status code
- *
- * @example
- * ```typescript
- * const stats = await getBookRatingStats(bookId);
- * console.log(`Average: ${stats.average}, Total: ${stats.count}`);
- * ```
- */
-/**
- * Calculate average rating stats for a book.
+ * Calculates aggregated rating statistics for a book.
+ * This is a client-side aggregation based on fetched reviews.
+ * 
+ * @param bookId - Unique identifier of the book.
+ * @returns A promise resolving to the average rating and total review count.
  */
 export async function getBookRatingStats(bookId: string): Promise<{
   average: number;
@@ -392,11 +324,12 @@ export async function getBookRatingStats(bookId: string): Promise<{
     return { average: 0, count: 0 };
   }
 
+  // Compute average rating rounded to 1 decimal place
   const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
   const average = totalRating / reviews.length;
 
   return {
-    average: Math.round(average * 10) / 10, // Round to 1 decimal place
+    average: Math.round(average * 10) / 10,
     count: reviews.length,
   };
 }

@@ -1,62 +1,92 @@
 /**
  * Advanced Search Service
  * 
- * Provides enhanced search capabilities for the book catalog.
- * Implements weighted matching across multiple fields to simulate semantic search.
+ * This module provides high-performance search capabilities for the book catalog.
+ * It implements a weighted relevance scoring system to ensure that the most
+ * pertinent books appear at the top of the search results.
  * 
- * Weighing Logic:
- * - Title Match: Highest weight (10x)
- * - Author Match: High weight (5x)
- * - Genre Match: Medium weight (3x)
- * - Summary/Description: Low weight (1x)
+ * Weighting Strategy:
+ * - Title Matches: 10 points (Highest relevance)
+ * - Author Matches: 5 points
+ * - Genre Matches: 3 points
+ * - Summary/Description Matches: 1 point (Contextual relevance)
+ * 
+ * This service allows for complex filtering by genre and supports multiple 
+ * sorting modes (relevance, title, rating, or date).
  */
 
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
-import { sql, or, like, and, eq, desc, asc, getTableColumns } from "drizzle-orm";
+import { sql, or, ilike, and, eq, desc, asc, getTableColumns } from "drizzle-orm";
+
+const MIN_SEARCH_LENGTH = 2;
+const MAX_SEARCH_LENGTH = 100;
+const MAX_SEARCH_LIMIT = 50;
 
 /**
- * Options for catalog search.
+ * Configuration options for executing a catalog search.
  */
 export interface SearchOptions {
+  /** The raw text query provided by the user. */
   query: string;
+  /** Optional filter to restrict results to a specific genre. */
   genre?: string;
+  /** Maximum number of results to return per page. */
   limit?: number;
+  /** Number of results to skip (for pagination). */
   offset?: number;
+  /** Criteria for ordering the results. */
   sortBy?: "relevance" | "title" | "rating" | "date";
 }
 
 /**
- * Perform a weighted advanced search on books.
+ * Performs a weighted advanced search against the books table.
  * 
- * This function calculates a "relevance score" for each book based on the search query
- * and sorts the results by this score.
+ * It dynamically constructs a SQL query that calculates a `relevance` score
+ * for every matching record based on where the search term was found.
+ * 
+ * @param options - Search configuration (query, filters, pagination, sorting).
+ * @returns A promise resolving to an object containing the list of books and total match count.
  */
 export async function performAdvancedSearch(options: SearchOptions) {
   const { query, genre, limit = 12, offset = 0, sortBy = "relevance" } = options;
-  const searchPattern = `%${query}%`;
+  const normalizedQuery = query.trim().slice(0, MAX_SEARCH_LENGTH);
+  const safeLimit = Math.min(MAX_SEARCH_LIMIT, Math.max(1, limit));
+  const safeOffset = Math.max(0, offset);
+
+  if (normalizedQuery.length < MIN_SEARCH_LENGTH) {
+    return {
+      books: [],
+      total: 0,
+    };
+  }
+
+  const searchPattern = `%${normalizedQuery}%`;
 
   // SQL expression for relevance scoring.
+  // This CASE statement assigns weights to matches in different columns.
   const relevanceScore = sql<number>`
-    (CASE WHEN ${books.title} LIKE ${searchPattern} THEN 10 ELSE 0 END) +
-    (CASE WHEN ${books.author} LIKE ${searchPattern} THEN 5 ELSE 0 END) +
-    (CASE WHEN ${books.genre} LIKE ${searchPattern} THEN 3 ELSE 0 END) +
-    (CASE WHEN ${books.summary} LIKE ${searchPattern} THEN 1 ELSE 0 END)
+    (CASE WHEN ${books.title} ILIKE ${searchPattern} THEN 10 ELSE 0 END) +
+    (CASE WHEN ${books.author} ILIKE ${searchPattern} THEN 5 ELSE 0 END) +
+    (CASE WHEN ${books.genre} ILIKE ${searchPattern} THEN 3 ELSE 0 END) +
+    (CASE WHEN ${books.summary} ILIKE ${searchPattern} THEN 1 ELSE 0 END)
   `;
 
+  // Construct the base WHERE conditions
   const whereConditions = [
-    eq(books.isActive, true),
-    genre ? eq(books.genre, genre) : sql`1=1`,
+    eq(books.isActive, true), // Only search for available/active books
+    genre ? eq(books.genre, genre) : sql`1=1`, // Genre filter (or no-op if null)
     or(
-      like(books.title, searchPattern),
-      like(books.author, searchPattern),
-      like(books.genre, searchPattern),
-      like(books.summary, searchPattern)
+      ilike(books.title, searchPattern),
+      ilike(books.author, searchPattern),
+      ilike(books.genre, searchPattern),
+      ilike(books.summary, searchPattern)
     )
   ];
 
   const whereClause = and(...whereConditions);
 
+  // Define the selection with the computed relevance score
   const baseQuery = db
     .select({
       ...getTableColumns(books),
@@ -65,9 +95,10 @@ export async function performAdvancedSearch(options: SearchOptions) {
     .from(books)
     .where(whereClause);
 
-  // Apply sorting
+  // Apply sorting logic based on the requested strategy
   let queryWithOrder;
   if (sortBy === "relevance") {
+    // Sort primarily by relevance score, with title as a tie-breaker
     queryWithOrder = baseQuery.orderBy(desc(relevanceScore), asc(books.title));
   } else if (sortBy === "title") {
     queryWithOrder = baseQuery.orderBy(asc(books.title));
@@ -79,8 +110,9 @@ export async function performAdvancedSearch(options: SearchOptions) {
     queryWithOrder = baseQuery;
   }
 
+  // Execute both the search and a total count query in parallel for efficiency
   const [results, totalCountResult] = await Promise.all([
-    queryWithOrder.limit(limit).offset(offset),
+    queryWithOrder.limit(safeLimit).offset(safeOffset),
     db.select({ count: sql<number>`count(*)` }).from(books).where(whereClause)
   ]);
   

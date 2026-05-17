@@ -4,13 +4,14 @@ interface SessionUser {
   name?: string | null;
   email?: string | null;
   role?: string; // User role (USER or ADMIN) for authorization checks
+  status?: "PENDING" | "APPROVED" | "REJECTED";
   universityId?: number;
   universityCard?: string;
 }
 
 interface Session {
   user?: SessionUser;
-  expires?: string;
+  expires: string;
 }
 interface Book {
   id: string;

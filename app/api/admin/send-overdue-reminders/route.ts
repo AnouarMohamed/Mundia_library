@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendOverdueReminders } from "@/lib/admin/actions/reminders";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { logAdminAction } from "@/lib/admin/audit";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -26,10 +27,17 @@ export async function POST(_request: NextRequest) {
       bookTitle: item.bookTitle,
       message: item.status === "sent" ? "Reminder sent" : "Reminder failed",
       sent: item.status === "sent",
-      error: item.status === "failed" ? item.error : undefined,
+      error: item.status === "failed" ? "Delivery failed" : undefined,
     }));
 
     const sentCount = results.filter((result) => result.sent).length;
+    await logAdminAction(
+      guard.user.id,
+      "SEND_OVERDUE_REMINDERS",
+      undefined,
+      "AUTOMATION",
+      { processedCount: results.length, sentCount },
+    );
 
     return NextResponse.json({
       success: true,
@@ -42,8 +50,7 @@ export async function POST(_request: NextRequest) {
       {
         success: false,
         error: "Failed to send overdue reminders",
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
+        message: "Request could not be completed",
       },
       { status: 500 }
     );
