@@ -501,7 +501,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             <EmptyState label="No recent borrow trend data yet." />
           ) : (
             <div className="h-72 min-w-0 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 640, height: 288 }}
+              >
                 <AreaChart data={borrowTrendData}>
                   <defs>
                     <linearGradient
@@ -570,7 +574,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             <EmptyState label="No borrow activity recorded yet." />
           ) : (
             <div className="h-72 min-w-0 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 640, height: 288 }}
+              >
                 <PieChart>
                   <Pie
                     data={borrowMixData}
@@ -622,7 +630,11 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
             <EmptyState label="No publication-year metadata available yet." />
           ) : (
             <div className="h-72 min-w-0 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                initialDimension={{ width: 640, height: 288 }}
+              >
                 <BarChart data={booksByYear}>
                   <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
                   <XAxis dataKey="year" stroke={chartAxis} fontSize={12} />

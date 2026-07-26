@@ -1,11 +1,24 @@
+/**
+ * BookVideo Component
+ *
+ * Handles the playback of book trailers and promotional videos.
+ * Supports direct URLs, Data-URIs, and optimized ImageKit video delivery.
+ *
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
 "use client";
 
 import React from "react";
-import { IKVideo, ImageKitProvider } from "imagekitio-next";
+import { ImageKitProvider, Video as IKVideo } from "@imagekit/next";
 import config from "@/lib/config";
 
 /**
- * Safely parse a video URL.
+ * Safely parses a string into a URL object.
+ *
+ * @param {string} value - The potential URL string
+ * @returns {URL | null} The URL object or null if invalid
  */
 const parseVideoUrl = (value: string): URL | null => {
   try {
@@ -16,16 +29,27 @@ const parseVideoUrl = (value: string): URL | null => {
 };
 
 /**
- * Restrict video playback to trusted ImageKit hosts.
+ * Validates if a hostname belongs to a trusted ImageKit endpoint.
+ *
+ * @param {string} hostname - Hostname to check
+ * @returns {boolean} True if host is trusted
  */
 const isTrustedImageKitHost = (hostname: string): boolean => {
   return hostname === "imagekit.io" || hostname.endsWith(".imagekit.io");
 };
 
 /**
- * Render a book trailer or fallback placeholder.
+ * BookVideo
+ *
+ * Renders a video player for a book. Includes logic for host validation
+ * and fallback display when no valid video is found.
+ *
+ * @param {Object} props - Component properties
+ * @param {string} props.videoUrl - The URL of the video to play
+ * @returns {JSX.Element} The rendered video player or placeholder
  */
 const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
+  // Support for direct data URIs (e.g. for small embedded clips)
   if (videoUrl.startsWith("data:video/")) {
     return (
       <video src={videoUrl} controls={true} className="w-full rounded-lg" />
@@ -36,7 +60,7 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
   const path = parsedUrl?.pathname.toLowerCase() ?? "";
   const hostname = parsedUrl?.hostname.toLowerCase() ?? "";
 
-  // Check if the URL is actually a video file or a trusted ImageKit video URL.
+  // Strategy: Determine if the URL points to a valid video asset
   const isVideoFile =
     Boolean(parsedUrl) &&
     (path.endsWith(".mp4") ||
@@ -47,7 +71,7 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
       path.includes("/video/") ||
       (isTrustedImageKitHost(hostname) && path.includes("/books/videos/")));
 
-  // If it's not a video file, show a placeholder
+  // Fallback: Show a friendly message if the video asset is missing or invalid
   if (!isVideoFile) {
     return (
       <div className="flex h-48 w-full items-center justify-center rounded-lg bg-gray-100 sm:h-64">
@@ -56,19 +80,18 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
     );
   }
 
-  // For ImageKit URLs in videos folder, try to play them as videos
-  // even if they have .png extension (they might be misnamed video files)
+  /**
+   * ImageKit Strategy:
+   * For ImageKit URLs in the designated videos folder, use the specialized IKVideo
+   * component to leverage transformation and optimization features.
+   */
   if (
     isTrustedImageKitHost(hostname) &&
     path.includes("/books/videos/") &&
-    config.env.imagekit.publicKey &&
     config.env.imagekit.urlEndpoint
   ) {
     return (
-      <ImageKitProvider
-        publicKey={config.env.imagekit.publicKey}
-        urlEndpoint={config.env.imagekit.urlEndpoint}
-      >
+      <ImageKitProvider urlEndpoint={config.env.imagekit.urlEndpoint}>
         <IKVideo
           src={videoUrl}
           controls={true}
@@ -78,6 +101,8 @@ const BookVideo = ({ videoUrl }: { videoUrl: string }) => {
     );
   }
 
+  // Standard Strategy: Use native HTML5 video player for other valid video URLs
   return <video src={videoUrl} controls={true} className="w-full rounded-lg" />;
 };
+
 export default BookVideo;

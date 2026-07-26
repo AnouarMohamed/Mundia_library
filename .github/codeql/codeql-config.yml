@@ -12,6 +12,7 @@ paths:
   - database
   - hooks
   - lib
+  - services
   - middleware.ts
   - auth.ts
 

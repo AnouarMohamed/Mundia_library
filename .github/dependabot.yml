@@ -52,6 +52,27 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: gradle
+    directory: /services
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:25"
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+      - security
+    commit-message:
+      prefix: deps
+      include: scope
+    groups:
+      kotlin-service-minor-patch:
+        update-types:
+          - minor
+          - patch
+
   - package-ecosystem: docker
     directory: /
     schedule:
@@ -63,6 +84,23 @@ updates:
     labels:
       - dependencies
       - docker
+      - security
+    commit-message:
+      prefix: docker
+      include: scope
+
+  - package-ecosystem: docker
+    directory: /services/circulation-service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:35"
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+      - backend
       - security
     commit-message:
       prefix: docker

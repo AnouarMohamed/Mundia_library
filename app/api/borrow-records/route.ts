@@ -1,63 +1,94 @@
 /**
- * Borrow Records API Route
- *
- * GET /api/borrow-records
- *
- * Purpose: Get borrow records with optional filters (user, book, status, date range, etc.).
- *
- * Query Parameters:
- * - userId (optional): Filter by user ID
- * - bookId (optional): Filter by book ID
- * - status (optional): Filter by status (PENDING, BORROWED, RETURNED)
- * - dateFrom (optional): Filter by borrow date from (YYYY-MM-DD)
- * - dateTo (optional): Filter by borrow date to (YYYY-MM-DD)
- * - overdue (optional): Filter only overdue records (true/false)
- * - sort (optional): Sort order (date, dueDate, status, user)
- * - page (optional): Page number (default: 1)
- * - limit (optional): Records per page (default: 50)
- *
- * IMPORTANT: This route uses Node.js runtime (not Edge) because it needs database access
+ * Borrow Records API Endpoint
+ * 
+ * Provides access to book borrowing history for users and administrators.
+ * This endpoint enforces strict authorization:
+ * - Regular users can only access their own records.
+ * - Administrators can access all records and filter by any user.
+ * 
+ * @module app/api/borrow-records/route
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { borrowRecords, books } from "@/database/schema";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
-import { headers } from "next/headers";
-import ratelimit from "@/lib/ratelimit";
 import {
   guardToResponse,
   requireApprovedUser,
 } from "@/lib/security/auth-guards";
+import {
+  enforceRateLimit,
+  isUuid,
+  normalizeTextParam,
+} from "@/lib/security/api-request";
+import {
+  badRequestResponse,
+  forbiddenResponse,
+  internalServerErrorResponse,
+  tooManyRequestsResponse,
+} from "@/lib/security/api-response";
+import { logError } from "@/lib/security/logger";
 
 /**
- * Use Node.js runtime for DB access.
+ * Force Node.js runtime for database connectivity.
  */
 export const runtime = "nodejs";
 
+// Input validation constants
+const BORROW_STATUSES = new Set(["PENDING", "BORROWED", "RETURNED"]);
+const SORT_OPTIONS = new Set(["date", "dueDate", "status", "user"]);
+
 /**
- * Get borrow records with filters
- *
- * @param request - Next.js request object
- * @returns JSON response with borrow records array
+ * Utility function to parse and validate date strings for filtering.
+ * 
+ * @param {string} value - The date string to parse (YYYY-MM-DD)
+ * @param {string} label - Label for error messages
+ * @returns {Object} Parsing result with status and date or error message
+ */
+const parseDateFilter = (value: string, label: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { ok: false as const, message: `${label} must be YYYY-MM-DD` };
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.toISOString().slice(0, 10) !== value
+  ) {
+    return { ok: false as const, message: `${label} must be a valid date` };
+  }
+
+  return { ok: true as const, date: parsed };
+};
+
+/**
+ * GET Handler for /api/borrow-records
+ * 
+ * Expected Query Parameters:
+ * - userId (UUID): Optional, filtered to authenticated user unless admin.
+ * - bookId (UUID): Optional filter for a specific book.
+ * - status (PENDING|BORROWED|RETURNED): Optional status filter.
+ * - dateFrom (YYYY-MM-DD): Optional start date filter.
+ * - dateTo (YYYY-MM-DD): Optional end date filter.
+ * - overdue (boolean): Optional filter for overdue books.
+ * - sort (date|dueDate|status|user): Optional sort field.
+ * - page (number): Page index (starts at 1).
+ * - limit (number): Results per page (max 100).
+ * 
+ * @param {NextRequest} request - Next.js Request object
+ * @returns {NextResponse} JSON response containing borrow records and pagination
  */
 export async function GET(request: NextRequest) {
   try {
-    // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
-
+    // 1. Rate Limiting: protect against automated scraping and abuse.
+    const success = await enforceRateLimit();
     if (!success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Too Many Requests",
-          message: "Rate limit exceeded. Please try again later.",
-        },
-        { status: 429 }
-      );
+      return tooManyRequestsResponse();
     }
 
+    // 2. Authentication and Approval Guard.
     const guard = await requireApprovedUser();
     if (!guard.ok) {
       return guardToResponse(guard);
@@ -65,21 +96,19 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
-    const userId = searchParams.get("userId") || undefined;
-    const bookId = searchParams.get("bookId") || undefined;
-    const status = searchParams.get("status") as
-      | "PENDING"
-      | "BORROWED"
-      | "RETURNED"
-      | null;
-    const dateFrom = searchParams.get("dateFrom") || undefined;
-    const dateTo = searchParams.get("dateTo") || undefined;
-    const overdue = searchParams.get("overdue") === "true";
-    const sort = searchParams.get("sort") || "date";
+    // 3. Input Normalization and Validation.
+    const userId = normalizeTextParam(searchParams.get("userId"), 36) || undefined;
+    const bookId = normalizeTextParam(searchParams.get("bookId"), 36) || undefined;
+    const statusParam =
+      normalizeTextParam(searchParams.get("status"), 20) || undefined;
+    const dateFrom = normalizeTextParam(searchParams.get("dateFrom"), 10);
+    const dateTo = normalizeTextParam(searchParams.get("dateTo"), 10);
+    const overdueParam =
+      normalizeTextParam(searchParams.get("overdue"), 5) || undefined;
+    const sort = normalizeTextParam(searchParams.get("sort"), 20) || "date";
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limitParam = parseInt(searchParams.get("limit") || "50", 10);
-    // Normalize pagination inputs.
+
     const safePage = Number.isNaN(page) ? 1 : Math.max(1, page);
     const safeLimit = Number.isNaN(limitParam)
       ? 50
@@ -87,23 +116,51 @@ export async function GET(request: NextRequest) {
 
     const isAdmin = guard.user.role === "ADMIN";
 
-    // CRITICAL: Authorization check
-    // Users can only access their own records unless they're admin
-    // If userId is provided in query params, verify it matches the authenticated user (unless admin)
-    const finalUserId = userId || guard.user.id;
-
-    if (!isAdmin && userId && userId !== guard.user.id) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Forbidden",
-          message: "You can only access your own borrow records",
-        },
-        { status: 403 }
-      );
+    // UUID Validation for relational IDs.
+    if (userId && !isUuid(userId)) {
+      return badRequestResponse("Invalid user ID");
     }
 
-    // Build where conditions
+    if (bookId && !isUuid(bookId)) {
+      return badRequestResponse("Invalid book ID");
+    }
+
+    if (statusParam && !BORROW_STATUSES.has(statusParam)) {
+      return badRequestResponse("Invalid borrow status");
+    }
+
+    if (overdueParam && !["true", "false"].includes(overdueParam)) {
+      return badRequestResponse("Invalid overdue filter");
+    }
+
+    if (!SORT_OPTIONS.has(sort)) {
+      return badRequestResponse("Invalid sort option");
+    }
+
+    const parsedDateFrom = dateFrom
+      ? parseDateFilter(dateFrom, "dateFrom")
+      : undefined;
+    if (parsedDateFrom && !parsedDateFrom.ok) {
+      return badRequestResponse(parsedDateFrom.message);
+    }
+
+    const parsedDateTo = dateTo ? parseDateFilter(dateTo, "dateTo") : undefined;
+    if (parsedDateTo && !parsedDateTo.ok) {
+      return badRequestResponse(parsedDateTo.message);
+    }
+
+    /**
+     * CRITICAL SECURITY CHECK:
+     * Users are restricted to their own records.
+     * Only admins can query records for other users.
+     */
+    const finalUserId = isAdmin ? userId : guard.user.id;
+
+    if (!isAdmin && userId && userId !== guard.user.id) {
+      return forbiddenResponse("You can only access your own borrow records");
+    }
+
+    // 4. Build database query conditions.
     const whereConditions = [];
 
     if (finalUserId) {
@@ -114,23 +171,25 @@ export async function GET(request: NextRequest) {
       whereConditions.push(eq(borrowRecords.bookId, bookId));
     }
 
-    if (status) {
-      whereConditions.push(eq(borrowRecords.status, status));
+    if (statusParam) {
+      whereConditions.push(
+        eq(
+          borrowRecords.status,
+          statusParam as "PENDING" | "BORROWED" | "RETURNED"
+        )
+      );
     }
 
-    if (dateFrom) {
-      // Convert string to Date for comparison
-      const dateFromObj = new Date(dateFrom);
-      whereConditions.push(gte(borrowRecords.borrowDate, dateFromObj));
+    if (parsedDateFrom?.ok) {
+      whereConditions.push(gte(borrowRecords.borrowDate, parsedDateFrom.date));
     }
 
-    if (dateTo) {
-      // Convert string to Date for comparison
-      const dateToObj = new Date(dateTo);
-      whereConditions.push(lte(borrowRecords.borrowDate, dateToObj));
+    if (parsedDateTo?.ok) {
+      whereConditions.push(lte(borrowRecords.borrowDate, parsedDateTo.date));
     }
 
-    if (overdue) {
+    // Filter for overdue books: status is BORROWED and due date has passed.
+    if (overdueParam === "true") {
       whereConditions.push(
         and(
           eq(borrowRecords.status, "BORROWED"),
@@ -139,7 +198,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Build sort order
+    // Define sort order.
     let orderBy;
     switch (sort) {
       case "dueDate":
@@ -157,14 +216,15 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Fetch borrow records with book details
+    // 5. Execute paginated join query to fetch records with book details.
     const offset = (safePage - 1) * safeLimit;
     const whereClause =
       whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    
     const [allBorrowRecords, totalRecordsResult] = await Promise.all([
       db
         .select({
-          // Borrow record fields
+          // Selecting specific fields from borrowRecords and books
           id: borrowRecords.id,
           userId: borrowRecords.userId,
           bookId: borrowRecords.bookId,
@@ -181,7 +241,6 @@ export async function GET(request: NextRequest) {
           updatedAt: borrowRecords.updatedAt,
           updatedBy: borrowRecords.updatedBy,
           createdAt: borrowRecords.createdAt,
-          // Book fields
           book: {
             id: books.id,
             title: books.title,
@@ -225,6 +284,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       borrows: allBorrowRecords,
+      total: totalRecords,
+      page: safePage,
+      totalPages,
+      limit: safeLimit,
       pagination: {
         currentPage: safePage,
         totalPages,
@@ -233,14 +296,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Error fetching borrow records:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch borrow records",
-        message: "Request could not be completed",
-      },
-      { status: 500 }
-    );
+    logError("borrow_records.fetch_failed", error);
+    return internalServerErrorResponse();
   }
 }

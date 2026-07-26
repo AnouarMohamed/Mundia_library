@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mundia-dev
+resources:
+  - namespace.yaml
+  - ../../platform/base
+
+helmGlobals:
+  chartHome: ../../../helm
+helmCharts:
+  - name: mundia-service
+    releaseName: circulation
+    namespace: mundia-dev
+    valuesFile: values-circulation.yaml
+    includeCRDs: false
+
+configMapGenerator:
+  - name: otel-destination
+    literals:
+      - endpoint=https://REPLACE_DEV_OTLP_ENDPOINT
+
+images:
+  - name: registry.invalid/platform/opentelemetry-collector-contrib
+    newName: REPLACE_APPROVED_REGISTRY/opentelemetry-collector-contrib
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+patches:
+  - target:
+      kind: ClusterSecretStore
+      name: aws-secrets-manager
+    patch: |-
+      - op: replace
+        path: /spec/provider/aws/region
+        value: REPLACE_DEV_AWS_REGION
+      - op: replace
+        path: /spec/conditions/0/namespaces
+        value:
+          - mundia-dev
+  - target:
+      kind: ExternalSecret
+      name: otel-exporter
+    patch: |-
+      - op: replace
+        path: /spec/data/0/remoteRef/key
+        value: mundia/dev/platform/otel
+  - target:
+      kind: NetworkPolicy
+      name: otel-gateway
+    patch: |-
+      - op: replace
+        path: /spec/egress/0/to/0/ipBlock/cidr
+        value: 10.40.0.0/16

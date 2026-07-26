@@ -1,17 +1,22 @@
-"use client";
-
 /**
  * BookOverviewContent Component
- *
- * Client component that displays book overview information.
- * Uses React Query to fetch book data dynamically, ensuring immediate updates.
- *
+ * 
+ * A high-fidelity client component that provides a detailed visual and informational 
+ * overview of a specific book. This component serves as the central hub for book-specific 
+ * actions like borrowing, viewing statistics, and reading descriptions.
+ * 
  * Features:
- * - Uses useBook hook to fetch book data with SSR initial data support
- * - Displays all book information including availableCopies, totalCopies, isActive
- * - Updates immediately when book data changes (via cache invalidation)
- * - Integrates with BookBorrowStats and BookBorrowButton for dynamic updates
+ * - Real-time synchronization of book metadata using TanStack Query.
+ * - Dynamic availability tracking (Available vs. Total copies).
+ * - Comprehensive technical details display (ISBN, Publisher, Language, etc.).
+ * - Integration with BookBorrowButton for contextual borrow/return actions.
+ * - Performance-optimized with SSR initial data to prevent hydration shifts.
+ * - Elegant 3D-style book cover presentation with CSS-based depth effects.
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React from "react";
 import BookCover from "@/components/BookCover";
@@ -25,48 +30,35 @@ import BookSkeleton from "@/components/skeletons/BookSkeleton";
 import type { BorrowRecord } from "@/lib/services/borrows";
 import type { ReviewEligibility } from "@/lib/services/reviews";
 
+/**
+ * Props for the BookOverviewContent component.
+ */
 interface BookOverviewContentProps {
-  /**
-   * Book ID
-   */
+  /** The unique identifier of the book. */
   bookId: string;
-  /**
-   * User ID
-   */
+  /** The unique identifier of the currently logged-in user. */
   userId: string;
-  /**
-   * User status (APPROVED, PENDING, etc.)
-   */
+  /** Current verification status of the user (e.g., "APPROVED"). */
   userStatus?: string | null;
-  /**
-   * Whether this is a detail page
-   */
+  /** Flag to adjust the layout and available actions for the full detail page. */
   isDetailPage?: boolean;
-  /**
-   * Initial book data from SSR (prevents duplicate fetch)
-   */
+  /** Initial book metadata from SSR to ensure immediate visual rendering. */
   initialBook: Book;
-  /**
-   * Initial borrow statistics from SSR (prevents duplicate fetch)
-   */
+  /** Initial high-level borrow statistics (total, active, returned). */
   initialStats?: {
     totalBorrows: number;
     activeBorrows: number;
     returnedBorrows: number;
   };
-  /**
-   * Initial user borrows from SSR (prevents duplicate fetch, ensures correct button state on first load)
+  /** 
+   * Initial list of borrow records for the current user.
+   * Crucial for determining the immediate state of the borrow button.
    */
   initialUserBorrows?: BorrowRecord[];
-  /**
-   * Initial review eligibility from SSR (prevents duplicate fetch, ensures correct button state on first load)
-   */
+  /** Initial eligibility status for the user to leave a review. */
   initialReviewEligibility?: ReviewEligibility;
 }
 
-/**
- * Client-rendered book overview with borrow actions.
- */
 const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
   bookId,
   userId,
@@ -77,7 +69,10 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
   initialUserBorrows,
   initialReviewEligibility,
 }) => {
-  // Use React Query hook with SSR initial data
+  /**
+   * Data Fetching: Primary query for book metadata.
+   * Leverages TanStack Query for caching and background synchronization.
+   */
   const {
     data: book,
     isLoading,
@@ -85,12 +80,12 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     error,
   } = useBook(bookId, initialBook);
 
-  // Show skeleton while loading (only if no initial data)
+  // Loading state: Render skeleton if no initial data is available
   if (isLoading && !initialBook) {
     return <BookSkeleton showDetails={false} />;
   }
 
-  // Show error state
+  // Error state: Display localized error feedback
   if (isError && !initialBook) {
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
@@ -108,9 +103,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     );
   }
 
-  // CRITICAL: Always prefer React Query data over initialBook
-  // React Query data is fresh and updates immediately after mutations
-  // initialBook is only used as fallback during initial load
+  // Data Source Selection: Prefer fresh query data over SSR snapshot
   const bookData = book ?? initialBook;
 
   if (!bookData) {
@@ -139,6 +132,7 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     updatedAt,
   } = bookData;
 
+  // Technical metadata definition for the summary list
   const detailFields = [
     { label: "Published", value: publicationYear ?? "Not listed" },
     { label: "Publisher", value: publisher || "Not listed" },

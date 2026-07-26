@@ -202,17 +202,22 @@ Check:
 curl -i "$BASE_URL/api/auth/imagekit"
 ```
 
-Likely causes:
+The expected response is `410 Gone`; direct client signing is intentionally
+retired. Uploads must use same-origin `POST /api/uploads`.
+
+Likely causes of server-mediated upload failures:
 
 - Missing ImageKit keys.
 - Invalid ImageKit URL endpoint.
 - Rate limit failure.
 - ImageKit service issue.
+- Production video scanning is not yet available.
 
 Actions:
 
 - Confirm service credentials.
-- Confirm upload client receives auth parameters.
+- Confirm the caller is authorized for the requested upload intent.
+- Confirm the request meets byte, media, and image-dimension limits.
 - Check provider dashboard.
 
 ## Data Repair Guidelines

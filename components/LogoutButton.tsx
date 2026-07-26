@@ -1,17 +1,14 @@
-"use client";
-
 /**
  * LogoutButton Component
- *
- * Client component for handling logout with React Query cache clearing.
- * Prevents white screen flash by using optimized logout flow.
- *
- * Features:
- * - Clears React Query cache before logout
- * - Shows toast notification
- * - Smooth transition to sign-in page
- * - Prevents white screen flash
+ * 
+ * Provides a specialized logout trigger that handles both authentication state 
+ * and client-side cache management.
+ * 
+ * @author Mundia Library Team
+ * @version 1.1.0
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { signOut } from "next-auth/react";
@@ -20,48 +17,57 @@ import { Button } from "@/components/ui/button";
 import { showToast } from "@/lib/toast";
 
 /**
- * Sign-out button with cache-safe flow.
+ * LogoutButton
+ * 
+ * Client component for handling logout with React Query cache clearing.
+ * Prevents white screen flash by using optimized logout flow.
  */
 const LogoutButton: React.FC = () => {
   const queryClient = useQueryClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  /**
+   * Orchestrates the secure and smooth sign-out process.
+   */
   const handleLogout = async () => {
-    // Prevent multiple clicks
+    // Safety check to prevent duplicate trigger during transition
     if (isLoggingOut) return;
 
     try {
       setIsLoggingOut(true);
 
-      // Show toast notification first
+      // Feedback: Show success toast immediately to acknowledge user intent
       showToast.auth.logoutSuccess();
 
-      // CRITICAL: Set logout flag to prevent UI updates during logout
-      // This prevents flickering/blinking of images and components during logout transition
+      /**
+       * CRITICAL PERFORMANCE WORKAROUND:
+       * Set a temporary cookie that signals the middleware and components 
+       * that a logout is in progress. This helps prevent flicker by 
+       * suppressing aggressive refetches during the redirect phase.
+       */
       document.cookie =
         "logout-in-progress=true; path=/; max-age=10; SameSite=Lax";
 
-      // CRITICAL: Don't invalidate queries during logout - it causes unnecessary refetches
-      // and flickering. The queries will naturally fail/clear when session is gone.
-      // We'll clear the cache after redirect completes.
-      // CRITICAL: Use NextAuth's standard built-in redirect
-      // This is the recommended approach - NextAuth handles:
-      // 1. Session clearing (CSRF token validation)
-      // 2. Cookie removal
-      // 3. Navigation to callbackUrl
-      // No need for manual navigation or cookie workarounds
+      /**
+       * Execute standard NextAuth sign-out.
+       * - Handles session clearing on server.
+       * - Clears CSRF tokens.
+       * - Redirects to the specified callbackUrl.
+       */
       await signOut({
-        redirect: true, // Standard NextAuth redirect (handles everything)
-        callbackUrl: "/sign-in", // Where to redirect after logout
+        redirect: true,
+        callbackUrl: "/sign-in",
       });
 
-      // CRITICAL: Clear cache AFTER redirect completes (longer delay)
-      // This ensures smooth transition - UI stays intact during entire logout process
-      // The redirect happens immediately, but we wait longer to ensure page has navigated
-      // before clearing cache. This prevents images from disappearing during logout.
+      /**
+       * CACHE CLEANUP:
+       * We wait for a short period to ensure the navigation is well underway 
+       * before clearing the React Query cache. Clearing it too early can 
+       * cause images and data to vanish before the page unmounts.
+       */
       setTimeout(() => {
         queryClient.clear();
-      }, 500); // Longer delay to ensure redirect has completed and page has navigated
+      }, 500); 
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoggingOut(false);

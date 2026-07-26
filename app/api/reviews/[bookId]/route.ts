@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { auth } from "@/auth";
 import { db } from "@/database/drizzle";
-import { bookReviews, users, borrowRecords } from "@/database/schema";
+import { bookReviews, borrowRecords } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
 import {
   guardToResponse,
@@ -15,6 +15,7 @@ import {
   tooManyRequestsResponse,
 } from "@/lib/security/api-response";
 import { logError } from "@/lib/security/logger";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 import { validateReviewPayload } from "@/lib/services/review-validation";
 
 /**
@@ -61,17 +62,21 @@ export async function GET(
         comment: bookReviews.comment,
         createdAt: bookReviews.createdAt,
         updatedAt: bookReviews.updatedAt,
-        userFullName: users.fullName,
       })
       .from(bookReviews)
-      .innerJoin(users, eq(bookReviews.userId, users.id))
       .where(eq(bookReviews.bookId, bookId))
       .orderBy(desc(bookReviews.createdAt));
 
-    const reviews = reviewsResult.map(({ userId, ...review }) => ({
-      ...review,
-      isOwner: Boolean(currentUserId && userId === currentUserId),
-    }));
+    const reviews = reviewsResult.map(({ userId, ...review }) => {
+      const isOwner = Boolean(currentUserId && userId === currentUserId);
+
+      return {
+        ...review,
+        // Legal names are account data, not public review metadata.
+        userFullName: isOwner ? "You" : "Verified reader",
+        isOwner,
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -92,6 +97,11 @@ export async function POST(
   { params }: { params: Promise<{ bookId: string }> }
 ) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request, {
+      requireJson: true,
+    });
+    if (sameOriginResponse) return sameOriginResponse;
+
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     const success = await enforceRateLimit();
 
@@ -193,7 +203,7 @@ export async function POST(
       review: newReview
         ? {
             ...newReview,
-            userFullName: guard.user.name || "You",
+            userFullName: "You",
             isOwner: true,
           }
         : newReview,

@@ -22,6 +22,9 @@ import {
 } from "@/lib/security/password";
 import { logWarn } from "@/lib/security/logger";
 
+const DUMMY_PASSWORD_HASH =
+  "bcrypt:$2a$12$MfiHJ9FzN45.FN6ibQBlFuH9YqrTr2Vw5J/AEmgYVSHTtjkOIVNKe";
+
 /**
  * Lazy import pattern for database connection
  *
@@ -73,6 +76,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        const email = credentials.email.toString().trim().toLowerCase();
+        const password = credentials.password.toString();
+        if (
+          email.length > 254 ||
+          password.length === 0 ||
+          password.length > 128
+        ) {
+          return null;
+        }
+
+        const { allowCredentialAttempt } = await import(
+          "@/lib/security/auth-rate-limit"
+        );
+        if (!(await allowCredentialAttempt(email))) {
+          logWarn("auth.credential_attempt_limited");
+          return null;
+        }
+
         /**
          * Lazy load database only when authorize is called (Node.js runtime)
          * This is safe because authorize() only runs in API routes (Node.js runtime)
@@ -86,13 +107,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const user = await db
           .select()
           .from(users)
-          .where(eq(users.email, credentials.email.toString().toLowerCase()))
+          .where(eq(users.email, email))
           .limit(1);
 
-        if (user.length === 0) return null;
+        if (user.length === 0) {
+          // Keep missing-account timing close to a real bcrypt verification.
+          await verifyPassword(password, DUMMY_PASSWORD_HASH);
+          return null;
+        }
 
         const storedPassword = user[0].password;
-        const password = credentials.password.toString();
         const isPasswordValid = await verifyPassword(password, storedPassword);
 
         if (!isPasswordValid) return null;
@@ -126,12 +150,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role: user[0].role,
           status: user[0].status,
           universityId: user[0].universityId,
-          universityCard: user[0].universityCard,
         } as User & {
           role: string;
           status: string;
           universityId: number;
-          universityCard: string;
         };
       },
     }),
@@ -161,8 +183,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.status = (user as User & { status?: string }).status;
         token.universityId = (user as User & { universityId?: number })
           .universityId;
-        token.universityCard = (user as User & { universityCard?: string })
-          .universityCard;
       }
 
       return token;
@@ -189,13 +209,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           role?: string;
           status?: string;
           universityId?: number;
-          universityCard?: string;
         }).role = token.role as string;
         (session.user as { status?: string }).status = token.status as string;
         (session.user as { universityId?: number }).universityId =
           token.universityId as number | undefined;
-        (session.user as { universityCard?: string }).universityCard =
-          token.universityCard as string | undefined;
       }
 
       return session;

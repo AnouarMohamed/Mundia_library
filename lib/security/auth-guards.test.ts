@@ -57,10 +57,7 @@ describe("auth guards", () => {
 
     const result = await requireUser();
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(401);
-    }
+    expect(result).toMatchObject({ ok: false, status: 401 });
   });
 
   it("rejects pending and rejected users from approved workflows", async () => {
@@ -70,10 +67,7 @@ describe("auth guards", () => {
 
     const pending = await requireApprovedUser();
 
-    expect(pending.ok).toBe(false);
-    if (!pending.ok) {
-      expect(pending.status).toBe(403);
-    }
+    expect(pending).toMatchObject({ ok: false, status: 403 });
 
     freshUserRowsMock.mockResolvedValueOnce([
       { ...approvedUser, status: "REJECTED" },
@@ -81,19 +75,13 @@ describe("auth guards", () => {
 
     const rejected = await requireApprovedUser();
 
-    expect(rejected.ok).toBe(false);
-    if (!rejected.ok) {
-      expect(rejected.status).toBe(403);
-    }
+    expect(rejected).toMatchObject({ ok: false, status: 403 });
   });
 
   it("rejects non-admin users from admin workflows", async () => {
     const result = await requireAdmin();
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(403);
-    }
+    expect(result).toMatchObject({ ok: false, status: 403 });
   });
 
   it("allows admins and owners for self-or-admin checks", async () => {
@@ -112,9 +100,6 @@ describe("auth guards", () => {
   it("rejects non-owner users for self-or-admin checks", async () => {
     const result = await requireSelfOrAdmin("user-2");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.status).toBe(403);
-    }
+    expect(result).toMatchObject({ ok: false, status: 403 });
   });
 });

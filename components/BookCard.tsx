@@ -1,8 +1,18 @@
+/**
+ * BookCard Component
+ * 
+ * A visually rich card component for displaying book information in lists
+ * and collections. Supports both general library view and user-specific 
+ * loaned book views.
+ * 
+ * @author Mundia Library Team
+ * @version 1.1.0
+ */
+
 import React from "react";
 import Link from "next/link";
 import BookCover from "@/components/BookCover";
 import { cn } from "@/lib/utils";
-// import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -18,6 +28,8 @@ interface BookCardProps extends Book {
 }
 
 /**
+ * BookCard
+ * 
  * A compact, visually rich card representing a book in the library.
  *
  * Features:
@@ -38,11 +50,11 @@ const BookCard = ({
   coverUrl,
   isLoanedBook = false,
 }: BookCardProps) => {
-  // Safe formatting for the star rating
+  // Safe formatting for the star rating, handles N/A cases
   const formattedRating =
     typeof rating === "number" ? rating.toFixed(1) : String(rating ?? "N/A");
 
-  // Logic to determine if inventory details should be shown
+  // Logic to determine if inventory details should be shown (based on data availability)
   const hasCopyData =
     typeof availableCopies === "number" && typeof totalCopies === "number";
 
@@ -55,12 +67,12 @@ const BookCard = ({
           isLoanedBook && "flex w-full flex-col items-center",
         )}
       >
-        {/* Visual Cover Section */}
+        {/* Visual Cover Section - Uses the optimized BookCover component */}
         <div className="book-card-cover">
           <BookCover coverColor={coverColor} coverImage={coverUrl} />
         </div>
 
-        {/* Metadata Section */}
+        {/* Metadata Section: Title, Author, Rating, Genre */}
         <div
           className={cn(
             "mt-3 sm:mt-4",
@@ -82,14 +94,16 @@ const BookCard = ({
               {formattedRating}
             </span>
           </div>
+          
           <p className="book-title line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
             {title}
           </p>
+          
           <p className="book-author mt-1.5 line-clamp-1 text-xs sm:text-sm">
             {author}
           </p>
 
-          {/* Inventory Stats (Hidden on loaned books to save space) */}
+          {/* Inventory Stats - Shown in library view to indicate current availability */}
           {hasCopyData && (
             <p className="book-card-copy mt-3">
               {availableCopies} of {totalCopies} available
@@ -97,7 +111,7 @@ const BookCard = ({
           )}
         </div>
 
-        {/* Loaned Book Specific Actions */}
+        {/* Loaned Book Specific Actions: Due date indicator and receipt download */}
         {isLoanedBook && (
           <div className="mt-2.5 w-full sm:mt-3">
             <div className="book-loaned rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-2 py-1.5">

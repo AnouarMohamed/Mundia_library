@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
 import { books } from "@/database/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 import {
   guardToActionError,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/security/auth-guards";
 import { logAdminAction } from "@/lib/admin/audit";
 import { logError } from "@/lib/security/logger";
+import { bookSchema } from "@/lib/validations";
 
 /**
  * Creates a new book record in the library catalog.
@@ -31,16 +32,24 @@ export const createBook = async (
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
+    const validated = bookSchema.safeParse(params);
+    if (!validated.success) {
+      return {
+        success: false,
+        message: validated.error.issues[0]?.message ?? "Invalid book data",
+      };
+    }
+    const safeParams = validated.data;
     const bookId = randomUUID();
 
     await db
       .insert(books)
       .values({
         id: bookId,
-        ...params,
-        availableCopies: params.totalCopies, // Initially all copies are available
+        ...safeParams,
+        availableCopies: safeParams.totalCopies, // Initially all copies are available
         updatedBy: guard.user.id,
-        isActive: params.isActive ?? true, // Default to true if not provided
+        isActive: safeParams.isActive ?? true, // Default to true if not provided
       });
 
     const newBook = await db
@@ -49,9 +58,9 @@ export const createBook = async (
       .where(eq(books.id, bookId))
       .limit(1);
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
     await logAdminAction(guard.user.id, "CREATE_BOOK", bookId, "BOOK", {
-      title: params.title,
+      title: safeParams.title,
     });
 
     return {
@@ -94,101 +103,92 @@ export const updateBook = async (
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
-    // Inventory Adjustment Logic
-    if (params.totalCopies) {
-      // 1. Get current inventory state
-      const currentBook = await db
-        .select({
-          totalCopies: books.totalCopies,
-          availableCopies: books.availableCopies,
-        })
-        .from(books)
-        .where(eq(books.id, bookId))
-        .limit(1);
+    const validated = bookSchema.partial().safeParse(params);
+    if (!validated.success) {
+      return {
+        success: false,
+        message: validated.error.issues[0]?.message ?? "Invalid book data",
+      };
+    }
+    const safeParams = validated.data;
 
-      if (currentBook.length === 0) {
+    // Inventory Adjustment Logic
+    if (safeParams.totalCopies !== undefined) {
+      if (
+        !Number.isInteger(safeParams.totalCopies) ||
+        safeParams.totalCopies < 1
+      ) {
+        return {
+          success: false,
+          message: "Total copies must be a positive integer",
+        };
+      }
+
+      const { totalCopies, ...metadataUpdates } = safeParams;
+      const [updatedBook] = await db
+        .update(books)
+        .set({
+          ...metadataUpdates,
+          totalCopies,
+          // This expression is evaluated against the row version locked by
+          // PostgreSQL. It therefore preserves concurrent approve/return
+          // changes instead of writing availability from a stale prior read.
+          availableCopies: sql`${totalCopies} - (${books.totalCopies} - ${books.availableCopies})`,
+          updatedBy: guard.user.id,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(books.id, bookId),
+            sql`${totalCopies} >= (${books.totalCopies} - ${books.availableCopies})`,
+          ),
+        )
+        .returning();
+
+      await revalidateCatalogTags();
+      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
+        totalCopies,
+      });
+
+      if (!updatedBook) {
+        return {
+          success: false,
+          message:
+            "Book not found or total copies is below the number currently checked out",
+        };
+      }
+
+      return {
+        success: true,
+        data: JSON.parse(JSON.stringify(updatedBook)),
+      };
+    } else {
+      // Standard Metadata Update
+      const [updatedBook] = await db
+        .update(books)
+        .set({
+          ...safeParams,
+          updatedBy: guard.user.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(books.id, bookId))
+        .returning();
+
+      await revalidateCatalogTags();
+      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
+        fields: Object.keys(safeParams),
+      });
+
+      if (!updatedBook) {
         return {
           success: false,
           message: "Book not found",
         };
       }
 
-      const currentData = currentBook[0];
-      
-      // 2. Calculate borrowed copies (delta)
-      const borrowedCopies =
-        currentData.totalCopies - currentData.availableCopies;
-      
-      // 3. Project new availability
-      const newAvailableCopies = Math.max(
-        0,
-        params.totalCopies - borrowedCopies
-      );
-
-      await db
-        .update(books)
-        .set({
-          ...params,
-          availableCopies: newAvailableCopies,
-          updatedBy: guard.user.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(books.id, bookId));
-
-      const updatedBook = await db
-        .select()
-        .from(books)
-        .where(eq(books.id, bookId))
-        .limit(1);
-
-      revalidateCatalogTags();
-      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
-        totalCopies: params.totalCopies,
-      });
-
-      if (updatedBook.length === 0) {
-        return {
-          success: false,
-          message: "Book not found after update",
-        };
-      }
-
       return {
         success: true,
-        data: JSON.parse(JSON.stringify(updatedBook[0])),
-      };
-    } else {
-      // Standard Metadata Update
-      await db
-        .update(books)
-        .set({
-          ...params,
-          updatedBy: guard.user.id,
-          updatedAt: new Date(),
-        })
-        .where(eq(books.id, bookId));
-
-      const updatedBook = await db
-        .select()
-        .from(books)
-        .where(eq(books.id, bookId))
-        .limit(1);
-
-      revalidateCatalogTags();
-      await logAdminAction(guard.user.id, "UPDATE_BOOK", bookId, "BOOK", {
-        fields: Object.keys(params),
-      });
-
-      if (updatedBook.length === 0) {
-        return {
-          success: false,
-          message: "Book not found after update",
-        };
-      }
-
-      return {
-        success: true,
-        data: JSON.parse(JSON.stringify(updatedBook[0])),
+        data: JSON.parse(JSON.stringify(updatedBook)),
       };
     }
   } catch (error) {

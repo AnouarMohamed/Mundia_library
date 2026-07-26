@@ -1,19 +1,21 @@
-"use client";
-
 /**
  * AdminBookRequestsList Component
- *
- * Client component that displays all borrow requests for admin management.
- * Uses React Query for data fetching and caching, with SSR initial data support.
- *
+ * 
+ * A specialized administrative dashboard component for managing book borrow requests.
+ * It provides a comprehensive interface for administrators to view, filter, search,
+ * and process (approve/reject/return) library borrow records.
+ * 
  * Features:
- * - Uses useBorrowRequests hook with initialData from SSR
- * - Displays skeleton loaders while fetching
- * - Shows error state if fetch fails
- * - Integrates mutations for approving, rejecting, and returning books
- * - Handles success/error messages from URL params
- * - All existing UI, styling, and functionality preserved
+ * - Real-time searching and status filtering.
+ * - Integration with TanStack Query for efficient data fetching and optimistic updates.
+ * - Support for SSR initial data to eliminate loading flickers.
+ * - Automated debounced search synchronization with URL parameters.
+ * - Contextual action buttons based on request status (Pending, Borrowed, Returned).
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,21 +33,22 @@ import {
 import type { BorrowRecordWithDetails } from "@/lib/services/borrows";
 import type { BorrowStatus } from "@/lib/services/borrows";
 
+/**
+ * Props for the AdminBookRequestsList component.
+ */
 interface AdminBookRequestsListProps {
-  /**
-   * Initial borrow requests data from SSR (prevents duplicate fetch)
-   */
+  /** Initial borrow requests data from SSR (prevents duplicate fetch). */
   initialRequests?: BorrowRecordWithDetails[];
-  /**
-   * Success message from URL params
-   */
+  /** Success message from URL params for feedback display. */
   successMessage?: string;
-  /**
-   * Error message from URL params
-   */
+  /** Error message from URL params for feedback display. */
   errorMessage?: string;
 }
 
+/**
+ * Formats a raw status string into a human-readable label.
+ * e.g., "PENDING_APPROVAL" -> "Pending Approval"
+ */
 const formatStatusLabel = (status: string): string =>
   status
     .toLowerCase()
@@ -61,20 +64,19 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
   const searchParamsHook = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Get current search params from URL
+  // URL State: Get current search and status filters from URL params
   const currentSearch = searchParamsHook.get("search") || "";
   const currentStatus = searchParamsHook.get("status") || "all";
 
+  // Local State: Track search input before debounced update to URL
   const [localSearch, setLocalSearch] = useState(currentSearch);
   const lastSyncedSearchRef = React.useRef(currentSearch);
 
-  // Sync localSearch with URL params when they change externally (e.g., browser back/forward)
-  // Only sync if the change didn't come from our own debounced update
+  /**
+   * Effect: Sync local search state with URL params.
+   * Ensures that external URL changes (back button, manual edits) are reflected in the input field.
+   */
   React.useEffect(() => {
-    // Only sync if:
-    // 1. currentSearch changed from an external source (not our debounce)
-    // 2. localSearch matches the last synced value (user isn't actively typing)
-    // This prevents overwriting user input while typing
     if (
       currentSearch !== lastSyncedSearchRef.current &&
       localSearch === lastSyncedSearchRef.current
@@ -84,7 +86,10 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
     }
   }, [currentSearch, localSearch]);
 
-  // Debounce search input for instant filtering
+  /**
+   * Effect: Debounced URL update for search.
+   * Updates the URL search parameter after the user stops typing for 300ms.
+   */
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== currentSearch) {
@@ -98,17 +103,16 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
         }
 
         const newUrl = `/admin/book-requests?${params.toString()}`;
-        // Update ref before navigation to prevent sync effect from overwriting
         lastSyncedSearchRef.current = trimmedSearch;
         queryClient.invalidateQueries({ queryKey: ["borrow-requests"] });
         router.replace(newUrl, { scroll: false });
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [localSearch, currentSearch, searchParamsHook, queryClient, router]);
 
-  // Build filters from URL params
+  // Memoized filter object for the data query
   const filters = React.useMemo(
     () => ({
       status:
@@ -118,14 +122,16 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
     [currentStatus, currentSearch],
   );
 
-  // Check if any filters are active
   const hasActiveFilters = currentSearch || currentStatus !== "all";
 
-  // Only use initialData on first load (when no filters are active)
+  // Only use initialData on first load when no filters are active to ensure fresh filtered results
   const initialRequestsData =
     !hasActiveFilters && initialRequests ? initialRequests : undefined;
 
-  // React Query hook with SSR initial data
+  /**
+   * Data Fetching: Primary query for borrow requests.
+   * Integrates SSR initial data and filters.
+   */
   const {
     data: requestsData,
     isLoading: requestsLoading,
@@ -133,21 +139,19 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
     error: requestsErrorData,
   } = useBorrowRequests(filters, initialRequestsData);
 
-  // React Query mutations
+  // Mutations for administrative actions
   const approveBorrowMutation = useApproveBorrow();
   const rejectBorrowMutation = useRejectBorrow();
   const returnBookMutation = useReturnBook();
 
-  // CRITICAL: Always prefer React Query data over initial data
-  // React Query data is fresh and updates immediately after mutations
-  // initial data is only used as fallback during initial load
-  // Extract data from response
-  // useBorrowRequests returns BorrowRecordWithDetails[] directly
+  // Final data source: Prefer fresh query data over SSR initial data
   const requests: BorrowRecordWithDetails[] = ((requestsData ??
     initialRequests) ||
     []) as BorrowRecordWithDetails[];
 
-  // Update search params in URL and trigger refetch
+  /**
+   * Updates multiple URL search parameters simultaneously and invalidates cache.
+   */
   const updateSearchParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParamsHook.toString());
 
@@ -174,7 +178,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
     router.push("/admin/book-requests");
   };
 
-  // Handler functions for mutations
+  // Action Handlers
   const handleApproveBorrow = async (recordId: string) => {
     const request = requests.find((r) => r.id === recordId);
     approveBorrowMutation.mutate({

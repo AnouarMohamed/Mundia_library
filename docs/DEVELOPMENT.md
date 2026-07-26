@@ -4,13 +4,13 @@ This guide describes a clean local development setup for contributors and mainta
 
 ## Prerequisites
 
-- Node.js 20
+- Node.js 24 LTS (24.17 or newer)
 - npm
 - Docker Desktop or Docker Engine
 - GitHub CLI, optional but useful for release and PR work
 - PostgreSQL client tools, optional for direct database inspection
 
-The CI workflow uses Node.js 20. Local development should use the same major version unless you are intentionally testing runtime compatibility.
+The CI workflow uses Node.js 24. Local development should use the same major version unless you are intentionally testing runtime compatibility.
 
 ## First-Time Setup
 
@@ -62,10 +62,10 @@ Open `http://localhost:3000`.
 
 The seed script creates two local accounts:
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Student | `test@user.com` | `12345678` |
-| Admin | `test@admin.com` | `12345678` |
+| Role    | Email            | Password   |
+| ------- | ---------------- | ---------- |
+| Student | `test@user.com`  | `12345678` |
+| Admin   | `test@admin.com` | `12345678` |
 
 Do not use these credentials in production.
 
@@ -116,7 +116,9 @@ Current application code uses PostgreSQL. Treat PostgreSQL as the canonical prod
 npm run db:migrate
 ```
 
-This runs `drizzle-kit push` against `DATABASE_URL`.
+This applies the reviewed canonical files in `migrations/postgres` with
+`drizzle-kit migrate`. Use `npm run db:push` only for disposable local
+experiments; never use it as a deployment path.
 
 ### Generate Migration Files
 
@@ -144,13 +146,13 @@ Open `http://localhost:8080`.
 
 Connection values:
 
-| Field | Value |
-| --- | --- |
-| System | PostgreSQL |
-| Server | `db` |
-| Username | `POSTGRES_USER` |
+| Field    | Value               |
+| -------- | ------------------- |
+| System   | PostgreSQL          |
+| Server   | `db`                |
+| Username | `POSTGRES_USER`     |
 | Password | `POSTGRES_PASSWORD` |
-| Database | `POSTGRES_DB` |
+| Database | `POSTGRES_DB`       |
 
 ## Adding A Feature
 
@@ -162,19 +164,35 @@ Use this flow for most product changes:
 4. Use server actions for form-first mutations and API routes for JSON integrations or client fetch paths.
 5. Revalidate affected cache tags when catalog, borrow, review, or recommendation data changes.
 6. Add focused tests for shared logic, action behavior, permissions, or regressions.
-7. Update documentation in the same PR when setup, behavior, routes, or operations change.
+7. **Maintain documentation:** Add TSDoc/JSDoc comments to all new functions, components, and services. Update existing documentation in the same PR when behavior changes.
+
+## Documentation Standards
+
+The codebase maintains a high standard of inline documentation to ensure long-term maintainability. All contributions must follow these rules:
+
+- **Module Headers:** Every file must start with a `/** ... */` block explaining its purpose, architectural role, and any critical dependencies (e.g., ImageKit, Upstash).
+- **TSDoc/JSDoc:** Every exported function, component, interface, and type must have a descriptive comment block.
+  - Use `@param` for function arguments.
+  - Use `@returns` for return values.
+  - Use `@template` for generics (e.g., in `AuthForm`).
+  - Use `@example` for complex utility functions.
+- **Inline Logic Comments:** Use `//` comments to explain _why_ complex logic is implemented in a specific way (e.g., why we use `unstable_cache` with specific tags).
+- **React Components:** Clearly state whether a component is a **Server Component** or **Client Component** and document its props thoroughly.
+- **API Routes:** Document the expected request format, authentication requirements, and standard response/error structures.
+
+See `lib/services/borrows.ts` or `components/AuthForm.tsx` for gold-standard examples.
 
 ## Route Ownership
 
-| Change type | Likely owner files |
-| --- | --- |
-| Student page | `app/(root)/**`, `components/**`, `lib/actions/**` |
-| Admin page | `app/admin/**`, `components/admin/**`, `components/Admin*.tsx`, `lib/admin/actions/**` |
-| Public JSON read | `app/api/**/route.ts`, service in `lib/services/**` |
-| Admin JSON route | `app/api/admin/**/route.ts`, `lib/admin/route-guard.ts` |
-| Database schema | `database/schema.ts`, `migrations/**` |
-| Cache behavior | `lib/cache/**`, affected mutation files |
-| Email or workflow | `lib/workflow.ts`, `lib/services/email-service.ts`, admin automation routes |
+| Change type       | Likely owner files                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| Student page      | `app/(root)/**`, `components/**`, `lib/actions/**`                                     |
+| Admin page        | `app/admin/**`, `components/admin/**`, `components/Admin*.tsx`, `lib/admin/actions/**` |
+| Public JSON read  | `app/api/**/route.ts`, service in `lib/services/**`                                    |
+| Admin JSON route  | `app/api/admin/**/route.ts`, `lib/admin/route-guard.ts`                                |
+| Database schema   | `database/schema.ts`, `migrations/**`                                                  |
+| Cache behavior    | `lib/cache/**`, affected mutation files                                                |
+| Email or workflow | `lib/workflow.ts`, `lib/services/email-service.ts`, admin automation routes            |
 
 ## Styling And Design System
 
@@ -199,6 +217,7 @@ See `PRODUCT.md` and `DESIGN.md` before making broad UI changes.
 ## Code Quality Rules
 
 - TypeScript should remain strict enough to catch contract drift.
+- **Documentation is code:** A PR without proper TSDoc/JSDoc for new logic is considered incomplete.
 - Lint runs with `--max-warnings=0`.
 - Shared helpers should have tests when behavior is non-trivial.
 - Admin routes must guard authorization server-side.
@@ -249,7 +268,6 @@ Check:
 
 Check:
 
-- `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY`
 - `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT`
 - `IMAGEKIT_PRIVATE_KEY`
 
@@ -258,6 +276,10 @@ Then call:
 ```bash
 curl http://localhost:3000/api/auth/imagekit
 ```
+
+The expected result is `410 Gone`. This confirms the unsafe direct-signing
+route remains retired; exercise uploads through the UI or an exact same-origin
+multipart `POST /api/uploads`.
 
 ### Rate limit errors locally
 

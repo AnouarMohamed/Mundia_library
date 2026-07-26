@@ -1,0 +1,7 @@
+bucket         = "REPLACE_PROD_TERRAFORM_STATE_BUCKET"
+key            = "mundiapolis/platform/prod.tfstate"
+region         = "REPLACE_STATE_REGION"
+encrypt        = true
+dynamodb_table = "REPLACE_PROD_TERRAFORM_LOCK_TABLE"
+role_arn       = "arn:aws:iam::REPLACE_PROD_ACCOUNT_ID:role/REPLACE_STATE_ROLE"
+

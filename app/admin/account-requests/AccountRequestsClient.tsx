@@ -389,6 +389,10 @@ const AccountRequestCard = ({
    * Resolve the full URL for the stored university card image.
    */
   const getImageUrl = (universityCard: string) => {
+    if (universityCard.startsWith("/")) {
+      return universityCard;
+    }
+
     if (
       universityCard.startsWith("http") ||
       universityCard.startsWith("data:")

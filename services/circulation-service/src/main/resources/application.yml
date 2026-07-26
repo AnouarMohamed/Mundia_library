@@ -1,0 +1,70 @@
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+
+spring:
+  application:
+    name: circulation-service
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:55432/circulation}
+    username: ${DATABASE_USERNAME:circulation}
+    password: ${DATABASE_PASSWORD:circulation-local-only}
+    hikari:
+      pool-name: circulation-pool
+      maximum-pool-size: ${DATABASE_POOL_MAX_SIZE:20}
+      minimum-idle: ${DATABASE_POOL_MIN_IDLE:2}
+      connection-timeout: 3000
+      validation-timeout: 1000
+      max-lifetime: 1500000
+  flyway:
+    enabled: true
+    clean-disabled: true
+    validate-on-migrate: true
+  jooq:
+    sql-dialect: postgres
+
+app:
+  circulation:
+    default-loan-period: ${DEFAULT_LOAN_PERIOD:P14D}
+    renewal-period: ${RENEWAL_PERIOD:P14D}
+    maximum-renewals: ${MAXIMUM_RENEWALS:2}
+    fine-currency: ${FINE_CURRENCY:MAD}
+    idempotency-retention: ${IDEMPOTENCY_RETENTION:P1D}
+  security:
+    jwt:
+      issuer: ${AUTH_ISSUER_URI}
+      jwk-set-uri: ${AUTH_JWK_SET_URI}
+      audience: ${AUTH_AUDIENCE:circulation-api}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState,db
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}

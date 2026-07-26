@@ -1,9 +1,10 @@
 /**
- * Admin Stats API Route
- *
- * GET /api/admin/stats
- *
- * Purpose: Get admin dashboard statistics.
+ * Admin Statistics API Endpoint
+ * 
+ * Provides high-level dashboard metrics for administrators.
+ * This includes counts for users, books, borrow records, and fine summaries.
+ * 
+ * @module app/api/admin/stats/route
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,22 +12,30 @@ import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 import { getAdminDashboardStats } from "@/lib/admin/actions/dashboard";
 
 /**
- * Use Node.js runtime for admin actions.
+ * Force Node.js runtime for complex aggregation queries.
  */
 export const runtime = "nodejs";
 
 /**
- * GET /api/admin/stats
- * Fetch dashboard statistics.
+ * GET Handler for /api/admin/stats
+ * 
+ * Fetches aggregated statistics for the admin dashboard.
+ * Requires administrative privileges.
+ * 
+ * @param {NextRequest} _request - Next.js Request object (unused)
+ * @returns {NextResponse} JSON response containing dashboard statistics
  */
 export async function GET(_request: NextRequest) {
   try {
+    // 1. Administrative Security Guard: Ensure only authorized admins can access stats.
     const guard = await requireAdminRouteAccess();
     if (!guard.ok) {
       return guard.response;
     }
 
+    // 2. Fetch statistics via the dashboard service action.
     const statsResult = await getAdminDashboardStats();
+    
     if (!statsResult.success) {
       return NextResponse.json(
         {
@@ -37,6 +46,7 @@ export async function GET(_request: NextRequest) {
       );
     }
 
+    // 3. Return the aggregated data.
     return NextResponse.json({
       success: true,
       stats: statsResult.data,

@@ -1,10 +1,10 @@
 /**
  * Application Configuration Module
- * 
+ *
  * This module centralizes all environment-based configuration for the application.
  * It uses Zod for runtime validation, ensuring that missing or invalid environment
  * variables are caught early in the development and deployment lifecycle.
- * 
+ *
  * Key configuration areas:
  * - Database & Caching (PostgreSQL, Upstash Redis)
  * - File Storage (ImageKit)
@@ -20,21 +20,25 @@ import { z } from "zod";
  * variables are missing or misconfigured.
  */
 const envSchema = z.object({
+  /** Explicit deployment tier; production enables fail-closed validation. */
+  appEnvironment: z
+    .enum(["development", "test", "staging", "production"])
+    .default("development"),
+
   /** Base URL for the API (used in client-side requests). */
   apiEndpoint: z.string().url().default("http://localhost:3000"),
   /** Production-grade API endpoint (often the same as apiEndpoint). */
   prodApiEndpoint: z.string().url().default("http://localhost:3000"),
-  
+
   /** ImageKit configuration for image hosting and optimization. */
   imagekit: z.object({
-    publicKey: z.string().default(""),
     urlEndpoint: z.union([z.string().url(), z.literal("")]).default(""),
     privateKey: z.string().default(""),
   }),
-  
+
   /** Primary database connection string (PostgreSQL). */
   databaseUrl: z.string().default(""),
-  
+
   /** Upstash services for caching (Redis) and background task orchestration (QStash). */
   upstash: z.object({
     redisUrl: z.union([z.string().url(), z.literal("")]).default(""),
@@ -44,22 +48,46 @@ const envSchema = z.object({
     qstashCurrentSigningKey: z.string().default(""),
     qstashNextSigningKey: z.string().default(""),
   }),
-  
+
   /** Brevo (formerly Sendinblue) configuration for transactional emails. */
   brevo: z.object({
     apiKey: z.string().default(""),
-    senderEmail: z.string().email("Brevo Sender Email must be a valid email").default("noreply@example.com"),
+    senderEmail: z
+      .string()
+      .email("Brevo Sender Email must be a valid email")
+      .default("noreply@example.com"),
     senderName: z.string().default("Mundiapolis Library"),
   }),
-  
+
   /** Resend configuration used as a fallback or secondary email provider. */
   resendToken: z.string().default(""),
 
-  /** 
-   * Global toggle for background workflows (onboarding, reminders). 
+  /**
+   * Global toggle for background workflows (onboarding, reminders).
    * Useful for disabling automation in restricted local environments.
    */
-  enableWorkflows: z.string().default("false").transform((v) => v === "true"),
+  enableWorkflows: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+
+  /**
+   * Legacy credential signup is disabled by default. Production identity must
+   * use the institutional OIDC provider or a verified invitation flow.
+   */
+  allowPublicSignup: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
+
+  /**
+   * Proxy forwarding headers are ignored unless the deployment explicitly
+   * confirms that its ingress strips and rewrites them.
+   */
+  trustProxyHeaders: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 /**
@@ -67,10 +95,10 @@ const envSchema = z.object({
  * Note: Only variables prefixed with NEXT_PUBLIC_ are accessible in the browser.
  */
 const envData = {
+  appEnvironment: process.env.APP_ENV,
   apiEndpoint: process.env.NEXT_PUBLIC_API_ENDPOINT,
   prodApiEndpoint: process.env.NEXT_PUBLIC_PROD_API_ENDPOINT,
   imagekit: {
-    publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY,
     urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT,
     privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
   },
@@ -90,6 +118,8 @@ const envData = {
   },
   resendToken: process.env.RESEND_TOKEN,
   enableWorkflows: process.env.ENABLE_WORKFLOWS,
+  allowPublicSignup: process.env.ALLOW_PUBLIC_SIGNUP,
+  trustProxyHeaders: process.env.TRUST_PROXY_HEADERS,
 };
 
 /**
@@ -114,16 +144,60 @@ const scrubUndefined = <T extends Record<string, unknown>>(value: T): T => {
 const parsedEnv = envSchema.safeParse(envData);
 const isServer = typeof window === "undefined";
 
+if (isServer && process.env.NODE_ENV === "production" && !process.env.APP_ENV) {
+  throw new Error(
+    "APP_ENV must be explicitly set for a production runtime or production build",
+  );
+}
+
 if (!parsedEnv.success) {
   console.error(
     "❌ Invalid environment variables:",
-    JSON.stringify(parsedEnv.error.format(), null, 2)
+    JSON.stringify(parsedEnv.error.format(), null, 2),
   );
-  
+
   // In production, fail hard on the server. Client bundles do not receive
   // server-only variables like DATABASE_URL.
   if (process.env.NODE_ENV === "production" && isServer) {
-    throw new Error("Invalid environment variables. Check the logs for details.");
+    throw new Error(
+      "Invalid environment variables. Check the logs for details.",
+    );
+  }
+}
+
+if (
+  parsedEnv.success &&
+  isServer &&
+  parsedEnv.data.appEnvironment === "production"
+) {
+  const missing: string[] = [];
+  if (!parsedEnv.data.databaseUrl) missing.push("DATABASE_URL");
+  if (!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET)) {
+    missing.push("AUTH_SECRET");
+  }
+  if (!parsedEnv.data.upstash.redisUrl) missing.push("UPSTASH_REDIS_URL");
+  if (!parsedEnv.data.upstash.redisToken) missing.push("UPSTASH_REDIS_TOKEN");
+  if (!parsedEnv.data.trustProxyHeaders)
+    missing.push("TRUST_PROXY_HEADERS=true");
+
+  if (parsedEnv.data.enableWorkflows) {
+    if (!parsedEnv.data.upstash.qstashToken) missing.push("QSTASH_TOKEN");
+    if (!parsedEnv.data.upstash.qstashCurrentSigningKey) {
+      missing.push("QSTASH_CURRENT_SIGNING_KEY");
+    }
+    if (!parsedEnv.data.upstash.qstashNextSigningKey) {
+      missing.push("QSTASH_NEXT_SIGNING_KEY");
+    }
+  }
+
+  if (process.env.DISABLE_RATE_LIMIT === "true") {
+    throw new Error("DISABLE_RATE_LIMIT is forbidden when APP_ENV=production");
+  }
+  if (parsedEnv.data.allowPublicSignup) {
+    throw new Error("ALLOW_PUBLIC_SIGNUP is forbidden when APP_ENV=production");
+  }
+  if (missing.length > 0) {
+    throw new Error(`Missing production configuration: ${missing.join(", ")}`);
   }
 }
 

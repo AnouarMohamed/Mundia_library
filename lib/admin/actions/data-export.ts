@@ -27,10 +27,19 @@ export class CSVExporter {
     }
 
     const str = String(field);
-    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-      return `"${str.replace(/"/g, '""')}"`;
+    // Spreadsheet applications interpret these prefixes as formulas even when
+    // the value came from a CSV field. Prefix with an apostrophe so exported
+    // patron/catalog data cannot execute formulas when an operator opens it.
+    const formulaSafe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+
+    if (
+      formulaSafe.includes(",") ||
+      formulaSafe.includes('"') ||
+      formulaSafe.includes("\n")
+    ) {
+      return `"${formulaSafe.replace(/"/g, '""')}"`;
     }
-    return str;
+    return formulaSafe;
   }
 
   static arrayToCSV(
@@ -42,7 +51,7 @@ export class CSVExporter {
     for (const row of data) {
       const values = headers.map((header) => {
         const value =
-          row[header.toLowerCase().replace(/\s+/g, "_")] || row[header] || "";
+          row[header.toLowerCase().replace(/\s+/g, "_")] ?? row[header] ?? "";
         return this.escapeCSVField(value);
       });
       csvRows.push(values.join(","));
@@ -262,7 +271,9 @@ export async function exportAnalytics(format: ExportFormat = "csv") {
     popularBooks,
     userActivity,
     overdueStats,
-    systemHealth,
+    totalBooksResult,
+    totalUsersResult,
+    activeBorrowsResult,
   ] = await Promise.all([
     // Borrowing trends
     db
@@ -313,26 +324,23 @@ export async function exportAnalytics(format: ExportFormat = "csv") {
       })
       .from(borrowRecords),
 
-    // System health
+    // System health (separate queries to avoid cross-joins)
+    db.select({ count: count() }).from(books),
+    db.select({ count: count() }).from(users),
     db
-      .select({
-        totalBooks: sql<number>`count(distinct ${books.id})`,
-        totalUsers: sql<number>`count(distinct ${users.id})`,
-        activeBorrows: sql<number>`count(case when ${borrowRecords.status} = 'BORROWED' then 1 end)`,
-      })
-      .from(books)
-      .leftJoin(users, sql`1=1`)
-      .leftJoin(borrowRecords, sql`1=1`),
+      .select({ count: count() })
+      .from(borrowRecords)
+      .where(eq(borrowRecords.status, "BORROWED")),
   ]);
 
   const analyticsData = {
     summary: {
       exportDate: new Date().toISOString(),
-      totalBooks: systemHealth[0]?.totalBooks || 0,
-      totalUsers: systemHealth[0]?.totalUsers || 0,
-      activeBorrows: systemHealth[0]?.activeBorrows || 0,
-      totalOverdue: overdueStats[0]?.totalOverdue || 0,
-      totalFines: overdueStats[0]?.totalFines || 0,
+      totalBooks: Number(totalBooksResult[0]?.count) || 0,
+      totalUsers: Number(totalUsersResult[0]?.count) || 0,
+      activeBorrows: Number(activeBorrowsResult[0]?.count) || 0,
+      totalOverdue: Number(overdueStats[0]?.totalOverdue) || 0,
+      totalFines: Number(overdueStats[0]?.totalFines) || 0,
     },
     borrowingTrends,
     popularBooks,

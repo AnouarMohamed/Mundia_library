@@ -1,0 +1,19 @@
+{{- if .Values.observability.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "mundia-service.fullname" . }}
+  labels:
+    {{- include "mundia-service.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "mundia-service.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: {{ .Values.observability.serviceMonitor.path }}
+      interval: {{ .Values.observability.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.observability.serviceMonitor.scrapeTimeout }}
+      scheme: http
+{{- end }}
+

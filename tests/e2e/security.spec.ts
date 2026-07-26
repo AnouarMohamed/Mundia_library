@@ -54,6 +54,34 @@ test("sign-in page renders", async ({ page }) => {
   await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
 });
 
+test("rendered documents enforce nonce-bound scripts", async ({ page }) => {
+  const cspViolations: string[] = [];
+  page.on("console", (message) => {
+    if (
+      message.type() === "error" &&
+      /content security policy|content-security-policy/i.test(message.text())
+    ) {
+      cspViolations.push(message.text());
+    }
+  });
+
+  const response = await page.goto("/sign-in");
+  await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
+
+  const policy = response?.headers()["content-security-policy"] ?? "";
+  const nonce = policy.match(/'nonce-([^']+)'/)?.[1];
+  expect(nonce).toBeTruthy();
+  expect(policy).toContain("'strict-dynamic'");
+  expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+
+  const scriptNonces = await page
+    .locator("script")
+    .evaluateAll((scripts) => scripts.map((script) => script.nonce));
+  expect(scriptNonces.length).toBeGreaterThan(0);
+  expect(scriptNonces.every((scriptNonce) => scriptNonce === nonce)).toBe(true);
+  expect(cspViolations).toEqual([]);
+});
+
 test("health endpoint returns only safe operational fields", async ({ request }) => {
   const response = await request.get("/api/health");
 

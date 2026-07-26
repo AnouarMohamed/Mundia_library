@@ -28,7 +28,7 @@ export interface Review {
   createdAt: Date | null;
   /** Timestamp of the last update to the review. */
   updatedAt: Date | null;
-  /** Full name of the user who wrote the review. */
+  /** Privacy-preserving public reviewer label; never a legal account name. */
   userFullName: string;
   /** Whether the authenticated user owns this review. */
   isOwner: boolean;

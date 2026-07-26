@@ -72,27 +72,27 @@ Historical performance and CI notes remain in `docs/` and are linked from the do
 
 ## Tech Stack
 
-| Layer | Choice |
-| --- | --- |
-| Framework | Next.js 15 App Router |
-| UI | React 19, Tailwind CSS, Radix UI primitives, lucide-react |
-| Language | TypeScript |
-| Auth | NextAuth v5 credentials provider with JWT sessions |
-| Database | PostgreSQL |
-| ORM | Drizzle ORM and drizzle-kit |
-| Cache and rate limit | Upstash Redis |
-| Background workflow | Upstash QStash and Workflow |
-| Images and uploads | ImageKit |
-| Email | Brevo primary, Resend fallback |
-| Tests | Vitest |
-| CI | GitHub Actions |
-| Deployment | Vercel, Docker, or standalone Next.js server bundle |
+| Layer                | Choice                                                    |
+| -------------------- | --------------------------------------------------------- |
+| Framework            | Next.js 15 App Router                                     |
+| UI                   | React 19, Tailwind CSS, Radix UI primitives, lucide-react |
+| Language             | TypeScript                                                |
+| Auth                 | NextAuth v5 credentials provider with JWT sessions        |
+| Database             | PostgreSQL                                                |
+| ORM                  | Drizzle ORM and drizzle-kit                               |
+| Cache and rate limit | Upstash Redis                                             |
+| Background workflow  | Upstash QStash and Workflow                               |
+| Images and uploads   | ImageKit                                                  |
+| Email                | Brevo primary, Resend fallback                            |
+| Tests                | Vitest                                                    |
+| CI                   | GitHub Actions                                            |
+| Deployment           | Vercel, Docker, or standalone Next.js server bundle       |
 
 ## Quick Start
 
 Prerequisites:
 
-- Node.js 20 for local development and CI parity
+- Node.js 24 LTS (24.17 or newer) for local development and CI parity
 - npm
 - PostgreSQL, either local or Docker
 - Optional service accounts for ImageKit, Upstash, Brevo, and Resend
@@ -135,30 +135,30 @@ Open:
 
 Seeded local accounts:
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Student | `test@user.com` | `12345678` |
-| Admin | `test@admin.com` | `12345678` |
+| Role    | Email            | Password   |
+| ------- | ---------------- | ---------- |
+| Student | `test@user.com`  | `12345678` |
+| Admin   | `test@admin.com` | `12345678` |
 
 These accounts are for local development and test environments only.
 
 ## Core Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start local Next.js development server |
-| `npm run build` | Build the production app |
-| `npm run start` | Start the production server after `next build` |
-| `npm run lint` | Run ESLint with zero-warning policy |
-| `npm run typecheck` | Run TypeScript without emitting files |
-| `npm run test` | Run Vitest tests |
-| `npm run ci:quality` | Run lint, typecheck, tests, and build |
-| `npm run db:migrate` | Apply Drizzle schema changes |
-| `npm run db:generate` | Generate Drizzle migration files |
-| `npm run db:studio` | Open Drizzle Studio |
-| `npm run seed` | Seed books and local test users |
-| `npm run benchmark:api` | Benchmark key API routes |
-| `npm run loadtest:nightly` | Run the heavier load-test script |
+| Command                    | Purpose                                        |
+| -------------------------- | ---------------------------------------------- |
+| `npm run dev`              | Start local Next.js development server         |
+| `npm run build`            | Build the production app                       |
+| `npm run start`            | Start the production server after `next build` |
+| `npm run lint`             | Run Oxlint with zero-warning policy            |
+| `npm run typecheck`        | Run TypeScript without emitting files          |
+| `npm run test`             | Run Vitest tests                               |
+| `npm run ci:quality`       | Run lint, typecheck, tests, and build          |
+| `npm run db:migrate`       | Apply Drizzle schema changes                   |
+| `npm run db:generate`      | Generate Drizzle migration files               |
+| `npm run db:studio`        | Open Drizzle Studio                            |
+| `npm run seed`             | Seed books and local test users                |
+| `npm run benchmark:api`    | Benchmark key API routes                       |
+| `npm run loadtest:nightly` | Run the heavier load-test script               |
 
 ## Production Checklist
 

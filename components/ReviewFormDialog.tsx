@@ -1,17 +1,14 @@
-"use client";
-
 /**
  * ReviewFormDialog Component
- *
- * Dialog component for submitting book reviews. Uses React Query mutation.
- * Integrates with useCreateReview mutation for proper cache invalidation.
- *
- * Features:
- * - Uses useCreateReview mutation
- * - Automatic cache invalidation on success
- * - Toast notifications via mutation callbacks
- * - Form validation
+ * 
+ * A modal dialog that wraps the book review form. 
+ * Provides a focused user experience for providing feedback and ratings.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -26,15 +23,36 @@ import {
 import { Star } from "lucide-react";
 import { useCreateReview } from "@/hooks/useMutations";
 
+/**
+ * Props for ReviewFormDialog
+ */
 interface ReviewFormDialogProps {
+  /**
+   * Unique ID of the book being reviewed
+   */
   bookId: string;
+  /**
+   * Visibility state of the dialog
+   */
   isOpen: boolean;
+  /**
+   * Callback function to close the dialog
+   */
   onClose: () => void;
+  /**
+   * Callback triggered after a successful review submission
+   */
   onReviewSubmitted: () => void;
 }
 
 /**
+ * ReviewFormDialog
+ * 
  * Modal review form with submission feedback.
+ * Features:
+ * - Uses useCreateReview mutation for data persistence.
+ * - Managed local state for ratings and comments.
+ * - Automatic reset and closure upon success.
  */
 export default function ReviewFormDialog({
   bookId,
@@ -42,20 +60,25 @@ export default function ReviewFormDialog({
   onClose,
   onReviewSubmitted,
 }: ReviewFormDialogProps) {
+  // Local form state
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const commentId = React.useId();
 
-  // Use React Query mutation for creating review
+  // Initialize review mutation
   const createReviewMutation = useCreateReview();
 
+  /**
+   * Handles the submission of the review.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!comment.trim()) {
-      return; // Validation handled by mutation
+      return; 
     }
 
-    // Use mutation to create review
+    // Execute the mutation with lifecycle callbacks
     createReviewMutation.mutate(
       {
         bookId,
@@ -64,11 +87,15 @@ export default function ReviewFormDialog({
       },
       {
         onSuccess: () => {
-          // Add delay before closing to let user see the toast
+          /**
+           * DELAYED CLOSURE:
+           * We add a short delay to allow the user to see the success toast 
+           * notification before the modal disappears.
+           */
           setTimeout(() => {
             onReviewSubmitted();
             onClose();
-            // Reset form
+            // Reset local form state for future use
             setRating(5);
             setComment("");
           }, 1500);
@@ -77,15 +104,22 @@ export default function ReviewFormDialog({
     );
   };
 
+  /**
+   * Safely handles dialog closure.
+   * Prevents closing while a submission is actively pending.
+   */
   const handleClose = () => {
     if (!createReviewMutation.isPending) {
       onClose();
-      // Reset form when closing
+      // Reset form state on close to ensure a clean slate next time
       setRating(5);
       setComment("");
     }
   };
 
+  /**
+   * Internal StarRating sub-component for visual rating selection.
+   */
   const StarRating = () => (
     <div className="flex items-center gap-0.5 sm:space-x-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -114,6 +148,7 @@ export default function ReviewFormDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="surface-panel sm:max-w-md [&>button]:text-[var(--mundia-ink)] [&>button]:hover:text-[var(--mundia-ink)]">
+        {/* Header Section */}
         <DialogHeader>
           <DialogTitle className="text-base text-[var(--mundia-ink)] sm:text-lg">
             Write a review
@@ -123,19 +158,26 @@ export default function ReviewFormDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Form Section */}
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          <div className="space-y-1.5 sm:space-y-2">
-            <label className="text-xs font-medium text-slate-600 sm:text-sm">
+          {/* Rating Selection */}
+          <fieldset className="space-y-1.5 sm:space-y-2">
+            <legend className="text-xs font-medium text-slate-600 sm:text-sm">
               Rating
-            </label>
+            </legend>
             <StarRating />
-          </div>
+          </fieldset>
 
+          {/* Comment Area */}
           <div className="space-y-1.5 sm:space-y-2">
-            <label className="text-xs font-medium text-slate-600 sm:text-sm">
+            <label
+              htmlFor={commentId}
+              className="text-xs font-medium text-slate-600 sm:text-sm"
+            >
               Your Review
             </label>
             <textarea
+              id={commentId}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="Share your thoughts about this book..."
@@ -148,6 +190,7 @@ export default function ReviewFormDialog({
             </p>
           </div>
 
+          {/* Footer with actions */}
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:gap-0">
             <Button
               type="button"

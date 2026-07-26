@@ -1,0 +1,8 @@
+{{ include "mundia-service.fullname" . }} is rendered with an immutable image
+digest, restricted security contexts, NetworkPolicy, autoscaling, disruption
+budget, and External Secrets references.
+
+This chart does not install the required CRDs/operators. Argo CD must reconcile
+External Secrets, OpenTelemetry, Prometheus, ingress, certificate, and policy
+operators before this release.
+

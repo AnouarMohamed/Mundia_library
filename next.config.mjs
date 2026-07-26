@@ -1,46 +1,42 @@
 /** @type {import("next").NextConfig} */
+const isProduction = process.env.NODE_ENV === "production";
+
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
   eslint: {
-    // `npm run lint` is the enforced gate. Next's build-time runner still
-    // passes legacy ESLint options that break this flat-config setup.
+    // `npm run lint` is the enforced Oxlint gate. Avoid running a second,
+    // framework-coupled legacy lint pass during the production build.
     ignoreDuringBuilds: true,
   },
   async headers() {
-    const csp = [
-      "default-src 'self'",
-      "base-uri 'self'",
-      "frame-ancestors 'none'",
-      "object-src 'none'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://ik.imagekit.io https://m.media-amazon.com https://placehold.co",
-      "media-src 'self' data: blob: https://ik.imagekit.io",
-      "font-src 'self' data:",
-      "connect-src 'self' https://*.upstash.io https://*.imagekit.io https://ik.imagekit.io",
-      "form-action 'self'",
-      "upgrade-insecure-requests",
-    ].join("; ");
+    const securityHeaders = [
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-DNS-Prefetch-Control", value: "off" },
+      { key: "X-Download-Options", value: "noopen" },
+      { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+      { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+      { key: "Origin-Agent-Cluster", value: "?1" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      },
+    ];
+
+    if (isProduction) {
+      securityHeaders.push({
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains; preload",
+      });
+    }
 
     return [
       {
         source: "/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: csp },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          {
-            key: "Permissions-Policy",
-            value:
-              "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-        ],
+        headers: securityHeaders,
       },
     ];
   },

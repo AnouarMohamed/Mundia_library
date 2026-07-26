@@ -1,0 +1,185 @@
+environment: dev
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: registry.invalid/mundiapolis/circulation-service
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 2
+revisionHistoryLimit: 5
+minReadySeconds: 10
+terminationGracePeriodSeconds: 45
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: http
+
+containerPort: 8080
+
+env:
+  APP_ENV: dev
+  PORT: "8080"
+
+externalSecret:
+  enabled: true
+  refreshInterval: 5m
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  targetName: circulation-runtime
+  creationPolicy: Owner
+  deletionPolicy: Retain
+  data:
+    - secretKey: DATABASE_URL
+      remoteKey: mundia/dev/circulation/postgres
+      property: jdbc_url
+    - secretKey: DATABASE_USERNAME
+      remoteKey: mundia/dev/circulation/postgres
+      property: username
+    - secretKey: DATABASE_PASSWORD
+      remoteKey: mundia/dev/circulation/postgres
+      property: password
+    - secretKey: AUTH_ISSUER_URI
+      remoteKey: mundia/dev/circulation/oidc
+      property: issuer
+    - secretKey: AUTH_JWK_SET_URI
+      remoteKey: mundia/dev/circulation/oidc
+      property: jwks_url
+    - secretKey: AUTH_AUDIENCE
+      remoteKey: mundia/dev/circulation/oidc
+      property: audience
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+probes:
+  startup:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 30
+  liveness:
+    path: /actuator/health/liveness
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    path: /actuator/health/readiness
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpuTargetUtilization: 65
+  memoryTargetUtilization: 75
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 4
+          periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 25
+          periodSeconds: 60
+      selectPolicy: Max
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: DoNotSchedule
+
+podAntiAffinity:
+  enabled: true
+  topologyKey: kubernetes.io/hostname
+
+networkPolicy:
+  enabled: true
+  ingressNamespaces:
+    - ingress-nginx
+    - monitoring
+  ingressPodLabels: {}
+  allowSameNamespace: true
+  egressCidrs:
+    - cidr: 10.40.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9094
+  allowOtelGateway: true
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+  hosts: []
+  tls: []
+
+observability:
+  otelInjection:
+    enabled: false
+    instrumentationName: default
+  otlpEndpoint: http://otel-gateway-collector:4317
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /actuator/prometheus

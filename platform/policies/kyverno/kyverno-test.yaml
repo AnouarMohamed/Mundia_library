@@ -1,0 +1,22 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: mundia-platform-policies
+policies:
+  - restrict-service-exposure.yaml
+  - require-tls-ingress.yaml
+resources:
+  - tests/unsafe-service.yaml
+  - tests/secure-ingress.yaml
+results:
+  - policy: mundia-restrict-service-exposure
+    rule: deny-nodeport-and-loadbalancer
+    resource: unsafe-service
+    kind: Service
+    result: fail
+  - policy: mundia-require-tls-ingress
+    rule: require-tls-for-every-host
+    resource: secure-ingress
+    kind: Ingress
+    result: pass
+

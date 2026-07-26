@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:15
+    image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
     container_name: library_db
     restart: unless-stopped
     environment:
@@ -10,13 +10,9 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_v18:/var/lib/postgresql
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -27,6 +23,10 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runner
+      args:
+        NEXT_PUBLIC_API_ENDPOINT: ${NEXT_PUBLIC_API_ENDPOINT:-http://localhost:3000}
+        NEXT_PUBLIC_PROD_API_ENDPOINT: ${NEXT_PUBLIC_PROD_API_ENDPOINT:-http://localhost:3000}
+        NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: ${NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT:-}
     container_name: library_app
     restart: unless-stopped
     depends_on:
@@ -88,4 +88,6 @@ services:
       - "${ADMINER_PORT:-8080}:8080"
 
 volumes:
-  postgres_data:
+  # A new volume avoids attempting an unsupported in-place PostgreSQL 15 -> 18
+  # data-directory upgrade. Migrate any existing local data explicitly.
+  postgres_data_v18:

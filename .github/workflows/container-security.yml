@@ -10,6 +10,7 @@ on:
       - package.json
       - package-lock.json
       - next.config.mjs
+      - "services/**"
   push:
     branches:
       - main
@@ -19,6 +20,7 @@ on:
       - package.json
       - package-lock.json
       - next.config.mjs
+      - "services/**"
   schedule:
     - cron: "45 4 * * 1"
   workflow_dispatch:
@@ -32,13 +34,29 @@ concurrency:
 
 jobs:
   trivy:
-    name: Scan Docker image with Trivy
+    name: Scan ${{ matrix.name }} image with Trivy
     if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: web
+            context: .
+            dockerfile: ./Dockerfile
+            image: mundia-library:security-scan
+            build_args: |
+              NEXT_PUBLIC_API_ENDPOINT=http://localhost:3000
+              NEXT_PUBLIC_PROD_API_ENDPOINT=http://localhost:3000
+          - name: circulation
+            context: ./services
+            dockerfile: ./services/circulation-service/Dockerfile
+            image: mundia-circulation-service:security-scan
+            build_args: ""
 
     steps:
       - name: Checkout
@@ -50,20 +68,21 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
         with:
-          context: .
-          file: ./Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           pull: true
           load: true
-          tags: mundia-library:security-scan
+          tags: ${{ matrix.image }}
+          build-args: ${{ matrix.build_args }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Generate Trivy SARIF report
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: mundia-library:security-scan
+          image-ref: ${{ matrix.image }}
           format: sarif
-          output: trivy-results.sarif
+          output: trivy-${{ matrix.name }}-results.sarif
           vuln-type: os,library
           severity: CRITICAL,HIGH
           ignore-unfixed: true
@@ -73,14 +92,14 @@ jobs:
         if: always()
         uses: github/codeql-action/upload-sarif@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
-          sarif_file: trivy-results.sarif
+          sarif_file: trivy-${{ matrix.name }}-results.sarif
 
-      - name: Block critical image vulnerabilities
+      - name: Block high and critical image vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: mundia-library:security-scan
+          image-ref: ${{ matrix.image }}
           format: table
           vuln-type: os,library
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"

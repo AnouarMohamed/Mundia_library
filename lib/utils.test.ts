@@ -14,6 +14,6 @@ describe("getInitials", () => {
 
 describe("cn", () => {
   it("merges class names and resolves tailwind conflicts", () => {
-    expect(cn("p-2", "p-4", "text-sm", false && "hidden")).toBe("p-4 text-sm");
+    expect(cn("p-2", "p-4", "text-sm", false)).toBe("p-4 text-sm");
   });
 });

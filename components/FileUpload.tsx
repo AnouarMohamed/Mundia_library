@@ -1,20 +1,25 @@
+/**
+ * FileUpload Component
+ * 
+ * Uploads images and videos through the server-mediated upload endpoint.
+ * 
+ * Features:
+ * - Client-side validation for file size and type.
+ * - Dynamic preview for both images and videos.
+ * - Specialized "upload intents" for compartmentalized storage (e.g., student IDs vs book covers).
+ */
+
 "use client";
 
-import { IKImage, ImageKitProvider, IKUpload, IKVideo } from "imagekitio-next";
-import config from "@/lib/config";
 import type { ChangeEvent } from "react";
 import { useRef, useState, useEffect } from "react";
-// import Image from "next/image";
 import { showToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
-const {
-  env: {
-    imagekit: { publicKey, urlEndpoint },
-  },
-} = config;
-const isImageKitConfigured = Boolean(publicKey && urlEndpoint);
-
+/**
+ * Maps the storage folder and file type to a specific security intent.
+ * This intent is verified server-side before issuing an upload signature.
+ */
 const getUploadIntent = (type: Props["type"], folder: string) => {
   if (folder === "ids") return "signup-card";
   if (folder === "books/covers" && type === "image") return "book-cover";
@@ -22,48 +27,26 @@ const getUploadIntent = (type: Props["type"], folder: string) => {
   return null;
 };
 
-const createAuthenticator = (intent: string) => async () => {
-  try {
-    const response = await fetch(
-      `/api/auth/imagekit?intent=${encodeURIComponent(intent)}`,
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      throw new Error(
-        `Request failed with status ${response.status}: ${errorText}`,
-      );
-    }
-
-    const data = await response.json();
-
-    const { signature, expire, token } = data;
-
-    return { token, expire, signature };
-  } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(`Authentication request failed: ${error.message}`);
-    } else {
-      throw new Error("Authentication request failed: Unknown error");
-    }
-  }
-};
-
+/**
+ * Props for the FileUpload component.
+ */
 interface Props {
+  /** The type of media being uploaded. */
   type: "image" | "video";
+  /** Standard HTML file acceptance string (e.g., "image/*"). */
   accept: string;
+  /** UI text shown when no file is selected. */
   placeholder: string;
+  /** Destination folder in the cloud storage. */
   folder: string;
+  /** Color theme for the upload button. */
   variant: "dark" | "light";
+  /** Callback triggered when a file is successfully uploaded/selected. */
   onFileChange: (filePath: string) => void;
+  /** Controlled value (full URL or path) from the parent form. */
   value?: string;
 }
 
-/**
- * File upload control. Uses ImageKit when configured, otherwise stores a data URL
- * so deployments can run without a third-party upload provider.
- */
 const FileUpload = ({
   type,
   accept,
@@ -73,17 +56,20 @@ const FileUpload = ({
   onFileChange,
   value,
 }: Props) => {
-  const ikUploadRef = useRef<HTMLInputElement | null>(null);
-  const localUploadRef = useRef<HTMLInputElement | null>(null);
+  const uploadRef = useRef<HTMLInputElement | null>(null);
+  
+  // Local state for path and progress
   const [file, setFile] = useState<{ filePath: string | null }>({
     filePath: value ?? null,
   });
   const [progress, setProgress] = useState(0);
+  
   const uploadIntent = getUploadIntent(type, folder);
 
-  // CRITICAL: Sync value prop with internal state
-  // This ensures the component updates when SSR data is provided (e.g., when editing a book)
-  // The value prop comes from form fields (react-hook-form) which may be initialized with SSR data
+  /** 
+   * CRITICAL: Sync value prop with internal state.
+   * Ensures the preview updates if the form is reset or initialized with SSR data.
+   */
   useEffect(() => {
     if (value !== undefined && value !== file.filePath) {
       setFile({ filePath: value ?? null });
@@ -99,14 +85,9 @@ const FileUpload = ({
     text: variant === "dark" ? "text-light-100" : "text-dark-400",
   };
 
-  /**
-   * Handle file upload errors
-   *
-   * @param error - Error object from ImageKit upload
-   */
+  /** Generic error handler for all upload scenarios. */
   const onError = (error: unknown): void => {
     void error;
-
     showToast.error(
       `${type === "image" ? "Image" : "Video"} Upload Failed`,
       `Your ${type} could not be uploaded. Please try again.`,
@@ -114,110 +95,76 @@ const FileUpload = ({
   };
 
   /**
-   * Upload success response type from ImageKit
-   * Note: imagekitio-next types may not fully match, so we use a flexible interface
-   */
-  interface UploadSuccessResponse {
-    filePath: string;
-    [key: string]: unknown;
-  }
-
-  /**
-   * Handle successful file upload
-   *
-   * @param res - Upload success response from ImageKit containing filePath
-   * Note: Using type assertion because imagekitio-next's IKUploadResponse type
-   * doesn't match the actual response structure at runtime
-   */
-  const onSuccess = (res: unknown): void => {
-    // Type guard: Check if response has filePath property
-    const response = res as UploadSuccessResponse;
-
-    if (!response.filePath || typeof response.filePath !== "string") {
-      console.error("Upload response missing filePath:", res);
-      onError(new Error("Upload response missing filePath"));
-      return;
-    }
-
-    // Construct full ImageKit URL from the relative filePath
-    const fullUrl = `${urlEndpoint}${response.filePath}`;
-
-    setFile({ filePath: fullUrl });
-    onFileChange(fullUrl);
-
-    showToast.success(
-      ` ${type === "image" ? "Image" : "Video"} Uploaded Successfully!`,
-      `${response.filePath} has been uploaded and is ready to use.`,
-    );
-  };
-
-  /**
-   * Validate file before upload
-   *
-   * @param file - File to validate
-   * @returns true if file is valid, false otherwise
+   * Client-side safety checks for file size before attempting upload.
+   * Limits: 20MB for images, 50MB for videos.
    */
   const onValidate = (file: File): boolean => {
     if (type === "image") {
       if (file.size > 20 * 1024 * 1024) {
-        showToast.error(
-          " File Too Large",
-          "Image files must be smaller than 20MB. Please compress your image and try again.",
-        );
-
+        showToast.error("File Too Large", "Images must be smaller than 20MB.");
         return false;
       }
     } else if (type === "video") {
       if (file.size > 50 * 1024 * 1024) {
-        showToast.error(
-          " File Too Large",
-          "Video files must be smaller than 50MB. Please compress your video and try again.",
-        );
+        showToast.error("File Too Large", "Videos must be smaller than 50MB.");
         return false;
       }
     }
-
     return true;
   };
 
-  const onLocalFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Sends the file to the authenticated server upload boundary. The server
+   * independently checks authorization, byte length, magic bytes and images by
+   * decoding/re-encoding them before storage.
+   */
+  const onFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
 
-    if (!selectedFile || !onValidate(selectedFile)) {
-      return;
-    }
+    if (!selectedFile || !onValidate(selectedFile) || !uploadIntent) return;
 
-    setProgress(0);
+    setProgress(10);
+    try {
+      const body = new FormData();
+      body.set("intent", uploadIntent);
+      body.set("file", selectedFile);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const filePath = typeof reader.result === "string" ? reader.result : "";
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body,
+      });
 
-      if (!filePath) {
-        onError(new Error("Could not read selected file"));
-        return;
+      if (!response.ok) {
+        throw new Error(`Upload rejected with status ${response.status}`);
       }
 
-      setFile({ filePath });
-      onFileChange(filePath);
+      const result = (await response.json()) as { url?: unknown };
+      if (typeof result.url !== "string" || !result.url.startsWith("https://")) {
+        throw new Error("Upload response did not contain a secure URL");
+      }
+
+      setFile({ filePath: result.url });
+      onFileChange(result.url);
       setProgress(100);
       showToast.success(
-        `${type === "image" ? "Image" : "Video"} Selected`,
-        "The file is stored with the form because no upload provider is configured.",
+        `${type === "image" ? "Image" : "Video"} Uploaded`,
+        "The server verified and stored your file.",
       );
-    };
-    reader.onerror = () => onError(reader.error);
-    reader.readAsDataURL(selectedFile);
-    event.target.value = "";
+    } catch (error) {
+      setProgress(0);
+      onError(error);
+    } finally {
+      event.target.value = "";
+    }
   };
 
+  /** Renders the styled upload button. */
   const uploadButton = (
     <button
       className={cn("upload-btn", styles.button)}
       onClick={(e) => {
         e.preventDefault();
-        ikUploadRef.current?.click();
-        localUploadRef.current?.click();
+        uploadRef.current?.click();
       }}
     >
       <div className="flex flex-col items-center gap-1">
@@ -235,12 +182,7 @@ const FileUpload = ({
         </div>
 
         {file.filePath && (
-          <p
-            className={cn(
-              "upload-filename break-all text-[10px] sm:text-xs",
-              styles.text,
-            )}
-          >
+          <p className={cn("upload-filename break-all text-[10px] sm:text-xs", styles.text)}>
             {file.filePath}
           </p>
         )}
@@ -248,6 +190,7 @@ const FileUpload = ({
     </button>
   );
 
+  /** Renders a simple progress bar during upload. */
   const progressIndicator = (
     <>
       {progress > 0 && progress !== 100 && (
@@ -263,88 +206,42 @@ const FileUpload = ({
     </>
   );
 
+  /** Renders the media preview based on the current file path. */
   const preview = file.filePath ? (
     <>
       {type === "image" ? (
-        file.filePath.startsWith("http") ||
-        file.filePath.startsWith("data:") ? (
-          <img
-            src={file.filePath}
-            alt="Uploaded image"
-            width={500}
-            height={300}
-            className="h-auto w-full max-w-full rounded-lg"
-          />
-        ) : isImageKitConfigured ? (
-          <IKImage
-            alt={file.filePath}
-            path={file.filePath}
-            width={500}
-            height={300}
-            className="h-auto w-full max-w-full"
-          />
-        ) : null
+        <img
+          src={file.filePath}
+          alt="Uploaded preview"
+          width={500}
+          height={300}
+          className="h-auto w-full max-w-full rounded-lg"
+        />
       ) : type === "video" ? (
-        file.filePath.startsWith("http") ||
-        file.filePath.startsWith("data:") ? (
-          <video
-            src={file.filePath}
-            controls={true}
-            className="h-64 w-full rounded-lg sm:h-96"
-          />
-        ) : isImageKitConfigured ? (
-          <IKVideo
-            path={file.filePath}
-            controls={true}
-            className="h-64 w-full rounded-lg sm:h-96"
-          />
-        ) : null
+        <video
+          src={file.filePath}
+          controls={true}
+          className="h-64 w-full rounded-lg sm:h-96"
+        />
       ) : null}
     </>
   ) : null;
 
-  if (!isImageKitConfigured || !uploadIntent) {
-    return (
-      <>
-        <input
-          ref={localUploadRef}
-          type="file"
-          accept={accept}
-          className="hidden"
-          onChange={onLocalFileChange}
-        />
-        {uploadButton}
-        {progressIndicator}
-        {preview}
-      </>
-    );
-  }
-
   return (
-    <ImageKitProvider
-      publicKey={publicKey}
-      urlEndpoint={urlEndpoint}
-      authenticator={createAuthenticator(uploadIntent)}
-    >
-      <IKUpload
-        ref={ikUploadRef}
-        onError={onError}
-        onSuccess={onSuccess}
-        useUniqueFileName={true}
-        validateFile={onValidate}
-        onUploadStart={() => setProgress(0)}
-        onUploadProgress={({ loaded, total }) => {
-          const percent = Math.round((loaded / total) * 100);
-          setProgress(percent);
-        }}
-        folder={folder}
+    <>
+      <input
+        ref={uploadRef}
+        type="file"
         accept={accept}
         className="hidden"
+        onChange={(event) => {
+          void onFileSelected(event);
+        }}
       />
       {uploadButton}
       {progressIndicator}
       {preview}
-    </ImageKitProvider>
+    </>
   );
 };
 

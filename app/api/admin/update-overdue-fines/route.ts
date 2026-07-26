@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateOverdueFines } from "@/lib/admin/actions/borrow";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -13,6 +14,11 @@ export const runtime = "nodejs";
  */
 export async function POST(request: NextRequest) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request, {
+      requireJson: true,
+    });
+    if (sameOriginResponse) return sameOriginResponse;
+
     const guard = await requireAdminRouteAccess();
     if (!guard.ok) {
       return guard.response;

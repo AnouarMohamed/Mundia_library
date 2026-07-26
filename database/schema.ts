@@ -9,6 +9,7 @@ import {
   boolean,
   numeric,
   timestamp,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -17,7 +18,7 @@ import {
  * - APPROVED: Active account allowed to use the library.
  * - REJECTED: Account denied by an administrator.
  */
-export const userStatusEnum = pgEnum("user_status", [
+export const userStatusEnum = pgEnum("status", [
   "PENDING",
   "APPROVED",
   "REJECTED",
@@ -28,7 +29,7 @@ export const userStatusEnum = pgEnum("user_status", [
  * - USER: Standard student access (borrow, return, review).
  * - ADMIN: Administrative access (approve requests, manage catalog, analytics).
  */
-export const userRoleEnum = pgEnum("user_role", ["USER", "ADMIN"]);
+export const userRoleEnum = pgEnum("role", ["USER", "ADMIN"]);
 
 /**
  * Enumeration of borrow record statuses.
@@ -48,11 +49,7 @@ export const borrowStatusEnum = pgEnum("borrow_status", [
  * - APPROVED: Request granted by an administrator.
  * - REJECTED: Request denied by an administrator.
  */
-export const requestStatusEnum = pgEnum("request_status", [
-  "PENDING",
-  "APPROVED",
-  "REJECTED",
-]);
+export const requestStatusEnum = userStatusEnum;
 
 /**
  * Enumeration of notification types for UI display and categorization.
@@ -69,14 +66,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
  */
 export const users = pgTable("users", {
   /** Unique identifier for the user (UUID v4). */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** Full legal name of the user. */
   fullName: varchar("full_name", { length: 255 }).notNull(),
   /** Email address used for login and notifications. */
-  email: varchar("email", { length: 255 }).notNull().unique(),
+  email: text("email").notNull().unique(),
   /** Unique university identification number. */
   universityId: integer("university_id").notNull().unique(),
   /** Hashed password. */
@@ -94,9 +88,12 @@ export const users = pgTable("users", {
     sql`CURRENT_DATE`
   ),
   /** Timestamp of the last successful login. */
-  lastLogin: timestamp("last_login", { mode: "date" }),
+  lastLogin: timestamp("last_login", { mode: "date", withTimezone: true }),
   /** Timestamp when the user record was created. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -104,10 +101,7 @@ export const users = pgTable("users", {
  */
 export const books = pgTable("books", {
   /** Unique identifier for the book (UUID v4). */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** Title of the book. */
   title: varchar("title", { length: 255 }).notNull(),
   /** Author(s) of the book. */
@@ -129,7 +123,7 @@ export const books = pgTable("books", {
   /** URL to a video trailer or related content. */
   videoUrl: text("video_url").notNull(),
   /** Short summary or tagline of the book. */
-  summary: text("summary").notNull(),
+  summary: varchar("summary").notNull(),
   /** International Standard Book Number. */
   isbn: varchar("isbn", { length: 20 }),
   /** Year of publication. */
@@ -145,11 +139,17 @@ export const books = pgTable("books", {
   /** Flag to soft-delete or hide books from the catalog. */
   isActive: boolean("is_active").notNull().default(true),
   /** Timestamp of the last update to the book record. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
   /** ID of the user (admin) who last updated the record. */
-  updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id),
+  updatedBy: uuid("updated_by").references(() => users.id),
   /** Timestamp when the book was added to the catalog. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -157,20 +157,22 @@ export const books = pgTable("books", {
  */
 export const borrowRecords = pgTable("borrow_records", {
   /** Unique identifier for the borrow record (UUID v4). */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** ID of the user who borrowed the book. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** ID of the book being borrowed. */
-  bookId: varchar("book_id", { length: 36 })
+  bookId: uuid("book_id")
     .notNull()
     .references(() => books.id),
   /** Timestamp when the borrow request was initially made or approved. */
-  borrowDate: timestamp("borrow_date", { mode: "date" }).notNull().defaultNow(),
+  borrowDate: timestamp("borrow_date", {
+    mode: "date",
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
   /** Expected return date. */
   dueDate: date("due_date", { mode: "string" }),
   /** Actual return date. */
@@ -192,13 +194,22 @@ export const borrowRecords = pgTable("borrow_records", {
   /** Number of times the due date has been extended. */
   renewalCount: integer("renewal_count").notNull().default(0),
   /** Timestamp when the last automated reminder email was sent. */
-  lastReminderSent: timestamp("last_reminder_sent", { mode: "date" }),
+  lastReminderSent: timestamp("last_reminder_sent", {
+    mode: "date",
+    withTimezone: true,
+  }),
   /** Timestamp of the last record update. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
   /** Identifier for the person/system that last updated the record. */
   updatedBy: text("updated_by"),
   /** Timestamp when the record was created. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -206,10 +217,7 @@ export const borrowRecords = pgTable("borrow_records", {
  */
 export const systemConfig = pgTable("system_config", {
   /** Unique identifier for the config entry. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** Configuration key (e.g., "DAILY_FINE_RATE"). */
   key: varchar("key", { length: 100 }).notNull().unique(),
   /** Serialized configuration value. */
@@ -217,11 +225,17 @@ export const systemConfig = pgTable("system_config", {
   /** Human-readable description of what this setting controls. */
   description: text("description"),
   /** Last update timestamp. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
   /** Identifier for who last changed the setting. */
   updatedBy: text("updated_by"),
   /** Creation timestamp. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -229,16 +243,13 @@ export const systemConfig = pgTable("system_config", {
  */
 export const bookReviews = pgTable("book_reviews", {
   /** Unique identifier for the review. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** ID of the book being reviewed. */
-  bookId: varchar("book_id", { length: 36 })
+  bookId: uuid("book_id")
     .notNull()
     .references(() => books.id),
   /** ID of the user who wrote the review. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** Star rating (e.g., 1-5). */
@@ -246,9 +257,15 @@ export const bookReviews = pgTable("book_reviews", {
   /** Detailed written feedback. */
   comment: text("comment").notNull(),
   /** Creation timestamp. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
   /** Last update timestamp. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -256,12 +273,9 @@ export const bookReviews = pgTable("book_reviews", {
  */
 export const adminRequests = pgTable("admin_requests", {
   /** Unique identifier for the request. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** ID of the user making the request. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** Reason provided by the user for why they need admin access. */
@@ -271,15 +285,21 @@ export const adminRequests = pgTable("admin_requests", {
     .notNull()
     .default("PENDING"),
   /** ID of the administrator who reviewed this request. */
-  reviewedBy: varchar("reviewed_by", { length: 36 }).references(() => users.id),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
   /** Timestamp of when the review occurred. */
-  reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+  reviewedAt: timestamp("reviewed_at", { mode: "date", withTimezone: true }),
   /** Feedback provided by the reviewer if the request was rejected. */
   rejectionReason: text("rejection_reason"),
   /** Creation timestamp. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
   /** Last update timestamp. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  }).defaultNow(),
 });
 
 /**
@@ -287,24 +307,26 @@ export const adminRequests = pgTable("admin_requests", {
  */
 export const auditLogs = pgTable("audit_logs", {
   /** Unique identifier for the log entry. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** ID of the user who performed the action. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** Short name of the action performed (e.g., "DELETE_BOOK"). */
   action: varchar("action", { length: 100 }).notNull(),
   /** ID of the entity affected by the action (if applicable). */
-  targetId: varchar("target_id", { length: 36 }),
+  targetId: uuid("target_id"),
   /** Type of the entity affected (e.g., "BOOK", "USER"). */
   targetType: varchar("target_type", { length: 50 }),
   /** Detailed JSON-serialized information about the change. */
   details: text("details"),
   /** Timestamp of the action. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -312,16 +334,13 @@ export const auditLogs = pgTable("audit_logs", {
  */
 export const renewalRequests = pgTable("renewal_requests", {
   /** Unique identifier for the renewal request. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** ID of the original borrow record. */
-  borrowRecordId: varchar("borrow_record_id", { length: 36 })
+  borrowRecordId: uuid("borrow_record_id")
     .notNull()
     .references(() => borrowRecords.id),
   /** ID of the user requesting the renewal. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** Status of the renewal request. */
@@ -333,9 +352,19 @@ export const renewalRequests = pgTable("renewal_requests", {
   /** Feedback from the admin if the renewal was denied. */
   rejectionReason: text("rejection_reason"),
   /** Creation timestamp. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
   /** Last update timestamp. */
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow(),
+  updatedAt: timestamp("updated_at", {
+    mode: "date",
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -343,12 +372,9 @@ export const renewalRequests = pgTable("renewal_requests", {
  */
 export const notifications = pgTable("notifications", {
   /** Unique identifier for the notification. */
-  id: varchar("id", { length: 36 })
-    .notNull()
-    .primaryKey()
-    .$defaultFn(() => globalThis.crypto.randomUUID()),
+  id: uuid("id").notNull().primaryKey().defaultRandom(),
   /** Recipient of the notification. */
-  userId: varchar("user_id", { length: 36 })
+  userId: uuid("user_id")
     .notNull()
     .references(() => users.id),
   /** Brief title of the notification. */
@@ -360,6 +386,10 @@ export const notifications = pgTable("notifications", {
   /** Flag indicating if the user has seen the notification. */
   isRead: boolean("is_read").notNull().default(false),
   /** Creation timestamp. */
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+  createdAt: timestamp("created_at", {
+    mode: "date",
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
 });
-

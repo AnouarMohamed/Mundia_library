@@ -95,7 +95,9 @@ describe("approveBorrowRequest", () => {
         })
         .mockReturnValueOnce({
           set: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue({}),
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: "record-1" }]),
+            }),
           }),
         }),
     };
@@ -109,6 +111,51 @@ describe("approveBorrowRequest", () => {
     expect(result.success).toBe(true);
     expect(db.transaction).toHaveBeenCalled();
     expect(tx.update).toHaveBeenCalledTimes(2);
+  });
+
+  it("rolls back when another approval wins the status transition", async () => {
+    const tx = {
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              { bookId: "book-1", userId: "user-1", status: "PENDING" },
+            ]),
+          }),
+        }),
+      }),
+      update: vi
+        .fn()
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([
+                {
+                  id: "book-1",
+                  title: "The Clean Coder",
+                  availableCopies: 9,
+                },
+              ]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+    };
+
+    (db.transaction as any).mockImplementation(async (callback: any) =>
+      callback(tx),
+    );
+
+    const result = await approveBorrowRequest("record-1");
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Only pending borrow requests can be approved");
   });
 
   it("should reject approval when no copy can be atomically reserved", async () => {

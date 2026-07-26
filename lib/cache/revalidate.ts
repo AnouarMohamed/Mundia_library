@@ -18,8 +18,8 @@ export function revalidateRecommendationsTag() {
 /**
  * Revalidate all catalog-related tags.
  */
-export function revalidateCatalogTags() {
+export async function revalidateCatalogTags() {
   revalidateBooksTag();
   revalidateRecommendationsTag();
-  void invalidatePattern("books:*");
+  await invalidatePattern("books:*");
 }

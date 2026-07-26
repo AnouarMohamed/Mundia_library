@@ -4,17 +4,18 @@
  * This module initializes and exports the Drizzle ORM instance used throughout the application.
  * It features a hybrid connection strategy to support both local development and serverless production:
  *
- * 1. Local/Docker Development: Uses 'pg' (node-postgres) for standard TCP connections to local PostgreSQL instances.
- * 2. Serverless/Production (Neon): Uses '@neondatabase/serverless' for HTTP-based connections, which are 
- *    more resilient in serverless environments (e.g., Vercel) where connection pooling is critical.
+ * All environments use the transaction-capable node-postgres driver.
  *
- * It also implements a singleton pattern using the global object in development to prevent 
- * exhausting database connections during Next.js Hot Module Replacement (HMR).
+ * The previous hostname-based selection used Drizzle's Neon HTTP driver for every
+ * remote PostgreSQL URL. That driver does not support interactive transactions,
+ * which made circulation approval and return operations fail in production.
+ *
+ * Hosted deployments must provide a pooled PostgreSQL URL (for example, a Neon
+ * pooled endpoint or PgBouncer) and tune DATABASE_POOL_MAX for the instance size.
+ * The singleton prevents connection exhaustion during Next.js HMR.
  */
 
 import config from "@/lib/config";
-import { neon } from "@neondatabase/serverless";
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzleNodePostgres } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@/database/schema";
@@ -26,16 +27,6 @@ const missingDatabaseUrlMessage =
 /** Creates a standard error for missing database configuration. */
 const createMissingDatabaseUrlError = () =>
   new Error(missingDatabaseUrlMessage);
-
-/** List of hostnames that should trigger the use of Node-Postgres instead of Neon HTTP. */
-const nodePostgresHosts = new Set([
-  "localhost",
-  "127.0.0.1",
-  "0.0.0.0",
-  "::1",
-  "db",
-  "postgres",
-]);
 
 /**
  * Validates and parses the database connection string.
@@ -56,48 +47,64 @@ const parseDatabaseUrl = (databaseUrl: string) => {
   }
 };
 
-type NeonClient = ReturnType<typeof neon>;
-type PgClient = Pool;
-type Client = NeonClient | PgClient;
+type Client = Pool;
 
 /**
- * Determines whether to use the Node-Postgres driver based on the hostname.
- * @param databaseUrl - The connection string.
- * @returns True if the host is local or a known Docker service name.
- */
-const shouldUseNodePostgres = (databaseUrl: string) =>
-  nodePostgresHosts.has(parseDatabaseUrl(databaseUrl).hostname);
-
-/**
- * Creates the appropriate database client (Neon HTTP or PG Pool).
+ * Creates a transaction-capable PostgreSQL connection pool.
  * @param databaseUrl - The connection string.
  */
 const createClient = (databaseUrl: string): Client => {
-  if (shouldUseNodePostgres(databaseUrl)) {
-    return new Pool({ connectionString: databaseUrl });
-  }
+  parseDatabaseUrl(databaseUrl);
 
-  return neon(databaseUrl);
+  const boundedMilliseconds = (
+    value: string | undefined,
+    fallback: number,
+  ) => {
+    const parsed = Number.parseInt(value ?? "", 10);
+    return Number.isFinite(parsed)
+      ? Math.min(120_000, Math.max(100, parsed))
+      : fallback;
+  };
+  const configuredPoolMax = Number.parseInt(
+    process.env.DATABASE_POOL_MAX ?? "10",
+    10,
+  );
+  const max = Number.isFinite(configuredPoolMax)
+    ? Math.min(100, Math.max(1, configuredPoolMax))
+    : 10;
+  const statementTimeout = boundedMilliseconds(
+    process.env.DATABASE_STATEMENT_TIMEOUT_MS,
+    15_000,
+  );
+  const queryTimeout = boundedMilliseconds(
+    process.env.DATABASE_QUERY_TIMEOUT_MS,
+    20_000,
+  );
+  const idleTransactionTimeout = boundedMilliseconds(
+    process.env.DATABASE_IDLE_TRANSACTION_TIMEOUT_MS,
+    15_000,
+  );
+
+  return new Pool({
+    connectionString: databaseUrl,
+    max,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 30_000,
+    statement_timeout: statementTimeout,
+    query_timeout: queryTimeout,
+    idle_in_transaction_session_timeout: idleTransactionTimeout,
+    allowExitOnIdle: process.env.NODE_ENV !== "production",
+  });
 };
 
-/** Wrapper for Neon HTTP drizzle initialization. */
-const createNeonDb = (client: NeonClient) =>
-  drizzleNeon(client, { schema });
-
-type Db = ReturnType<typeof createNeonDb>;
+type Db = ReturnType<typeof drizzleNodePostgres<typeof schema>>;
 
 /**
  * Initializes the Drizzle ORM instance with the provided client.
- * @param client - The database client.
- * @param databaseUrl - The connection string (used to determine driver type).
+ * @param client - The node-postgres pool.
  */
-const createDb = (client: Client, databaseUrl: string): Db => {
-  if (shouldUseNodePostgres(databaseUrl)) {
-    return drizzleNodePostgres(client as PgClient, { schema }) as unknown as Db;
-  }
-
-  return createNeonDb(client as NeonClient);
-};
+const createDb = (client: Client): Db =>
+  drizzleNodePostgres(client, { schema });
 
 /**
  * Fallback proxy that throws an error when any database property is accessed.
@@ -118,11 +125,8 @@ const createMissingDatabase = () =>
   ) as Db;
 
 declare global {
-  // eslint-disable-next-line no-var
   var __libraryClient: Client | undefined;
-  // eslint-disable-next-line no-var
   var __libraryDb: Db | undefined;
-  // eslint-disable-next-line no-var
   var __libraryDbUrl: string | undefined;
 }
 
@@ -149,7 +153,7 @@ const client = databaseUrl
 const db = client
   ? cachedConnectionMatches && globalForDb.__libraryDb
     ? globalForDb.__libraryDb
-    : createDb(client, databaseUrl)
+    : createDb(client)
   : createMissingDatabase();
 
 // In development, cache the connection in the global object.
@@ -164,7 +168,7 @@ if (process.env.NODE_ENV !== "production" && client) {
  * Primary used in scripts or long-running processes to clean up Pool resources.
  */
 const closeDb = async () => {
-  if (client instanceof Pool) {
+  if (client) {
     await client.end();
   }
 };

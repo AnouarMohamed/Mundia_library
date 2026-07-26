@@ -1,18 +1,49 @@
+/**
+ * BookList Component
+ * 
+ * Renders a labeled section containing a list of book cards. 
+ * Includes responsive layout handling and optional "View All" redirection.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
 import React from "react";
 import BookCard from "@/components/BookCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+/**
+ * Props for BookList
+ */
 interface Props {
+  /**
+   * The heading title for the section
+   */
   title: string;
+  /**
+   * Array of book objects to display
+   */
   books: Book[];
+  /**
+   * Optional additional CSS classes for the container
+   */
   containerClassName?: string;
+  /**
+   * Whether to show the "View All Books" button
+   * @default false
+   */
   showViewAllButton?: boolean;
 }
 
 /**
- * Sectioned list of book cards with optional CTA.
+ * BookList
+ * 
+ * Sectioned list of book cards with optional call-to-action (CTA).
+ * 
+ * @param {Props} props - Component properties
+ * @returns {JSX.Element} The rendered book list section
  */
 const BookList = ({
   title,
@@ -22,11 +53,14 @@ const BookList = ({
 }: Props) => {
   return (
     <section className={cn("fade-in-up", containerClassName)}>
+      {/* Section Header: Title and optional CTA */}
       <div className="book-section-heading">
         <div>
           <p className="book-section-kicker">Curated Shelf</p>
           <h2 className="book-section-title">{title}</h2>
         </div>
+        
+        {/* Desktop View All Button */}
         {showViewAllButton && books.length > 0 && (
           <Link href="/all-books" className="hidden sm:block">
             <Button className="book-section-cta">View All Books</Button>
@@ -34,6 +68,7 @@ const BookList = ({
         )}
       </div>
 
+      {/* Book Grid/List - Conditional rendering for empty state */}
       {books.length > 0 ? (
         <ul className="book-list">
           {books.map((book) => (
@@ -48,6 +83,7 @@ const BookList = ({
         </div>
       )}
 
+      {/* Mobile View All Button - Placed at the bottom for better UX on small screens */}
       {showViewAllButton && (
         <div className="mt-6 flex justify-center sm:hidden">
           <Link href="/all-books">
@@ -58,4 +94,5 @@ const BookList = ({
     </section>
   );
 };
+
 export default BookList;

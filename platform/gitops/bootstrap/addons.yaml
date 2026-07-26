@@ -1,0 +1,213 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: REPLACE_VERIFIED_EXTERNAL_SECRETS_CHART_VERSION
+    helm:
+      releaseName: external-secrets
+      values: |
+        installCRDs: true
+        serviceAccount:
+          create: true
+          name: external-secrets
+        replicaCount: 2
+        webhook:
+          replicaCount: 2
+        certController:
+          replicaCount: 2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: ingress-nginx
+    targetRevision: REPLACE_VERIFIED_INGRESS_NGINX_CHART_VERSION
+    helm:
+      releaseName: ingress-nginx
+      values: |
+        controller:
+          replicaCount: 3
+          allowSnippetAnnotations: false
+          config:
+            allow-backend-server-header: "false"
+            enable-modsecurity: "true"
+            enable-owasp-modsecurity-crs: "true"
+            hsts: "true"
+            hsts-include-subdomains: "true"
+            hsts-max-age: "31536000"
+            hide-headers: "X-Powered-By,Server"
+            server-tokens: "false"
+            ssl-protocols: "TLSv1.2 TLSv1.3"
+          service:
+            externalTrafficPolicy: Local
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+          admissionWebhooks:
+            enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ingress-nginx
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: REPLACE_VERIFIED_CERT_MANAGER_CHART_VERSION
+    helm:
+      releaseName: cert-manager
+      values: |
+        crds:
+          enabled: true
+        replicaCount: 2
+        webhook:
+          replicaCount: 2
+        cainjector:
+          replicaCount: 2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: REPLACE_VERIFIED_KYVERNO_CHART_VERSION
+    helm:
+      releaseName: kyverno
+      values: |
+        admissionController:
+          replicas: 3
+        backgroundController:
+          replicas: 2
+        cleanupController:
+          replicas: 2
+        reportsController:
+          replicas: 2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://kubernetes-sigs.github.io/metrics-server
+    chart: metrics-server
+    targetRevision: REPLACE_VERIFIED_METRICS_SERVER_CHART_VERSION
+    helm:
+      releaseName: metrics-server
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  project: platform-addons
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: REPLACE_VERIFIED_PROMETHEUS_STACK_CHART_VERSION
+    helm:
+      releaseName: monitoring
+      values: |
+        grafana:
+          enabled: false
+        prometheus:
+          prometheusSpec:
+            retention: 15d
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+

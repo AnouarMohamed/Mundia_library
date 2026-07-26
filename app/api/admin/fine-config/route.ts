@@ -5,6 +5,7 @@ import {
 } from "@/lib/admin/actions/config";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
 import { logAdminAction } from "@/lib/admin/audit";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -48,6 +49,11 @@ export async function GET(_request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request, {
+      requireJson: true,
+    });
+    if (sameOriginResponse) return sameOriginResponse;
+
     const guard = await requireAdminRouteAccess();
     if (!guard.ok) {
       return guard.response;

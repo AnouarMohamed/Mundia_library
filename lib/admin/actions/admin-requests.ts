@@ -11,6 +11,18 @@ import {
 } from "@/lib/security/auth-guards";
 import { logAdminAction } from "@/lib/admin/audit";
 import { logError } from "@/lib/security/logger";
+import { isUuid } from "@/lib/security/api-request";
+
+const adminRequestMutationErrors = new Set([
+  "Admin request not found",
+  "This request has already been processed",
+  "User not found",
+]);
+
+const safeAdminRequestMutationError = (error: unknown, fallback: string) =>
+  error instanceof Error && adminRequestMutationErrors.has(error.message)
+    ? error.message
+    : fallback;
 
 export interface AdminRequest {
   id: string;
@@ -53,6 +65,20 @@ export async function createAdminRequest(
   requestReason: string
 ): Promise<CreateAdminRequestResult> {
   try {
+    if (!isUuid(userId)) {
+      return { success: false, error: "Invalid user ID" };
+    }
+    const normalizedReason = requestReason.trim();
+    if (
+      normalizedReason.length < 10 ||
+      normalizedReason.length > 1_000
+    ) {
+      return {
+        success: false,
+        error: "Request reason must be between 10 and 1000 characters",
+      };
+    }
+
     const guard = await requireSelfOrAdmin(userId);
     if (!guard.ok) return guardToActionError(guard);
 
@@ -104,7 +130,7 @@ export async function createAdminRequest(
       .values({
         id: requestId,
         userId,
-        requestReason,
+        requestReason: normalizedReason,
         status: "PENDING",
       });
 
@@ -166,7 +192,8 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
       })
       .from(adminRequests)
       .innerJoin(users, eq(adminRequests.userId, users.id))
-      .orderBy(desc(adminRequests.createdAt));
+      .orderBy(desc(adminRequests.createdAt))
+      .limit(100);
 
     return {
       success: true,
@@ -207,7 +234,8 @@ export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult>
       .from(adminRequests)
       .innerJoin(users, eq(adminRequests.userId, users.id))
       .where(eq(adminRequests.status, "PENDING"))
-      .orderBy(desc(adminRequests.createdAt));
+      .orderBy(desc(adminRequests.createdAt))
+      .limit(100);
 
     return {
       success: true,
@@ -231,83 +259,106 @@ export async function approveAdminRequest(
   _reviewedBy: string
 ): Promise<UpdateAdminRequestResult> {
   try {
+    if (!isUuid(requestId)) {
+      return { success: false, error: "Invalid request ID" };
+    }
+
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
-    // Get the request
-    const request = await db
-      .select()
-      .from(adminRequests)
-      .where(eq(adminRequests.id, requestId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({
+          userId: adminRequests.userId,
+          status: adminRequests.status,
+          userEmail: users.email,
+          userFullName: users.fullName,
+        })
+        .from(adminRequests)
+        .innerJoin(users, eq(adminRequests.userId, users.id))
+        .where(eq(adminRequests.id, requestId))
+        .limit(1);
 
-    if (request.length === 0) {
+      if (!request) {
+        throw new Error("Admin request not found");
+      }
+
+      if (request.status !== "PENDING") {
+        throw new Error("This request has already been processed");
+      }
+
+      const reviewedAt = new Date();
+      const [updatedRequest] = await tx
+        .update(adminRequests)
+        .set({
+          status: "APPROVED",
+          reviewedBy: guard.user.id,
+          reviewedAt,
+          updatedAt: reviewedAt,
+        })
+        .where(
+          and(
+            eq(adminRequests.id, requestId),
+            eq(adminRequests.status, "PENDING"),
+          ),
+        )
+        .returning({
+          id: adminRequests.id,
+          userId: adminRequests.userId,
+          requestReason: adminRequests.requestReason,
+          status: adminRequests.status,
+          reviewedBy: adminRequests.reviewedBy,
+          reviewedAt: adminRequests.reviewedAt,
+          rejectionReason: adminRequests.rejectionReason,
+          createdAt: adminRequests.createdAt,
+          updatedAt: adminRequests.updatedAt,
+        });
+
+      if (!updatedRequest) {
+        throw new Error("This request has already been processed");
+      }
+
+      const [promotedUser] = await tx
+        .update(users)
+        .set({ role: "ADMIN" })
+        .where(eq(users.id, request.userId))
+        .returning({ id: users.id });
+
+      if (!promotedUser) {
+        // Throwing rolls the request transition back with the role update.
+        throw new Error("User not found");
+      }
+
       return {
-        success: false,
-        error: "Admin request not found",
+        userId: request.userId,
+        request: {
+          ...updatedRequest,
+          userEmail: request.userEmail,
+          userFullName: request.userFullName,
+        },
       };
-    }
-
-    if (request[0].status !== "PENDING") {
-      return {
-        success: false,
-        error: "This request has already been processed",
-      };
-    }
-
-    // Update the user's role to ADMIN
-    await db
-      .update(users)
-      .set({ role: "ADMIN" })
-      .where(eq(users.id, request[0].userId));
-
-    // Update the admin request status
-    await db
-      .update(adminRequests)
-      .set({
-        status: "APPROVED",
-        reviewedBy: guard.user.id,
-        reviewedAt: new Date(),
-      })
-      .where(eq(adminRequests.id, requestId));
-
-    // Get the full updated request with user details
-    const fullRequest = await db
-      .select({
-        id: adminRequests.id,
-        userId: adminRequests.userId,
-        userEmail: users.email,
-        userFullName: users.fullName,
-        requestReason: adminRequests.requestReason,
-        status: adminRequests.status,
-        reviewedBy: adminRequests.reviewedBy,
-        reviewedAt: adminRequests.reviewedAt,
-        rejectionReason: adminRequests.rejectionReason,
-        createdAt: adminRequests.createdAt,
-        updatedAt: adminRequests.updatedAt,
-      })
-      .from(adminRequests)
-      .innerJoin(users, eq(adminRequests.userId, users.id))
-      .where(eq(adminRequests.id, requestId))
-      .limit(1);
+    });
 
     await logAdminAction(
       guard.user.id,
       "APPROVE_ADMIN_REQUEST",
       requestId,
       "ADMIN_REQUEST",
-      { userId: request[0].userId },
+      { userId: result.userId },
     );
 
     return {
       success: true,
-      data: fullRequest[0],
+      data: result.request,
     };
   } catch (error) {
     logError("admin_request.approve_failed", error, { requestId });
     return {
       success: false,
-      error: "Failed to approve admin request",
+      error: safeAdminRequestMutationError(
+        error,
+        "Failed to approve admin request",
+      ),
     };
   }
 }
@@ -322,78 +373,96 @@ export async function rejectAdminRequest(
   rejectionReason?: string
 ): Promise<UpdateAdminRequestResult> {
   try {
+    if (!isUuid(requestId)) {
+      return { success: false, error: "Invalid request ID" };
+    }
+    const normalizedReason = rejectionReason?.trim();
+    if (normalizedReason && normalizedReason.length > 1_000) {
+      return { success: false, error: "Rejection reason is too long" };
+    }
+
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
-    // Get the request
-    const request = await db
-      .select()
-      .from(adminRequests)
-      .where(eq(adminRequests.id, requestId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({
+          status: adminRequests.status,
+          userEmail: users.email,
+          userFullName: users.fullName,
+        })
+        .from(adminRequests)
+        .innerJoin(users, eq(adminRequests.userId, users.id))
+        .where(eq(adminRequests.id, requestId))
+        .limit(1);
 
-    if (request.length === 0) {
+      if (!request) {
+        throw new Error("Admin request not found");
+      }
+
+      if (request.status !== "PENDING") {
+        throw new Error("This request has already been processed");
+      }
+
+      const reviewedAt = new Date();
+      const [updatedRequest] = await tx
+        .update(adminRequests)
+        .set({
+          status: "REJECTED",
+          reviewedBy: guard.user.id,
+          reviewedAt,
+          rejectionReason: normalizedReason,
+          updatedAt: reviewedAt,
+        })
+        .where(
+          and(
+            eq(adminRequests.id, requestId),
+            eq(adminRequests.status, "PENDING"),
+          ),
+        )
+        .returning({
+          id: adminRequests.id,
+          userId: adminRequests.userId,
+          requestReason: adminRequests.requestReason,
+          status: adminRequests.status,
+          reviewedBy: adminRequests.reviewedBy,
+          reviewedAt: adminRequests.reviewedAt,
+          rejectionReason: adminRequests.rejectionReason,
+          createdAt: adminRequests.createdAt,
+          updatedAt: adminRequests.updatedAt,
+        });
+
+      if (!updatedRequest) {
+        throw new Error("This request has already been processed");
+      }
+
       return {
-        success: false,
-        error: "Admin request not found",
+        ...updatedRequest,
+        userEmail: request.userEmail,
+        userFullName: request.userFullName,
       };
-    }
-
-    if (request[0].status !== "PENDING") {
-      return {
-        success: false,
-        error: "This request has already been processed",
-      };
-    }
-
-    // Update the admin request status
-    await db
-      .update(adminRequests)
-      .set({
-        status: "REJECTED",
-        reviewedBy: guard.user.id,
-        reviewedAt: new Date(),
-        rejectionReason,
-      })
-      .where(eq(adminRequests.id, requestId));
-
-    // Get the full updated request with user details
-    const fullRequest = await db
-      .select({
-        id: adminRequests.id,
-        userId: adminRequests.userId,
-        userEmail: users.email,
-        userFullName: users.fullName,
-        requestReason: adminRequests.requestReason,
-        status: adminRequests.status,
-        reviewedBy: adminRequests.reviewedBy,
-        reviewedAt: adminRequests.reviewedAt,
-        rejectionReason: adminRequests.rejectionReason,
-        createdAt: adminRequests.createdAt,
-        updatedAt: adminRequests.updatedAt,
-      })
-      .from(adminRequests)
-      .innerJoin(users, eq(adminRequests.userId, users.id))
-      .where(eq(adminRequests.id, requestId))
-      .limit(1);
+    });
 
     await logAdminAction(
       guard.user.id,
       "REJECT_ADMIN_REQUEST",
       requestId,
       "ADMIN_REQUEST",
-      { reason: rejectionReason },
+      { reason: normalizedReason },
     );
 
     return {
       success: true,
-      data: fullRequest[0],
+      data: result,
     };
   } catch (error) {
     logError("admin_request.reject_failed", error, { requestId });
     return {
       success: false,
-      error: "Failed to reject admin request",
+      error: safeAdminRequestMutationError(
+        error,
+        "Failed to reject admin request",
+      ),
     };
   }
 }
@@ -406,48 +475,6 @@ export async function removeAdminPrivileges(
   userId: string,
   _removedBy: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    const guard = await requireAdmin();
-    if (!guard.ok) return guardToActionError(guard);
-
-    // Check if user exists and is an admin
-    const user = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
-
-    if (user.length === 0) {
-      return {
-        success: false,
-        error: "User not found",
-      };
-    }
-
-    if (user[0].role !== "ADMIN") {
-      return {
-        success: false,
-        error: "User is not an admin",
-      };
-    }
-
-    // Update the user's role to USER
-    await db.update(users).set({ role: "USER" }).where(eq(users.id, userId));
-    await logAdminAction(
-      guard.user.id,
-      "REMOVE_ADMIN_PRIVILEGES",
-      userId,
-      "USER",
-    );
-
-    return {
-      success: true,
-    };
-  } catch (error) {
-    logError("admin_request.remove_admin_failed", error, { userId });
-    return {
-      success: false,
-      error: "Failed to remove admin privileges",
-    };
-  }
+  const { updateUserRole } = await import("@/lib/admin/actions/user");
+  return updateUserRole(userId, "USER");
 }

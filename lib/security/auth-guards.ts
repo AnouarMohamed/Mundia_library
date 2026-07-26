@@ -42,7 +42,6 @@ export type AuthenticatedUser = {
   role: AppRole;
   status: AccountStatus;
   universityId?: number;
-  universityCard?: string;
 };
 
 /** Result of a successful guard check. */
@@ -80,7 +79,6 @@ const getFreshUserState = async (userId: string) => {
       role: users.role,
       status: users.status,
       universityId: users.universityId,
-      universityCard: users.universityCard,
     })
     .from(users)
     .where(eq(users.id, userId))
@@ -145,7 +143,6 @@ export const requireUser = async (): Promise<AuthGuardResult> => {
       role: user.role as AppRole,
       status: user.status as AccountStatus,
       universityId: user.universityId,
-      universityCard: user.universityCard,
     },
   };
 };

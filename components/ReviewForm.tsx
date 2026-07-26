@@ -1,51 +1,72 @@
-"use client";
-
 /**
  * ReviewForm Component
- *
- * Form component for submitting book reviews. Uses React Query mutation.
- * Integrates with useCreateReview mutation for proper cache invalidation.
- *
- * Features:
- * - Uses useCreateReview mutation
- * - Automatic cache invalidation on success
- * - Toast notifications via mutation callbacks
- * - Form validation
+ * 
+ * A functional form component for capturing and submitting book reviews.
+ * Integrates directly with TanStack Query mutations for persistence.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCreateReview } from "@/hooks/useMutations";
 import { Star } from "lucide-react";
 
+/**
+ * Props for ReviewForm
+ */
 interface ReviewFormProps {
+  /**
+   * Unique ID of the book being reviewed
+   */
   bookId: string;
+  /**
+   * Success callback invoked after the review is persisted
+   */
   onReviewSubmitted: () => void;
+  /**
+   * Callback to handle form cancellation
+   */
   onCancel: () => void;
 }
 
 /**
+ * ReviewForm
+ * 
  * Standalone review form for book pages.
+ * Features:
+ * - Uses useCreateReview mutation for data persistence.
+ * - Automatic cache invalidation on success.
+ * - Form state management for ratings and comments.
  */
 export default function ReviewForm({
   bookId,
   onReviewSubmitted,
   onCancel,
 }: ReviewFormProps) {
+  // Local state for the draft review
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const commentId = React.useId();
 
-  // Use React Query mutation for creating review
+  // Initialize the review creation mutation
   const createReviewMutation = useCreateReview();
 
+  /**
+   * Handles form submission.
+   * Triggers the mutation and invokes parent callbacks upon success.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!comment.trim()) {
-      return; // Validation handled by mutation
+      return; 
     }
 
-    // Use mutation to create review
+    // Execute mutation
     createReviewMutation.mutate(
       {
         bookId,
@@ -60,6 +81,9 @@ export default function ReviewForm({
     );
   };
 
+  /**
+   * Internal StarRating sub-component for interactive rating selection.
+   */
   const StarRating = () => (
     <div className="flex items-center gap-0.5 sm:space-x-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -92,18 +116,24 @@ export default function ReviewForm({
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
+        {/* Rating Input Field */}
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
             Rating
-          </label>
+          </legend>
           <StarRating />
-        </div>
+        </fieldset>
 
+        {/* Comment Textarea */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
+          <label
+            htmlFor={commentId}
+            className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm"
+          >
             Your Review
           </label>
           <textarea
+            id={commentId}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your thoughts about this book..."
@@ -116,6 +146,7 @@ export default function ReviewForm({
           </p>
         </div>
 
+        {/* Action Controls */}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:space-x-3 sm:gap-0">
           <Button
             type="button"

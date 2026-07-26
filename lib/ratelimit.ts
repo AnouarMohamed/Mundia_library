@@ -2,8 +2,10 @@ import { Ratelimit } from "@upstash/ratelimit";
 import redis from "@/database/redis";
 import config from "@/lib/config";
 
-const isDevelopment = process.env.NODE_ENV !== "production";
 const isRateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true";
+const isLocalEnvironment = ["development", "test"].includes(
+  config.env.appEnvironment,
+);
 const hasRedisConfig = Boolean(
   config.env.upstash.redisUrl && config.env.upstash.redisToken
 );
@@ -36,9 +38,9 @@ const ratelimit = new Ratelimit({
  */
 const originalLimit = ratelimit.limit.bind(ratelimit);
 ratelimit.limit = async (key: string) => {
-  // Bypass rate limiting in local development or if explicitly disabled.
-  // This prevents network round-trips to external Upstash Redis during dev.
-  if (isDevelopment || isRateLimitDisabled || !hasRedisConfig) {
+  // Local development may run without Redis. Production never honors the
+  // bypass toggle and fails closed when the limiter is unavailable.
+  if (isLocalEnvironment && (isRateLimitDisabled || !hasRedisConfig)) {
     return {
       success: true,
       limit: 200,
@@ -48,13 +50,27 @@ ratelimit.limit = async (key: string) => {
     };
   }
 
+  if (!hasRedisConfig) {
+    return {
+      success: false,
+      limit: 200,
+      remaining: 0,
+      reset: Date.now() + 60_000,
+      pending: Promise.resolve(),
+    };
+  }
+
   try {
     return await originalLimit(key);
   } catch (error) {
     console.error("Rate limit check failed:", error);
-    // If rate limiting fails due to infrastructure issues, we fail open 
-    // to avoid breaking the application.
-    throw error;
+    return {
+      success: false,
+      limit: 200,
+      remaining: 0,
+      reset: Date.now() + 60_000,
+      pending: Promise.resolve(),
+    };
   }
 };
 

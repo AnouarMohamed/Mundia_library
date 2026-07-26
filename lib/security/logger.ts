@@ -16,7 +16,10 @@
 type LogLevel = "info" | "warn" | "error";
 
 /** Contextual metadata attached to a log entry. */
-type LogContext = Record<string, string | number | boolean | null | undefined>;
+type LogContext = Record<string, unknown>;
+
+const SENSITIVE_KEY_PATTERN =
+  /password|passphrase|token|secret|api.?key|authorization|cookie|email|address|phone|card|credential|session/i;
 
 /**
  * Deeply traverses an object to redact sensitive keys.
@@ -25,18 +28,34 @@ type LogContext = Record<string, string | number | boolean | null | undefined>;
  * @param value - The object or value to sanitize.
  * @returns A new object with sensitive fields masked as "[redacted]".
  */
-const redact = (value: unknown): unknown => {
+const redact = (
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+): unknown => {
   if (!value || typeof value !== "object") {
     return value;
   }
 
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (seen.has(value)) {
+    return "[circular]";
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redact(item, seen));
+  }
+
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, item]) => {
-      if (/password|token|secret|key|authorization|cookie/i.test(key)) {
+      if (SENSITIVE_KEY_PATTERN.test(key)) {
         return [key, "[redacted]"];
       }
 
-      return [key, item];
+      return [key, redact(item, seen)];
     }),
   );
 };

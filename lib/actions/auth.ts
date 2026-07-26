@@ -18,14 +18,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import { signIn } from "@/auth";
-import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 import { redirect } from "next/navigation";
-import { workflowClient } from "@/lib/workflow";
 import config from "@/lib/config";
 import { isTransientDbError, withDbRetry } from "@/lib/db/retry";
 import { hashPassword } from "@/lib/security/password";
+import { getClientIp } from "@/lib/security/api-request";
 import { logError, logInfo } from "@/lib/security/logger";
+import { signInSchema, signUpSchema } from "@/lib/validations";
 
 /**
  * Authenticates a user using email and password credentials.
@@ -39,11 +39,16 @@ import { logError, logInfo } from "@/lib/security/logger";
 export const signInWithCredentials = async (
   params: Pick<AuthCredentials, "email" | "password">
 ) => {
-  const { email, password } = params;
+  const parsedCredentials = signInSchema.safeParse(params);
+  if (!parsedCredentials.success) {
+    return { success: false, error: "Invalid email or password." };
+  }
+
+  const { email, password } = parsedCredentials.data;
   const normalizedEmail = email.toLowerCase();
 
-  // Identify client IP for rate limiting
-  const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
+  // Identify client IP for rate limiting using central security utility
+  const ip = await getClientIp();
   const { success } = await ratelimit.limit(ip);
 
   if (!success) return redirect("/too-fast");
@@ -85,11 +90,31 @@ export const signInWithCredentials = async (
  * @returns A promise resolving to a success flag, or an error object with field-specific feedback.
  */
 export const signUp = async (params: AuthCredentials) => {
-  const { fullName, email, universityId, password, universityCard } = params;
+  if (!config.env.allowPublicSignup) {
+    logInfo("auth.public_signup_disabled");
+    return {
+      success: false,
+      error:
+        "Public registration is temporarily unavailable. Use institutional sign-in or contact the library.",
+    };
+  }
+
+  const parsedCredentials = signUpSchema.safeParse(params);
+  if (!parsedCredentials.success) {
+    const firstIssue = parsedCredentials.error.issues[0];
+    return {
+      success: false,
+      error: firstIssue?.path[0]?.toString() ?? "validation",
+      fieldError: firstIssue?.message ?? "Invalid registration details.",
+    };
+  }
+
+  const { fullName, email, universityId, password, universityCard } =
+    parsedCredentials.data;
   const normalizedEmail = email.toLowerCase();
 
-  // Apply rate limiting based on IP address
-  const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
+  // Apply rate limiting based on IP address using central security utility
+  const ip = await getClientIp();
   const { success } = await ratelimit.limit(ip);
 
   if (!success) return redirect("/too-fast");
@@ -185,24 +210,6 @@ export const signUp = async (params: AuthCredentials) => {
         }),
       { retries: 2, delayMs: 300 }
     );
-
-    const workflowsEnabled =
-      process.env.ENABLE_WORKFLOWS === "true" ||
-      (process.env.NODE_ENV === "production" &&
-        process.env.ENABLE_WORKFLOWS !== "false");
-
-    // Only trigger workflow when real QStash credentials are expected.
-    if (workflowsEnabled) {
-      await workflowClient.trigger({
-        url: `${config.env.prodApiEndpoint}/api/workflows/onboarding`,
-        body: {
-          email: normalizedEmail,
-          fullName,
-        },
-      });
-    } else {
-      console.log("Skipping workflow trigger in development mode");
-    }
 
     logInfo("auth.signup_pending_account_created", {
       email: normalizedEmail,

@@ -1,18 +1,23 @@
-"use client";
-
 /**
  * BookCollection Component
- *
- * Client component that displays a collection of books with filters, search, sorting, and pagination.
- * Uses React Query for data fetching and caching, with SSR initial data support.
- *
+ * 
+ * A feature-rich client component that serves as the primary interface for browsing 
+ * and searching the library's book catalog. It provides an integrated experience 
+ * combining filtering, sorting, pagination, and ISBN scanning.
+ * 
  * Features:
- * - Uses useAllBooks hook with initialData from SSR
- * - Displays skeleton loaders while fetching
- * - Shows error state if fetch fails
- * - Handles URL-based search params for filters
- * - Supports pagination
+ * - Dynamic book grid with responsive layouts.
+ * - Multi-criteria filtering: Search (text/ISBN), Genre, Availability, and Rating.
+ * - Advanced sorting options (Title, Author, Rating, Date).
+ * - ISBN Scanner integration using device camera for quick lookup.
+ * - Synchronization with URL parameters for persistent and shareable search states.
+ * - TanStack Query integration with SSR initial data for zero-flicker loading.
+ * - Pre-emptive caching of user borrow records to speed up sub-navigation.
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,27 +35,22 @@ import type { BorrowRecord } from "@/lib/services/borrows";
 import { Camera } from "lucide-react";
 import ISBNScanner from "@/components/ISBNScanner";
 
+/**
+ * Props for the BookCollection component.
+ */
 interface BookCollectionProps {
-  /**
-   * Initial books data from SSR (prevents duplicate fetch)
-   */
+  /** Initial array of books from SSR. */
   initialBooks?: Book[];
-  /**
-   * Initial genres list from SSR
-   */
+  /** List of available genres for the filter dropdown. */
   initialGenres?: string[];
-  /**
-   * Initial pagination data from SSR
-   */
+  /** Pagination metadata from the initial server-side load. */
   initialPagination?: {
     currentPage: number;
     totalPages: number;
     totalBooks: number;
     booksPerPage: number;
   };
-  /**
-   * Initial search params from SSR
-   */
+  /** The search parameters used for the initial server-side fetch. */
   initialSearchParams?: {
     search: string;
     genre: string;
@@ -59,13 +59,13 @@ interface BookCollectionProps {
     sort: string;
     page: number;
   };
-  /**
-   * Initial user borrows from SSR (populates React Query cache for faster navigation to book detail pages)
+  /** 
+   * Initial user borrow records. 
+   * Used to hydrate the React Query cache for immediate access in child components.
    */
   initialUserBorrows?: BorrowRecord[];
-  /**
-   * Legacy props for backward compatibility (deprecated, use initial* props instead)
-   */
+  
+  // Legacy props for backward compatibility (Deprecated)
   books?: Book[];
   genres?: string[];
   searchParams?: {
@@ -84,16 +84,12 @@ interface BookCollectionProps {
   };
 }
 
-/**
- * Book collection with filters, search, and pagination.
- */
 const BookCollection: React.FC<BookCollectionProps> = ({
   initialBooks,
   initialGenres,
   initialPagination,
   initialSearchParams,
   initialUserBorrows,
-  // Legacy props for backward compatibility
   books: legacyBooks,
   genres: legacyGenres,
   searchParams: legacySearchParams,
@@ -102,23 +98,27 @@ const BookCollection: React.FC<BookCollectionProps> = ({
   const router = useRouter();
   const searchParamsHook = useSearchParams();
   const queryClient = useQueryClient();
+  const genreFilterId = React.useId();
+  const availabilityFilterId = React.useId();
+  const ratingFilterId = React.useId();
 
-  // Initialize React Query cache with SSR user borrows data
-  // This ensures that when users navigate to book detail pages, the data is already cached
+  /**
+   * Effect: Hydrate React Query Cache.
+   * On mount, if initial borrow data exists, we manually populate the cache.
+   * This eliminates the need for a network request when the user interacts with 
+   * borrow-related buttons on the detail pages.
+   */
   useEffect(() => {
     if (initialUserBorrows && initialUserBorrows.length > 0) {
-      // Extract userId from first record (all records have same userId)
       const userId = initialUserBorrows[0].userId;
       if (userId) {
-        // Set the query data in React Query cache for the main user-borrows query
-        // This is the query key used by BookBorrowButton: ["user-borrows", userId, undefined]
         const queryKey = ["user-borrows", userId, undefined];
         queryClient.setQueryData(queryKey, initialUserBorrows);
       }
     }
   }, [initialUserBorrows, queryClient]);
 
-  // Prepare initial data for React Query
+  // Normalize initial data structure for useAllBooks
   const initialData: BooksListResponse | undefined =
     initialBooks || legacyBooks
       ? {
@@ -140,7 +140,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
         }
       : undefined;
 
-  // Get search params from initial, legacy, or URL
+  // Resolve active search parameters from URL or SSR defaults
   const searchParamsToUse = initialSearchParams ||
     legacySearchParams || {
       search: searchParamsHook.get("search") || "",
@@ -151,7 +151,9 @@ const BookCollection: React.FC<BookCollectionProps> = ({
       page: parseInt(searchParamsHook.get("page") || "1", 10),
     };
 
-  // Use React Query hook with initialData
+  /**
+   * Data Fetching: Primary query for the book catalog.
+   */
   const {
     data: booksData,
     isLoading,
@@ -186,15 +188,9 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     initialData,
   );
 
-  // Use React Query data if available, otherwise fall back to legacy props or initial data
-  // CRITICAL: Always prefer React Query data over initial/legacy data
-  // React Query data is fresh and updates immediately after mutations
-  // initial/legacy data is only used as fallback during initial load
+  // Derived Data: Prioritize fresh query data from TanStack Query
   const books = (booksData?.books ?? legacyBooks ?? initialBooks) || [];
   const genres = (legacyGenres ?? initialGenres) || [];
-  // CRITICAL: Always prefer React Query data over initial/legacy data
-  // React Query data is fresh and updates immediately after mutations
-  // initial/legacy data is only used as fallback during initial load
   const pagination = (legacyPagination ??
     initialPagination ??
     (booksData
@@ -211,7 +207,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     booksPerPage: 12,
   };
 
-  // Get current search params from URL or use initial/legacy
+  // UI Search Params: Current state derived from URL or fallbacks
   const currentSearchParams = legacySearchParams ||
     initialSearchParams || {
       search: searchParamsHook.get("search") || "",
@@ -222,9 +218,14 @@ const BookCollection: React.FC<BookCollectionProps> = ({
       page: parseInt(searchParamsHook.get("page") || "1", 10),
     };
 
+  // Local UI state for search input and scanner modal
   const [localSearch, setLocalSearch] = useState(currentSearchParams.search);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
+  /**
+   * Updates the URL search parameters and triggers a navigation.
+   * Automatically resets pagination to page 1 for new filter combinations.
+   */
   const updateSearchParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParamsHook.toString());
 
@@ -236,7 +237,6 @@ const BookCollection: React.FC<BookCollectionProps> = ({
       }
     });
 
-    // Reset to page 1 when filters change
     if (Object.keys(newParams).some((key) => key !== "page")) {
       params.delete("page");
     }
@@ -249,6 +249,7 @@ const BookCollection: React.FC<BookCollectionProps> = ({
     updateSearchParams({ search: localSearch });
   };
 
+  /** Callback for successful ISBN detection via camera scanner. */
   const handleScanSuccess = (isbn: string) => {
     setLocalSearch(isbn);
     updateSearchParams({ search: isbn });
@@ -390,10 +391,14 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Genre Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
+                <label
+                  htmlFor={genreFilterId}
+                  className="text-xs font-semibold text-slate-600 sm:text-sm"
+                >
                   Genre
                 </label>
                 <select
+                  id={genreFilterId}
                   value={currentSearchParams.genre}
                   onChange={(e) => handleFilterChange("genre", e.target.value)}
                   className="catalog-field"
@@ -409,10 +414,14 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Availability Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
+                <label
+                  htmlFor={availabilityFilterId}
+                  className="text-xs font-semibold text-slate-600 sm:text-sm"
+                >
                   Availability
                 </label>
                 <select
+                  id={availabilityFilterId}
                   value={currentSearchParams.availability}
                   onChange={(e) =>
                     handleFilterChange("availability", e.target.value)
@@ -427,10 +436,14 @@ const BookCollection: React.FC<BookCollectionProps> = ({
 
               {/* Rating Filter */}
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-xs font-semibold text-slate-600 sm:text-sm">
+                <label
+                  htmlFor={ratingFilterId}
+                  className="text-xs font-semibold text-slate-600 sm:text-sm"
+                >
                   Minimum Rating
                 </label>
                 <select
+                  id={ratingFilterId}
                   value={currentSearchParams.rating}
                   onChange={(e) => handleFilterChange("rating", e.target.value)}
                   className="catalog-field"

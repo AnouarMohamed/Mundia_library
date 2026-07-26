@@ -1,0 +1,38 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mundia-restrict-service-exposure
+  annotations:
+    policies.kyverno.io/title: Restrict direct service exposure
+    policies.kyverno.io/category: Network Security
+    policies.kyverno.io/severity: high
+spec:
+  admission: true
+  background: true
+  validationFailureAction: Enforce
+  rules:
+    - name: deny-nodeport-and-loadbalancer
+      match:
+        any:
+          - resources:
+              kinds:
+                - Service
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      validate:
+        message: Application Services must remain ClusterIP; public traffic enters only through the approved TLS ingress.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.type || 'ClusterIP' }}"
+                operator: AnyIn
+                value:
+                  - NodePort
+                  - LoadBalancer
+

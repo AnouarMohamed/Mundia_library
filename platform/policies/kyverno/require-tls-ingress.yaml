@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mundia-require-tls-ingress
+  annotations:
+    policies.kyverno.io/title: Require TLS ingress
+    policies.kyverno.io/category: Network Security
+    policies.kyverno.io/severity: critical
+spec:
+  admission: true
+  background: true
+  validationFailureAction: Enforce
+  rules:
+    - name: require-tls-for-every-host
+      match:
+        any:
+          - resources:
+              kinds:
+                - Ingress
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      validate:
+        message: Every Ingress must declare TLS and force HTTPS.
+        pattern:
+          metadata:
+            annotations:
+              nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+          spec:
+            tls:
+              - secretName: "?*"
+                hosts:
+                  - "?*"
+            rules:
+              - host: "?*"
+

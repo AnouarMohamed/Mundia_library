@@ -1,8 +1,55 @@
-"use client";
-
 /**
  * BookDetailContent Component
- *
+ * 
+ * Orchestrates the display of detailed information for a single book.
+ * Includes video trailers, summaries, and user reviews.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
+"use client";
+
+import React from "react";
+import BookVideo from "@/components/BookVideo";
+import ReviewsSection from "@/components/ReviewsSection";
+import BookSkeleton from "@/components/skeletons/BookSkeleton";
+import { useBook, useBookReviews } from "@/hooks/useQueries";
+
+/**
+ * Props for BookDetailContent
+ */
+interface BookDetailContentProps {
+  /**
+   * Unique identifier of the book (UUID)
+   */
+  bookId: string;
+  /**
+   * Unique identifier of the current user (optional)
+   */
+  userId?: string;
+  /**
+   * Initial book data from SSR to prevent layout shift and duplicate fetches
+   */
+  initialBook?: Book;
+  /**
+   * Initial reviews data from SSR
+   */
+  initialReviews?: Array<{
+    id: string;
+    rating: number;
+    comment: string;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+    /** Privacy-preserving reviewer label, not an account holder's legal name. */
+    userFullName: string;
+    isOwner: boolean;
+  }>;
+}
+
+/**
+ * BookDetailContent
+ * 
  * Client component that displays book details, video, summary, and reviews.
  * Uses React Query for data fetching and caching, with SSR initial data support.
  *
@@ -12,50 +59,13 @@
  * - Shows error state if fetch fails
  * - Integrates with BookOverview, BookVideo, and ReviewsSection components
  */
-
-import React from "react";
-import BookVideo from "@/components/BookVideo";
-import ReviewsSection from "@/components/ReviewsSection";
-import BookSkeleton from "@/components/skeletons/BookSkeleton";
-import { useBook, useBookReviews } from "@/hooks/useQueries";
-
-interface BookDetailContentProps {
-  /**
-   * Book ID
-   */
-  bookId: string;
-  /**
-   * User ID for book overview
-   */
-  userId?: string;
-  /**
-   * Initial book data from SSR (prevents duplicate fetch)
-   */
-  initialBook?: Book;
-  /**
-   * Initial reviews data from SSR (prevents duplicate fetch)
-   */
-  initialReviews?: Array<{
-    id: string;
-    rating: number;
-    comment: string;
-    createdAt: Date | null;
-    updatedAt: Date | null;
-    userFullName: string;
-    isOwner: boolean;
-  }>;
-}
-
-/**
- * Book detail panel with video, summary, and reviews.
- */
 const BookDetailContent: React.FC<BookDetailContentProps> = ({
   bookId,
   userId: _userId,
   initialBook,
   initialReviews,
 }) => {
-  // Use React Query hooks with SSR initial data
+  // Use React Query hooks with SSR initial data to ensure fast first paint
   const {
     data: book,
     isLoading: isLoadingBook,
@@ -70,7 +80,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
     error: reviewsError,
   } = useBookReviews(bookId, initialReviews);
 
-  // Show skeleton while loading (only if no initial data)
+  // Show skeleton while loading (only if no initial data is available)
   if (
     (isLoadingBook && !initialBook) ||
     (isLoadingReviews && !initialReviews)
@@ -78,7 +88,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
     return <BookSkeleton showDetails={true} />;
   }
 
-  // Show error state for book
+  // Handle failure to load core book data
   if (isErrorBook || !book) {
     return (
       <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
@@ -102,7 +112,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
   return (
     <div className="book-details">
       <div className="flex-[1.5] w-full min-w-0 max-w-full overflow-hidden">
-        {/* Video Section */}
+        {/* Video Section - Displays book trailer if available */}
         <section className="flex flex-col gap-4 sm:gap-7">
           <h3 className="text-base font-semibold text-[var(--mundia-navy)] sm:text-lg">
             Video
@@ -110,7 +120,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
           <BookVideo videoUrl={bookData.videoUrl} />
         </section>
 
-        {/* Summary Section */}
+        {/* Summary Section - Renders summary text with preserved line breaks */}
         <section className="mt-6 flex flex-col gap-4 sm:mt-10 sm:gap-7">
           <h3 className="text-base font-semibold text-[var(--mundia-navy)] sm:text-lg">
             Summary
@@ -124,16 +134,19 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
           </div>
         </section>
 
-        {/* Reviews Section */}
+        {/* Reviews Section - Displays user feedback and ratings */}
         <section className="mt-6 flex flex-col gap-4 sm:mt-10 sm:gap-7">
-          {/* CRITICAL: Pass React Query data to ReviewsSection
-              React Query data updates immediately after mutations
-              initialReviews is only used as fallback during initial load */}
+          {/* 
+            CRITICAL PERFORMANCE: Pass React Query data to ReviewsSection.
+            React Query data updates immediately after mutations (adding/editing reviews),
+            whereas initialReviews is static SSR data.
+          */}
           <ReviewsSection
             bookId={bookId}
             reviews={reviews ?? initialReviews ?? []}
           />
-          {/* Show error message for reviews if failed but book loaded */}
+          
+          {/* Show non-blocking error message for reviews if book loaded successfully */}
           {isErrorReviews && (
             <div className="rounded-lg border border-yellow-500 bg-yellow-50 p-3 text-yellow-800 sm:p-4">
               <p className="text-sm font-semibold sm:text-base">
@@ -149,7 +162,7 @@ const BookDetailContent: React.FC<BookDetailContentProps> = ({
         </section>
       </div>
 
-      {/* SIMILAR - Can be added later */}
+      {/* Future expansion: Similar Books section could be added here */}
     </div>
   );
 };

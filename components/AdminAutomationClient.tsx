@@ -1,3 +1,20 @@
+/**
+ * AdminAutomationClient Component
+ * 
+ * A comprehensive administrative control panel for managing library automation tasks.
+ * This client component serves as the central hub for:
+ * 
+ * 1. Financial Management: Configuring daily fine rates for overdue books.
+ * 2. Communication: Manually triggering "due soon" and "overdue" email reminders.
+ * 3. Analytics/AI: Triggering recommendation engine updates and trending book calculations.
+ * 4. Data Portability: Exporting system data (Books, Users, Borrows, Analytics) as CSV files.
+ * 
+ * Built with:
+ * - React Query (hooks/mutations) for robust server-state management.
+ * - Lucide-React for consistent iconography.
+ * - Custom toast system for user feedback.
+ */
+
 "use client";
 
 import React from "react";
@@ -34,12 +51,19 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+/**
+ * Props for the AdminAutomationClient component.
+ */
 interface AdminAutomationClientProps {
+  /** Initial fine configuration from SSR to prevent layout shift. */
   initialFineConfig?: FineConfig;
+  /** Initial reminder statistics from SSR. */
   initialReminderStats?: ReminderStats;
+  /** Initial exportable entity counts from SSR. */
   initialExportStats?: ExportStats;
 }
 
+/** Supported data export categories. */
 type ExportKind = "books" | "users" | "borrows" | "analytics";
 
 const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
@@ -47,10 +71,12 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
   initialReminderStats,
   initialExportStats,
 }) => {
+  // Queries for real-time automation statistics
   const fineConfigQuery = useFineConfig(initialFineConfig);
   const reminderStatsQuery = useReminderStats(initialReminderStats);
   const exportStatsQuery = useExportStats(initialExportStats);
 
+  // Mutations for administrative actions
   const updateFineConfigMutation = useUpdateFineConfig();
   const sendDueRemindersMutation = useSendDueReminders();
   const sendOverdueRemindersMutation = useSendOverdueReminders();
@@ -59,6 +85,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
   const updateTrendingMutation = useUpdateTrendingBooks();
   const refreshCacheMutation = useRefreshRecommendationCache();
 
+  // Local state for form inputs and transient UI states
   const [fineAmountInput, setFineAmountInput] = React.useState<string>(
     (initialFineConfig?.fineAmount ?? 1).toFixed(2),
   );
@@ -66,12 +93,14 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
     null,
   );
 
+  /** Sync local input state with server state when it changes. */
   React.useEffect(() => {
     if (fineConfigQuery.data?.fineAmount !== undefined) {
       setFineAmountInput(fineConfigQuery.data.fineAmount.toFixed(2));
     }
   }, [fineConfigQuery.data?.fineAmount]);
 
+  // Derived state with safe fallbacks
   const reminderStats = reminderStatsQuery.data ?? {
     dueSoon: 0,
     overdue: 0,
@@ -84,6 +113,10 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
     totalBorrows: 0,
   };
 
+  /**
+   * Updates the global fine configuration.
+   * Validates that the input is a non-negative number.
+   */
   const handleFineConfigSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -99,6 +132,10 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
     updateFineConfigMutation.mutate({ fineAmount: parsedFineAmount });
   };
 
+  /**
+   * Initiates a browser-side download of system data in CSV format.
+   * Generates a temporary object URL for the exported blob.
+   */
   const handleExport = async (type: ExportKind) => {
     try {
       setExportingType(type);
@@ -127,6 +164,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
     }
   };
 
+  // Aggregated loading states for UI feedback
   const remindersActionPending =
     sendDueRemindersMutation.isPending ||
     sendOverdueRemindersMutation.isPending ||
@@ -139,6 +177,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
 
   return (
     <section className="space-y-5 sm:space-y-6">
+      {/* Header Section */}
       <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6">
         <h1 className="text-xl font-semibold text-slate-800 sm:text-2xl">
           Automation
@@ -148,6 +187,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
         </p>
       </div>
 
+      {/* Real-time Stats Dashboard */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="border-slate-200">
           <CardHeader className="pb-2">
@@ -190,6 +230,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {/* Fine Configuration Card */}
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
@@ -227,6 +268,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
           </CardContent>
         </Card>
 
+        {/* Reminder Trigger Card */}
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
@@ -267,6 +309,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
           </CardContent>
         </Card>
 
+        {/* Intelligence Actions Card */}
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
@@ -307,6 +350,7 @@ const AdminAutomationClient: React.FC<AdminAutomationClientProps> = ({
           </CardContent>
         </Card>
 
+        {/* Data Export Card */}
         <Card className="border-slate-200">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg text-slate-800">

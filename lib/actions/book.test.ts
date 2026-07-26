@@ -59,10 +59,10 @@ describe("borrowBook", () => {
 
     const result = await borrowBook({ userId: "user-2", bookId: "book-1" });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("You can only access your own data");
-    }
+    expect(result).toMatchObject({
+      success: false,
+      error: "You can only access your own data",
+    });
   });
 
   it("should fail if book is not available", async () => {
@@ -77,10 +77,10 @@ describe("borrowBook", () => {
 
     const result = await borrowBook({ userId: "user-1", bookId: "book-1" });
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe("Book is not available for borrowing");
-    }
+    expect(result).toMatchObject({
+      success: false,
+      error: "Book is not available for borrowing",
+    });
   });
 
   it("should successfully create a pending borrow request", async () => {
@@ -116,9 +116,9 @@ describe("borrowBook", () => {
 
     const result = await borrowBook({ userId: "user-1", bookId: "book-1" });
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data[0].status).toBe("PENDING");
-    }
+    expect(result).toMatchObject({
+      success: true,
+      data: [{ status: "PENDING" }],
+    });
   });
 });

@@ -10,6 +10,7 @@ import {
 } from "@/lib/security/api-response";
 import { isUuid } from "@/lib/security/api-request";
 import { logError } from "@/lib/security/logger";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
  * Use Node.js runtime for auth/session access.
@@ -21,10 +22,13 @@ export const runtime = "nodejs";
  * Mark a specific notification as read.
  */
 export async function PATCH(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request);
+    if (sameOriginResponse) return sameOriginResponse;
+
     const guard = await requireApprovedUser();
     if (!guard.ok) return guardToResponse(guard);
 

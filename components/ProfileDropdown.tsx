@@ -1,18 +1,21 @@
-"use client";
-
 /**
  * ProfileDropdown Component
  *
- * Client component that displays user profile image with dropdown menu.
- * Shows user info (Full name, Email, University ID) and actions (Become Admin, Logout).
+ * Provides a user-focused dropdown menu in the header.
+ * Displays profile information and core account actions like 'Become Admin' or 'Logout'.
+ *
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { IKImage } from "imagekitio-next";
+import { Image as IKImage } from "@imagekit/next";
 import config from "@/lib/config";
 import {
   DropdownMenu,
@@ -24,16 +27,37 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { showToast } from "@/lib/toast";
 
+/**
+ * Props for ProfileDropdown
+ */
 interface ProfileDropdownProps {
+  /**
+   * User's full display name
+   */
   fullName: string;
+  /**
+   * User's primary email address
+   */
   email: string;
+  /**
+   * Numeric university identifier (optional)
+   */
   universityId?: number;
+  /**
+   * URL or path to the user's university ID card image
+   */
   universityCard?: string;
+  /**
+   * True if the user has administrative privileges
+   */
   isAdmin: boolean;
 }
 
 /**
- * Profile menu with account actions.
+ * ProfileDropdown
+ *
+ * Client component that displays user profile image with dropdown menu.
+ * Shows user info (Full name, Email, University ID) and actions (Become Admin, Logout).
  */
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   fullName,
@@ -45,39 +69,45 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
   const queryClient = useQueryClient();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  /**
+   * Secured logout process with cache invalidation.
+   */
   const handleLogout = async () => {
-    // Prevent multiple clicks
+    // Prevent multiple clicks during the transition
     if (isLoggingOut) return;
 
     try {
       setIsLoggingOut(true);
 
-      // Show toast notification first
+      // Visual feedback via toast
       showToast.auth.logoutSuccess();
 
-      // CRITICAL: Set logout flag to prevent UI updates during logout
-      // This prevents flickering/blinking of images and components during logout transition
+      /**
+       * CRITICAL: Set logout flag cookie.
+       * This signal helps components avoid redundant data fetching during the redirect.
+       */
       document.cookie =
         "logout-in-progress=true; path=/; max-age=10; SameSite=Lax";
 
-      // CRITICAL: Use NextAuth's standard built-in redirect
-      // This is the recommended approach - NextAuth handles:
-      // 1. Session clearing (CSRF token validation)
-      // 2. Cookie removal
-      // 3. Navigation to callbackUrl
-      // No need for manual navigation or cookie workarounds
+      /**
+       * Standard NextAuth sign-out:
+       * 1. Clears server-side session.
+       * 2. Removes local authentication cookies.
+       * 3. Redirects to sign-in page.
+       */
       await signOut({
-        redirect: true, // Standard NextAuth redirect (handles everything)
-        callbackUrl: "/sign-in", // Where to redirect after logout
+        redirect: true,
+        callbackUrl: "/sign-in",
       });
 
-      // CRITICAL: Clear cache AFTER redirect completes (longer delay)
-      // This ensures smooth transition - UI stays intact during entire logout process
-      // The redirect happens immediately, but we wait longer to ensure page has navigated
-      // before clearing cache. This prevents images from disappearing during logout.
+      /**
+       * POST-LOGOUT CLEANUP:
+       * Clear the TanStack Query cache after a delay to ensure no sensitive
+       * data remains in memory once the user has transitioned.
+       */
       setTimeout(() => {
         queryClient.clear();
-      }, 500); // Longer delay to ensure redirect has completed and page has navigated
+      }, 500);
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoggingOut(false);
@@ -90,6 +120,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
 
   return (
     <DropdownMenu modal={false}>
+      {/* Profile Image Trigger */}
       <DropdownMenuTrigger asChild>
         <button className="relative size-8 overflow-hidden rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] transition-all hover:border-[var(--mundia-navy)] focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 focus:ring-offset-transparent sm:size-10">
           {universityCard ? (
@@ -104,7 +135,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
               />
             ) : config.env.imagekit.urlEndpoint ? (
               <IKImage
-                path={
+                src={
                   universityCard.startsWith("/")
                     ? universityCard.slice(1)
                     : universityCard
@@ -130,10 +161,13 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
           )}
         </button>
       </DropdownMenuTrigger>
+
+      {/* Dropdown Menu Content */}
       <DropdownMenuContent
         align="end"
         className="w-56 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1 text-[var(--mundia-ink)] sm:w-64"
       >
+        {/* User Identity Section */}
         <DropdownMenuLabel className="rounded-lg bg-[var(--surface-0)] px-2.5 py-1.5 sm:px-3 sm:py-2">
           <div className="space-y-0.5 sm:space-y-1">
             <p className="text-xs font-semibold text-[var(--mundia-ink)] sm:text-sm">
@@ -147,7 +181,10 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
             )}
           </div>
         </DropdownMenuLabel>
+
         <DropdownMenuSeparator className="my-1 bg-[var(--mundia-line)]" />
+
+        {/* Conditional "Become Admin" shortcut for students */}
         {!isAdmin && (
           <DropdownMenuItem
             asChild
@@ -161,6 +198,8 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
             </Link>
           </DropdownMenuItem>
         )}
+
+        {/* Logout Menu Item */}
         <DropdownMenuItem
           onClick={handleLogout}
           disabled={isLoggingOut}

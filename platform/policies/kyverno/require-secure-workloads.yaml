@@ -1,0 +1,104 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mundia-require-secure-workloads
+  annotations:
+    policies.kyverno.io/title: Require secure Mundiapolis workloads
+    policies.kyverno.io/category: Pod Security, Reliability
+    policies.kyverno.io/severity: high
+spec:
+  admission: true
+  background: true
+  validationFailureAction: Enforce
+  rules:
+    - name: restricted-pod-and-container-context
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      validate:
+        message: Pods must run without root, privilege escalation, extra capabilities, writable roots, or unrestricted seccomp.
+        pattern:
+          spec:
+            automountServiceAccountToken: false
+            securityContext:
+              runAsNonRoot: true
+              seccompProfile:
+                type: RuntimeDefault
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                      - ALL
+    - name: require-resources-and-probes
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      validate:
+        message: Every application container needs CPU/memory requests and limits plus startup, readiness, and liveness probes.
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+                startupProbe:
+                  "?*": "?*"
+                readinessProbe:
+                  "?*": "?*"
+                livenessProbe:
+                  "?*": "?*"
+    - name: deny-host-access-and-privileged
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      validate:
+        message: Host namespaces, host paths, privileged containers, and host ports are forbidden.
+        pattern:
+          spec:
+            =(hostNetwork): false
+            =(hostPID): false
+            =(hostIPC): false
+            =(volumes):
+              - X(hostPath): "null"
+            containers:
+              - =(securityContext):
+                  =(privileged): false
+                =(ports):
+                  - X(hostPort): "null"
+

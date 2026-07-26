@@ -63,6 +63,11 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
   const { borrowRecordId, reason } = params;
 
   try {
+    const normalizedReason = reason?.trim();
+    if (normalizedReason && normalizedReason.length > 1_000) {
+      return { success: false, error: "Renewal reason is too long." };
+    }
+
     // 1. Authenticate the user
     const guard = await requireApprovedUser();
     if (!guard.ok) {
@@ -114,12 +119,12 @@ export async function requestRenewal(params: RequestRenewalParams): Promise<Rene
     await db.insert(renewalRequests).values({
       borrowRecordId,
       userId: userId!,
-      requestReason: reason,
+      requestReason: normalizedReason,
       status: "PENDING",
     });
 
     // 6. Refresh UI data
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return { 
       success: true, 

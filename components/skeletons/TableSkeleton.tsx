@@ -1,70 +1,51 @@
+/**
+ * TableSkeleton Component
+ * 
+ * A configurable loading placeholder for tabular data.
+ * Mimics the structure of standard HTML tables with headers and rows to minimize layout shift.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /**
- * TableSkeleton Component
- *
- * A skeleton loader that matches the exact dimensions and layout of table components.
- * Used to show loading states while table data is being fetched.
- *
- * Features:
- * - Exact size matching to prevent layout shift
- * - Configurable number of columns and rows
- * - Matches table structure (thead, tbody, borders, padding)
- * - Supports custom column widths
- * - Responsive layout matching
- *
- * Usage:
- * ```tsx
- * // Basic table skeleton (7 columns, 5 rows)
- * <TableSkeleton columns={7} rows={5} />
- *
- * // Custom column widths
- * <TableSkeleton
- *   columns={5}
- *   rows={3}
- *   columnWidths={["w-32", "w-48", "w-24", "w-32", "w-40"]}
- * />
- *
- * // Without header
- * <TableSkeleton columns={4} rows={5} showHeader={false} />
- * ```
- *
- * Dimensions matched:
- * - Table: w-full border-collapse border border-gray-200
- * - Thead tr: bg-gray-50
- * - Th/Td: border border-gray-200 px-4 py-2 text-left
- * - Tbody tr: hover:bg-gray-50
+ * Props for TableSkeleton
  */
 interface TableSkeletonProps {
   /**
-   * Number of columns in the table
-   * Default: 7
+   * Total number of columns to render
+   * @default 7
    */
   columns?: number;
   /**
-   * Number of rows in the table body
-   * Default: 5
+   * Total number of data rows to render
+   * @default 5
    */
   rows?: number;
   /**
-   * Optional array of width classes for each column
-   * If not provided, columns will have default widths
-   * Example: ["w-32", "w-48", "w-24"]
+   * Optional array of Tailwind width classes (e.g., ["w-20", "w-40"]) for specific column sizing.
    */
   columnWidths?: string[];
   /**
-   * Whether to show the table header
-   * Default: true
+   * Whether to include the table header (thead) row.
+   * @default true
    */
   showHeader?: boolean;
   /**
-   * Additional CSS classes to apply to the table
+   * Additional CSS classes for the table element.
    */
   className?: string;
 }
 
+/**
+ * TableSkeleton
+ * 
+ * Renders a ghost table structure using shadcn/ui Skeleton primitives.
+ */
 const TableSkeleton: React.FC<TableSkeletonProps> = ({
   columns = 7,
   rows = 5,
@@ -72,20 +53,24 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
   showHeader = true,
   className,
 }) => {
-  // Generate default column widths if not provided
+  /**
+   * Helper: Determines the width of a specific column based on its index.
+   * Uses provided widths or falls back to a sensible default pattern.
+   */
   const getColumnWidth = (index: number): string => {
     if (columnWidths && columnWidths[index]) {
       return columnWidths[index];
     }
-    // Default widths based on common table patterns
+    
+    // Default width progression for standard library tables (Title, Email, ID, etc.)
     const defaultWidths = [
-      "w-32", // Name/Title
-      "w-48", // Email/Description
-      "w-24", // ID/Number
-      "w-20", // Badge/Status
-      "w-20", // Badge/Role
-      "w-24", // Date
-      "w-40", // Actions
+      "w-32", // Col 0
+      "w-48", // Col 1
+      "w-24", // Col 2
+      "w-20", // Col 3
+      "w-20", // Col 4
+      "w-24", // Col 5
+      "w-40", // Col 6 (Actions)
     ];
     return defaultWidths[index] || "w-32";
   };
@@ -99,6 +84,7 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
             className
           )}
         >
+          {/* Header Row Placeholder */}
           {showHeader && (
             <thead>
               <tr className="bg-gray-50">
@@ -113,6 +99,8 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
               </tr>
             </thead>
           )}
+          
+          {/* Body Rows Placeholders */}
           <tbody>
             {Array.from({ length: rows }).map((_, rowIndex) => (
               <tr key={rowIndex} className="hover:bg-gray-50">
@@ -121,15 +109,17 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
                     key={colIndex}
                     className="border border-gray-200 px-4 py-2"
                   >
-                    {/* Vary skeleton heights for visual interest */}
                     <Skeleton
                       className={cn(
                         "h-5",
                         getColumnWidth(colIndex),
-                        // Make some cells slightly different (badges, buttons)
-                        colIndex === columns - 1 && "h-8 w-24", // Actions column
+                        /**
+                         * Visual Variety: 
+                         * Make action buttons and badges visually distinct in the skeleton.
+                         */
+                        colIndex === columns - 1 && "h-8 w-24", 
                         (colIndex === columns - 2 ||
-                          colIndex === columns - 3) && "h-6 w-20 rounded-full" // Badge columns
+                          colIndex === columns - 3) && "h-6 w-20 rounded-full" 
                       )}
                     />
                   </td>

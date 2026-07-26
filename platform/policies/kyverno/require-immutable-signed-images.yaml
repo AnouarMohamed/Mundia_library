@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: mundia-require-immutable-signed-images
+  annotations:
+    policies.kyverno.io/title: Require immutable and signed images
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: critical
+spec:
+  admission: true
+  background: true
+  validationFailureAction: Enforce
+  rules:
+    - name: verify-keyless-signature-and-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+      verifyImages:
+        - imageReferences:
+            - "REPLACE_APPROVED_REGISTRY/*"
+          mutateDigest: false
+          verifyDigest: true
+          required: true
+          attestors:
+            - entries:
+                - keyless:
+                    subject: REPLACE_SIGNING_WORKFLOW_IDENTITY
+                    issuer: REPLACE_SIGNING_OIDC_ISSUER
+                    rekor:
+                      url: https://rekor.sigstore.dev
+

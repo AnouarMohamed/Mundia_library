@@ -1,22 +1,22 @@
-"use client";
-
 /**
  * BookBorrowStats Component
- *
- * Client component that displays borrow statistics for a specific book.
- * Uses React Query for data fetching and caching, with SSR initial data support.
- *
- * Features:
- * - Uses useBookBorrowStats and useBook hooks with initialData from SSR
- * - Displays statistics: total borrows, active borrows, returned borrows
- * - Updates immediately when borrows change (via cache invalidation)
- * - Shows availability status based on availableCopies from React Query book data
+ * 
+ * Displays analytical statistics for a specific book, including total borrows,
+ * active loans, and current availability status.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React from "react";
 import { useBookBorrowStats, useBook } from "@/hooks/useQueries";
 import { Skeleton } from "@/components/ui/skeleton";
 
+/**
+ * Props for BookBorrowStats
+ */
 interface BookBorrowStatsProps {
   /**
    * Book ID (UUID)
@@ -42,7 +42,16 @@ interface BookBorrowStatsProps {
 }
 
 /**
- * Borrow stats panel with availability state.
+ * BookBorrowStats
+ * 
+ * Client component that displays borrow statistics for a specific book.
+ * Uses React Query for data fetching and caching, with SSR initial data support.
+ *
+ * Features:
+ * - Uses useBookBorrowStats and useBook hooks with initialData from SSR
+ * - Displays statistics: total borrows, active borrows, returned borrows
+ * - Updates immediately when borrows change (via cache invalidation)
+ * - Shows availability status based on availableCopies from React Query book data
  */
 const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
   bookId,
@@ -60,13 +69,19 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
     isError,
   } = useBookBorrowStats(bookId, initialStats);
 
-  // CRITICAL: Always prefer React Query data over initial/prop data
-  // React Query data is fresh and updates immediately after mutations
-  // initial/prop data is only used as fallback during initial load
+  /**
+   * Data Selection Logic:
+   * CRITICAL: Always prefer React Query data over initial/prop data.
+   * React Query data is fresh and updates immediately after mutations.
+   * initial/prop data is only used as fallback during initial load.
+   */
   const statsData = stats ?? initialStats;
 
-  // Get availableCopies from React Query book data (updates immediately)
-  // Fallback to prop or initialBook if React Query data not yet loaded
+  /**
+   * Availability Calculation:
+   * Get availableCopies from React Query book data (updates immediately).
+   * Fallback to prop or initialBook if React Query data not yet loaded.
+   */
   const availableCopies =
     book?.availableCopies ??
     initialBook?.availableCopies ??
@@ -75,7 +90,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
 
   const isLoading = bookLoading || statsLoading;
 
-  // Show skeleton while loading (only if no initial data)
+  // Show skeleton while loading (only if no initial data is available to display)
   if (isLoading && !initialStats) {
     return (
       <div className="border-y border-[var(--mundia-line)] py-4">
@@ -90,7 +105,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
     );
   }
 
-  // Show error state (fallback to initial stats if available)
+  // Show error state (fallback to initial stats if available to prevent complete UI failure)
   if (isError && !initialStats) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-4">
@@ -101,6 +116,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
     );
   }
 
+  // Final check - if we have no data at all, don't render anything
   if (!statsData) {
     return null;
   }
@@ -111,6 +127,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
         Borrowing activity
       </p>
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+        {/* Total Borrows across all time */}
         <div>
           <dt className="text-sm text-[var(--mundia-muted)]">Total borrows</dt>
           <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
@@ -118,6 +135,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
           </dd>
         </div>
 
+        {/* Current active loans */}
         <div>
           <dt className="text-sm text-[var(--mundia-muted)]">Active borrows</dt>
           <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">
@@ -125,6 +143,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
           </dd>
         </div>
 
+        {/* Real-time availability indicator */}
         <div>
           <dt className="text-sm text-[var(--mundia-muted)]">Availability</dt>
           <dd
@@ -138,6 +157,7 @@ const BookBorrowStats: React.FC<BookBorrowStatsProps> = ({
           </dd>
         </div>
 
+        {/* Total successfully returned books */}
         <div>
           <dt className="text-sm text-[var(--mundia-muted)]">Returned</dt>
           <dd className="mt-1 text-lg font-semibold text-[var(--mundia-ink)]">

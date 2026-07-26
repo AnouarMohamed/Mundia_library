@@ -2,16 +2,26 @@
   "name": "university-library",
   "version": "0.2.1",
   "private": true,
+  "engines": {
+    "node": ">=24.17.0 <25"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "fsevents": false,
+    "unrs-resolver@1.11.1": true
+  },
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "ci:quality": "npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build",
+    "security:audit": "npm audit --audit-level=high",
+    "security:audit:runtime": "npm audit --omit=dev --audit-level=high",
+    "ci:quality": "npm run security:audit && npm run lint && npm run typecheck && npm run test && npm run test:e2e && npm run build",
     "benchmark:api": "node scripts/benchmark-api-routes.mjs",
     "explain:hot-queries": "tsx scripts/explain-hot-queries.ts",
     "loadtest:nightly": "node scripts/nightly-load-test.mjs",
@@ -19,6 +29,8 @@
     "db:migrate-csv": "tsx database/migrate-from-csv.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:verify-schema": "node scripts/verify-production-schema.mjs",
+    "db:verify-concurrency": "node scripts/verify-concurrency-invariants.mjs",
     "db:push": "drizzle-kit push",
     "db:perf-indexes": "tsx scripts/add-performance-indexes.ts",
     "db:studio": "drizzle-kit studio",
@@ -32,7 +44,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
-    "@neondatabase/serverless": "^1.1.0",
+    "@imagekit/next": "^2.1.5",
+    "@imagekit/nodejs": "^7.10.0",
     "@noble/hashes": "^1.8.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.2",
@@ -50,7 +63,6 @@
     "@upstash/ratelimit": "^2.0.5",
     "@upstash/redis": "^1.35.3",
     "@upstash/workflow": "^1.2.0",
-    "argon2-browser": "^1.18.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -59,11 +71,9 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.2",
     "html5-qrcode": "^2.3.8",
-    "imagekit": "^6.0.0",
-    "imagekitio-next": "^1.0.1",
     "lucide-react": "^0.577.0",
-    "next": "^15.5.15",
-    "next-auth": "^5.0.0-beta.25",
+    "next": "^15.5.22",
+    "next-auth": "^5.0.0-beta.32",
     "pg": "^8.20.0",
     "react": "^19.2.3",
     "react-colorful": "^5.6.1",
@@ -76,22 +86,17 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.60.0",
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20",
+    "@types/node": "^24.13.3",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^15.5.15",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-tailwindcss": "^3.17.5",
     "fast-check": "^4.7.0",
-    "postcss": "^8.5.14",
+    "oxlint": "^1.75.0",
+    "postcss": "^8.5.23",
     "prettier": "^3.4.2",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
@@ -100,10 +105,11 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "esbuild": "^0.27.7",
-    "@typescript-eslint/typescript-estree": {
-      "minimatch": "^9.0.9"
-    },
-    "uuid": "^14.0.0"
+    "esbuild": "0.28.1",
+    "axios": "^1.18.1",
+    "form-data": "^4.0.6",
+    "sharp": "^0.35.3",
+    "uuid": "^14.0.0",
+    "postcss": "^8.5.23"
   }
 }

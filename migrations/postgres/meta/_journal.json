@@ -36,6 +36,20 @@
       "when": 1779016409806,
       "tag": "0008_security_performance_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785033951263,
+      "tag": "0009_reconcile_production_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785033952000,
+      "tag": "0010_protect_audit_history",
+      "breakpoints": true
     }
   ]
 }

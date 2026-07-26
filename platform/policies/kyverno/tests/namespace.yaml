@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mundia-policy-test
+  labels:
+    mundiapolis.io/environment: dev
+

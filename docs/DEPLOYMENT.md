@@ -19,6 +19,7 @@ Every production deployment needs:
 Minimum:
 
 ```bash
+APP_ENV=production
 DATABASE_URL=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
@@ -30,7 +31,6 @@ NEXT_PUBLIC_PROD_API_ENDPOINT=
 Recommended for full product behavior:
 
 ```bash
-NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=
 NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=
 IMAGEKIT_PRIVATE_KEY=
 UPSTASH_REDIS_URL=
@@ -117,8 +117,16 @@ The repository includes a multi-stage Dockerfile and Compose stack.
 
 ### Build Image
 
+The browser-visible `NEXT_PUBLIC_*` values are compiled into the Next.js
+client bundle. Pass the real public values as build arguments; never pass
+secrets as Docker build arguments.
+
 ```bash
-docker build -t mundia-library:local .
+docker build \
+  --build-arg NEXT_PUBLIC_API_ENDPOINT=https://library.example.edu \
+  --build-arg NEXT_PUBLIC_PROD_API_ENDPOINT=https://library.example.edu \
+  --build-arg NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/example \
+  -t mundia-library:local .
 ```
 
 ### Run Full Local Stack
@@ -129,13 +137,13 @@ docker compose up --build
 
 Services:
 
-| Service | Purpose |
-| --- | --- |
-| `db` | PostgreSQL 15. |
-| `migrate` | Applies Drizzle schema. |
-| `app` | Production Next.js standalone server. |
-| `seed` | Optional seeded data, behind the `tools` profile. |
-| `adminer` | Browser database admin tool. |
+| Service   | Purpose                                           |
+| --------- | ------------------------------------------------- |
+| `db`      | PostgreSQL 18.                                    |
+| `migrate` | Applies Drizzle schema.                           |
+| `app`     | Production Next.js standalone server.             |
+| `seed`    | Optional seeded data, behind the `tools` profile. |
+| `adminer` | Browser database admin tool.                      |
 
 Run seed in Compose:
 
@@ -146,6 +154,8 @@ docker compose --profile tools run --rm seed
 ### Production Docker Notes
 
 - Provide secrets through the platform secret manager, not image layers.
+- The runtime image sets `APP_ENV=production` and runs as an unprivileged user;
+  missing production configuration is a startup failure.
 - Use a managed PostgreSQL service for real production.
 - Put the app behind HTTPS.
 - Set `NEXTAUTH_URL` to the public HTTPS URL.
@@ -272,6 +282,7 @@ At minimum, monitor:
 - `DATABASE_URL` pointing at the wrong database.
 - `NEXTAUTH_URL` mismatch causing auth callback or cookie problems.
 - Workflow automation enabled before email sender verification.
-- Missing ImageKit keys breaking sign-up or book cover upload.
+- Missing ImageKit keys breaking server-mediated book-cover upload. Public
+  identity upload is intentionally disabled in production.
 - Missing Redis credentials causing cache/rate-limit paths to fail in production.
 - Schema changes applied after application code starts using the new shape.

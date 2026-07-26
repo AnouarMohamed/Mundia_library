@@ -1,63 +1,48 @@
+/**
+ * AdminStatsSkeleton Component
+ * 
+ * Provides a low-fidelity loading placeholder for the administrator statistics 
+ * dashboard. Designed to minimize layout shift (CLS) during data fetching.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 /**
- * AdminStatsSkeleton Component
- *
- * A skeleton loader that matches the exact dimensions and layout of admin statistics cards.
- * Supports both the standard stat card format (used in admin dashboard) and Card-based format
- * (used in automation page).
- * Used to show loading states while admin statistics are being fetched.
- *
- * Features:
- * - Exact size matching to prevent layout shift
- * - Supports standard stat format (variant="stat")
- * - Supports Card format (variant="card")
- * - Matches grid layout (grid-cols-1 md:grid-cols-2 lg:grid-cols-5)
- * - Responsive layout matching
- *
- * Usage:
- * ```tsx
- * // Standard stat cards (admin dashboard)
- * <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5">
- *   {[...Array(5)].map((_, i) => (
- *     <AdminStatsSkeleton key={i} variant="stat" />
- *   ))}
- * </div>
- *
- * // Card format (automation page)
- * <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
- *   {[...Array(4)].map((_, i) => (
- *     <AdminStatsSkeleton key={i} variant="card" />
- *   ))}
- * </div>
- * ```
- *
- * Dimensions matched:
- * - Stat: bg-white rounded-lg p-5 space-y-5 flex-1
- * - Stat info: flex justify-between items-center gap-5
- * - Stat label: font-medium text-base
- * - Stat number: text-2xl font-bold
- * - Stat description: text-sm text-gray-500
+ * Props for AdminStatsSkeleton
  */
 interface AdminStatsSkeletonProps {
   /**
-   * Display variant: "stat" for standard stat cards, "card" for Card-based format
-   * Default: "stat"
+   * Display variant: 
+   * - "stat": standard minimalist stat cards (Admin Dashboard)
+   * - "card": detailed shadcn/ui Card format (Automation Page)
+   * @default "stat"
    */
   variant?: "stat" | "card";
   /**
-   * Additional CSS classes to apply
+   * Additional CSS classes for custom overrides
    */
   className?: string;
 }
 
+/**
+ * AdminStatsSkeleton
+ * 
+ * A skeleton loader that matches the exact dimensions and layout of admin statistics cards.
+ */
 const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
   variant = "stat",
   className,
 }) => {
+  /**
+   * BRANCH: Card Variant
+   * Matches the visual weight of standard Dashboard Cards with headers.
+   */
   if (variant === "card") {
     return (
       <Card
@@ -70,16 +55,19 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
           <Skeleton className="h-5 w-24" />
         </CardHeader>
         <CardContent>
-          {/* Number */}
+          {/* Main Stat Number placeholder */}
           <Skeleton className="mb-1 h-8 w-16" />
-          {/* Description */}
+          {/* Descriptive subtext placeholder */}
           <Skeleton className="h-4 w-32" />
         </CardContent>
       </Card>
     );
   }
 
-  // Standard stat variant
+  /**
+   * BRANCH: Stat Variant (Default)
+   * Matches the minimalist stat blocks used in the primary administrative grid.
+   */
   return (
     <div
       className={cn(
@@ -89,11 +77,16 @@ const AdminStatsSkeleton: React.FC<AdminStatsSkeletonProps> = ({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
+          {/* Label placeholder */}
           <Skeleton className="h-4 w-20" />
+          {/* Large Value placeholder */}
           <Skeleton className="h-8 w-16" />
         </div>
+        {/* Decorative Icon placeholder */}
         <Skeleton className="size-10 rounded-lg" />
       </div>
+      
+      {/* Footer/Trend text placeholder */}
       <Skeleton className="mt-4 h-3.5 w-40" />
     </div>
   );

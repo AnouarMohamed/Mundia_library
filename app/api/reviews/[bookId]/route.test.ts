@@ -52,23 +52,20 @@ describe("GET /api/reviews/[bookId]", () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it("does not expose reviewer email or user ID", async () => {
+  it("does not expose reviewer identity fields or legal names", async () => {
     vi.mocked(db.select).mockReturnValueOnce({
       from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue([
-              {
-                id: "review-1",
-                userId: "user-1",
-                rating: 5,
-                comment: "Useful",
-                createdAt: null,
-                updatedAt: null,
-                userFullName: "Test User",
-              },
-            ]),
-          }),
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockResolvedValue([
+            {
+              id: "review-1",
+              userId: "another-user",
+              rating: 5,
+              comment: "Useful",
+              createdAt: null,
+              updatedAt: null,
+            },
+          ]),
         }),
       }),
     } as never);
@@ -94,10 +91,12 @@ describe("GET /api/reviews/[bookId]", () => {
         comment: "Useful",
         createdAt: null,
         updatedAt: null,
-        userFullName: "Test User",
-        isOwner: true,
+        userFullName: "Verified reader",
+        isOwner: false,
       },
     ]);
-    expect(JSON.stringify(body)).not.toMatch(/userEmail|userId/i);
+    expect(JSON.stringify(body)).not.toMatch(
+      /userEmail|userId|Test User/i,
+    );
   });
 });

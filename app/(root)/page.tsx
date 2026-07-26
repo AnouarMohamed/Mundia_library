@@ -1,44 +1,34 @@
+/**
+ * Root Entry Point
+ * 
+ * This is the landing page of the application (/).
+ * Its primary responsibility is to route authenticated users to their destination (the library).
+ * 
+ * @module app/(root)/page
+ */
+
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 
 /**
- * Root entrypoint that routes users to the library view.
+ * Home page component (Server Component).
+ * 
+ * Checks for an active session and redirects the user accordingly.
+ * If no session is found, redirects to /sign-in.
+ * If authenticated, redirects to /library (the main app dashboard).
  */
 const Home = async () => {
+  // Fetch the current user session server-side.
   const session = await getSession();
 
+  // Redirect to sign-in if no valid session or user ID is found.
   if (!session?.user?.id) {
     redirect("/sign-in");
   }
 
-  // Default landing for authenticated users.
+  // Default landing page for all authenticated users.
+  // In a more complex scenario, this could route based on roles or user preferences.
   redirect("/library");
 }
-  /*
-  const roleFromSession = (session.user as { role?: string }).role;
-  if (roleFromSession === "ADMIN") {
-    redirect("/library");
-  }
 
-  if (roleFromSession === "USER") {
-    redirect("/library");
-  }
-
-  if (!roleFromSession) {
-    const roleFromDb = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, session.user.id))
-      .limit(1)
-      .then((rows) => rows[0]?.role);
-
-    if (roleFromDb === "ADMIN") {
-      redirect("/library");
-    }
-  }
-
-  redirect("/library");
-};
-
-   */
 export default Home;

@@ -1,48 +1,55 @@
 /**
- * Users API Route
- *
- * GET /api/users
- *
- * Purpose: Get a list of users with optional search, filters, sorting, and pagination.
- *
- * Query Parameters:
- * - search (optional): Search by name, email, or university ID
- * - status (optional): Filter by status ("PENDING", "APPROVED", "REJECTED", or "all")
- * - role (optional): Filter by role ("USER", "ADMIN", or "all")
- * - sort (optional): Sort order ("name", "email", "created", "status")
- * - page (optional): Page number (default: 1)
- * - limit (optional): Users per page (default: 50)
- *
- * IMPORTANT: This route uses Node.js runtime (not Edge) because it needs database access
+ * Users API Endpoint (Admin Only)
+ * 
+ * Provides administrative access to the user database.
+ * Supports searching by name, email, or university ID, as well as filtering by status and role.
+ * 
+ * @module app/api/users/route
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
 import ratelimit from "@/lib/ratelimit";
 import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import { desc, asc, eq, and, or, like, sql } from "drizzle-orm";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import {
+  getClientIp,
+  normalizeTextParam,
+} from "@/lib/security/api-request";
+import { logError } from "@/lib/security/logger";
 
 /**
- * Use Node.js runtime for DB access.
+ * Force Node.js runtime for database connectivity.
  */
 export const runtime = "nodejs";
 
 /**
- * Get users list with filters and pagination
- *
- * @param request - Next.js request object
- * @returns JSON response with users array, pagination info
+ * GET Handler for /api/users
+ * 
+ * Expected Query Parameters:
+ * - search (string): Search term for name, email, or university ID.
+ * - status (PENDING|APPROVED|REJECTED|all): Filter by account status.
+ * - role (USER|ADMIN|all): Filter by user role.
+ * - sort (name|email|created|status): Sort field.
+ * - page (number): Page index (starts at 1).
+ * - limit (number): Results per page (max 100).
+ * 
+ * @param {NextRequest} request - Next.js Request object
+ * @returns {NextResponse} JSON response containing user list and pagination metadata
  */
 export async function GET(request: NextRequest) {
   try {
-    // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
-    // This endpoint returns user data (sensitive information, admin-only)
-    // Rate limiting provides protection against abuse
-    const ip = (await headers()).get("x-forwarded-for") || "127.0.0.1";
-    const { success } = await ratelimit.limit(ip);
+    // Authenticate before consuming an administrator-scoped limiter bucket.
+    const guard = await requireAdminRouteAccess();
+    if (!guard.ok) {
+      return guard.response;
+    }
 
+    const ip = await getClientIp();
+    const { success } = await ratelimit.limit(
+      `admin-users:${guard.user.id}:${ip}`,
+    );
     if (!success) {
       return NextResponse.json(
         {
@@ -50,30 +57,60 @@ export async function GET(request: NextRequest) {
           error: "Too Many Requests",
           message: "Rate limit exceeded. Please try again later.",
         },
-        { status: 429 }
+        { status: 429 },
       );
-    }
-
-    const guard = await requireAdminRouteAccess();
-    if (!guard.ok) {
-      return guard.response;
     }
 
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
-    const search = searchParams.get("search") || "";
+    // Bound every value before it reaches a query, allocation, or response.
+    const search = normalizeTextParam(searchParams.get("search"), 100);
     const status = searchParams.get("status") || "";
     const role = searchParams.get("role") || "";
     const sort = searchParams.get("sort") || "name";
-    // Normalize pagination inputs.
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedLimit = Number.parseInt(
+      searchParams.get("limit") || "50",
+      10,
+    );
+    const page =
+      Number.isSafeInteger(requestedPage) && requestedPage > 0
+        ? requestedPage
+        : 1;
+    const limit =
+      Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 100)
+        : 50;
 
-    // Build where conditions
+    const allowedStatuses = new Set([
+      "",
+      "all",
+      "PENDING",
+      "APPROVED",
+      "REJECTED",
+    ]);
+    const allowedRoles = new Set(["", "all", "USER", "ADMIN"]);
+    const allowedSorts = new Set([
+      "name",
+      "email",
+      "created",
+      "status",
+    ]);
+    if (
+      !allowedStatuses.has(status) ||
+      !allowedRoles.has(role) ||
+      !allowedSorts.has(sort)
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid query parameters" },
+        { status: 400 },
+      );
+    }
+
+    // 4. Build database query conditions.
     const whereConditions = [];
 
-    // Search condition (name, email, or university ID)
+    // Full-text search emulation across multiple fields.
     if (search) {
       const searchPattern = `%${search}%`;
       whereConditions.push(
@@ -85,19 +122,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Status filter
     if (status && status !== "all") {
       whereConditions.push(
         eq(users.status, status as "PENDING" | "APPROVED" | "REJECTED")
       );
     }
 
-    // Role filter
     if (role && role !== "all") {
       whereConditions.push(eq(users.role, role as "USER" | "ADMIN"));
     }
 
-    // Build sort order
+    // Define sort order.
     let orderBy;
     switch (sort) {
       case "email":
@@ -115,7 +150,7 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Fetch users with pagination
+    // 5. Execute paginated data query.
     const offset = (page - 1) * limit;
     const allUsers = await db
       .select({
@@ -123,13 +158,12 @@ export async function GET(request: NextRequest) {
         fullName: users.fullName,
         email: users.email,
         universityId: users.universityId,
-        universityCard: users.universityCard,
         status: users.status,
         role: users.role,
         lastActivityDate: users.lastActivityDate,
         lastLogin: users.lastLogin,
         createdAt: users.createdAt,
-        // Exclude password for security
+        // CRITICAL: sensitive fields like passwords are NEVER returned.
       })
       .from(users)
       .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
@@ -137,7 +171,7 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    // Get total count for pagination
+    // Get total count for pagination.
     const totalUsersResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(users)
@@ -148,14 +182,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      users: allUsers,
+      users: allUsers.map((user) => ({
+        ...user,
+        universityCard: `/api/admin/users/${user.id}/identity-card`,
+      })),
       total: totalUsers,
       page,
       totalPages,
       limit,
     });
   } catch (error) {
-    console.error("Error fetching users:", error);
+    logError("admin.users_api_fetch_failed", error);
     return NextResponse.json(
       {
         success: false,

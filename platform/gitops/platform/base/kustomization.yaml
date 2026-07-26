@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cluster-secret-store.yaml
+  - limits.yaml
+  - otel-exporter-secret.yaml
+  - otel-gateway.yaml
+  - resource-quota.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: mundiapolis-library
+      app.kubernetes.io/managed-by: argocd

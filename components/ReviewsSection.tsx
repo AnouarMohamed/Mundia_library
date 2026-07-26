@@ -1,17 +1,22 @@
-"use client";
-
 /**
  * ReviewsSection Component
- *
- * Component for displaying and managing book reviews. Uses React Query mutations.
- * Integrates with useDeleteReview and useUpdateReview mutations for proper cache invalidation.
- *
+ * 
+ * A specialized client-side component for managing the display, creation, and 
+ * modification of book reviews. It provides a seamless user experience for 
+ * feedback collection with real-time updates via TanStack Query.
+ * 
  * Features:
- * - Uses useDeleteReview and useUpdateReview mutations
- * - Automatic cache invalidation on success
- * - Toast notifications via mutation callbacks
- * - No page reloads - uses cache invalidation instead
+ * - Dynamic review list with "Owner" specific actions (Edit/Delete).
+ * - Interactive star rating system for qualitative feedback.
+ * - Inline editing form to minimize context switching.
+ * - Integration with TanStack Query mutations for automated cache invalidation.
+ * - Accessible Alert Dialogs for destructive actions like review deletion.
+ * - Visual indicators for "Edited" status based on creation/update timestamps.
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,42 +34,62 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+/**
+ * Represents a single book review record.
+ */
 interface Review {
+  /** Unique identifier for the review. */
   id: string;
+  /** Rating value from 1 to 5 stars. */
   rating: number;
+  /** Text content of the review. */
   comment: string;
+  /** Timestamp of initial creation. */
   createdAt: Date | null;
+  /** Timestamp of the most recent modification. */
   updatedAt: Date | null;
+  /** Privacy-preserving reviewer label. */
   userFullName: string;
+  /** Flag indicating if the current session user owns this review. */
   isOwner: boolean;
 }
 
+/**
+ * Props for the ReviewCard component.
+ */
 interface ReviewCardProps {
+  /** The review data object to render. */
   review: Review;
+  /** Callback triggered when the user initiates an edit. */
   onEdit: (review: Review) => void;
+  /** Callback triggered after a successful deletion. */
   onDelete: (reviewId: string) => void;
 }
 
 /**
- * Single review card with edit/delete actions.
+ * Individual Review Display Card.
+ * Handles the display of a single review and its contextual administrative menu.
  */
 function ReviewCard({
   review,
   onEdit,
   onDelete,
 }: ReviewCardProps) {
+  // Local state for the floating action menu (Edit/Delete)
   const [showMenu, setShowMenu] = useState(false);
 
-  // Use React Query mutation for deleting review
+  // Mutation for deleting the review with automated cache invalidation
   const deleteReviewMutation = useDeleteReview();
 
   const isOwner = review.isOwner;
+  // Detect if the review has been modified after initial creation
   const isEdited =
     review.createdAt &&
     review.updatedAt &&
     new Date(review.createdAt).getTime() !==
       new Date(review.updatedAt).getTime();
 
+  /** Specialized sub-component for rendering the star visualizer. */
   const StarRating = ({ rating }: { rating: number }) => (
     <div className="flex items-center gap-0.5 sm:space-x-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -81,8 +106,8 @@ function ReviewCard({
     </div>
   );
 
+  /** Handles the confirmation and execution of review deletion. */
   const handleDelete = () => {
-    // Use mutation to delete review
     deleteReviewMutation.mutate(
       {
         reviewId: review.id,
@@ -207,18 +232,25 @@ function ReviewCard({
   );
 }
 
+/**
+ * Props for the main ReviewsSection component.
+ */
 interface ReviewsSectionProps {
+  /** The unique identifier for the book being reviewed. */
   bookId: string;
+  /** Array of reviews to display. */
   reviews: Review[];
 }
 
 /**
- * Render the review list and inline editor.
+ * Main Reviews Section Container.
+ * Orchestrates the transition between the review list and the editing form.
  */
 export default function ReviewsSection({
   bookId: _bookId,
   reviews,
 }: ReviewsSectionProps) {
+  // Track which review is currently being edited in-line
   const [editingReview, setEditingReview] = useState<Review | null>(null);
 
   const handleReviewEdit = (review: Review) => {
@@ -226,20 +258,15 @@ export default function ReviewsSection({
   };
 
   const handleReviewDelete = () => {
-    // CRITICAL: No manual invalidation needed here
-    // The useDeleteReview mutation already handles all cache invalidation
-    // via invalidateAfterReviewChange() which invalidates reviews, books, and analytics
-    // Manual invalidation here would cause redundant refetches
+    // Note: Cache invalidation is handled globally by useDeleteReview mutation
   };
 
   const handleReviewUpdate = () => {
     setEditingReview(null);
-    // CRITICAL: No manual invalidation needed here
-    // The useUpdateReview mutation already handles all cache invalidation
-    // via invalidateAfterReviewChange() which invalidates reviews, books, and analytics
-    // Manual invalidation here would cause redundant refetches
+    // Note: Cache invalidation is handled globally by useUpdateReview mutation
   };
 
+  // If in edit mode, swap the list for the specialized form
   if (editingReview) {
     return (
       <EditReviewForm
@@ -278,28 +305,35 @@ export default function ReviewsSection({
   );
 }
 
-// Edit Review Form Component
+/**
+ * Props for the EditReviewForm component.
+ */
 interface EditReviewFormProps {
+  /** The review record being modified. */
   review: Review;
+  /** Callback to exit edit mode without saving. */
   onCancel: () => void;
+  /** Callback triggered after a successful save. */
   onUpdate: () => void;
 }
 
+/**
+ * Specialized form for updating an existing review.
+ */
 function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
+  // Controlled inputs for the review edit session
   const [rating, setRating] = useState(review.rating);
   const [comment, setComment] = useState(review.comment);
+  const commentId = React.useId();
 
-  // Use React Query mutation for updating review
+  // Mutation for saving changes with optimistic UI support
   const updateReviewMutation = useUpdateReview();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!comment.trim()) {
-      return; // Validation handled by mutation
-    }
+    if (!comment.trim()) return;
 
-    // Use mutation to update review
     updateReviewMutation.mutate(
       {
         reviewId: review.id,
@@ -314,6 +348,7 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
     );
   };
 
+  /** Sub-component for interactive star rating selection. */
   const StarRating = () => (
     <div className="flex items-center gap-0.5 sm:space-x-1">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -346,18 +381,22 @@ function EditReviewForm({ review, onCancel, onUpdate }: EditReviewFormProps) {
       </h3>
 
       <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
             Rating
-          </label>
+          </legend>
           <StarRating />
-        </div>
+        </fieldset>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm">
+          <label
+            htmlFor={commentId}
+            className="mb-1.5 block text-xs font-medium text-slate-600 sm:mb-2 sm:text-sm"
+          >
             Your Review
           </label>
           <textarea
+            id={commentId}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Share your thoughts about this book..."

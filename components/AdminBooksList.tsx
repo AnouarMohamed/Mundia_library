@@ -1,18 +1,21 @@
-"use client";
-
 /**
  * AdminBooksList Component
- *
- * Client component that displays all books in a grid layout for admin management.
- * Uses React Query for data fetching and caching, with SSR initial data support.
- *
+ * 
+ * A robust administrative dashboard component for managing the library's book catalog.
+ * It provides a detailed list view with advanced filtering, searching, and 
+ * high-level inventory statistics for each book.
+ * 
  * Features:
- * - Uses useAllBooks hook with initialData from SSR
- * - Displays skeleton loaders while fetching
- * - Shows error state if fetch fails
- * - Displays books in a responsive grid layout
- * - Shows book details, status, and action buttons
+ * - Responsive grid and list layouts for book catalog.
+ * - Multi-criteria filtering (search, genre, availability).
+ * - Real-time inventory status indicators (Available, Unavailable, Inactive).
+ * - Debounced search integration with URL parameters for shareable states.
+ * - Seamless integration with TanStack Query and SSR initial data.
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,10 +29,11 @@ import { getBookGenres } from "@/lib/services/books";
 import BookCardSkeleton from "@/components/skeletons/BookCardSkeleton";
 import type { BookFilters } from "@/lib/services/books";
 
+/**
+ * Props for the AdminBooksList component.
+ */
 interface AdminBooksListProps {
-  /**
-   * Initial books data from SSR (prevents duplicate fetch)
-   */
+  /** Initial books data from SSR (prevents duplicate fetch and loading flickers). */
   initialBooks?: Book[];
 }
 
@@ -38,22 +42,24 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
   const searchParamsHook = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Get current search params from URL
+  // URL State: Extract current filters from URL parameters
   const currentSearch = searchParamsHook.get("search") || "";
   const currentGenre = searchParamsHook.get("genre") || "all";
   const currentAvailability = searchParamsHook.get("availability") || "all";
 
+  // Local State: Track UI-only states like pending search input and available genres
   const [localSearch, setLocalSearch] = useState(currentSearch);
   const [genres, setGenres] = useState<string[]>([]);
   const lastSyncedSearchRef = React.useRef(currentSearch);
+  const searchInputId = React.useId();
+  const genreFilterId = React.useId();
+  const availabilityFilterId = React.useId();
 
-  // Sync localSearch with URL params when they change externally (e.g., browser back/forward)
-  // Only sync if the change didn't come from our own debounced update
+  /**
+   * Effect: Sync local search state with URL params.
+   * Ensures that external URL changes (back button, manual edits) are reflected in the input field.
+   */
   React.useEffect(() => {
-    // Only sync if:
-    // 1. currentSearch changed from an external source (not our debounce)
-    // 2. localSearch matches the last synced value (user isn't actively typing)
-    // This prevents overwriting user input while typing
     if (
       currentSearch !== lastSyncedSearchRef.current &&
       localSearch === lastSyncedSearchRef.current
@@ -63,14 +69,19 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
     }
   }, [currentSearch, localSearch]);
 
-  // Fetch genres on mount
+  /**
+   * Effect: Fetch unique genres from the database for the filter dropdown.
+   */
   React.useEffect(() => {
     getBookGenres()
       .then((genresList) => setGenres(genresList))
       .catch((error) => console.error("Error fetching genres:", error));
   }, []);
 
-  // Debounce search input for instant filtering
+  /**
+   * Effect: Debounced URL update for search.
+   * Updates the URL search parameter after the user stops typing for 300ms.
+   */
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== currentSearch) {
@@ -84,17 +95,16 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
         }
 
         const newUrl = `/admin/books?${params.toString()}`;
-        // Update ref before navigation to prevent sync effect from overwriting
         lastSyncedSearchRef.current = trimmedSearch;
         queryClient.invalidateQueries({ queryKey: ["all-books"] });
         router.replace(newUrl, { scroll: false });
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [localSearch, currentSearch, searchParamsHook, queryClient, router]);
 
-  // Build filters from URL params
+  // Memoized filter configuration for the data query
   const filters: BookFilters = React.useMemo(
     () => ({
       search: currentSearch || undefined,
@@ -103,17 +113,16 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
         currentAvailability !== "all"
           ? (currentAvailability as BookFilters["availability"])
           : undefined,
-      limit: 1000, // High limit to get all books
+      limit: 1000, // High limit to ensure comprehensive results in the admin list
       page: 1,
     }),
     [currentSearch, currentGenre, currentAvailability],
   );
 
-  // Check if any filters are active
   const hasActiveFilters =
     currentSearch || currentGenre !== "all" || currentAvailability !== "all";
 
-  // Only use initialData on first load (when no filters are active)
+  // Wrap initial data in the expected structure for useAllBooks
   const initialBooksData =
     !hasActiveFilters && initialBooks
       ? {
@@ -125,7 +134,9 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
         }
       : undefined;
 
-  // Use React Query hook with SSR initial data
+  /**
+   * Data Fetching: Primary query for the book catalog.
+   */
   const {
     data: booksData,
     isLoading,
@@ -133,14 +144,12 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
     error,
   } = useAllBooks(filters, initialBooksData);
 
-  // CRITICAL: Always prefer React Query data over initial data
-  // React Query data is fresh and updates immediately after mutations
-  // initial data is only used as fallback during initial load
-  // Extract books from response with proper typing
-  // Book is a global type from types.d.ts
+  // Final data source: Prefer fresh query data over SSR initial data
   const allBooks: Book[] = ((booksData?.books ?? initialBooks) || []) as Book[];
 
-  // Update search params in URL and trigger refetch
+  /**
+   * Updates multiple URL search parameters simultaneously and invalidates cache.
+   */
   const updateSearchParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParamsHook.toString());
 
@@ -253,10 +262,14 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
           }}
           className="min-w-0"
         >
-          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+          <label
+            htmlFor={searchInputId}
+            className="mb-1.5 block text-xs font-semibold text-slate-600"
+          >
             Search
           </label>
           <Input
+            id={searchInputId}
             type="text"
             placeholder="Title, author, ISBN"
             value={localSearch}
@@ -266,10 +279,14 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
         </form>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+          <label
+            htmlFor={genreFilterId}
+            className="mb-1.5 block text-xs font-semibold text-slate-600"
+          >
             Genre
           </label>
           <select
+            id={genreFilterId}
             value={currentGenre}
             onChange={(e) => handleFilterChange("genre", e.target.value)}
             className="admin-field w-full xl:min-w-[180px]"
@@ -284,10 +301,14 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+          <label
+            htmlFor={availabilityFilterId}
+            className="mb-1.5 block text-xs font-semibold text-slate-600"
+          >
             Availability
           </label>
           <select
+            id={availabilityFilterId}
             value={currentAvailability}
             onChange={(e) => handleFilterChange("availability", e.target.value)}
             className="admin-field w-full xl:min-w-[180px]"

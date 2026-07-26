@@ -1,5 +1,8 @@
 # AGENTS.md — Mundiapolis Library
 
+Use Node.js 24 LTS (24.17 or newer); older release lines are outside the
+production support baseline.
+
 ## Quick start
 
 ```bash
@@ -14,25 +17,25 @@ Local accounts: `test@user.com` / `12345678` (student), `test@admin.com` / `1234
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `npm run lint` | ESLint with `--max-warnings=0` |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Vitest |
-| `npm run ci:quality` | lint → typecheck → test → build (run before PR) |
-| `npm run dev:turbo` | Next.js with Turbopack |
-| `npm run db:migrate` | `drizzle-kit push` (not the deprecated `run-migrations.js`) |
-| `npm run db:generate` | `drizzle-kit generate` |
-| `npm run seed` | Seed books + test users (run after migrate) |
+| Command               | Purpose                                       |
+| --------------------- | --------------------------------------------- |
+| `npm run lint`        | Oxlint with `--deny-warnings`                 |
+| `npm run typecheck`   | `tsc --noEmit`                                |
+| `npm run test`        | Vitest                                        |
+| `npm run ci:quality`  | audit → lint → typecheck → test → E2E → build |
+| `npm run dev:turbo`   | Next.js with Turbopack                        |
+| `npm run db:migrate`  | Apply reviewed canonical migrations           |
+| `npm run db:generate` | `drizzle-kit generate`                        |
+| `npm run seed`        | Seed books + test users (run after migrate)   |
 
 ## Architecture
 
 - **Next.js 15 App Router**, React 19, TypeScript, Drizzle ORM, PostgreSQL.
 - **NextAuth v5** credentials provider, JWT sessions. Auth file (`auth.ts`) uses lazy DB imports for Edge runtime compatibility.
-- **Middleware** only guards `/admin/*` (reads JWT directly, no DB). All other routes protected by layouts/page guards.
+- **Middleware** only prefilters `/admin/*` for session-cookie presence. The admin layout and route/action guards perform authoritative session, role, status, and fresh-DB authorization.
 - **Server actions** in `lib/actions/` (student) and `lib/admin/actions/` (admin).
 - **API routes** in `app/api/`.
-- **DB driver**: `database/drizzle.ts` auto-selects `pg` (Pool) for localhost hosts, Neon HTTP driver for remote URLs.
+- **DB driver**: `database/drizzle.ts` uses a bounded, transaction-capable `pg` Pool in every environment.
 - **Rate limiting**: Upstash Redis via `lib/ratelimit.ts`, bypassed in dev or when `DISABLE_RATE_LIMIT=true`.
 - **Cache**: Next.js `unstable_cache` with tags + Upstash Redis stale-while-revalidate (`lib/cache/`).
 - **Background workflows**: Upstash QStash/Workflow (`lib/workflow.ts`). Toggle via `ENABLE_WORKFLOWS=false`.
@@ -42,31 +45,31 @@ Local accounts: `test@user.com` / `12345678` (student), `test@admin.com` / `1234
 - Path alias `@/*` → project root.
 - Tests are colocated as `*.test.ts` next to source. Vitest with `environment: "node"`.
 - Tests: `lib/utils.test.ts`, `lib/actions/book.test.ts`, `lib/actions/renewal.test.ts`, `lib/admin/actions/borrow.test.ts`, `lib/admin/actions/recommendations.test.ts`, `lib/cache/redis-cache.test.ts`, `lib/services/apiError.fuzz.test.ts`.
-- ESLint ignores `.next/`, `node_modules/`, `out/`, `build/`, `dist/`, `coverage/`, `artifacts/`, `.agents/`, `.cursor/`.
+- Oxlint ignores `.next/`, `node_modules/`, `out/`, `build/`, `dist/`, `coverage/`, `artifacts/`, `.agents/`, `.cursor/`.
 - `scripts/`, `database/seed.ts`, `database/migrate-from-csv.ts` excluded from tsconfig.
-- `next.config.mjs` has `eslint.ignoreDuringBuilds: true` (CI still runs lint separately) and `output: "standalone"`.
+- `next.config.mjs` skips Next's legacy build-time lint runner; CI runs Oxlint separately. Output is `standalone`.
 - `components.json` exists for shadcn/ui setup (if editing UI primitives).
 
 ## Key areas
 
-| Directory | Ownership |
-|-----------|-----------|
-| `app/(root)/` | Student/faculty pages (browse, borrow, review, profile) |
-| `app/admin/` | Admin pages (dashboard, catalog, approvals, users) |
-| `app/api/` | JSON endpoints (books, borrows, reviews, auth, notifications, workflows) |
-| `lib/actions/` | Student server actions |
-| `lib/admin/actions/` | Admin server actions |
-| `lib/services/` | Business logic (books, borrows, reviews, email, search, notifications) |
-| `database/schema.ts` | Drizzle schema (single file, 365 lines) |
-| `components/` | React components (shared + admin) |
-| `docs/` | Full operating manual (architecture, dev, deploy, operations, testing) |
-| `scripts/` | Utility scripts (benchmarks, load tests, data fixes, migrations) |
+| Directory            | Ownership                                                                |
+| -------------------- | ------------------------------------------------------------------------ |
+| `app/(root)/`        | Student/faculty pages (browse, borrow, review, profile)                  |
+| `app/admin/`         | Admin pages (dashboard, catalog, approvals, users)                       |
+| `app/api/`           | JSON endpoints (books, borrows, reviews, auth, notifications, workflows) |
+| `lib/actions/`       | Student server actions                                                   |
+| `lib/admin/actions/` | Admin server actions                                                     |
+| `lib/services/`      | Business logic (books, borrows, reviews, email, search, notifications)   |
+| `database/schema.ts` | Drizzle schema (single file, 365 lines)                                  |
+| `components/`        | React components (shared + admin)                                        |
+| `docs/`              | Full operating manual (architecture, dev, deploy, operations, testing)   |
+| `scripts/`           | Utility scripts (benchmarks, load tests, data fixes, migrations)         |
 
 ## Database
 
 - Schema: `database/schema.ts`. Drizzle config: `drizzle.config.ts` (reads `.env.local`).
 - Migrations in `migrations/postgres/`. Use `npm run db:generate` then review before committing.
-- `npm run db:migrate` = `drizzle-kit push` (applies schema directly, suitable for dev).
+- `npm run db:migrate` = `drizzle-kit migrate`; `db:push` is disposable-local only.
 - Borrow lifecycle: `PENDING` → `BORROWED` → `RETURNED`. `books.availableCopies` must stay in sync.
 - User roles: `USER` (student) and `ADMIN`. Account statuses: `PENDING`, `APPROVED`, `REJECTED`.
 

@@ -1,0 +1,79 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const managedKeys = [
+  "NODE_ENV",
+  "APP_ENV",
+  "DATABASE_URL",
+  "AUTH_SECRET",
+  "NEXTAUTH_SECRET",
+  "UPSTASH_REDIS_URL",
+  "UPSTASH_REDIS_TOKEN",
+  "TRUST_PROXY_HEADERS",
+  "DISABLE_RATE_LIMIT",
+  "ALLOW_PUBLIC_SIGNUP",
+  "ENABLE_WORKFLOWS",
+] as const;
+
+const originalValues = new Map(
+  managedKeys.map((key) => [key, process.env[key]]),
+);
+
+const setValidProductionEnvironment = () => {
+  process.env.APP_ENV = "production";
+  process.env.DATABASE_URL = "postgresql://example:example@localhost/example";
+  process.env.AUTH_SECRET = "test-secret-with-sufficient-entropy";
+  process.env.UPSTASH_REDIS_URL = "https://redis.example.test";
+  process.env.UPSTASH_REDIS_TOKEN = "test-token";
+  process.env.TRUST_PROXY_HEADERS = "true";
+  process.env.DISABLE_RATE_LIMIT = "false";
+  process.env.ALLOW_PUBLIC_SIGNUP = "false";
+  process.env.ENABLE_WORKFLOWS = "false";
+};
+
+describe.sequential("production configuration", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    setValidProductionEnvironment();
+  });
+
+  afterEach(() => {
+    for (const key of managedKeys) {
+      const original = originalValues.get(key);
+      if (original === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = original;
+      }
+    }
+    vi.resetModules();
+  });
+
+  it("accepts an explicit fail-closed production configuration", async () => {
+    await expect(import("@/lib/config")).resolves.toBeDefined();
+  });
+
+  it("rejects an implicit deployment tier in a production runtime", async () => {
+    process.env.NODE_ENV = "production";
+    delete process.env.APP_ENV;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /APP_ENV must be explicitly set/,
+    );
+  });
+
+  it("rejects production without distributed rate-limit storage", async () => {
+    delete process.env.UPSTASH_REDIS_URL;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /UPSTASH_REDIS_URL/,
+    );
+  });
+
+  it("rejects production security bypasses", async () => {
+    process.env.DISABLE_RATE_LIMIT = "true";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /DISABLE_RATE_LIMIT is forbidden/,
+    );
+  });
+});

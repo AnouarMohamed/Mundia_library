@@ -21,12 +21,14 @@ export const signUpSchema = z.object({
   email: z
     .string()
     .min(1, "Email is required")
+    .max(254, "Email address is too long")
     .email("Please enter a valid email address"),
   /** Account password. Minimum 8 characters for security. */
   password: z
     .string()
     .min(1, "Password is required")
-    .min(8, "Password must be at least 8 characters"),
+    .min(12, "Password must be at least 12 characters")
+    .max(128, "Password must be at most 128 characters"),
   /** Numeric university ID. Preprocessed to handle empty string inputs. */
   universityId: z.preprocess(
     (val) => {
@@ -51,8 +53,8 @@ export const signUpSchema = z.object({
   /** URL or reference to the uploaded university card image. */
   universityCard: z
     .string()
-    .optional()
-    .or(z.literal("")),
+    .min(1, "University card is required")
+    .max(2048, "University card reference is too long"),
 });
 
 /**
@@ -60,9 +62,9 @@ export const signUpSchema = z.object({
  */
 export const signInSchema = z.object({
   /** User email. */
-  email: z.string().email(),
+  email: z.string().max(254).email(),
   /** User password. */
-  password: z.string().min(8),
+  password: z.string().min(1).max(128),
 });
 
 /**

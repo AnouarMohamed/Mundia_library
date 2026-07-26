@@ -18,18 +18,23 @@ This runs:
 4. `npm run test:e2e`
 5. `npm run build`
 
+The CI quality job provisions an isolated PostgreSQL 18 service, applies the
+canonical migration chain, and creates deterministic local-only users before
+Playwright runs. This keeps all eight authorization tests active; CI must not
+silently reduce the browser suite to unauthenticated smoke tests.
+
 ## Individual Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm run lint` | ESLint with zero-warning policy. |
-| `npm run typecheck` | TypeScript compile check without emitted files. |
-| `npm run test` | Vitest test suite. |
-| `npm run test:e2e` | Playwright smoke and security E2E suite. |
-| `npm run build` | Production Next.js build. |
-| `npm run benchmark:api` | Key API route benchmark. |
-| `npm run loadtest:nightly` | Heavier load test and baseline comparison. |
-| `npm run explain:hot-queries` | Query plan diagnostics. |
+| Command                       | Purpose                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run lint`                | Oxlint with React, hooks, Next.js, TypeScript, import, Vitest, and accessibility plugins under a zero-warning policy. |
+| `npm run typecheck`           | TypeScript compile check without emitted files.                                                                       |
+| `npm run test`                | Vitest test suite.                                                                                                    |
+| `npm run test:e2e`            | Playwright smoke and security E2E suite.                                                                              |
+| `npm run build`               | Production Next.js build.                                                                                             |
+| `npm run benchmark:api`       | Key API route benchmark.                                                                                              |
+| `npm run loadtest:nightly`    | Heavier load test and baseline comparison.                                                                            |
+| `npm run explain:hot-queries` | Query plan diagnostics.                                                                                               |
 
 ## Current Test Locations
 
@@ -53,12 +58,12 @@ page rendering, and the health endpoint safety check.
 
 Authenticated role checks run when seeded test credentials are available:
 
-| Variable | Purpose |
-| --- | --- |
-| `E2E_USER_EMAIL` / `E2E_USER_PASSWORD` | Approved non-admin user. |
-| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` | Approved admin user. |
-| `E2E_PENDING_EMAIL` / `E2E_PENDING_PASSWORD` | Pending user for status enforcement. |
-| `E2E_OTHER_USER_ID` | Different user ID used to verify borrow-record isolation. |
+| Variable                                     | Purpose                                                   |
+| -------------------------------------------- | --------------------------------------------------------- |
+| `E2E_USER_EMAIL` / `E2E_USER_PASSWORD`       | Approved non-admin user.                                  |
+| `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD`     | Approved admin user.                                      |
+| `E2E_PENDING_EMAIL` / `E2E_PENDING_PASSWORD` | Pending user for status enforcement.                      |
+| `E2E_OTHER_USER_ID`                          | Different user ID used to verify borrow-record isolation. |
 
 Leave these unset for local smoke testing. Set them in a seeded CI or preview
 environment to exercise the full authenticated security path.
@@ -81,20 +86,20 @@ UI-only layout changes do not always need unit tests, but they should still be m
 
 ## GitHub Actions Workflows
 
-| Workflow | File | Purpose |
-| --- | --- | --- |
-| CI | `.github/workflows/ci.yml` | Lint, typecheck, tests, Playwright E2E, production build, Docker image build on push. |
-| API Performance Benchmarks | `.github/workflows/api-benchmarks.yml` | PR and main benchmark gate for key API routes. |
-| Nightly API Load Test | `.github/workflows/nightly-load-test.yml` | Scheduled load and regression trend checks. |
-| CodeQL | `.github/workflows/codeql.yml` | Static analysis for JavaScript/TypeScript security. |
-| Container Security | `.github/workflows/container-security.yml` | Docker image scanning. |
-| Dependency Review | `.github/workflows/dependency-review.yml` | Blocks risky dependency changes on PRs. |
-| npm Audit | `.github/workflows/npm-audit.yml` | Audits production npm dependencies. |
-| Secret Scan | `.github/workflows/secret-scan.yml` | Detects committed secrets. |
-| Scorecard | `.github/workflows/scorecard.yml` | Supply-chain posture checks. |
-| PR Labeler | `.github/workflows/pr-labeler.yml` | Labels PRs by changed paths. |
-| PR Size | `.github/workflows/pr-size.yml` | Adds PR size signal. |
-| Stale | `.github/workflows/stale.yml` | Marks inactive issues and PRs. |
+| Workflow                   | File                                       | Purpose                                                                               |
+| -------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| CI                         | `.github/workflows/ci.yml`                 | Lint, typecheck, tests, Playwright E2E, production build, Docker image build on push. |
+| API Performance Benchmarks | `.github/workflows/api-benchmarks.yml`     | PR and main benchmark gate for key API routes.                                        |
+| Nightly API Load Test      | `.github/workflows/nightly-load-test.yml`  | Scheduled load and regression trend checks.                                           |
+| CodeQL                     | `.github/workflows/codeql.yml`             | Static analysis for JavaScript/TypeScript security.                                   |
+| Container Security         | `.github/workflows/container-security.yml` | Docker image scanning.                                                                |
+| Dependency Review          | `.github/workflows/dependency-review.yml`  | Blocks risky dependency changes on PRs.                                               |
+| npm Audit                  | `.github/workflows/npm-audit.yml`          | Audits production npm dependencies.                                                   |
+| Secret Scan                | `.github/workflows/secret-scan.yml`        | Detects committed secrets.                                                            |
+| Scorecard                  | `.github/workflows/scorecard.yml`          | Supply-chain posture checks.                                                          |
+| PR Labeler                 | `.github/workflows/pr-labeler.yml`         | Labels PRs by changed paths.                                                          |
+| PR Size                    | `.github/workflows/pr-size.yml`            | Adds PR size signal.                                                                  |
+| Stale                      | `.github/workflows/stale.yml`              | Marks inactive issues and PRs.                                                        |
 
 More detail:
 
@@ -135,12 +140,12 @@ Measured routes:
 
 Default thresholds:
 
-| Metric | Default |
-| --- | ---: |
-| Books list P95 | 500 ms |
-| Genres P95 | 350 ms |
-| Recommendations P95 | 550 ms |
-| Book details P95 | 450 ms |
+| Metric              | Default |
+| ------------------- | ------: |
+| Books list P95      |  500 ms |
+| Genres P95          |  350 ms |
+| Recommendations P95 |  550 ms |
+| Book details P95    |  450 ms |
 
 CI uses a PostgreSQL service, applies schema, seeds data, builds the app, starts `next start`, waits for readiness, then runs the benchmark script.
 
@@ -232,12 +237,9 @@ Security automation includes:
 
 Do not bypass these checks for production-bound changes without documenting the risk and follow-up owner.
 
-The current moderate production audit finding is the nested
-`next/node_modules/postcss <8.5.10` advisory. The top-level PostCSS package is
-kept patched, but Next.js still vendors its own PostCSS copy. The npm audit
-workflow blocks critical advisories and reports moderate advisories until the
-upstream Next.js dependency can be upgraded safely or overridden without
-breaking installs.
+The npm audit workflow checks the complete dependency graph, including build
+and test tooling, and blocks high or critical advisories. Runtime-only audit
+evidence remains available through `npm run security:audit:runtime`.
 
 ## Fixing A Failing CI Run
 

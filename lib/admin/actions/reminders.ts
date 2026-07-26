@@ -3,7 +3,7 @@ import { borrowRecords, users, books } from "@/database/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sendEmailWithFallback } from "@/lib/services/email-service";
 import { requireAdmin } from "@/lib/security/auth-guards";
-import { logError } from "@/lib/security/logger";
+import { logError, logInfo } from "@/lib/security/logger";
 
 const assertAdmin = async () => {
   const guard = await requireAdmin();
@@ -31,17 +31,18 @@ export class EmailService {
       );
 
       if (!result.success) {
-        console.error("Email sending failed:", result.error);
+        logError("email.reminder_send_failed", result.error, { to });
         return { success: false, error: result.error || "Unknown error" };
       }
 
-      console.log(` Email sent successfully to ${to} via ${result.provider}`);
-      console.log(`Subject: ${subject}`);
-      console.log(`Message ID: ${result.messageId}`);
+      logInfo("email.reminder_send_success", { 
+        provider: result.provider,
+        messageId: result.messageId
+      });
 
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error("Email sending failed:", error);
+      logError("email.reminder_send_exception", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",

@@ -1,0 +1,98 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    ".next/**",
+    "node_modules/**",
+    "out/**",
+    "build/**",
+    "dist/**",
+    "coverage/**",
+    "artifacts/**",
+    ".agents/**",
+    ".cursor/**",
+    "next-env.d.ts"
+  ],
+  "plugins": [
+    "react",
+    "unicorn",
+    "typescript",
+    "oxc",
+    "import",
+    "vitest",
+    "jsx-a11y",
+    "nextjs"
+  ],
+  "rules": {
+    "import/no-anonymous-default-export": "error",
+    "no-array-constructor": "error",
+    "no-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^(users|useState)$"
+      }
+    ],
+    "no-var": "error",
+    "prefer-const": "error",
+    "prefer-rest-params": "error",
+    "prefer-spread": "error",
+    "jsx-a11y/alt-text": [
+      "error",
+      {
+        "elements": ["img"],
+        "img": ["Image"]
+      }
+    ],
+    "react/display-name": "error",
+    "react/exhaustive-deps": "error",
+    "react/jsx-no-comment-textnodes": "error",
+    "react/no-danger": "error",
+    "react/no-unescaped-entities": "error",
+    "react/require-render-return": "error",
+    "react/rules-of-hooks": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unsafe-function-type": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
+      "rules": {
+        "no-unused-vars": "off",
+        "typescript/no-explicit-any": "off",
+        "vitest/require-mock-type-parameters": "off"
+      }
+    },
+    {
+      "files": [
+        "app/(auth)/layout.tsx",
+        "app/(root)/library/page.tsx",
+        "app/admin/account-requests/AccountRequestsClient.tsx",
+        "components/BookCard.tsx",
+        "components/BookCover.tsx",
+        "components/BookOverviewContent.tsx",
+        "components/FileUpload.tsx",
+        "components/Header.tsx",
+        "components/ReturnBookButton.tsx",
+        "components/admin/Sidebar.tsx"
+      ],
+      "rules": {
+        "nextjs/no-img-element": "off"
+      }
+    },
+    {
+      "files": ["components/BookVideo.tsx", "components/FileUpload.tsx"],
+      "rules": {
+        "jsx-a11y/media-has-caption": "off"
+      }
+    }
+  ]
+}

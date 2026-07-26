@@ -102,7 +102,7 @@ The product is production-capable when:
 - [ ] CodeQL passes.
 - [ ] Secret scan passes.
 - [ ] Dependency review passes.
-- [ ] npm audit has no untriaged critical production advisories.
+- [ ] The complete npm dependency graph has no high or critical advisories.
 - [ ] Container scan has no untriaged critical findings.
 - [ ] Admin APIs use server-side guards.
 - [ ] User-owned APIs prevent cross-user access.
@@ -159,15 +159,19 @@ A release should not ship if any of these are true:
 
 ## Known Hardening Work
 
-Track these items as production maturity work:
+Track these remaining items as production maturity work:
 
-- Replace salted SHA-256 password hashing with Argon2id or bcrypt.
-- Add end-to-end tests for auth, borrowing, returns, and admin approval.
+- Retire application-owned credentials after the managed OIDC cutover. New
+  hashes already use bcrypt and verified legacy SHA-256 records are upgraded.
+- Extend end-to-end tests beyond the current auth/authorization browser suite
+  to every circulation and administrative transition.
 - Consolidate email sending ownership between direct provider service and QStash workflow email.
-- Add explicit health endpoint for deployment and uptime monitoring.
-- Add structured logging with request IDs.
-- Add audit logging coverage for all privileged admin mutations.
-- Add database migration policy with reviewed SQL artifacts.
+- Wire the existing process-only liveness and dependency-aware readiness routes
+  into the production platform and verify their failure behavior.
+- Propagate request, trace, actor, and causation IDs through every log and event.
+- Make mandatory privileged audit evidence atomic with every remaining legacy
+  mutation; the append-only database guard alone is not sufficient.
+- Continue enforcing the reviewed canonical SQL migration and drift policy.
 - Add visual regression coverage for main pages.
 - Add stricter package artifact generation script.
 - Confirm backup and restore drill with actual production provider.
@@ -189,13 +193,13 @@ A production feature is done when:
 
 Every production area should have a named maintainer before institutional rollout:
 
-| Area | Owner needed |
-| --- | --- |
-| Deployment and environment | Yes |
-| Database and backups | Yes |
-| Security advisories | Yes |
-| Library operations process | Yes |
-| Email sender and templates | Yes |
-| Admin account lifecycle | Yes |
-| Release management | Yes |
-| Incident response | Yes |
+| Area                       | Owner needed |
+| -------------------------- | ------------ |
+| Deployment and environment | Yes          |
+| Database and backups       | Yes          |
+| Security advisories        | Yes          |
+| Library operations process | Yes          |
+| Email sender and templates | Yes          |
+| Admin account lifecycle    | Yes          |
+| Release management         | Yes          |
+| Incident response          | Yes          |

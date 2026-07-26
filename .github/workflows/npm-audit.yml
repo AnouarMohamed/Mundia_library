@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   audit:
-    name: Audit production dependencies
+    name: Audit complete dependency graph
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -37,19 +37,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
-      - name: Fail on critical production advisories
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Fail on high or critical advisories
+        run: npm audit --audit-level=high
 
-      - name: Report moderate production advisories
+      - name: Report all remaining advisories
         if: always()
-        run: npm audit --omit=dev --audit-level=moderate || true
+        run: npm audit --audit-level=low || true
 
       - name: Generate full advisory report
         if: always()
-        run: npm audit --omit=dev --json > npm-audit-report.json || true
+        run: npm audit --json > npm-audit-report.json || true
 
       - name: Upload audit report
         if: always()

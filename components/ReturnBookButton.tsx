@@ -1,37 +1,53 @@
-"use client";
-
 /**
  * ReturnBookButton Component
- *
- * Button component for returning books. Uses React Query mutation.
- * Integrates with useReturnBook mutation for proper cache invalidation.
- *
- * Features:
- * - Uses useReturnBook mutation
- * - Automatic cache invalidation on success
- * - Toast notifications via mutation callbacks
- * - No page refresh needed - uses cache invalidation
+ * 
+ * A specialized button that initiates the book return workflow.
+ * Features real-time state updates via TanStack Query and visual 
+ * indicators for overdue status.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { useReturnBook } from "@/hooks/useMutations";
 
+/**
+ * Props for ReturnBookButton
+ */
 interface Props {
+  /**
+   * The unique ID of the borrow record being closed
+   */
   recordId: string;
+  /**
+   * Display title of the book
+   */
   bookTitle: string;
-  dueDate: Date | null; // Can be null for pending requests
+  /**
+   * Deadline date for returning the book
+   */
+  dueDate: Date | null; 
 }
 
 /**
- * Return action with overdue styling.
+ * ReturnBookButton
+ * 
+ * Button component for returning books. Uses React Query mutation.
+ * Integrates with useReturnBook mutation for proper cache invalidation.
  */
 const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
-  // Use React Query mutation for returning book
+  // Initialize the return book mutation hook
   const returnBookMutation = useReturnBook();
 
+  /**
+   * Handler for the return action.
+   * Executes the mutation which handles server persistence and cache cleanup.
+   */
   const handleReturnBook = () => {
-    // Use mutation to return book
     returnBookMutation.mutate(
       {
         recordId,
@@ -45,7 +61,10 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
     );
   };
 
-  // Calculate if book is overdue (only if dueDate exists)
+  /**
+   * Urgency/Status Logic:
+   * Determines if the book is currently overdue and calculates the day count.
+   */
   const today = new Date();
   const isOverdue = dueDate && today > new Date(dueDate);
   const daysOverdue = isOverdue
@@ -71,6 +90,8 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
         height={20}
         className="size-4 sm:size-5"
       />
+      
+      {/* Dynamic text based on current state (Pending, Overdue, or Normal) */}
       <span className="text-sm font-semibold text-white">
         {returnBookMutation.isPending
           ? "Returning..."

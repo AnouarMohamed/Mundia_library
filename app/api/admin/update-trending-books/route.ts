@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateTrendingBooks } from "@/lib/admin/actions/recommendations";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -11,8 +12,13 @@ export const runtime = "nodejs";
  * POST /api/admin/update-trending-books
  * Recompute trending books for the catalog.
  */
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request, {
+      requireJson: true,
+    });
+    if (sameOriginResponse) return sameOriginResponse;
+
     const guard = await requireAdminRouteAccess();
     if (!guard.ok) {
       return guard.response;

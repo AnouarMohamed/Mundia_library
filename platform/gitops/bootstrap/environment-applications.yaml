@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mundia-workloads
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/environments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mundia-workloads
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/environments/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mundia-workloads
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/environments/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-prod
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+

@@ -252,6 +252,7 @@ export async function getBorrowRequests(
   search?: string
 ): Promise<BorrowRecordWithDetails[]> {
   const params = new URLSearchParams();
+  params.set("limit", "100");
   if (status) params.append("status", status);
   if (search) params.append("search", search);
 

@@ -1,0 +1,87 @@
+# Mundiapolis backend services
+
+This is an additive Gradle multi-project build for the strangler migration. The
+existing Next.js application remains the production entry point until a service
+passes its migration and cutover gates.
+
+## Requirements
+
+- JDK 25
+- Docker, for PostgreSQL integration tests
+
+## Build and test
+
+```bash
+cd services
+./gradlew clean check
+```
+
+`circulation-service` generates jOOQ sources from its Flyway migrations before
+compilation. Integration tests start an isolated PostgreSQL container and verify
+that Flyway and the persistence adapter work together.
+
+## Run locally
+
+Start PostgreSQL:
+
+```bash
+docker compose up -d circulation-db
+```
+
+Run the service with a real development OIDC issuer and JWK set:
+
+```bash
+export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
+export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
+export AUTH_AUDIENCE=circulation-api
+./gradlew :circulation-service:bootRun
+```
+
+The local database defaults are defined in `compose.yaml`. Production must
+provide all database and identity settings through its secret/configuration
+manager.
+
+Health probes:
+
+- `GET /actuator/health/liveness`
+- `GET /actuator/health/readiness`
+
+All non-health HTTP endpoints require a valid bearer token. Domain endpoints
+also enforce explicit OAuth scopes.
+
+## Circulation command API
+
+The first authoritative slice exposes:
+
+| Command | Endpoint | Required scope |
+|---|---|---|
+| Request own loan | `POST /api/v1/circulation/loans` | `circulation.loan.request` |
+| Request for another member | `POST /api/v1/circulation/loans` | `circulation.loan.request.on-behalf` |
+| Approve and allocate a copy | `POST /api/v1/circulation/loans/{loanId}/approve` | `circulation.loan.approve` |
+| Return a loan and release its copy | `POST /api/v1/circulation/loans/{loanId}/return` | `circulation.loan.return` |
+
+Every command requires an `Idempotency-Key` header containing 16–128 visible
+ASCII characters. A successful replay returns the original response snapshot
+and sets `Idempotency-Replayed: true`. Reusing the key for different input is a
+conflict. Keys are namespaced by a SHA-256 fingerprint of the validated token
+issuer, subject, authorized party, and client identifier; one actor can never
+collide with or replay another actor's key.
+
+Self-service request tokens must contain a canonical UUID `membership_id`
+claim matching the request body. Missing, malformed, or cross-member claims
+fail closed with HTTP 403 before any command transaction begins. Staff service
+tokens may omit that claim only when granted the separate
+`circulation.loan.request.on-behalf` scope.
+
+Copy allocation is stable by barcode and identifier. Loan state, copy state,
+the idempotency result, and one versioned outbox event commit in the same
+PostgreSQL transaction. Publishing the outbox is deliberately outside this
+slice.
+
+## Container build
+
+Use `services` as the build context:
+
+```bash
+docker build -f circulation-service/Dockerfile -t mundia/circulation-service:dev .
+```

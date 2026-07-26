@@ -14,6 +14,7 @@ import {
   tooManyRequestsResponse,
 } from "@/lib/security/api-response";
 import { logError } from "@/lib/security/logger";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
  * Use Node.js runtime for DB access.
@@ -25,10 +26,13 @@ export const runtime = "nodejs";
  * Delete a review.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request);
+    if (sameOriginResponse) return sameOriginResponse;
+
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     const success = await enforceRateLimit();
 

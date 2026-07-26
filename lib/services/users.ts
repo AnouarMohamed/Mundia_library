@@ -42,7 +42,7 @@ export interface User {
   email: string;
   /** Unique university identification number. */
   universityId: number;
-  /** URL to the hosted image of the user's university ID card. */
+  /** Admin-only same-origin evidence endpoint; never a public storage URL. */
   universityCard: string;
   /** Current verification status of the account. */
   status: UserStatus | null;

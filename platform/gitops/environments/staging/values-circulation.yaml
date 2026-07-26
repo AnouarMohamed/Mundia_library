@@ -1,0 +1,47 @@
+environment: staging
+image:
+  repository: REPLACE_APPROVED_REGISTRY/mundiapolis/circulation-service
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+replicaCount: 3
+env:
+  APP_ENV: staging
+  PORT: "8080"
+externalSecret:
+  targetName: circulation-runtime
+  data:
+    - secretKey: DATABASE_URL
+      remoteKey: mundia/staging/circulation/postgres
+      property: jdbc_url
+    - secretKey: DATABASE_USERNAME
+      remoteKey: mundia/staging/circulation/postgres
+      property: username
+    - secretKey: DATABASE_PASSWORD
+      remoteKey: mundia/staging/circulation/postgres
+      property: password
+    - secretKey: AUTH_ISSUER_URI
+      remoteKey: mundia/staging/circulation/oidc
+      property: issuer
+    - secretKey: AUTH_JWK_SET_URI
+      remoteKey: mundia/staging/circulation/oidc
+      property: jwks_url
+    - secretKey: AUTH_AUDIENCE
+      remoteKey: mundia/staging/circulation/oidc
+      property: audience
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 15
+podDisruptionBudget:
+  minAvailable: 2
+networkPolicy:
+  egressCidrs:
+    - cidr: 10.50.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9094
+        - protocol: TCP
+          port: 6379
+

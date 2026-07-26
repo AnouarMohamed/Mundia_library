@@ -18,7 +18,7 @@
 
 import { db } from "@/database/drizzle";
 import { renewalRequests, borrowRecords, users, books } from "@/database/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { logAdminAction } from "@/lib/admin/audit";
 import { revalidateCatalogTags } from "@/lib/cache/revalidate";
 import { createNotification } from "@/lib/services/notification-service";
@@ -27,6 +27,18 @@ import {
   requireAdmin,
 } from "@/lib/security/auth-guards";
 import { logError } from "@/lib/security/logger";
+
+const renewalMutationErrors = new Set([
+  "Renewal request not found.",
+  "Associated borrow record not found.",
+  "This renewal request has already been processed.",
+  "Renewals can only be approved for active borrowings.",
+]);
+
+const safeRenewalMutationError = (error: unknown, fallback: string) =>
+  error instanceof Error && renewalMutationErrors.has(error.message)
+    ? error.message
+    : fallback;
 
 /**
  * Fetch all renewal requests with associated user and book information
@@ -57,7 +69,8 @@ export async function getAllRenewalRequests() {
       .innerJoin(users, eq(renewalRequests.userId, users.id))
       .innerJoin(borrowRecords, eq(renewalRequests.borrowRecordId, borrowRecords.id))
       .innerJoin(books, eq(borrowRecords.bookId, books.id))
-      .orderBy(desc(renewalRequests.createdAt));
+      .orderBy(desc(renewalRequests.createdAt))
+      .limit(100);
 
     return { success: true, data: requests };
   } catch (error) {
@@ -82,85 +95,131 @@ export async function getAllRenewalRequests() {
  */
 export async function approveRenewal(requestId: string) {
   try {
-    // 1. Validate admin session
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
     const adminId = guard.user.id;
 
-    // 2. Fetch request and record
-    const [request] = await db
-      .select({
-        borrowRecordId: renewalRequests.borrowRecordId,
-        userId: renewalRequests.userId,
-      })
-      .from(renewalRequests)
-      .where(eq(renewalRequests.id, requestId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({
+          borrowRecordId: renewalRequests.borrowRecordId,
+          userId: renewalRequests.userId,
+          status: renewalRequests.status,
+        })
+        .from(renewalRequests)
+        .where(eq(renewalRequests.id, requestId))
+        .limit(1);
 
-    if (!request) return { success: false, error: "Renewal request not found." };
+      if (!request) {
+        throw new Error("Renewal request not found.");
+      }
 
-    const [record] = await db
-      .select({
-        dueDate: borrowRecords.dueDate,
-        renewalCount: borrowRecords.renewalCount,
-        bookTitle: books.title,
-      })
-      .from(borrowRecords)
-      .innerJoin(books, eq(borrowRecords.bookId, books.id))
-      .where(eq(borrowRecords.id, request.borrowRecordId))
-      .limit(1);
+      if (request.status !== "PENDING") {
+        throw new Error("This renewal request has already been processed.");
+      }
 
-    if (!record) return { success: false, error: "Associated borrow record not found." };
+      const [record] = await tx
+        .select({
+          dueDate: borrowRecords.dueDate,
+          status: borrowRecords.status,
+          bookTitle: books.title,
+        })
+        .from(borrowRecords)
+        .innerJoin(books, eq(borrowRecords.bookId, books.id))
+        .where(eq(borrowRecords.id, request.borrowRecordId))
+        .limit(1);
 
-    // 3. Calculate new due date
-    // If current due date exists, add 7 days to it. Otherwise, add 7 days from today.
-    const currentDueDate = record.dueDate ? new Date(record.dueDate) : new Date();
-    const newDueDate = new Date(currentDueDate);
-    newDueDate.setDate(newDueDate.getDate() + 7);
-    newDueDate.setHours(23, 59, 59, 999);
-    const newDueDateString = newDueDate.toISOString().split("T")[0];
+      if (!record) {
+        throw new Error("Associated borrow record not found.");
+      }
 
-    // 4. Update borrow record
-    await db
-      .update(borrowRecords)
-      .set({
-        dueDate: newDueDateString,
-        renewalCount: record.renewalCount + 1,
-        updatedAt: new Date(),
-        updatedBy: adminId,
-      })
-      .where(eq(borrowRecords.id, request.borrowRecordId));
+      if (record.status !== "BORROWED") {
+        throw new Error("Renewals can only be approved for active borrowings.");
+      }
 
-    // 5. Update renewal request status
-    await db
-      .update(renewalRequests)
-      .set({
-        status: "APPROVED",
-        updatedAt: new Date(),
-      })
-      .where(eq(renewalRequests.id, requestId));
+      const currentDueDate = record.dueDate
+        ? new Date(record.dueDate)
+        : new Date();
+      const newDueDate = new Date(currentDueDate);
+      newDueDate.setDate(newDueDate.getDate() + 7);
+      newDueDate.setHours(23, 59, 59, 999);
+      const newDueDateString = newDueDate.toISOString().split("T")[0];
+
+      const [approvedRequest] = await tx
+        .update(renewalRequests)
+        .set({
+          status: "APPROVED",
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(renewalRequests.id, requestId),
+            eq(renewalRequests.status, "PENDING"),
+          ),
+        )
+        .returning({ id: renewalRequests.id });
+
+      if (!approvedRequest) {
+        throw new Error("This renewal request has already been processed.");
+      }
+
+      const [renewedRecord] = await tx
+        .update(borrowRecords)
+        .set({
+          dueDate: newDueDateString,
+          renewalCount: sql`${borrowRecords.renewalCount} + 1`,
+          updatedAt: new Date(),
+          updatedBy: adminId,
+        })
+        .where(
+          and(
+            eq(borrowRecords.id, request.borrowRecordId),
+            eq(borrowRecords.status, "BORROWED"),
+          ),
+        )
+        .returning({ id: borrowRecords.id });
+
+      if (!renewedRecord) {
+        // Returning no row means a concurrent return won. Throwing also rolls
+        // back the request transition performed earlier in this transaction.
+        throw new Error("Renewals can only be approved for active borrowings.");
+      }
+
+      return {
+        borrowRecordId: request.borrowRecordId,
+        userId: request.userId,
+        bookTitle: record.bookTitle,
+        newDueDateString,
+      };
+    });
 
     // Send notification to the student
     await createNotification({
-      userId: request.userId,
+      userId: result.userId,
       title: "Renewal Approved",
-      message: `Your renewal request for "${record.bookTitle}" has been approved. The new due date is ${newDueDateString}.`,
+      message: `Your renewal request for "${result.bookTitle}" has been approved. The new due date is ${result.newDueDateString}.`,
       type: "SUCCESS",
     });
 
     // 6. Log admin action
     await logAdminAction(adminId!, "APPROVE_RENEWAL", requestId, "RENEWAL_REQUEST", {
-      borrowRecordId: request.borrowRecordId,
-      newDueDate: newDueDateString,
+      borrowRecordId: result.borrowRecordId,
+      newDueDate: result.newDueDateString,
     });
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return { success: true, message: "Renewal approved and due date extended." };
   } catch (error) {
     logError("admin.renewal_approve_failed", error, { requestId });
-    return { success: false, error: "Failed to approve renewal request." };
+    return {
+      success: false,
+      error: safeRenewalMutationError(
+        error,
+        "Failed to approve renewal request.",
+      ),
+    };
   }
 }
 
@@ -173,53 +232,87 @@ export async function approveRenewal(requestId: string) {
  */
 export async function rejectRenewal(requestId: string, reason?: string) {
   try {
+    const normalizedReason = reason?.trim();
+    if (normalizedReason && normalizedReason.length > 1_000) {
+      return { success: false, error: "Rejection reason is too long." };
+    }
+
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
     const adminId = guard.user.id;
 
-    const [request] = await db
-      .select({
-        borrowRecordId: renewalRequests.borrowRecordId,
-        userId: renewalRequests.userId,
-        bookTitle: books.title,
-      })
-      .from(renewalRequests)
-      .innerJoin(borrowRecords, eq(renewalRequests.borrowRecordId, borrowRecords.id))
-      .innerJoin(books, eq(borrowRecords.bookId, books.id))
-      .where(eq(renewalRequests.id, requestId))
-      .limit(1);
+    const result = await db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({
+          borrowRecordId: renewalRequests.borrowRecordId,
+          userId: renewalRequests.userId,
+          status: renewalRequests.status,
+          bookTitle: books.title,
+        })
+        .from(renewalRequests)
+        .innerJoin(
+          borrowRecords,
+          eq(renewalRequests.borrowRecordId, borrowRecords.id),
+        )
+        .innerJoin(books, eq(borrowRecords.bookId, books.id))
+        .where(eq(renewalRequests.id, requestId))
+        .limit(1);
 
-    if (!request) return { success: false, error: "Renewal request not found." };
+      if (!request) {
+        throw new Error("Renewal request not found.");
+      }
 
-    // Update status to REJECTED
-    await db
-      .update(renewalRequests)
-      .set({
-        status: "REJECTED",
-        rejectionReason: reason,
-        updatedAt: new Date(),
-      })
-      .where(eq(renewalRequests.id, requestId));
+      if (request.status !== "PENDING") {
+        throw new Error("This renewal request has already been processed.");
+      }
+
+      const [rejectedRequest] = await tx
+        .update(renewalRequests)
+        .set({
+          status: "REJECTED",
+          rejectionReason: normalizedReason,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(renewalRequests.id, requestId),
+            eq(renewalRequests.status, "PENDING"),
+          ),
+        )
+        .returning({ id: renewalRequests.id });
+
+      if (!rejectedRequest) {
+        throw new Error("This renewal request has already been processed.");
+      }
+
+      return request;
+    });
 
     // Send notification to the student
     await createNotification({
-      userId: request.userId,
+      userId: result.userId,
       title: "Renewal Rejected",
-      message: `Your renewal request for "${request.bookTitle}" has been rejected.${reason ? ` Reason: ${reason}` : ""}`,
+      message: `Your renewal request for "${result.bookTitle}" has been rejected.${normalizedReason ? ` Reason: ${normalizedReason}` : ""}`,
       type: "WARNING",
     });
 
     // Log admin action
     await logAdminAction(adminId!, "REJECT_RENEWAL", requestId, "RENEWAL_REQUEST", {
-      reason,
+      reason: normalizedReason,
     });
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return { success: true, message: "Renewal request rejected." };
   } catch (error) {
     logError("admin.renewal_reject_failed", error, { requestId });
-    return { success: false, error: "Failed to reject renewal request." };
+    return {
+      success: false,
+      error: safeRenewalMutationError(
+        error,
+        "Failed to reject renewal request.",
+      ),
+    };
   }
 }

@@ -86,46 +86,13 @@ export const getAllBorrowRequests = async () => {
       .from(borrowRecords)
       .innerJoin(users, eq(borrowRecords.userId, users.id))
       .innerJoin(books, eq(borrowRecords.bookId, books.id))
-      .orderBy(desc(borrowRecords.createdAt));
+      .orderBy(desc(borrowRecords.createdAt))
+      .limit(100);
 
     return { success: true, data: requests };
   } catch (error) {
     logError("admin.borrow_requests_fetch_failed", error);
     return { success: false, error: "Failed to fetch borrow requests" };
-  }
-};
-
-/**
- * Directly updates the status of a borrow record.
- * 
- * @param recordId - ID of the record to update.
- * @param status - New status (PENDING, BORROWED, RETURNED).
- * @returns Success status or error message.
- */
-export const updateBorrowStatus = async (
-  recordId: string,
-  status: "PENDING" | "BORROWED" | "RETURNED"
-) => {
-  try {
-    const guard = await requireAdmin();
-    if (!guard.ok) return guardToActionError(guard);
-
-    await db
-      .update(borrowRecords)
-      .set({ status, updatedAt: new Date(), updatedBy: guard.user.id })
-      .where(eq(borrowRecords.id, recordId));
-    await logAdminAction(
-      guard.user.id,
-      "UPDATE_BORROW_STATUS",
-      recordId,
-      "BORROW_RECORD",
-      { status },
-    );
-
-    return { success: true };
-  } catch (error) {
-    logError("admin.borrow_status_update_failed", error, { recordId, status });
-    return { success: false, error: "Failed to update borrow status" };
   }
 };
 
@@ -192,7 +159,7 @@ export const approveBorrowRequest = async (recordId: string) => {
         throw new Error("Book is no longer available");
       }
 
-      await tx
+      const [approvedRecord] = await tx
         .update(borrowRecords)
         .set({
           status: "BORROWED",
@@ -206,7 +173,14 @@ export const approveBorrowRequest = async (recordId: string) => {
             eq(borrowRecords.id, recordId),
             eq(borrowRecords.status, "PENDING"),
           ),
-        );
+        )
+        .returning({ id: borrowRecords.id });
+
+      if (!approvedRecord) {
+        // Another request won the race after our initial read. Throwing rolls
+        // back the inventory decrement made earlier in this transaction.
+        throw new Error("Only pending borrow requests can be approved");
+      }
 
       return {
         bookId: record.bookId,
@@ -227,7 +201,7 @@ export const approveBorrowRequest = async (recordId: string) => {
       userId: result.userId,
     });
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return { success: true };
   } catch (error) {
@@ -250,8 +224,9 @@ export const approveBorrowRequest = async (recordId: string) => {
 /**
  * Rejects a pending borrow request.
  * 
- * Note: Currently deletes the record for simplicity. In audit-heavy environments, 
- * this should be changed to a status update (e.g., 'REJECTED').
+ * The legacy model has no REJECTED request state, so this removes only a record
+ * that is still PENDING. The conditional delete prevents a rejection racing an
+ * approval from deleting an active or historical loan.
  * 
  * @param recordId - UUID of the request.
  * @returns Success status or error.
@@ -261,27 +236,32 @@ export const rejectBorrowRequest = async (recordId: string) => {
     const guard = await requireAdmin();
     if (!guard.ok) return guardToActionError(guard);
 
-    const record = await db
-      .select({
+    const [record] = await db
+      .delete(borrowRecords)
+      .where(
+        and(
+          eq(borrowRecords.id, recordId),
+          eq(borrowRecords.status, "PENDING"),
+        ),
+      )
+      .returning({
         bookId: borrowRecords.bookId,
         userId: borrowRecords.userId,
-      })
-      .from(borrowRecords)
-      .where(eq(borrowRecords.id, recordId))
-      .limit(1);
+      });
 
-    if (record.length === 0) {
-      return { success: false, error: "Borrow record not found" };
+    if (!record) {
+      return {
+        success: false,
+        error: "Only pending borrow requests can be rejected",
+      };
     }
 
-    await db.delete(borrowRecords).where(eq(borrowRecords.id, recordId));
-
     await logAdminAction(guard.user.id, "REJECT_BORROW", recordId, "BORROW_RECORD", {
-      bookId: record[0].bookId,
-      userId: record[0].userId,
+      bookId: record.bookId,
+      userId: record.userId,
     });
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return { success: true };
   } catch (error) {
@@ -511,7 +491,7 @@ export const returnBook = async (recordId: string) => {
       const fineAmount =
         daysOverdue > 0 ? (daysOverdue * 1.0).toFixed(2) : "0.00";
 
-      await tx
+      const [returnedRecord] = await tx
         .update(borrowRecords)
         .set({
           status: "RETURNED",
@@ -527,7 +507,14 @@ export const returnBook = async (recordId: string) => {
             eq(borrowRecords.id, recordId),
             eq(borrowRecords.status, "BORROWED"),
           ),
-        );
+        )
+        .returning({ id: borrowRecords.id });
+
+      if (!returnedRecord) {
+        // A concurrent return already completed. Abort before incrementing
+        // inventory so availableCopies cannot be inflated.
+        throw new Error("Only borrowed books can be returned");
+      }
 
       await tx
         .update(books)
@@ -549,7 +536,7 @@ export const returnBook = async (recordId: string) => {
       daysOverdue: result.daysOverdue,
     });
 
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return {
       success: true,

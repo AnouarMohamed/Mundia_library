@@ -38,6 +38,20 @@ jobs:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: library
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U library -d library"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout
@@ -46,12 +60,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Complete dependency audit
+        run: npm run security:audit
 
       - name: Lint
         run: npm run lint
@@ -62,33 +79,47 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Prepare E2E database
+        env:
+          DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
+          ALLOW_TEST_FIXTURES: "true"
+        run: |
+          npm run db:migrate
+          npm run seed
+
       - name: Install Playwright browser
         run: npx playwright install chromium
 
       - name: Playwright E2E
         env:
-          DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'postgresql://build:build@localhost:5432/builddb' }}
+          DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
           NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
           AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
           NEXTAUTH_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3100
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3100
           NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
-          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ${{ secrets['NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY'] || 'ci-build-public-key' }}
           IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
           ENABLE_WORKFLOWS: "false"
+          E2E_USER_EMAIL: test@user.com
+          E2E_USER_PASSWORD: "12345678"
+          E2E_ADMIN_EMAIL: test@admin.com
+          E2E_ADMIN_PASSWORD: "12345678"
+          E2E_PENDING_EMAIL: pending-e2e@example.test
+          E2E_PENDING_PASSWORD: "12345678"
+          E2E_OTHER_USER_ID: 00000000-0000-4000-8000-000000000002
         run: npm run test:e2e
 
       - name: Build
         env:
-          DATABASE_URL: ${{ secrets['CI_DATABASE_URL'] || 'postgresql://build:build@localhost:5432/builddb' }}
+          APP_ENV: development
+          DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
           NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
           AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
           NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
-          NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: ${{ secrets['NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY'] || 'ci-build-public-key' }}
           IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
           UPSTASH_REDIS_URL: ${{ secrets['UPSTASH_REDIS_URL'] || 'https://example.upstash.io' }}
           UPSTASH_REDIS_TOKEN: ${{ secrets['UPSTASH_REDIS_TOKEN'] || 'ci-build-token' }}
@@ -99,6 +130,78 @@ jobs:
           RESEND_TOKEN: ${{ secrets['RESEND_TOKEN'] || 'ci-build-token' }}
           ENABLE_WORKFLOWS: "false"
         run: npm run build
+
+  migration:
+    name: Fresh Database Migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: library
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U library -d library"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Apply canonical migrations
+        run: npm run db:migrate
+
+      - name: Verify production schema
+        run: npm run db:verify-schema
+
+      - name: Verify local fixture seed against migrated schema
+        env:
+          ALLOW_TEST_FIXTURES: "true"
+        run: npm run seed
+
+      - name: Verify circulation concurrency invariants
+        run: npm run db:verify-concurrency
+
+  circulation-service:
+    name: Circulation Service (JDK 25)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@f236b35da9d031e13b1005234ebe4392ed54c580 # v5.0.0
+
+      - name: Compile, test, and package
+        working-directory: services
+        run: ./gradlew clean check bootJar --no-daemon
 
   docker:
     name: Docker Image Build
@@ -121,5 +224,19 @@ jobs:
           pull: true
           push: false
           tags: mundia-library:ci
+          build-args: |
+            NEXT_PUBLIC_API_ENDPOINT=http://localhost:3000
+            NEXT_PUBLIC_PROD_API_ENDPOINT=http://localhost:3000
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build circulation service image
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7
+        with:
+          context: ./services
+          file: ./services/circulation-service/Dockerfile
+          pull: true
+          push: false
+          tags: mundia-circulation-service:ci
+          cache-from: type=gha,scope=circulation
+          cache-to: type=gha,mode=max,scope=circulation

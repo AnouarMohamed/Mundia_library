@@ -129,7 +129,7 @@ export const borrowBook = async (
     }
 
     // 3. Cache maintenance
-    revalidateCatalogTags();
+    await revalidateCatalogTags();
 
     return {
       success: true,

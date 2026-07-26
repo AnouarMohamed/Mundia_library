@@ -1,9 +1,27 @@
+/**
+ * AdminDropdown Component
+ * 
+ * Provides a hoverable dropdown menu for administrative navigation.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
+ */
+
 "use client";
 
 import Link from "next/link";
 import { useState } from "react";
 
+/**
+ * AdminDropdown
+ * 
+ * A navigation component that reveals administrative links when hovered.
+ * Designed for the main header to provide quick access to various admin modules.
+ * 
+ * @returns {JSX.Element} The rendered admin dropdown component
+ */
 const AdminDropdown = () => {
+  // State to track if the dropdown is currently visible
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -22,11 +40,12 @@ const AdminDropdown = () => {
         </Link>
       </div>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - only rendered when isOpen is true */}
       {isOpen && (
         <div className="absolute left-0 top-full z-50 mt-2 w-44 rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-1.5 sm:w-52">
-          {/* Add a small invisible bridge to prevent hover gap */}
+          {/* Add a small invisible bridge to prevent hover gap that might trigger onMouseLeave */}
           <div className="absolute inset-x-0 -top-2 h-2"></div>
+          
           <div className="py-1 sm:py-1.5">
             <Link
               href="/admin"

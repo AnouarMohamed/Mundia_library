@@ -36,23 +36,23 @@ Error envelope:
 
 Status codes:
 
-| Status | Meaning |
-| --- | --- |
-| `200` | Request succeeded. |
-| `201` | Resource created. |
-| `400` | Invalid request input. |
-| `401` | Authentication required. |
-| `403` | Authenticated user does not have access. |
-| `404` | Resource not found. |
-| `429` | Rate limit exceeded. |
-| `500` | Server error. |
+| Status | Meaning                                  |
+| ------ | ---------------------------------------- |
+| `200`  | Request succeeded.                       |
+| `201`  | Resource created.                        |
+| `400`  | Invalid request input.                   |
+| `401`  | Authentication required.                 |
+| `403`  | Authenticated user does not have access. |
+| `404`  | Resource not found.                      |
+| `429`  | Rate limit exceeded.                     |
+| `500`  | Server error.                            |
 
 ## Authentication
 
 Auth is handled by NextAuth route handlers:
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
+| Method     | Endpoint                  | Purpose                                                      |
+| ---------- | ------------------------- | ------------------------------------------------------------ |
 | `GET/POST` | `/api/auth/[...nextauth]` | NextAuth session, callback, sign-in, and sign-out internals. |
 
 Most browser-facing authentication should use the app pages and NextAuth helpers, not direct API calls.
@@ -67,15 +67,15 @@ File: `app/api/books/route.ts`
 
 Query parameters:
 
-| Parameter | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `search` | string | empty | Searches title/author through advanced search service. |
-| `genre` | string | empty | Exact genre filter. |
-| `availability` | `available`, `unavailable` | empty | Filters by `availableCopies`. |
-| `rating` | `1` to `5` | empty | Minimum rating. |
-| `sort` | `title`, `author`, `rating`, `date`, `relevance` for search | `title` | Search defaults to relevance when valid. |
-| `page` | integer | `1` | Clamped to `>= 1`. |
-| `limit` | integer | `12` | Clamped to `1..50`. |
+| Parameter      | Values                                                      | Default | Notes                                                  |
+| -------------- | ----------------------------------------------------------- | ------- | ------------------------------------------------------ |
+| `search`       | string                                                      | empty   | Searches title/author through advanced search service. |
+| `genre`        | string                                                      | empty   | Exact genre filter.                                    |
+| `availability` | `available`, `unavailable`                                  | empty   | Filters by `availableCopies`.                          |
+| `rating`       | `1` to `5`                                                  | empty   | Minimum rating.                                        |
+| `sort`         | `title`, `author`, `rating`, `date`, `relevance` for search | `title` | Search defaults to relevance when valid.               |
+| `page`         | integer                                                     | `1`     | Clamped to `>= 1`.                                     |
+| `limit`        | integer                                                     | `12`    | Clamped to `1..50`.                                    |
 
 Example:
 
@@ -136,9 +136,9 @@ File: `app/api/books/recommendations/route.ts`
 
 Query parameters:
 
-| Parameter | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `limit` | integer | `10` | Clamped by route implementation. |
+| Parameter | Values  | Default | Notes                            |
+| --------- | ------- | ------- | -------------------------------- |
+| `limit`   | integer | `10`    | Clamped by route implementation. |
 
 Example:
 
@@ -158,17 +158,17 @@ Auth: required.
 
 Query parameters:
 
-| Parameter | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `userId` | user UUID | current user | Non-admin users cannot request another user. |
-| `bookId` | book UUID | empty | Filter by book. |
-| `status` | `PENDING`, `BORROWED`, `RETURNED` | empty | Filter by lifecycle status. |
-| `dateFrom` | `YYYY-MM-DD` | empty | Borrow date lower bound. |
-| `dateTo` | `YYYY-MM-DD` | empty | Borrow date upper bound. |
-| `overdue` | `true`, `false` | `false` | Active overdue records only. |
-| `sort` | `date`, `dueDate`, `status`, `user` | `date` | Sort order. |
-| `page` | integer | `1` | Clamped to `>= 1`. |
-| `limit` | integer | `50` | Clamped to `1..100`. |
+| Parameter  | Values                              | Default      | Notes                                        |
+| ---------- | ----------------------------------- | ------------ | -------------------------------------------- |
+| `userId`   | user UUID                           | current user | Non-admin users cannot request another user. |
+| `bookId`   | book UUID                           | empty        | Filter by book.                              |
+| `status`   | `PENDING`, `BORROWED`, `RETURNED`   | empty        | Filter by lifecycle status.                  |
+| `dateFrom` | `YYYY-MM-DD`                        | empty        | Borrow date lower bound.                     |
+| `dateTo`   | `YYYY-MM-DD`                        | empty        | Borrow date upper bound.                     |
+| `overdue`  | `true`, `false`                     | `false`      | Active overdue records only.                 |
+| `sort`     | `date`, `dueDate`, `status`, `user` | `date`       | Sort order.                                  |
+| `page`     | integer                             | `1`          | Clamped to `>= 1`.                           |
+| `limit`    | integer                             | `50`         | Clamped to `1..100`.                         |
 
 Example:
 
@@ -262,23 +262,23 @@ Auth: route-dependent. Treat as admin-sensitive data and verify guard behavior b
 
 ## Upload APIs
 
-### `GET /api/auth/imagekit`
+### `POST /api/uploads`
 
-Returns ImageKit authentication parameters for client uploads.
+Accepts a bounded multipart upload with `intent` and `file`. The server
+authorizes the intent, validates size and type, re-encodes images, chooses the
+storage key, and uploads the verified bytes. Book media requires an
+administrator. Public identity uploads are disabled in production, and
+production video ingestion remains disabled until a quarantine/malware scanner
+is connected.
 
-File: `app/api/auth/imagekit/route.ts`
+File: `app/api/uploads/route.ts`
 
-Rate limited. Authentication is optional so the sign-up flow can upload a university card before a session exists.
-
-Example:
-
-```bash
-curl "http://localhost:3000/api/auth/imagekit"
-```
+Cookie-authenticated calls require an exact same-origin request. The retired
+`GET /api/auth/imagekit` endpoint always returns `410 Gone` and never returns an
+upload signature.
 
 Production requires:
 
-- `NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY`
 - `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT`
 - `IMAGEKIT_PRIVATE_KEY`
 
@@ -310,10 +310,10 @@ File: `app/api/admin/borrow-requests/route.ts`
 
 Query parameters:
 
-| Parameter | Values | Default | Notes |
-| --- | --- | --- | --- |
-| `search` | string | empty | Matches title, author, user name, email, or university ID. |
-| `status` | `PENDING`, `BORROWED`, `RETURNED` | empty | Filters borrow lifecycle status. |
+| Parameter | Values                            | Default | Notes                                                      |
+| --------- | --------------------------------- | ------- | ---------------------------------------------------------- |
+| `search`  | string                            | empty   | Matches title, author, user name, email, or university ID. |
+| `status`  | `PENDING`, `BORROWED`, `RETURNED` | empty   | Filters borrow lifecycle status.                           |
 
 ### `GET /api/admin/admin-requests`
 

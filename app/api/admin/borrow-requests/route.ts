@@ -14,8 +14,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/database/drizzle";
 import { borrowRecords, books, users } from "@/database/schema";
-import { eq, desc, and, or, like, sql } from "drizzle-orm";
+import { eq, desc, and, or, ilike, sql } from "drizzle-orm";
 import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import ratelimit from "@/lib/ratelimit";
+import {
+  getClientIp,
+  normalizeTextParam,
+} from "@/lib/security/api-request";
+import { logError } from "@/lib/security/logger";
 
 /**
  * Use Node.js runtime for DB access.
@@ -35,22 +41,60 @@ export async function GET(request: NextRequest) {
       return guard.response;
     }
 
+    const ip = await getClientIp();
+    const rate = await ratelimit.limit(
+      `admin-borrow-requests:${guard.user.id}:${ip}`,
+    );
+    if (!rate.success) {
+      return NextResponse.json(
+        { success: false, error: "Too Many Requests" },
+        { status: 429 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parse query parameters
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status") as
-      | "PENDING"
-      | "BORROWED"
-      | "RETURNED"
-      | null;
+    const search = normalizeTextParam(searchParams.get("search"), 100);
+    const status = searchParams.get("status");
+    const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const requestedLimit = Number.parseInt(
+      searchParams.get("limit") || "50",
+      10,
+    );
+    const page =
+      Number.isSafeInteger(requestedPage) && requestedPage > 0
+        ? requestedPage
+        : 1;
+    const limit =
+      Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 100)
+        : 50;
+    const allowedStatuses = new Set([
+      null,
+      "",
+      "PENDING",
+      "BORROWED",
+      "RETURNED",
+    ]);
+    if (!allowedStatuses.has(status)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid status filter" },
+        { status: 400 },
+      );
+    }
 
     // Build where conditions
     const whereConditions = [];
 
     // Status filter
     if (status) {
-      whereConditions.push(eq(borrowRecords.status, status));
+      whereConditions.push(
+        eq(
+          borrowRecords.status,
+          status as "PENDING" | "BORROWED" | "RETURNED",
+        ),
+      );
     }
 
     // Search condition
@@ -58,18 +102,21 @@ export async function GET(request: NextRequest) {
       const searchPattern = `%${search}%`;
       whereConditions.push(
         or(
-          like(books.title, searchPattern),
-          like(books.author, searchPattern),
-          like(users.fullName, searchPattern),
-          like(users.email, searchPattern),
+          ilike(books.title, searchPattern),
+          ilike(books.author, searchPattern),
+          ilike(users.fullName, searchPattern),
+          ilike(users.email, searchPattern),
           sql`CAST(${users.universityId} AS text) LIKE ${searchPattern}`
         )
       );
     }
 
     // Fetch borrow records with user and book details
-    const allBorrowRecords = await db
-      .select({
+    const whereClause =
+      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    const offset = (page - 1) * limit;
+    const [allBorrowRecords, countResult] = await Promise.all([
+      db.select({
         // Borrow record fields
         id: borrowRecords.id,
         userId: borrowRecords.userId,
@@ -101,10 +148,18 @@ export async function GET(request: NextRequest) {
       .from(borrowRecords)
       .innerJoin(users, eq(borrowRecords.userId, users.id))
       .innerJoin(books, eq(borrowRecords.bookId, books.id))
-      .where(
-        whereConditions.length > 0 ? and(...whereConditions) : undefined
-      )
-      .orderBy(desc(borrowRecords.createdAt));
+      .where(whereClause)
+      .orderBy(desc(borrowRecords.createdAt))
+      .limit(limit)
+      .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(borrowRecords)
+        .innerJoin(users, eq(borrowRecords.userId, users.id))
+        .innerJoin(books, eq(borrowRecords.bookId, books.id))
+        .where(whereClause),
+    ]);
+    const total = countResult[0]?.count ?? 0;
 
     // Transform to BorrowRecordWithDetails format
     const requests = allBorrowRecords.map((record) => ({
@@ -139,9 +194,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       requests,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      limit,
     });
   } catch (error) {
-    console.error("Error fetching borrow requests:", error);
+    logError("admin.borrow_requests_api_fetch_failed", error);
     return NextResponse.json(
       {
         success: false,

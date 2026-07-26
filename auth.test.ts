@@ -54,6 +54,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/lib/security/logger", () => ({
+  logError: vi.fn(),
   logWarn: vi.fn(),
 }));
 

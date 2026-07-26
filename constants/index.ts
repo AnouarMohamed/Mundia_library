@@ -1,3 +1,18 @@
+/**
+ * Application Constants
+ * 
+ * This module serves as the single source of truth for static UI text, 
+ * navigation configurations, and development-only sample data.
+ * 
+ * Using constants ensures:
+ * - Consistency across forms and navigation menus.
+ * - Easier localization and global UI updates.
+ * - Decoupling of business logic from display text.
+ */
+
+/**
+ * Navigation links for the main library interface.
+ */
 export const navigationLinks = [
   {
     href: "/library",
@@ -13,6 +28,9 @@ export const navigationLinks = [
   },
 ];
 
+/**
+ * Sidebar navigation links for the administrative dashboard.
+ */
 export const adminSideBarLinks = [
   {
     img: "/icons/admin/home.svg",
@@ -46,6 +64,9 @@ export const adminSideBarLinks = [
   },
 ];
 
+/**
+ * Human-readable labels for student registration and profile form fields.
+ */
 export const FIELD_NAMES = {
   fullName: "Full name",
   email: "Email",
@@ -54,6 +75,9 @@ export const FIELD_NAMES = {
   universityCard: "Upload University ID Card",
 };
 
+/**
+ * HTML input types for form fields.
+ */
 export const FIELD_TYPES = {
   fullName: "text",
   email: "email",
@@ -61,6 +85,9 @@ export const FIELD_TYPES = {
   password: "password",
 };
 
+/**
+ * Placeholder text for user-related form fields.
+ */
 export const FIELD_PLACEHOLDERS = {
   fullName: "John Doe",
   email: "john@university.edu",
@@ -69,6 +96,9 @@ export const FIELD_PLACEHOLDERS = {
   universityCard: "Upload your ID",
 };
 
+/**
+ * Placeholder text specifically for the book management (Create/Edit) form.
+ */
 export const BOOK_FIELD_PLACEHOLDERS = {
   title: "Book title",
   author: "Author name",
@@ -87,6 +117,10 @@ export const BOOK_FIELD_PLACEHOLDERS = {
   videoUrl: "Upload a book trailer",
 };
 
+/**
+ * Static sample data used for initial development, testing, and UI prototyping.
+ * These records follow the structure expected by the Book UI components.
+ */
 export const sampleBooks = [
   {
     id: 1,

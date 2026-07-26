@@ -1,0 +1,62 @@
+environment: prod
+image:
+  repository: REPLACE_APPROVED_REGISTRY/mundiapolis/circulation-service
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+replicaCount: 4
+revisionHistoryLimit: 10
+minReadySeconds: 20
+env:
+  APP_ENV: prod
+  PORT: "8080"
+externalSecret:
+  targetName: circulation-runtime
+  refreshInterval: 2m
+  data:
+    - secretKey: DATABASE_URL
+      remoteKey: mundia/prod/circulation/postgres
+      property: jdbc_url
+    - secretKey: DATABASE_USERNAME
+      remoteKey: mundia/prod/circulation/postgres
+      property: username
+    - secretKey: DATABASE_PASSWORD
+      remoteKey: mundia/prod/circulation/postgres
+      property: password
+    - secretKey: AUTH_ISSUER_URI
+      remoteKey: mundia/prod/circulation/oidc
+      property: issuer
+    - secretKey: AUTH_JWK_SET_URI
+      remoteKey: mundia/prod/circulation/oidc
+      property: jwks_url
+    - secretKey: AUTH_AUDIENCE
+      remoteKey: mundia/prod/circulation/oidc
+      property: audience
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+  limits:
+    cpu: "2"
+    memory: 1536Mi
+autoscaling:
+  enabled: true
+  minReplicas: 4
+  maxReplicas: 50
+  cpuTargetUtilization: 60
+  memoryTargetUtilization: 70
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 3
+networkPolicy:
+  enabled: true
+  egressCidrs:
+    - cidr: 10.60.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 9094
+        - protocol: TCP
+          port: 6379
+

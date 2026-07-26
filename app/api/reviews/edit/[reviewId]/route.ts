@@ -14,6 +14,7 @@ import {
   tooManyRequestsResponse,
 } from "@/lib/security/api-response";
 import { logError } from "@/lib/security/logger";
+import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 import { validateReviewPayload } from "@/lib/services/review-validation";
 
 /**
@@ -30,6 +31,11 @@ export async function PUT(
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request, {
+      requireJson: true,
+    });
+    if (sameOriginResponse) return sameOriginResponse;
+
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     const success = await enforceRateLimit();
 
@@ -123,10 +129,13 @@ export async function PUT(
  * Delete a review.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ reviewId: string }> }
 ) {
   try {
+    const sameOriginResponse = enforceSameOriginRequest(request);
+    if (sameOriginResponse) return sameOriginResponse;
+
     // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
     const success = await enforceRateLimit();
 

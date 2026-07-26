@@ -5,7 +5,6 @@ import {
   bookReviews,
   books,
   borrowRecords,
-  users,
 } from "@/database/schema";
 import BookOverview from "@/components/BookOverview";
 import BookDetailContent from "@/components/BookDetailContent";
@@ -44,10 +43,8 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
         createdAt: bookReviews.createdAt,
         updatedAt: bookReviews.updatedAt,
         userId: bookReviews.userId,
-        userFullName: users.fullName,
       })
       .from(bookReviews)
-      .innerJoin(users, eq(bookReviews.userId, users.id))
       .where(eq(bookReviews.bookId, id))
       .orderBy(desc(bookReviews.createdAt)),
     db
@@ -83,10 +80,15 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     notFound();
   }
 
-  const reviewRows = rawReviewRows.map(({ userId: reviewUserId, ...review }) => ({
-    ...review,
-    isOwner: reviewUserId === userId,
-  }));
+  const reviewRows = rawReviewRows.map(({ userId: reviewUserId, ...review }) => {
+    const isOwner = reviewUserId === userId;
+
+    return {
+      ...review,
+      userFullName: isOwner ? "You" : "Verified reader",
+      isOwner,
+    };
+  });
 
   // Normalize date/fine fields for client consumption.
   const initialUserBorrows = rawUserBorrows.map((record) => ({

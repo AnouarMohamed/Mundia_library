@@ -1,8 +1,11 @@
 /**
  * AdminRenewalRequestsList Component
- *
+ * 
  * A client component for administrators to manage book renewal requests.
- * Uses React Query for data fetching and mutations.
+ * Provides functionality to approve or reject requests with real-time updates.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
 
 "use client";
@@ -15,25 +18,48 @@ import BorrowSkeleton from "@/components/skeletons/BorrowSkeleton";
 import { CheckCircle, XCircle } from "lucide-react";
 import type { RenewalRequestWithDetails } from "@/lib/services/renewals";
 
+/**
+ * Props for AdminRenewalRequestsList
+ */
 interface AdminRenewalRequestsListProps {
+  /**
+   * Optional initial requests data for SSR hydration
+   */
   initialRequests?: RenewalRequestWithDetails[];
 }
 
+/**
+ * Helper function to format status strings for display.
+ * Converts "PENDING_APPROVAL" to "Pending Approval"
+ * 
+ * @param status - The raw status string from the database
+ * @returns A formatted, human-readable status label
+ */
 const formatStatusLabel = (status: string): string =>
   status
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+/**
+ * AdminRenewalRequestsList
+ * 
+ * Manages the display and lifecycle of book renewal requests.
+ * Uses React Query for data fetching and mutations.
+ */
 const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
   initialRequests,
 }) => {
+  // Fetch renewal requests with optional initial data for hydration
   const { data, isLoading, isError } = useRenewalRequests(initialRequests);
+  
+  // Define mutations for approving and rejecting requests
   const approveMutation = useApproveRenewal();
   const rejectMutation = useRejectRenewal();
 
   const requests = data || [];
 
+  // Display skeletons during initial loading if no initial data is present
   if (isLoading && (!initialRequests || initialRequests.length === 0)) {
     return (
       <div className="space-y-4">
@@ -44,6 +70,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
     );
   }
 
+  // Handle error states
   if (isError) {
     return (
       <div className="status-danger rounded-lg border p-4 text-center">
@@ -58,6 +85,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
         Renewal Requests ({requests.length})
       </h2>
 
+      {/* Empty state when no requests are available */}
       {requests.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[var(--mundia-line)] bg-[var(--mundia-paper)] py-8 text-center text-slate-500">
           No pending renewal requests found.
@@ -73,6 +101,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
                 <h3 className="text-base font-bold text-slate-900">
                   {request.bookTitle}
                 </h3>
+                {/* Status indicator with dynamic styling */}
                 <span
                   className={`status-pill ${
                     request.status === "PENDING"
@@ -86,6 +115,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
                 </span>
               </div>
 
+              {/* Request metadata grid */}
               <div className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm text-slate-600 sm:grid-cols-2">
                 <p>
                   <span className="font-medium text-slate-800">User:</span>{" "}
@@ -111,6 +141,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
                 </p>
               </div>
 
+              {/* Display reason for renewal if provided */}
               {request.requestReason && (
                 <p className="mt-2 rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper-warm)] p-2 text-xs italic text-slate-600">
                   &quot;{request.requestReason}&quot;
@@ -118,6 +149,7 @@ const AdminRenewalRequestsList: React.FC<AdminRenewalRequestsListProps> = ({
               )}
             </div>
 
+            {/* Action buttons for pending requests */}
             <div className="flex shrink-0 gap-2">
               {request.status === "PENDING" ? (
                 <>

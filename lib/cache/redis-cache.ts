@@ -88,16 +88,31 @@ export async function invalidateCache(key: string): Promise<void> {
 }
 
 /**
- * Clear multiple keys using a pattern.
- * Use sparingly on large keyspaces.
+ * Clear multiple keys using an incremental scan.
+ *
+ * Redis KEYS blocks while traversing the entire keyspace. SCAN keeps each
+ * operation bounded so catalog invalidation cannot stall a shared production
+ * Redis instance as the keyspace grows.
  */
 export async function invalidatePattern(pattern: string): Promise<void> {
   try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(...keys);
-    }
+    let cursor = "0";
+
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, {
+        match: pattern,
+        count: 100,
+      });
+      cursor = nextCursor;
+
+      for (let offset = 0; offset < keys.length; offset += 100) {
+        const batch = keys.slice(offset, offset + 100);
+        if (batch.length > 0) {
+          await redis.del(...batch);
+        }
+      }
+    } while (cursor !== "0");
   } catch (error) {
-    console.error(`Redis keys/del error for pattern ${pattern}:`, error);
+    console.error(`Redis scan/del error for pattern ${pattern}:`, error);
   }
 }

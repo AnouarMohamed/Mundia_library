@@ -442,7 +442,8 @@ export async function generateAllUserRecommendations(): Promise<
   const allUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.status, "APPROVED"));
+    .where(eq(users.status, "APPROVED"))
+    .limit(50); // Hard limit to prevent resource exhaustion
 
   const results = [];
   for (const user of allUsers) {
@@ -532,7 +533,8 @@ export async function getRecommendationStats(): Promise<RecommendationStats> {
   const allUsers = await db
     .select({ id: users.id })
     .from(users)
-    .where(eq(users.status, "APPROVED"));
+    .where(eq(users.status, "APPROVED"))
+    .limit(100); // Sampling limit to prevent timeouts
 
   let totalRecommendations = 0;
   let genreBasedCount = 0;

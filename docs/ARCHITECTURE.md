@@ -4,20 +4,21 @@ Mundiapolis Library is a full-stack Next.js application. The application combine
 
 ## Runtime Overview
 
-| Area | Implementation | Notes |
-| --- | --- | --- |
-| Pages | `app/**/page.tsx` | App Router pages and layouts. |
-| Student shell | `app/(root)/layout.tsx` | Requires a signed-in session before rendering student pages. |
-| Admin shell | `app/admin/layout.tsx` | Requires authenticated admin access and falls back to DB role lookup for stale sessions. |
-| Admin middleware | `middleware.ts` | Restricts `/admin/*` early with JWT token checks. |
-| Auth | `auth.ts` | NextAuth v5 credentials provider, JWT sessions, lazy DB imports for Edge compatibility. |
-| Server actions | `lib/actions/**`, `lib/admin/actions/**` | Mutations and admin workflows. |
-| API routes | `app/api/**/route.ts` | JSON endpoints for catalog, borrows, admin operations, reviews, notifications, uploads, and workflows. |
-| Database | `database/drizzle.ts`, `database/schema.ts` | Drizzle ORM over PostgreSQL. Local hostnames use `pg`; remote URLs use Neon HTTP driver. |
-| Cache | `lib/cache/**`, `database/redis.ts` | Upstash Redis plus Next.js cache tags for selected read paths. |
-| Background work | `lib/workflow.ts` | Upstash QStash and Workflow clients. |
-| Email | `lib/services/email-service.ts` | Brevo primary provider with Resend fallback for selected email flows. |
-| Images | `app/api/auth/imagekit/route.ts` | ImageKit auth parameter endpoint for uploads. |
+| Area             | Implementation                              | Notes                                                                                                        |
+| ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Pages            | `app/**/page.tsx`                           | App Router pages and layouts.                                                                                |
+| Student shell    | `app/(root)/layout.tsx`                     | Requires a signed-in session before rendering student pages.                                                 |
+| Admin shell      | `app/admin/layout.tsx`                      | Requires authenticated admin access and falls back to DB role lookup for stale sessions.                     |
+| Admin middleware | `middleware.ts`                             | Prefilters `/admin/*` for session-cookie presence; the server layout is the authoritative role/status guard. |
+| Auth             | `auth.ts`                                   | NextAuth v5 credentials provider, JWT sessions, lazy DB imports for Edge compatibility.                      |
+| Server actions   | `lib/actions/**`, `lib/admin/actions/**`    | Mutations and admin workflows.                                                                               |
+| API routes       | `app/api/**/route.ts`                       | JSON endpoints for catalog, borrows, admin operations, reviews, notifications, uploads, and workflows.       |
+| Database         | `database/drizzle.ts`, `database/schema.ts` | Drizzle ORM over a transaction-capable `pg` pool in every environment.                                       |
+| Cache            | `lib/cache/**`, `database/redis.ts`         | Upstash Redis plus Next.js cache tags for selected read paths.                                               |
+| Background work  | `lib/workflow.ts`                           | Upstash QStash and Workflow clients.                                                                         |
+| Email            | `lib/services/email-service.ts`             | Brevo primary provider with Resend fallback for selected email flows.                                        |
+| Uploads          | `app/api/uploads/route.ts`                  | Server-mediated, policy-bound uploads; the legacy client-signing route is retired.                           |
+| Health           | `app/api/health`, `app/api/health/live`     | Dependency-aware readiness plus a process-only liveness probe.                                               |
 
 ## Request Flow
 
@@ -50,7 +51,9 @@ sequenceDiagram
 
 ## Authentication And Authorization
 
-Authentication uses credentials sign-in through NextAuth. Passwords are stored as salted SHA-256 hashes in the current implementation.
+Authentication currently uses credentials sign-in through NextAuth while the
+managed OIDC migration is in progress. New passwords use bcrypt; successful
+verification of a legacy SHA-256 record rewrites it to bcrypt.
 
 Important files:
 
@@ -63,17 +66,17 @@ Important files:
 
 Role model:
 
-| Role | Access |
-| --- | --- |
-| `USER` | Student and faculty workflows: browse, borrow, renew, review, view own history. |
+| Role    | Access                                                                                                |
+| ------- | ----------------------------------------------------------------------------------------------------- |
+| `USER`  | Student and faculty workflows: browse, borrow, renew, review, view own history.                       |
 | `ADMIN` | All user workflows plus admin dashboard, catalog, approvals, reminders, exports, and user management. |
 
 Account status model:
 
-| Status | Meaning |
-| --- | --- |
-| `PENDING` | Account created but not approved. |
-| `APPROVED` | Account can use the system. |
+| Status     | Meaning                                 |
+| ---------- | --------------------------------------- |
+| `PENDING`  | Account created but not approved.       |
+| `APPROVED` | Account can use the system.             |
 | `REJECTED` | Account was denied by an administrator. |
 
 ## Borrow Lifecycle
@@ -100,12 +103,11 @@ Availability is stored on `books.availableCopies`. Mutations that approve or ret
 
 ## Data Access Strategy
 
-`database/drizzle.ts` chooses the database driver based on `DATABASE_URL`:
-
-- Local hosts such as `localhost`, `127.0.0.1`, `db`, and `postgres` use `pg` with a pooled Node Postgres client.
-- Remote PostgreSQL URLs use the Neon serverless driver.
-
-This lets local Docker and CI use a normal PostgreSQL container while hosted environments can use a serverless-friendly connection path.
+`database/drizzle.ts` uses the transaction-capable `pg` driver in every
+environment. The pool has bounded connection, statement, query, idle, and
+idle-in-transaction budgets. Hosted deployments should use a managed pooled
+PostgreSQL endpoint or PgBouncer and budget the per-process pool against the
+database connection limit.
 
 ## Caching Strategy
 
@@ -148,12 +150,12 @@ Production should decide which path owns each email class and keep sender identi
 
 ## Route Groups
 
-| Route group | Purpose |
-| --- | --- |
-| `app/(auth)` | Sign-in and sign-up pages. |
-| `app/(root)` | Authenticated student and faculty experience. |
-| `app/admin` | Admin circulation, catalog, automation, and user management. |
-| `app/api` | JSON API and integration endpoints. |
+| Route group  | Purpose                                                      |
+| ------------ | ------------------------------------------------------------ |
+| `app/(auth)` | Sign-in and sign-up pages.                                   |
+| `app/(root)` | Authenticated student and faculty experience.                |
+| `app/admin`  | Admin circulation, catalog, automation, and user management. |
+| `app/api`    | JSON API and integration endpoints.                          |
 
 ## Admin Operations Surface
 
@@ -174,7 +176,7 @@ The admin area currently includes:
 Next.js standalone output is enabled in `next.config.mjs`:
 
 ```js
-output: "standalone"
+output: "standalone";
 ```
 
 This supports:

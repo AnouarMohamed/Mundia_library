@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "legacy-circulation-snapshot/v1",
+  "capturedAt": "2026-07-26T10:00:00.000Z",
+  "source": {
+    "database": "legacy_library",
+    "serverVersion": "18.0"
+  },
+  "books": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "totalCopies": 1,
+      "availableCopies": 1,
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2026-02-01T09:00:00.000Z"
+    }
+  ],
+  "borrowRecords": [
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+      "userId": "33333333-3333-4333-8333-333333333333",
+      "bookId": "11111111-1111-4111-8111-111111111111",
+      "borrowDate": "2026-01-01T09:00:00.000Z",
+      "dueDate": "2026-01-15",
+      "returnDate": null,
+      "status": "BORROWED",
+      "borrowedBy": null,
+      "returnedBy": null,
+      "fineAmount": "0.00",
+      "notes": null,
+      "renewalCount": 0,
+      "lastReminderSent": null,
+      "updatedAt": null,
+      "updatedBy": null,
+      "createdAt": null
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2",
+      "userId": "44444444-4444-4444-8444-444444444444",
+      "bookId": "11111111-1111-4111-8111-111111111111",
+      "borrowDate": "2026-01-02T09:00:00.000Z",
+      "dueDate": "2026-01-16",
+      "returnDate": null,
+      "status": "BORROWED",
+      "borrowedBy": null,
+      "returnedBy": null,
+      "fineAmount": "0.00",
+      "notes": null,
+      "renewalCount": 0,
+      "lastReminderSent": null,
+      "updatedAt": null,
+      "updatedBy": null,
+      "createdAt": null
+    },
+    {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3",
+      "userId": "55555555-5555-4555-8555-555555555555",
+      "bookId": "11111111-1111-4111-8111-111111111111",
+      "borrowDate": "2025-01-01T09:00:00.000Z",
+      "dueDate": null,
+      "returnDate": "2025-01-10",
+      "status": "RETURNED",
+      "borrowedBy": null,
+      "returnedBy": null,
+      "fineAmount": "0.00",
+      "notes": null,
+      "renewalCount": 0,
+      "lastReminderSent": null,
+      "updatedAt": null,
+      "updatedBy": null,
+      "createdAt": null
+    }
+  ]
+}

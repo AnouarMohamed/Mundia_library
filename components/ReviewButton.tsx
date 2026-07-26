@@ -1,17 +1,14 @@
-"use client";
-
 /**
  * ReviewButton Component
- *
- * Button component for reviewing books. Uses React Query hook for eligibility check.
- * Integrates with useReviewEligibility hook and useCreateReview mutation.
- *
- * Features:
- * - Uses useReviewEligibility hook for eligibility check
- * - Shows loading state while checking eligibility
- * - Displays appropriate button state based on eligibility
- * - Opens ReviewFormDialog when eligible
+ * 
+ * Handles the entry point for book reviews. 
+ * Orchestrates eligibility checks and triggers the ReviewFormDialog.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,17 +17,33 @@ import { MessageCircle } from "lucide-react";
 import { useReviewEligibility } from "@/hooks/useQueries";
 import type { ReviewEligibility } from "@/lib/services/reviews";
 
+/**
+ * Props for ReviewButton
+ */
 interface ReviewButtonProps {
+  /**
+   * Unique identifier of the book (UUID)
+   */
   bookId: string;
+  /**
+   * Unique identifier of the user (UUID)
+   */
   userId: string;
   /**
-   * Initial review eligibility from SSR (prevents duplicate fetch, ensures correct button state on first load)
+   * Initial review eligibility from SSR (prevents duplicate fetch)
    */
   initialReviewEligibility?: ReviewEligibility;
 }
 
 /**
+ * ReviewButton
+ * 
  * Entry point for submitting a book review.
+ * Features:
+ * - Uses useReviewEligibility hook for eligibility check
+ * - Shows loading state while checking eligibility
+ * - Displays appropriate button state based on eligibility
+ * - Opens ReviewFormDialog when eligible
  */
 export default function ReviewButton({
   bookId,
@@ -39,25 +52,31 @@ export default function ReviewButton({
 }: ReviewButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
 
-  // Use React Query hook for eligibility check with SSR initial data
+  // Fetch live eligibility state using React Query, leveraging SSR data for hydration
   const { data: eligibility, isLoading } = useReviewEligibility(
     bookId,
     initialReviewEligibility,
   );
 
+  // Derived state for better readability
   const canReview = eligibility?.canReview || false;
   const hasExistingReview = eligibility?.hasExistingReview || false;
   const isCurrentlyBorrowed = eligibility?.isCurrentlyBorrowed || false;
 
+  /**
+   * SUCCESS CALLBACK:
+   * Invoked after the ReviewFormDialog successfully submits a review.
+   */
   const handleReviewSubmitted = () => {
     setShowDialog(false);
-    // CRITICAL: No manual invalidation needed here
-    // The useCreateReview mutation in ReviewFormDialog already handles
-    // all cache invalidation via invalidateAfterReviewChange()
-    // which invalidates reviews, books, and analytics queries
-    // Manual invalidation here would cause redundant refetches
+    /**
+     * CRITICAL PERFORMANCE NOTE: 
+     * Cache invalidation is handled centrally within the mutation success callback
+     * in ReviewFormDialog. Manual invalidation here would be redundant.
+     */
   };
 
+  // State 1: Still verifying eligibility
   if (isLoading) {
     return (
       <Button
@@ -70,6 +89,7 @@ export default function ReviewButton({
     );
   }
 
+  // State 2: User has already reviewed this book
   if (hasExistingReview) {
     return (
       <Button
@@ -84,6 +104,7 @@ export default function ReviewButton({
     );
   }
 
+  // State 3: User is not yet allowed to review (e.g., must return book first)
   if (!canReview) {
     return (
       <Button
@@ -100,6 +121,7 @@ export default function ReviewButton({
     );
   }
 
+  // State 4: User is eligible to review
   return (
     <>
       <Button
@@ -112,6 +134,7 @@ export default function ReviewButton({
         </span>
       </Button>
 
+      {/* The actual modal form for data entry */}
       <ReviewFormDialog
         bookId={bookId}
         isOpen={showDialog}

@@ -9,6 +9,12 @@ import {
 } from "@/lib/security/auth-guards";
 import { logAdminAction } from "@/lib/admin/audit";
 import { approveBorrowRequest, rejectBorrowRequest } from "@/lib/admin/actions/borrow";
+import { updateUserRole } from "@/lib/admin/actions/user";
+
+const MAX_BULK_ITEMS = 100;
+
+const hasSafeBatchSize = (ids: string[]) =>
+  ids.length > 0 && ids.length <= MAX_BULK_ITEMS;
 
 // Bulk book operations
 /**
@@ -16,26 +22,37 @@ import { approveBorrowRequest, rejectBorrowRequest } from "@/lib/admin/actions/b
  */
 export async function bulkUpdateBooks(
   bookIds: string[],
-  updates: Partial<typeof books.$inferInsert>
+  updates: { isActive?: boolean }
 ) {
   const guard = await requireAdmin();
   if (!guard.ok) return guardToActionError(guard);
 
-  if (bookIds.length === 0) {
-    return { success: false, message: "No books selected" };
+  if (!hasSafeBatchSize(bookIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} books`,
+    };
   }
 
   try {
+    const safeUpdates: { isActive?: boolean } = {};
+    if (typeof updates.isActive === "boolean") {
+      safeUpdates.isActive = updates.isActive;
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+      return { success: false, message: "No supported updates supplied" };
+    }
+
     await db
       .update(books)
       .set({
-        ...updates,
+        ...safeUpdates,
         updatedAt: new Date(),
       })
       .where(inArray(books.id, bookIds));
     await logAdminAction(guard.user.id, "BULK_UPDATE_BOOKS", undefined, "BOOK", {
       bookIds,
-      updates,
+      updates: safeUpdates,
     });
 
     return {
@@ -58,8 +75,11 @@ export async function bulkDeleteBooks(bookIds: string[]) {
   const guard = await requireAdmin();
   if (!guard.ok) return guardToActionError(guard);
 
-  if (bookIds.length === 0) {
-    return { success: false, message: "No books selected" };
+  if (!hasSafeBatchSize(bookIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} books`,
+    };
   }
 
   try {
@@ -125,25 +145,42 @@ export async function bulkDeactivateBooks(bookIds: string[]) {
  */
 export async function bulkUpdateUsers(
   userIds: string[],
-  updates: Partial<typeof users.$inferInsert>
+  updates: { status?: "PENDING" | "APPROVED" | "REJECTED" }
 ) {
   const guard = await requireAdmin();
   if (!guard.ok) return guardToActionError(guard);
 
-  if (userIds.length === 0) {
-    return { success: false, message: "No users selected" };
+  if (!hasSafeBatchSize(userIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} users`,
+    };
   }
 
   try {
+    const safeUpdates: {
+      status?: "PENDING" | "APPROVED" | "REJECTED";
+    } = {};
+    if (
+      updates.status === "PENDING" ||
+      updates.status === "APPROVED" ||
+      updates.status === "REJECTED"
+    ) {
+      safeUpdates.status = updates.status;
+    }
+    if (Object.keys(safeUpdates).length === 0) {
+      return { success: false, message: "No supported updates supplied" };
+    }
+
     await db
       .update(users)
       .set({
-        ...updates,
+        ...safeUpdates,
       })
       .where(inArray(users.id, userIds));
     await logAdminAction(guard.user.id, "BULK_UPDATE_USERS", undefined, "USER", {
       userIds,
-      updates,
+      updates: safeUpdates,
     });
 
     return {
@@ -177,14 +214,48 @@ export async function bulkRejectUsers(userIds: string[]) {
  * Bulk grant admin role to users.
  */
 export async function bulkMakeAdminUsers(userIds: string[]) {
-  return bulkUpdateUsers(userIds, { role: "ADMIN" });
+  if (!hasSafeBatchSize(userIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} users`,
+    };
+  }
+
+  const results = [];
+  for (const userId of userIds) {
+    results.push(await updateUserRole(userId, "ADMIN"));
+  }
+  const failures = results.filter((result) => !result.success);
+  return failures.length === 0
+    ? { success: true, message: `Granted admin to ${userIds.length} user(s)` }
+    : {
+        success: false,
+        message: `${failures.length} admin role update(s) failed`,
+      };
 }
 
 /**
  * Bulk remove admin role from users.
  */
 export async function bulkRemoveAdminUsers(userIds: string[]) {
-  return bulkUpdateUsers(userIds, { role: "USER" });
+  if (!hasSafeBatchSize(userIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} users`,
+    };
+  }
+
+  const results = [];
+  for (const userId of userIds) {
+    results.push(await updateUserRole(userId, "USER"));
+  }
+  const failures = results.filter((result) => !result.success);
+  return failures.length === 0
+    ? { success: true, message: `Removed admin from ${userIds.length} user(s)` }
+    : {
+        success: false,
+        message: `${failures.length} admin role update(s) failed`,
+      };
 }
 
 // Bulk borrow operations
@@ -195,8 +266,11 @@ export async function bulkApproveBorrowRequests(recordIds: string[]) {
   const guard = await requireAdmin();
   if (!guard.ok) return guardToActionError(guard);
 
-  if (recordIds.length === 0) {
-    return { success: false, message: "No requests selected" };
+  if (!hasSafeBatchSize(recordIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} requests`,
+    };
   }
 
   try {
@@ -240,8 +314,11 @@ export async function bulkRejectBorrowRequests(recordIds: string[]) {
   const guard = await requireAdmin();
   if (!guard.ok) return guardToActionError(guard);
 
-  if (recordIds.length === 0) {
-    return { success: false, message: "No requests selected" };
+  if (!hasSafeBatchSize(recordIds)) {
+    return {
+      success: false,
+      message: `Select between 1 and ${MAX_BULK_ITEMS} requests`,
+    };
   }
 
   try {

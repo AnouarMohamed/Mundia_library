@@ -1,18 +1,22 @@
-"use client";
-
 /**
  * AdminUsersList Component
- *
- * Client component that displays all users and pending admin requests for admin management.
- * Uses React Query for data fetching and caching, with SSR initial data support.
- *
+ * 
+ * A comprehensive administrative tool for managing the platform's user base and admin requests.
+ * It provides a tabular view of all users with advanced filtering capabilities and a 
+ * specialized section for reviewing pending administrative privilege requests.
+ * 
  * Features:
- * - Uses useAllUsers and usePendingAdminRequests hooks with initialData from SSR
- * - Displays skeleton loaders while fetching
- * - Shows error state if fetch fails
- * - Integrates mutations for user role/status updates and admin request approvals
- * - Displays users in a table and admin requests in cards
+ * - Real-time user searching and filtering by role and status.
+ * - Integration with TanStack Query for synchronized state across multiple data hooks.
+ * - Workflow for approving/rejecting new user registrations.
+ * - Privilege management: promoting users to Admin or revoking Admin rights.
+ * - Responsive table design with dedicated mobile-friendly action layouts.
+ * - Automated search persistence via URL parameters.
+ * 
+ * Type: Client Component
  */
+
+"use client";
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -37,35 +41,30 @@ import type {
 } from "@/lib/services/users";
 import type { AdminRequest } from "@/lib/services/users";
 
+/**
+ * Props for the AdminUsersList component.
+ */
 interface AdminUsersListProps {
-  /**
-   * Initial users data from SSR (prevents duplicate fetch)
-   */
+  /** Initial users data from SSR to prevent hydration flickers. */
   initialUsers?: User[];
-  /**
-   * Initial admin requests data from SSR (prevents duplicate fetch)
-   */
+  /** Initial pending admin requests from SSR. */
   initialAdminRequests?: AdminRequest[];
-  /**
-   * Success message from URL params
-   */
+  /** Feedback message for successful operations. */
   successMessage?: string;
-  /**
-   * Error message from URL params
-   */
+  /** Feedback message for failed operations. */
   errorMessage?: string;
-  /**
-   * Current user ID (for preventing self-removal)
-   */
+  /** ID of the currently logged-in administrator to prevent self-modification. */
   currentUserId?: string;
 }
 
+/** Formats user status (e.g., "PENDING") into "Pending". */
 const formatStatusLabel = (status: string | null | undefined): string =>
   (status ?? "Unknown")
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
+/** Maps internal role constants to user-friendly labels. */
 const formatRoleLabel = (role: string | null | undefined): string =>
   role === "ADMIN" ? "Admin" : "Student";
 
@@ -81,16 +80,20 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   const searchParamsHook = useSearchParams();
   const queryClient = useQueryClient();
 
-  // Get current search params from URL (default sort to "created" for most recent first)
+  // URL State: Extract current filters and sorting from URL
   const currentSearch = searchParamsHook.get("search") || "";
   const currentStatus = searchParamsHook.get("status") || "all";
   const currentRole = searchParamsHook.get("role") || "all";
   const currentSort = searchParamsHook.get("sort") || "created";
 
+  // Local State: Track search input before debouncing to URL
   const [localSearch, setLocalSearch] = useState(currentSearch);
   const lastSyncedSearchRef = React.useRef(currentSearch);
 
-  // Debounce search input for instant filtering
+  /**
+   * Effect: Debounced URL update for user search.
+   * Ensures efficient filtering without overloading the database on every keystroke.
+   */
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (localSearch !== currentSearch) {
@@ -109,18 +112,16 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
         const newUrl = `/admin/users?${params.toString()}`;
 
-        // Update ref before navigation to prevent sync effect from overwriting
         lastSyncedSearchRef.current = trimmedSearch;
         queryClient.invalidateQueries({ queryKey: ["all-users"] });
         router.replace(newUrl, { scroll: false });
       }
-    }, 300); // 300ms debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [localSearch, currentSearch, searchParamsHook, queryClient, router]);
 
-  // Build filters from URL params (default sort to "created" for most recent first)
-  // Use useMemo to ensure filters object updates when URL params change
+  // Memoized filter configuration for the main user query
   const filters: UserFilters = React.useMemo(() => {
     return {
       search: currentSearch || undefined,
@@ -136,12 +137,10 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     };
   }, [currentSearch, currentStatus, currentRole, currentSort]);
 
-  // Check if any filters are active (used for conditional initialData and empty state)
   const hasActiveFilters =
     currentSearch || currentStatus !== "all" || currentRole !== "all";
 
-  // Only use initialData on first load (when no filters are active)
-  // This prevents initialData from overriding filtered results
+  // Prepare initial data structure for TanStack Query
   const initialUsersData: UsersListResponse | undefined =
     !hasActiveFilters && initialUsers
       ? {
@@ -153,6 +152,9 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
         }
       : undefined;
 
+  /**
+   * Data Fetching: Multi-query setup for users and administrative requests.
+   */
   const {
     data: usersData,
     isLoading: usersLoading,
@@ -167,14 +169,16 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     error: adminRequestsErrorData,
   } = usePendingAdminRequests(initialAdminRequests);
 
-  // React Query mutations
+  // Mutations for administrative actions
   const updateUserRoleMutation = useUpdateUserRole();
   const updateUserStatusMutation = useUpdateUserStatus();
   const approveAdminRequestMutation = useApproveAdminRequest();
   const rejectAdminRequestMutation = useRejectAdminRequest();
   const removeAdminPrivilegesMutation = useRemoveAdminPrivileges();
 
-  // Update search params in URL and trigger refetch
+  /**
+   * Updates multiple URL search parameters simultaneously and invalidates cache.
+   */
   const updateSearchParams = (newParams: Record<string, string>) => {
     const params = new URLSearchParams(searchParamsHook.toString());
 
@@ -186,17 +190,12 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       }
     });
 
-    // Always include sort if not present
     if (!params.get("sort")) {
       params.set("sort", "created");
     }
 
     const newUrl = `/admin/users?${params.toString()}`;
-
-    // Invalidate queries to force refetch with new params
     queryClient.invalidateQueries({ queryKey: ["all-users"] });
-
-    // Use replace to avoid adding to history and ensure immediate update
     router.replace(newUrl, { scroll: false });
   };
 
@@ -215,13 +214,11 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     router.push("/admin/users?sort=created");
   };
 
-  // Sync localSearch with URL params when they change externally (e.g., browser back/forward)
-  // Only sync if the change didn't come from our own debounced update
+  /**
+   * Effect: Sync local search state with URL params.
+   * Handles external navigation (browser back/forward) correctly.
+   */
   React.useEffect(() => {
-    // Only sync if:
-    // 1. currentSearch changed from an external source (not our debounce)
-    // 2. localSearch matches the last synced value (user isn't actively typing)
-    // This prevents overwriting user input while typing
     if (
       currentSearch !== lastSyncedSearchRef.current &&
       localSearch === lastSyncedSearchRef.current
@@ -231,7 +228,10 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     }
   }, [currentSearch, localSearch]);
 
-  // Ensure sort param is set on initial load (most recent first)
+  /**
+   * Effect: Default Sort enforcement.
+   * Ensures "created" sort is applied on initial load if not specified.
+   */
   React.useEffect(() => {
     if (!searchParamsHook.get("sort")) {
       const params = new URLSearchParams(searchParamsHook.toString());
@@ -240,18 +240,13 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     }
   }, [searchParamsHook, router]);
 
-  // CRITICAL: Always prefer React Query data over initial data
-  // React Query data is fresh and updates immediately after mutations
-  // initial data is only used as fallback during initial load
-  // Extract data from responses
-  // useAllUsers returns UsersListResponse with users array
+  // Derived Data: Prefer fresh query data over SSR initial data
   const users: User[] = ((usersData?.users ?? initialUsers) || []) as User[];
-  // usePendingAdminRequests returns AdminRequest[] directly
   const adminRequests: AdminRequest[] = ((adminRequestsData ??
     initialAdminRequests) ||
     []) as AdminRequest[];
 
-  // Handler functions for mutations
+  // Action Handlers
   const handleUpdateUserRole = async (
     userId: string,
     role: "USER" | "ADMIN",
@@ -278,9 +273,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
   const handleApproveAdminRequest = async (requestId: string) => {
     const adminId = session?.user?.id;
-    if (!adminId) {
-      return;
-    }
+    if (!adminId) return;
     const request = adminRequests.find((r) => r.id === requestId);
     approveAdminRequestMutation.mutate({
       requestId,
@@ -291,9 +284,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
   const handleRejectAdminRequest = async (requestId: string) => {
     const adminId = session?.user?.id;
-    if (!adminId) {
-      return;
-    }
+    if (!adminId) return;
     const request = adminRequests.find((r) => r.id === requestId);
     rejectAdminRequestMutation.mutate({
       requestId,
@@ -305,9 +296,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
 
   const handleRemoveAdminPrivileges = async (userId: string) => {
     const adminId = session?.user?.id;
-    if (!adminId) {
-      return;
-    }
+    if (!adminId) return;
     const user = users.find((u) => u.id === userId);
     removeAdminPrivilegesMutation.mutate({
       userId,

@@ -1,13 +1,11 @@
 /**
  * RenewalRequestButton Component
- *
- * A client component that allows students to request a renewal for a borrowed book.
- * It includes a dialog to provide an optional reason for the renewal.
- *
- * Features:
- * - Checks eligibility before allowing the request.
- * - Displays a loading state during the submission.
- * - Shows success/error toasts upon completion.
+ * 
+ * Provides a UI trigger for students to request a due-date extension for borrowed books.
+ * Includes eligibility checks and a dialog for capturing the request reason.
+ * 
+ * @author Mundia Library Team
+ * @version 1.0.0
  */
 
 "use client";
@@ -28,11 +26,29 @@ import { RotateCcw, Loader2 } from "lucide-react";
 import { requestRenewal, canRequestRenewal } from "@/lib/actions/renewal";
 import { toast } from "@/hooks/use-toast";
 
+/**
+ * Props for RenewalRequestButton
+ */
 interface RenewalRequestButtonProps {
+  /**
+   * The unique ID of the borrow record being renewed
+   */
   borrowRecordId: string;
+  /**
+   * The display title of the book for the confirmation dialog
+   */
   bookTitle: string;
 }
 
+/**
+ * RenewalRequestButton
+ * 
+ * A client component that allows students to request a renewal for a borrowed book.
+ * Features:
+ * - Checks eligibility before allowing the request.
+ * - Displays a loading state during the submission.
+ * - Shows success/error toasts upon completion.
+ */
 const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
   borrowRecordId,
   bookTitle,
@@ -43,7 +59,11 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
   const [isEligible, setIsEligible] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
-  // Check eligibility on mount
+  /**
+   * ELIGIBILITY CHECK:
+   * On mount, we verify if this specific borrow record is allowed to be renewed 
+   * (e.g., hasn't exceeded max renewals, isn't too early, etc.)
+   */
   useEffect(() => {
     const checkEligibility = async () => {
       const eligible = await canRequestRenewal(borrowRecordId);
@@ -53,6 +73,10 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
     checkEligibility();
   }, [borrowRecordId]);
 
+  /**
+   * SUBMISSION HANDLER:
+   * Sends the renewal request to the server action.
+   */
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
@@ -68,7 +92,7 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
           variant: "default",
         });
         setIsOpen(false);
-        setIsEligible(false); // Disable button after successful request
+        setIsEligible(false); // Disable button immediately to prevent duplicate requests
       } else {
         toast({
           title: "Request failed",
@@ -87,11 +111,13 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
     }
   };
 
+  // Don't render if we're still checking eligibility or if the user isn't eligible
   if (isChecking) return null;
   if (!isEligible) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {/* Trigger Button */}
       <DialogTrigger asChild>
         <Button
           variant="outline"
@@ -102,6 +128,8 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
           <span>Request renewal</span>
         </Button>
       </DialogTrigger>
+      
+      {/* Renewal Request Dialog Content */}
       <DialogContent className="surface-panel sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-[var(--mundia-ink)]">
@@ -112,6 +140,8 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
             days.
           </DialogDescription>
         </DialogHeader>
+        
+        {/* Reason Input Section */}
         <div className="grid gap-4 py-4">
           <div className="flex flex-col gap-2">
             <label htmlFor="reason" className="text-sm font-medium">
@@ -127,6 +157,8 @@ const RenewalRequestButton: React.FC<RenewalRequestButtonProps> = ({
             />
           </div>
         </div>
+        
+        {/* Action Buttons */}
         <DialogFooter>
           <Button
             variant="ghost"

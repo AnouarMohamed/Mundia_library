@@ -1,20 +1,12 @@
 /**
- * Books API Route
- *
- * GET /api/books
- *
- * Purpose: Get a list of books with optional search, filters, sorting, and pagination.
- *
- * Query Parameters:
- * - search (optional): Search by title or author
- * - genre (optional): Filter by genre
- * - availability (optional): Filter by availability ("available" or "unavailable")
- * - rating (optional): Minimum rating (1-5)
- * - sort (optional): Sort order ("title", "author", "rating", "date")
- * - page (optional): Page number (default: 1)
- * - limit (optional): Books per page (default: 12)
- *
- * IMPORTANT: This route uses Node.js runtime (not Edge) because it needs database access
+ * Books API Endpoint
+ * 
+ * Provides a searchable, filterable, and paginated list of books.
+ * Utilizes a multi-layered caching strategy:
+ * 1. Redis (Upstash) for fast global distributed caching.
+ * 2. Next.js unstable_cache for per-node memory caching and revalidation.
+ * 
+ * @module app/api/books/route
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -36,10 +28,11 @@ import {
 import { logError } from "@/lib/security/logger";
 
 /**
- * Use Node.js runtime for DB access and Redis caching.
+ * Force Node.js runtime for database connectivity and Redis access.
  */
 export const runtime = "nodejs";
 
+// Input validation constants
 const MAX_SEARCH_LENGTH = 100;
 const MAX_GENRE_LENGTH = 120;
 const SORT_OPTIONS = new Set(["title", "author", "rating", "date"]);
@@ -56,7 +49,7 @@ type BooksQueryInput = {
 };
 
 interface BooksResult {
-  books: Book[]; 
+  books: Array<typeof books.$inferSelect & { relevance?: number }>;
   pagination: {
     currentPage: number;
     totalPages: number;
@@ -66,12 +59,15 @@ interface BooksResult {
 }
 
 /**
- * Fetch a page of books with optional search, filters, and caching.
+ * Internal function to fetch a page of books, handling both database queries and Redis caching.
+ * 
+ * @param {BooksQueryInput} input - Validated query parameters
+ * @returns {Promise<BooksResult>} Object containing book list and pagination metadata
  */
-const fetchBooksPage = async (input: BooksQueryInput) => {
+const fetchBooksPage = async (input: BooksQueryInput): Promise<BooksResult> => {
   const cacheKey = `books:list:${JSON.stringify(input)}`;
 
-  // 1. Try to get from Redis cache
+  // 1. Try to retrieve data from the primary Redis cache (Upstash).
   const { data: cachedResult, isStale } =
     await getCachedData<BooksResult>(cacheKey);
 
@@ -79,12 +75,17 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
     return cachedResult;
   }
 
-  // 2. Fetch from DB (either first time or background refresh)
-  const fetchFromDb = async () => {
+  /**
+   * Encapsulated database fetch logic.
+   */
+  const fetchFromDb = async (): Promise<BooksResult> => {
     const offset = (input.page - 1) * input.limit;
 
     let result: BooksResult;
+    
+    // Check if we are performing a text search or a filtered list query.
     if (input.search) {
+      // Use the advanced search service (handles full-text search and relevance).
       const searchSortBy = (
         ["relevance", "title", "rating", "date"].includes(input.sort)
           ? input.sort
@@ -109,12 +110,14 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
         },
       };
     } else {
+      // Standard filtered list query using Drizzle ORM.
       const whereConditions = [eq(books.isActive, true)];
 
       if (input.genre) {
         whereConditions.push(eq(books.genre, input.genre));
       }
 
+      // Handle availability filtering via SQL fragments.
       if (input.availability === "available") {
         whereConditions.push(sql`${books.availableCopies} > 0`);
       } else if (input.availability === "unavailable") {
@@ -126,6 +129,7 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
         whereConditions.push(sql`${books.rating} >= ${minRating}`);
       }
 
+      // Define sort order.
       let orderBy;
       switch (input.sort) {
         case "author":
@@ -146,6 +150,7 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
       const whereClause =
         whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
+      // Execute both main data query and count query in parallel.
       const [allBooks, totalBooksResult] = await Promise.all([
         db
           .select()
@@ -172,14 +177,15 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
       };
     }
 
-    // Cache the result (5 minutes fresh, 1 hour stale)
+    // Populate the Redis cache (5m fresh, 1h stale-while-revalidate).
     await setCachedData(cacheKey, result, { ttl: 300, swr: 3600 });
     return result;
   };
 
+  // Stale-While-Revalidate (SWR) implementation for Redis.
   if (cachedResult && isStale) {
-    // SWR: return stale and refresh in background
-    fetchFromDb().catch(console.error);
+    // Return stale data immediately and refresh cache in the background.
+    fetchFromDb().catch((err) => logError("books.swr_refresh_failed", err));
     return cachedResult;
   }
 
@@ -187,7 +193,8 @@ const fetchBooksPage = async (input: BooksQueryInput) => {
 };
 
 /**
- * Next.js cache wrapper for the book list query.
+ * Secondary cache layer using Next.js unstable_cache.
+ * This caches the result in memory on the specific server node.
  */
 const getCachedBooksPage = unstable_cache(
   async (input: BooksQueryInput) => fetchBooksPage(input),
@@ -199,25 +206,31 @@ const getCachedBooksPage = unstable_cache(
 );
 
 /**
- * Get books list with filters and pagination
- *
- * @param request - Next.js request object
- * @returns JSON response with books array and pagination info
+ * GET Handler for /api/books
+ * 
+ * Expected Query Parameters:
+ * - search (string): Optional search term
+ * - genre (string): Optional genre filter
+ * - availability (available|unavailable): Optional availability filter
+ * - rating (1-5): Optional minimum rating filter
+ * - sort (title|author|rating|date): Optional sort field
+ * - page (number): Page index (starts at 1)
+ * - limit (number): Results per page (max 50)
+ * 
+ * @param {NextRequest} request - Next.js Request object
+ * @returns {NextResponse} JSON response containing books and pagination info
  */
 export async function GET(request: NextRequest) {
   try {
-    // Rate limiting to prevent abuse (applies to both authenticated and unauthenticated users)
-    // This endpoint returns public book data (book list with filters, not user-specific)
-    // Rate limiting provides protection against abuse while keeping it accessible for public book pages
+    // 1. Rate Limiting: protect against automated scraping and abuse.
     const success = await enforceRateLimit();
-
     if (!success) {
       return tooManyRequestsResponse();
     }
 
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
+    // 2. Input Normalization and Validation.
     const search = normalizeTextParam(
       searchParams.get("search"),
       MAX_SEARCH_LENGTH
@@ -232,6 +245,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limitParam = parseInt(searchParams.get("limit") || "12", 10);
 
+    // Parameter Validation
     if (!SORT_OPTIONS.has(sort)) {
       return badRequestResponse("Invalid sort option");
     }
@@ -252,6 +266,7 @@ export async function GET(request: NextRequest) {
       ? 12
       : Math.min(50, Math.max(1, limitParam));
 
+    // 3. Data Retrieval via Caching Layers.
     const result = await getCachedBooksPage({
       search,
       genre,

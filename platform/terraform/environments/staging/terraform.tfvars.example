@@ -1,0 +1,41 @@
+aws_account_id      = "REPLACE_STAGING_ACCOUNT_ID"
+deployment_role_arn = "arn:aws:iam::REPLACE_STAGING_ACCOUNT_ID:role/REPLACE_TERRAFORM_ROLE"
+region              = "REPLACE_PRIMARY_REGION"
+
+configuration = {
+  vpc_cidr                     = "10.50.0.0/16"
+  availability_zone_count     = 3
+  nat_gateway_per_az          = true
+  kubernetes_version          = "REPLACE_APPROVED_EKS_MINOR"
+  endpoint_public_access      = false
+  public_access_cidrs         = []
+  administrator_principal_arns = [
+    "arn:aws:iam::REPLACE_STAGING_ACCOUNT_ID:role/REPLACE_SSO_ADMIN_ROLE"
+  ]
+  addon_versions = {
+    coredns                = "REPLACE_EXACT_ADDON_VERSION"
+    kube-proxy             = "REPLACE_EXACT_ADDON_VERSION"
+    vpc-cni                = "REPLACE_EXACT_ADDON_VERSION"
+    eks-pod-identity-agent = "REPLACE_EXACT_ADDON_VERSION"
+  }
+  node_instance_types = ["REPLACE_CAPACITY_TESTED_INSTANCE_TYPE"]
+  node_min_size       = 3
+  node_desired_size   = 3
+  node_max_size       = 10
+
+  dependency_contract = {
+    postgres_secret_arn         = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/staging/circulation/postgres"
+    kafka_secret_arn            = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/staging/circulation/kafka"
+    redis_secret_arn            = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/staging/circulation/redis"
+    oidc_secret_arn             = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/staging/circulation/oidc"
+    otel_secret_arn             = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/staging/platform/otel"
+    object_storage_bucket_arn   = "arn:aws:s3:::REPLACE_STAGING_BUCKET"
+    opensearch_endpoint         = "https://REPLACE_PRIVATE_OPENSEARCH_ENDPOINT"
+    oidc_issuer_url             = "https://REPLACE_INSTITUTIONAL_OIDC_ISSUER"
+    oidc_jwks_url               = "https://REPLACE_INSTITUTIONAL_OIDC_JWKS"
+    otel_exporter_endpoint      = "https://REPLACE_OTLP_ENDPOINT"
+    secret_manager_kms_key_arns = [
+      "arn:aws:kms:REPLACE_REGION:REPLACE_ACCOUNT:key/REPLACE_KMS_KEY_ID"
+    ]
+  }
+}

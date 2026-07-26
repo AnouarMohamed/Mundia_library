@@ -1,0 +1,7 @@
+bucket         = "REPLACE_STAGING_TERRAFORM_STATE_BUCKET"
+key            = "mundiapolis/platform/staging.tfstate"
+region         = "REPLACE_STATE_REGION"
+encrypt        = true
+dynamodb_table = "REPLACE_STAGING_TERRAFORM_LOCK_TABLE"
+role_arn       = "arn:aws:iam::REPLACE_STAGING_ACCOUNT_ID:role/REPLACE_STATE_ROLE"
+

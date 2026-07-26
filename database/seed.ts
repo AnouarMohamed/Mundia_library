@@ -1,33 +1,18 @@
 import dummyBooks from "../dummybooks.json";
 import { books, users } from "@/database/schema";
-import { sha256 } from "@noble/hashes/sha256";
-import { randomBytes } from "@noble/hashes/utils";
 import { config } from "dotenv";
+import { hashPassword } from "@/lib/security/password";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
 
 type Db = typeof import("@/database/drizzle").db;
 
-const concatUint8Arrays = (a: Uint8Array, b: Uint8Array): Uint8Array => {
-  const c = new Uint8Array(a.length + b.length);
-  c.set(a, 0);
-  c.set(b, a.length);
-  return c;
-};
-
-const hashPassword = (password: string) => {
-  const salt = randomBytes(16);
-  const passwordBytes = new TextEncoder().encode(password);
-  const hashBuffer = sha256(concatUint8Arrays(passwordBytes, salt));
-
-  return `${Buffer.from(salt).toString("base64")}:${Buffer.from(hashBuffer).toString("base64")}`;
-};
-
 const seedGuestUsers = async (db: Db) => {
-  const guestPassword = hashPassword("12345678");
+  const guestPassword = await hashPassword("12345678");
   const guestUsers = [
     {
+      id: "00000000-0000-4000-8000-000000000001",
       fullName: "Guest User",
       email: "test@user.com",
       universityId: 90000001,
@@ -37,6 +22,7 @@ const seedGuestUsers = async (db: Db) => {
       role: "USER" as const,
     },
     {
+      id: "00000000-0000-4000-8000-000000000002",
       fullName: "Guest Admin",
       email: "test@admin.com",
       universityId: 90000002,
@@ -44,6 +30,16 @@ const seedGuestUsers = async (db: Db) => {
       universityCard: "guest-admin-card",
       status: "APPROVED" as const,
       role: "ADMIN" as const,
+    },
+    {
+      id: "00000000-0000-4000-8000-000000000003",
+      fullName: "Pending E2E User",
+      email: "pending-e2e@example.test",
+      universityId: 90000003,
+      password: guestPassword,
+      universityCard: "pending-e2e-card",
+      status: "PENDING" as const,
+      role: "USER" as const,
     },
   ];
 
@@ -68,7 +64,29 @@ const seed = async (db: Db) => {
   console.log("Seeding data...");
 
   try {
-    await seedGuestUsers(db);
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error("DATABASE_URL is required for seeding");
+    }
+
+    const databaseHost = new URL(databaseUrl).hostname;
+    const localDatabaseHosts = new Set([
+      "localhost",
+      "127.0.0.1",
+      "::1",
+      "db",
+      "postgres",
+    ]);
+    const fixturesExplicitlyAllowed =
+      process.env.ALLOW_TEST_FIXTURES === "true";
+
+    if (fixturesExplicitlyAllowed && localDatabaseHosts.has(databaseHost)) {
+      await seedGuestUsers(db);
+    } else {
+      console.log(
+        "Skipping fixture accounts; they are allowed only for an explicitly configured local database.",
+      );
+    }
 
     for (const book of dummyBooks) {
       await db
@@ -98,8 +116,7 @@ const main = async () => {
   }
 };
 
-main()
-  .catch((error) => {
-    console.error("Seeding failed:", error);
-    process.exitCode = 1;
-  })
+main().catch((error) => {
+  console.error("Seeding failed:", error);
+  process.exitCode = 1;
+});
