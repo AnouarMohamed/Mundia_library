@@ -170,6 +170,7 @@ data class CirculationOutboxEvent(
     val eventVersion: Int,
     val occurredAt: Instant,
     val result: LoanCommandResult,
+    val actorFingerprint: String,
 )
 
 sealed class CirculationCommandException(message: String) : RuntimeException(message)

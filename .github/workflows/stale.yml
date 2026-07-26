@@ -6,8 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  issues: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: stale-bot
@@ -18,6 +17,9 @@ jobs:
     name: Mark stale work
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Mark inactive issues and pull requests

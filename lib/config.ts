@@ -14,6 +14,63 @@
 
 import { z } from "zod";
 
+const optionalBooleanString = z
+  .enum(["true", "false"])
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value === "true"));
+
+const exactHttpsIssuer = z
+  .string()
+  .default("")
+  .refine((value) => {
+    if (!value) return true;
+    if (value.trim() !== value) return false;
+
+    try {
+      const issuer = new URL(value);
+      return (
+        issuer.protocol === "https:" &&
+        !issuer.username &&
+        !issuer.password &&
+        !issuer.search &&
+        !issuer.hash
+      );
+    } catch {
+      return false;
+    }
+  }, "OIDC issuer must be an exact HTTPS URL without credentials, query, or fragment");
+
+const optionalOpaqueSetting = (maximumLength: number, label: string) =>
+  z
+    .string()
+    .max(maximumLength)
+    .default("")
+    .refine(
+      (value) => value === "" || /\S/.test(value),
+      `${label} must not contain only whitespace`,
+    );
+
+const oidcEmailDomains = z
+  .string()
+  .default("")
+  .transform((value) =>
+    value
+      .split(",")
+      .map((domain) => domain.trim().toLowerCase())
+      .filter(Boolean),
+  )
+  .refine(
+    (domains) =>
+      domains.every(
+        (domain) =>
+          domain.length <= 253 &&
+          /^(?!-)(?:[a-z0-9-]+\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(
+            domain,
+          ),
+      ),
+    "OIDC allowed email domains must be comma-separated DNS names",
+  );
+
 /**
  * Application configuration schema using Zod for runtime validation.
  * This ensures that the application fails fast if critical environment
@@ -88,6 +145,24 @@ const envSchema = z.object({
     .string()
     .default("false")
     .transform((v) => v === "true"),
+
+  /**
+   * Institutional identity provider. The issuer string is retained exactly:
+   * it is never lowercased, trimmed, or otherwise canonicalized.
+   */
+  oidc: z.object({
+    issuer: exactHttpsIssuer,
+    clientId: optionalOpaqueSetting(512, "OIDC client ID"),
+    clientSecret: optionalOpaqueSetting(4096, "OIDC client secret"),
+    allowedEmailDomains: oidcEmailDomains,
+  }),
+
+  /**
+   * Password sign-in is a local compatibility path. Undefined means enabled
+   * in development/test only; it can never enable credentials in a protected
+   * deployment tier.
+   */
+  enableLocalCredentials: optionalBooleanString,
 });
 
 /**
@@ -120,6 +195,13 @@ const envData = {
   enableWorkflows: process.env.ENABLE_WORKFLOWS,
   allowPublicSignup: process.env.ALLOW_PUBLIC_SIGNUP,
   trustProxyHeaders: process.env.TRUST_PROXY_HEADERS,
+  oidc: {
+    issuer: process.env.OIDC_ISSUER,
+    clientId: process.env.OIDC_CLIENT_ID,
+    clientSecret: process.env.OIDC_CLIENT_SECRET,
+    allowedEmailDomains: process.env.OIDC_ALLOWED_EMAIL_DOMAINS,
+  },
+  enableLocalCredentials: process.env.ENABLE_LOCAL_CREDENTIALS,
 };
 
 /**
@@ -158,9 +240,50 @@ if (!parsedEnv.success) {
 
   // In production, fail hard on the server. Client bundles do not receive
   // server-only variables like DATABASE_URL.
-  if (process.env.NODE_ENV === "production" && isServer) {
+  if (
+    isServer &&
+    (process.env.NODE_ENV === "production" ||
+      process.env.APP_ENV === "staging" ||
+      process.env.APP_ENV === "production")
+  ) {
     throw new Error(
       "Invalid environment variables. Check the logs for details.",
+    );
+  }
+}
+
+if (parsedEnv.success && isServer) {
+  const protectedIdentityTier = ["staging", "production"].includes(
+    parsedEnv.data.appEnvironment,
+  );
+  const oidcValuesPresent = [
+    parsedEnv.data.oidc.issuer,
+    parsedEnv.data.oidc.clientId,
+    parsedEnv.data.oidc.clientSecret,
+    ...parsedEnv.data.oidc.allowedEmailDomains,
+  ].some(Boolean);
+  const missingOidc: string[] = [];
+  if (!parsedEnv.data.oidc.issuer) missingOidc.push("OIDC_ISSUER");
+  if (!parsedEnv.data.oidc.clientId) missingOidc.push("OIDC_CLIENT_ID");
+  if (!parsedEnv.data.oidc.clientSecret) missingOidc.push("OIDC_CLIENT_SECRET");
+  if (parsedEnv.data.oidc.allowedEmailDomains.length === 0) {
+    missingOidc.push("OIDC_ALLOWED_EMAIL_DOMAINS");
+  }
+
+  if ((protectedIdentityTier || oidcValuesPresent) && missingOidc.length > 0) {
+    throw new Error(
+      `Missing institutional OIDC configuration: ${missingOidc.join(", ")}`,
+    );
+  }
+
+  if (protectedIdentityTier && parsedEnv.data.enableLocalCredentials === true) {
+    throw new Error(
+      "ENABLE_LOCAL_CREDENTIALS is forbidden when APP_ENV is staging or production",
+    );
+  }
+  if (protectedIdentityTier && parsedEnv.data.allowPublicSignup) {
+    throw new Error(
+      "ALLOW_PUBLIC_SIGNUP is forbidden when APP_ENV is staging or production",
     );
   }
 }
@@ -206,9 +329,28 @@ if (
  * Provides type-safe access to environment variables.
  */
 const config = {
-  env: parsedEnv.success
-    ? parsedEnv.data
-    : (scrubUndefined(envData) as unknown as z.infer<typeof envSchema>),
+  env: (() => {
+    const env = parsedEnv.success
+      ? parsedEnv.data
+      : (scrubUndefined(envData) as unknown as z.infer<typeof envSchema>);
+    const localTier = ["development", "test"].includes(env.appEnvironment);
+    const oidcEnabled = Boolean(
+      env.oidc?.issuer &&
+      env.oidc.clientId &&
+      env.oidc.clientSecret &&
+      env.oidc.allowedEmailDomains.length > 0,
+    );
+
+    return {
+      ...env,
+      oidc: {
+        ...env.oidc,
+        enabled: oidcEnabled,
+      },
+      localCredentialsEnabled:
+        localTier && env.enableLocalCredentials !== false,
+    };
+  })(),
 };
 
 export default config;

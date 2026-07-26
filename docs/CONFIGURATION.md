@@ -55,6 +55,22 @@ Production should set all local required variables plus the service integrations
 | `BREVO_SENDER_NAME`                 | Brevo email enabled                          | Sender display name.                                  |
 | `RESEND_TOKEN`                      | Resend fallback/workflow email enabled       | Resend API token.                                     |
 | `ENABLE_WORKFLOWS`                  | Background automation enabled                | Toggles workflow features.                            |
+| `OIDC_ISSUER`                       | Always in staging/production                 | Exact HTTPS issuer; matched byte-for-byte to `iss`.   |
+| `OIDC_CLIENT_ID`                    | Always in staging/production                 | Registered confidential BFF client ID.                |
+| `OIDC_CLIENT_SECRET`                | Always in staging/production                 | BFF client secret, sourced from the secret manager.   |
+| `OIDC_ALLOWED_EMAIL_DOMAINS`        | Always in staging/production                 | Exact comma-separated institutional email domains.    |
+
+`ENABLE_LOCAL_CREDENTIALS` is a development/test-only compatibility flag.
+Staging and production reject `true` at startup. When omitted, local
+credentials remain available in development and test so the deterministic E2E
+fixtures still work. Public signup is also forbidden in protected tiers.
+
+OIDC identities are never auto-linked by email. Before a user can sign in, an
+administrator must bind the exact issuer/subject tuple to an existing local
+user through the privileged CLI described in
+[Institutional OIDC](./OIDC_IDENTITY.md).
+Encrypted BFF sessions have an eight-hour absolute maximum, and institutional
+sessions are rechecked against their opaque live binding on protected access.
 
 ## Docker Compose Variables
 
@@ -113,6 +129,7 @@ The app intentionally fails fast for some missing production settings and degrad
 | QStash   | Workflow calls throw a clear QStash configuration error; production workflow endpoints require signing keys.       |
 | Brevo    | Email send fails over to Resend when configured.                                                                   |
 | Resend   | Fallback email send fails when token is missing.                                                                   |
+| OIDC     | Staging/production startup fails; local development keeps only the admitted local credentials path.                |
 
 ## Secrets Handling
 
@@ -135,3 +152,5 @@ Before enabling a production deployment:
 6. Confirm ImageKit upload endpoints and keys are from the production ImageKit project.
 7. Confirm sender email is verified in the email provider.
 8. Confirm Redis credentials are active and scoped to the intended Upstash database.
+9. Confirm the OIDC issuer is exact, the registered callback is
+   `/api/auth/callback/institutional-oidc`, and local credentials are disabled.

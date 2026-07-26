@@ -12,6 +12,11 @@ const managedKeys = [
   "DISABLE_RATE_LIMIT",
   "ALLOW_PUBLIC_SIGNUP",
   "ENABLE_WORKFLOWS",
+  "OIDC_ISSUER",
+  "OIDC_CLIENT_ID",
+  "OIDC_CLIENT_SECRET",
+  "OIDC_ALLOWED_EMAIL_DOMAINS",
+  "ENABLE_LOCAL_CREDENTIALS",
 ] as const;
 
 const originalValues = new Map(
@@ -28,6 +33,11 @@ const setValidProductionEnvironment = () => {
   process.env.DISABLE_RATE_LIMIT = "false";
   process.env.ALLOW_PUBLIC_SIGNUP = "false";
   process.env.ENABLE_WORKFLOWS = "false";
+  process.env.OIDC_ISSUER = "https://identity.example.test/tenant";
+  process.env.OIDC_CLIENT_ID = "library-bff";
+  process.env.OIDC_CLIENT_SECRET = "test-client-secret";
+  process.env.OIDC_ALLOWED_EMAIL_DOMAINS = "student.example.test";
+  process.env.ENABLE_LOCAL_CREDENTIALS = "false";
 };
 
 describe.sequential("production configuration", () => {
@@ -64,9 +74,7 @@ describe.sequential("production configuration", () => {
   it("rejects production without distributed rate-limit storage", async () => {
     delete process.env.UPSTASH_REDIS_URL;
 
-    await expect(import("@/lib/config")).rejects.toThrow(
-      /UPSTASH_REDIS_URL/,
-    );
+    await expect(import("@/lib/config")).rejects.toThrow(/UPSTASH_REDIS_URL/);
   });
 
   it("rejects production security bypasses", async () => {
@@ -75,5 +83,52 @@ describe.sequential("production configuration", () => {
     await expect(import("@/lib/config")).rejects.toThrow(
       /DISABLE_RATE_LIMIT is forbidden/,
     );
+  });
+
+  it("rejects production without complete institutional OIDC settings", async () => {
+    delete process.env.OIDC_CLIENT_SECRET;
+
+    await expect(import("@/lib/config")).rejects.toThrow(/OIDC_CLIENT_SECRET/);
+  });
+
+  it("rejects a non-HTTPS or non-exact institutional issuer", async () => {
+    process.env.OIDC_ISSUER =
+      "http://identity.example.test/tenant?not-exact=true";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /Invalid environment variables/,
+    );
+  });
+
+  it("forbids the legacy credentials provider in production", async () => {
+    process.env.ENABLE_LOCAL_CREDENTIALS = "true";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /ENABLE_LOCAL_CREDENTIALS is forbidden/,
+    );
+  });
+
+  it("requires OIDC in staging too", async () => {
+    process.env.APP_ENV = "staging";
+    delete process.env.OIDC_ISSUER;
+
+    await expect(import("@/lib/config")).rejects.toThrow(/OIDC_ISSUER/);
+  });
+
+  it("forbids the legacy credentials provider in staging too", async () => {
+    process.env.APP_ENV = "staging";
+    process.env.ENABLE_LOCAL_CREDENTIALS = "true";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /ENABLE_LOCAL_CREDENTIALS is forbidden/,
+    );
+  });
+
+  it("keeps deterministic password login available in test by default", async () => {
+    process.env.APP_ENV = "test";
+    delete process.env.ENABLE_LOCAL_CREDENTIALS;
+
+    const { default: config } = await import("@/lib/config");
+    expect(config.env.localCredentialsEnabled).toBe(true);
   });
 });

@@ -13,8 +13,14 @@ variable "vpc_cidr" {
   type        = string
 
   validation {
-    condition     = can(cidrnetmask(var.vpc_cidr)) && startswith(var.vpc_cidr, "10.")
-    error_message = "vpc_cidr must be a valid, organization-approved 10/8 CIDR."
+    condition = (
+      can(cidrnetmask(var.vpc_cidr)) &&
+      can(regex(
+        "^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.)",
+        var.vpc_cidr,
+      ))
+    )
+    error_message = "vpc_cidr must be a valid, organization-approved RFC1918 CIDR."
   }
 }
 
@@ -53,4 +59,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-

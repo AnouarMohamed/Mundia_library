@@ -1,6 +1,6 @@
 import { db } from "@/database/drizzle";
 import { systemConfig } from "@/database/schema";
-import { requireAdmin } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 import { eq } from "drizzle-orm";
 
 // Configuration keys
@@ -9,7 +9,7 @@ export const CONFIG_KEYS = {
 } as const;
 
 const assertAdmin = async () => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("fines.manage_policy");
   if (!guard.ok) {
     throw new Error(guard.message);
   }
@@ -122,6 +122,14 @@ export async function setConfigValue(
 export async function getDailyFineAmount(): Promise<number> {
   await assertAdmin();
 
+  return getDailyFineAmountForCalculation();
+}
+
+/**
+ * Internal policy read used by the separately authorized fine-calculation
+ * command. This does not mutate policy and is not exposed as an HTTP handler.
+ */
+export async function getDailyFineAmountForCalculation(): Promise<number> {
   const value = await getConfigValueFromStorage(
     CONFIG_KEYS.DAILY_FINE_AMOUNT,
     "1.00"

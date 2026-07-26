@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   readJsonArtifact,
+  readSecretUrlFile,
   reserveJsonArtifact,
   writeJsonArtifact,
 } from "./artifacts.js";
@@ -16,7 +17,7 @@ No command writes to a database except the explicitly guarded "apply" command.
 No command accepts a non-loopback database URL.
 
 Commands:
-  snapshot  Capture a repeatable-read, read-only legacy snapshot.
+  snapshot  Capture a serializable, read-only, deferrable legacy snapshot.
   plan      Create a deterministic dry-run migration plan.
   reconcile Compare a plan with target rows using a read-only transaction.
   verify    Verify a plan or reconciliation artifact offline.
@@ -90,21 +91,28 @@ function print(value: unknown): void {
 
 function redactError(message: string): string {
   return message.replace(
-    /\b(postgres(?:ql)?:\/\/[^:\s/]+:)[^@\s/]+@/gi,
+    /\b(postgres(?:ql)?:\/\/)[^\s]*@/gi,
     "$1***@",
   );
 }
 
 async function snapshot(options: Map<string, string | true>): Promise<void> {
-  assertAllowed(options, ["help", "source-url", "expect-database", "out"]);
+  assertAllowed(options, [
+    "help",
+    "source-url-file",
+    "expect-database",
+    "out",
+  ]);
   if (flag(options, "help")) {
     process.stdout.write(
-      "snapshot --source-url postgresql://USER:PASS@127.0.0.1:PORT/DB --expect-database DB --out snapshot.json\n",
+      "snapshot --source-url-file /secure/source-url --expect-database DB --out snapshot.json\n",
     );
     return;
   }
   const result = await snapshotLegacy({
-    sourceUrl: required(options, "source-url"),
+    sourceUrl: await readSecretUrlFile(
+      required(options, "source-url-file"),
+    ),
     expectedDatabase: required(options, "expect-database"),
   });
   const output = required(options, "out");
@@ -126,7 +134,10 @@ async function plan(options: Map<string, string | true>): Promise<void> {
     "identifier-policy",
     "uuid-namespace",
     "allow-synthetic-historical-copy-assignment",
-    "allow-archived-unsupported-operational-fields",
+    "fine-currency",
+    "legacy-null-fine-policy",
+    "legacy-fine-balance-policy",
+    "fine-assessment-time-policy",
     "out",
   ]);
   if (flag(options, "help")) {
@@ -135,12 +146,28 @@ async function plan(options: Map<string, string | true>): Promise<void> {
         "plan --snapshot snapshot.json --branch-id UUID --identifier-policy preserve-legacy-uuids --out plan.json",
         "Optional explicit policies:",
         "  --allow-synthetic-historical-copy-assignment",
-        "  --allow-archived-unsupported-operational-fields",
+        "Required finance-owner decisions:",
+        "  --fine-currency MAD",
+        "  --legacy-null-fine-policy no-fine",
+        "  --legacy-fine-balance-policy current-outstanding-as-initial-assessment",
+        "  --fine-assessment-time-policy legacy-updated-at",
       ].join("\n") + "\n",
     );
     return;
   }
   exact(options, "identifier-policy", "preserve-legacy-uuids");
+  exact(options, "fine-currency", "MAD");
+  exact(options, "legacy-null-fine-policy", "no-fine");
+  exact(
+    options,
+    "legacy-fine-balance-policy",
+    "current-outstanding-as-initial-assessment",
+  );
+  exact(
+    options,
+    "fine-assessment-time-policy",
+    "legacy-updated-at",
+  );
   const raw = await readJsonArtifact(required(options, "snapshot"));
   const namespace = options.get("uuid-namespace");
   const result = buildPlan(raw, {
@@ -153,10 +180,7 @@ async function plan(options: Map<string, string | true>): Promise<void> {
       options,
       "allow-synthetic-historical-copy-assignment",
     ),
-    allowArchivedUnsupportedOperationalFields: flag(
-      options,
-      "allow-archived-unsupported-operational-fields",
-    ),
+    fineMigrationPolicyAcknowledged: true,
   });
   const output = required(options, "out");
   await writeJsonArtifact(output, result);
@@ -180,13 +204,13 @@ async function reconcileCommand(
   assertAllowed(options, [
     "help",
     "plan",
-    "target-url",
+    "target-url-file",
     "expect-database",
     "out",
   ]);
   if (flag(options, "help")) {
     process.stdout.write(
-      "reconcile --plan plan.json --target-url postgresql://USER:PASS@127.0.0.1:PORT/DB --expect-database DB --out reconciliation.json\n",
+      "reconcile --plan plan.json --target-url-file /secure/target-url --expect-database DB --out reconciliation.json\n",
     );
     return;
   }
@@ -195,7 +219,9 @@ async function reconcileCommand(
   );
   const result = await reconcileTarget({
     plan: planValue,
-    targetUrl: required(options, "target-url"),
+    targetUrl: await readSecretUrlFile(
+      required(options, "target-url-file"),
+    ),
     expectedDatabase: required(options, "expect-database"),
   });
   const output = required(options, "out");
@@ -215,18 +241,16 @@ async function verify(options: Map<string, string | true>): Promise<void> {
   assertAllowed(options, ["help", "plan", "report"]);
   if (flag(options, "help")) {
     process.stdout.write(
-      ["verify --plan plan.json", "verify --report reconciliation.json"].join(
-        "\n",
-      ) + "\n",
+      [
+        "verify --plan plan.json",
+        "verify --report reconciliation.json --plan plan.json",
+      ].join("\n") + "\n",
     );
     return;
   }
   const planPath = options.get("plan");
   const reportPath = options.get("report");
-  if ((typeof planPath === "string") === (typeof reportPath === "string")) {
-    throw new Error("Supply exactly one of --plan or --report");
-  }
-  if (typeof planPath === "string") {
+  if (typeof reportPath !== "string" && typeof planPath === "string") {
     const result = verifyPlan(await readJsonArtifact(planPath));
     print({
       status: "VALID",
@@ -237,8 +261,15 @@ async function verify(options: Map<string, string | true>): Promise<void> {
     });
     return;
   }
+  if (typeof reportPath !== "string" || typeof planPath !== "string") {
+    throw new Error(
+      "Supply --plan alone, or supply both --report and its --plan",
+    );
+  }
+  const expectedPlan = verifyPlan(await readJsonArtifact(planPath));
   const result = verifyReconciliationReport(
-    await readJsonArtifact(reportPath as string),
+    await readJsonArtifact(reportPath),
+    expectedPlan,
   );
   print({
     status: "VALID",
@@ -254,7 +285,7 @@ async function apply(options: Map<string, string | true>): Promise<void> {
   assertAllowed(options, [
     "help",
     "plan",
-    "target-url",
+    "target-url-file",
     "expect-database",
     "expect-plan-sha256",
     "cutover-state",
@@ -268,7 +299,7 @@ async function apply(options: Map<string, string | true>): Promise<void> {
         "CIRCULATION_MIGRATION_WRITE_ACK=TARGET_ONLY_NO_DUAL_WRITE \\",
         "  npm run cli -- apply \\",
         "  --plan final-plan.json \\",
-        "  --target-url postgresql://USER:PASS@127.0.0.1:PORT/DB \\",
+        "  --target-url-file /secure/target-url \\",
         "  --expect-database DB --expect-plan-sha256 SHA256 \\",
         "  --cutover-state legacy-writes-frozen \\",
         "  --target-writer-state stopped --allow-target-writes \\",
@@ -292,7 +323,9 @@ async function apply(options: Map<string, string | true>): Promise<void> {
     );
   }
   const output = required(options, "evidence");
-  const targetUrl = required(options, "target-url");
+  const targetUrl = await readSecretUrlFile(
+    required(options, "target-url-file"),
+  );
   const expectedDatabase = required(options, "expect-database");
   const reservation = await reserveJsonArtifact(output, {
     schemaVersion: "circulation-application-pending/v1",
@@ -337,6 +370,9 @@ async function apply(options: Map<string, string | true>): Promise<void> {
     transactionOutcome: result.application?.transactionOutcome,
     insertedCopies: result.application?.insertedCopies,
     insertedLoans: result.application?.insertedLoans,
+    insertedFines: result.application?.insertedFines,
+    insertedFineLedgerEntries:
+      result.application?.insertedFineLedgerEntries,
   });
   if (
     result.status !== "MATCH" ||

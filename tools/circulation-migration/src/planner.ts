@@ -10,19 +10,32 @@ import {
   type MigrationPlan,
   type MigrationPlanWithoutHash,
   type TargetCopy,
+  type TargetFine,
+  type TargetFineLedgerEntry,
   type TargetLoan,
 } from "./types.js";
 import { isUuid, normalizeUuid, uuidV5 } from "./uuid.js";
 
 export const DEFAULT_COPY_UUID_NAMESPACE =
   "8f3243f8-3d52-5aeb-97fc-66edbf3e3eb4";
+export const HISTORICAL_FINANCE_ACTOR_FINGERPRINT = sha256(
+  "mundiapolis:circulation-migration:historical-finance:v1",
+);
+export const HISTORICAL_FINE_REASON =
+  "Imported legacy outstanding fine balance at circulation cutover";
+const MAX_RENEWAL_COUNT = 100;
+const MAX_FINE_MINOR = 1_000_000_000_000n;
+const MAX_COPIES_PER_EDITION = 100_000;
+const MAX_SOURCE_BOOKS = 1_000_000;
+const MAX_SOURCE_LOANS = 2_000_000;
+const MAX_TARGET_ROWS = 2_000_000;
 
 export interface PlannerOptions {
   branchId: string;
   deterministicUuidNamespace?: string;
   preserveLegacyIdentifiersAcknowledged?: boolean;
   allowSyntheticHistoricalCopyAssignment?: boolean;
-  allowArchivedUnsupportedOperationalFields?: boolean;
+  fineMigrationPolicyAcknowledged?: boolean;
 }
 
 interface NormalizedBook {
@@ -55,12 +68,28 @@ export function parseSnapshot(value: unknown): LegacySnapshot {
   if (!Array.isArray(value.books) || !Array.isArray(value.borrowRecords)) {
     throw new TypeError("Snapshot books and borrowRecords must be arrays");
   }
+  if (
+    value.books.length > MAX_SOURCE_BOOKS ||
+    value.borrowRecords.length > MAX_SOURCE_LOANS
+  ) {
+    throw new TypeError(
+      "Snapshot row count exceeds the bounded migration safety envelope",
+    );
+  }
   if (typeof value.capturedAt !== "string" || !isPlainObject(value.source)) {
     throw new TypeError("Snapshot capture metadata is missing");
   }
   if (
     typeof value.source.database !== "string" ||
-    typeof value.source.serverVersion !== "string"
+    value.source.database.length === 0 ||
+    value.source.database.length > 128 ||
+    typeof value.source.serverVersion !== "string" ||
+    value.source.serverVersion.length === 0 ||
+    value.source.serverVersion.length > 128 ||
+    value.source.contractVersion !==
+      "legacy-circulation-source/pg18-v1" ||
+    value.source.transactionIsolation !==
+      "SERIALIZABLE_READ_ONLY_DEFERRABLE"
   ) {
     throw new TypeError("Snapshot source metadata is invalid");
   }
@@ -109,16 +138,18 @@ function addFinding(
   findings.push({ ...finding, entityId: finding.entityId ?? null });
 }
 
-function operationalFieldsPresent(record: LegacyBorrowRecord): string[] {
-  const present: string[] = [];
-  const fine = Number(record.fineAmount ?? "0");
-  if (Number.isFinite(fine) && fine !== 0) present.push("fineAmount");
-  if (record.renewalCount !== 0) present.push("renewalCount");
-  return present;
+function parseFineMinor(value: unknown): bigint | null {
+  if (value === null) return 0n;
+  if (typeof value !== "string") return null;
+  const match = /^(0|[1-9]\d*)(?:\.(\d{1,2}))?$/.exec(value);
+  if (!match) return null;
+  const fraction = (match[2] ?? "").padEnd(2, "0");
+  const minor = BigInt(match[1]!) * 100n + BigInt(fraction || "0");
+  return minor <= MAX_FINE_MINOR ? minor : null;
 }
 
 function archiveFieldsPresent(record: LegacyBorrowRecord): string[] {
-  const present = operationalFieldsPresent(record);
+  const present: string[] = [];
   if (record.borrowedBy) present.push("borrowedBy");
   if (record.returnedBy) present.push("returnedBy");
   if (record.notes) present.push("notes");
@@ -144,6 +175,17 @@ export function buildPlan(
   }
 
   const findings: Finding[] = [];
+  if (!/^18(?:\.|\s|$)/.test(snapshot.source.serverVersion)) {
+    addFinding(findings, {
+      severity: "ERROR",
+      code: "SOURCE_POSTGRES_VERSION_UNSUPPORTED",
+      entityType: "SNAPSHOT",
+      message:
+        "Snapshot source metadata is below or outside the PostgreSQL 18 migration baseline.",
+      remediation:
+        "Capture the final snapshot from the reviewed PostgreSQL 18 restored source.",
+    });
+  }
   if (options.preserveLegacyIdentifiersAcknowledged !== true) {
     addFinding(findings, {
       severity: "ERROR",
@@ -163,6 +205,27 @@ export function buildPlan(
         "Operator acknowledged book→edition and user→member UUID preservation.",
       remediation:
         "Retain independent catalog and membership reconciliation evidence.",
+    });
+  }
+  if (options.fineMigrationPolicyAcknowledged !== true) {
+    addFinding(findings, {
+      severity: "ERROR",
+      code: "LEGACY_FINE_POLICY_NOT_ACKNOWLEDGED",
+      entityType: "SNAPSHOT",
+      message:
+        "The MAD/current-outstanding-balance/null-means-no-fine migration policy was not explicitly acknowledged.",
+      remediation:
+        "Have the finance owner approve the recorded currency and balance semantics before creating a final plan.",
+    });
+  } else {
+    addFinding(findings, {
+      severity: "INFO",
+      code: "LEGACY_FINE_POLICY_ACKNOWLEDGED",
+      entityType: "SNAPSHOT",
+      message:
+        "Operator acknowledged MAD minor units, NULL as no fine, and current outstanding balance as an initial assessment.",
+      remediation:
+        "Retain the finance-owner approval with the independently authenticated plan hash.",
     });
   }
   const books = new Map<string, NormalizedBook>();
@@ -199,7 +262,11 @@ export function buildPlan(
       (source.updatedAt !== null && !bookUpdatedAt) ||
       (bookCreatedAt &&
         bookUpdatedAt &&
-        new Date(bookUpdatedAt).valueOf() < new Date(bookCreatedAt).valueOf())
+        new Date(bookUpdatedAt).valueOf() < new Date(bookCreatedAt).valueOf()) ||
+      (bookCreatedAt &&
+        new Date(bookCreatedAt).valueOf() > new Date(capturedAt).valueOf()) ||
+      (bookUpdatedAt &&
+        new Date(bookUpdatedAt).valueOf() > new Date(capturedAt).valueOf())
     ) {
       addFinding(findings, {
         severity: "ERROR",
@@ -213,6 +280,7 @@ export function buildPlan(
     if (
       !Number.isSafeInteger(source.totalCopies) ||
       source.totalCopies < 0 ||
+      source.totalCopies > MAX_COPIES_PER_EDITION ||
       !Number.isSafeInteger(source.availableCopies) ||
       source.availableCopies < 0 ||
       source.availableCopies > source.totalCopies
@@ -222,7 +290,7 @@ export function buildPlan(
         code: "BOOK_INVENTORY_INVALID",
         entityType: "BOOK",
         entityId: id,
-        message: `Inventory is invalid: total=${String(
+        message: `Inventory is invalid or exceeds the ${MAX_COPIES_PER_EDITION}-copy per-edition migration bound: total=${String(
           source.totalCopies,
         )}, available=${String(source.availableCopies)}.`,
         remediation:
@@ -232,11 +300,22 @@ export function buildPlan(
     }
     books.set(id, { source, id });
   }
+  const totalPlannedCopies = [...books.values()].reduce(
+    (total, book) => total + book.source.totalCopies,
+    0,
+  );
+  if (totalPlannedCopies > MAX_TARGET_ROWS) {
+    throw new TypeError(
+      `Snapshot would create ${totalPlannedCopies} copies, above the ${MAX_TARGET_ROWS}-row migration safety bound`,
+    );
+  }
 
   const duplicateLoanIds = new Set<string>();
   const seenLoanIds = new Set<string>();
   const openMemberEditions = new Map<string, string>();
   const sourceLoansByBook = new Map<string, LegacyBorrowRecord[]>();
+  const sourceLoanById = new Map<string, LegacyBorrowRecord>();
+  const fineMinorByLoanId = new Map<string, bigint>();
 
   for (const source of snapshot.borrowRecords) {
     if (!isUuid(source.id)) {
@@ -298,11 +377,66 @@ export function buildPlan(
       });
       continue;
     }
+    if (
+      !Number.isSafeInteger(source.renewalCount) ||
+      source.renewalCount < 0 ||
+      source.renewalCount > MAX_RENEWAL_COUNT
+    ) {
+      addFinding(findings, {
+        severity: "ERROR",
+        code: "LOAN_RENEWAL_COUNT_INVALID",
+        entityType: "LOAN",
+        entityId: id,
+        message: `Renewal count ${String(source.renewalCount)} is outside the target range 0-${MAX_RENEWAL_COUNT}.`,
+        remediation:
+          "Reconcile renewal_count before migration; it cannot be archived or truncated.",
+      });
+      continue;
+    }
+    if (source.status === "PENDING" && source.renewalCount !== 0) {
+      addFinding(findings, {
+        severity: "ERROR",
+        code: "PENDING_LOAN_RENEWAL_INVALID",
+        entityType: "LOAN",
+        entityId: id,
+        message: "A pending request cannot already contain renewals.",
+        remediation: "Reconcile the legacy lifecycle and renewal state.",
+      });
+      continue;
+    }
+    const fineMinor = parseFineMinor(source.fineAmount);
+    if (fineMinor === null) {
+      addFinding(findings, {
+        severity: "ERROR",
+        code: "LOAN_FINE_AMOUNT_INVALID",
+        entityType: "LOAN",
+        entityId: id,
+        message:
+          "Fine amount is not a non-negative, exact two-decimal MAD amount within the target ledger range.",
+        remediation:
+          "Resolve the authoritative outstanding MAD balance; rounding, exponent notation, and truncation are forbidden.",
+      });
+      continue;
+    }
+    if (source.status === "PENDING" && fineMinor > 0n) {
+      addFinding(findings, {
+        severity: "ERROR",
+        code: "FINE_ON_INELIGIBLE_LOAN",
+        entityType: "LOAN",
+        entityId: id,
+        message: "A pending request has a nonzero fine balance.",
+        remediation:
+          "Resolve the lifecycle or fine ownership before migration.",
+      });
+      continue;
+    }
 
     const bookId = normalizeUuid(source.bookId);
     const rows = sourceLoansByBook.get(bookId) ?? [];
     rows.push(source);
     sourceLoansByBook.set(bookId, rows);
+    sourceLoanById.set(id, source);
+    fineMinorByLoanId.set(id, fineMinor);
 
     if (source.status === "PENDING" || source.status === "BORROWED") {
       const key = `${normalizeUuid(source.userId)}:${bookId}`;
@@ -393,7 +527,10 @@ export function buildPlan(
       const id = normalizeUuid(source.id);
       if (duplicateLoanIds.has(id)) continue;
       const requestedAt = normalizeTimestamp(source.borrowDate);
-      if (!requestedAt) {
+      if (
+        !requestedAt ||
+        new Date(requestedAt).valueOf() > new Date(capturedAt).valueOf()
+      ) {
         addFinding(findings, {
           severity: "ERROR",
           code: "LOAN_BORROW_TIMESTAMP_INVALID",
@@ -405,6 +542,26 @@ export function buildPlan(
         });
         continue;
       }
+      const catalogCreatedAt = normalizeTimestamp(
+        books.get(bookId)?.source.createdAt,
+      );
+      if (
+        catalogCreatedAt &&
+        new Date(requestedAt).valueOf() <
+          new Date(catalogCreatedAt).valueOf()
+      ) {
+        addFinding(findings, {
+          severity: "ERROR",
+          code: "LOAN_BEFORE_BOOK_ACQUISITION",
+          entityType: "LOAN",
+          entityId: id,
+          message:
+            "Loan checkout predates the catalog's recorded book acquisition.",
+          remediation:
+            "Recover authoritative catalog/loan timestamps before migration.",
+        });
+        continue;
+      }
 
       const memberId = normalizeUuid(source.userId);
       const createdAt = normalizeTimestamp(source.createdAt) ?? requestedAt;
@@ -413,8 +570,13 @@ export function buildPlan(
         (source.createdAt !== null &&
           normalizeTimestamp(source.createdAt) === null) ||
         (source.updatedAt !== null && updatedAt === null) ||
+        new Date(createdAt).valueOf() >
+          new Date(requestedAt).valueOf() ||
         (updatedAt &&
-          new Date(updatedAt).valueOf() < new Date(createdAt).valueOf())
+          (new Date(updatedAt).valueOf() <
+            new Date(requestedAt).valueOf() ||
+            new Date(updatedAt).valueOf() >
+              new Date(capturedAt).valueOf()))
       ) {
         addFinding(findings, {
           severity: "ERROR",
@@ -426,52 +588,17 @@ export function buildPlan(
           remediation: "Recover authoritative loan audit timestamps.",
         });
       }
-      const fineAmount = Number(source.fineAmount ?? "0");
-      if (
-        (source.fineAmount !== null &&
-          !/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(source.fineAmount)) ||
-        !Number.isFinite(fineAmount) ||
-        fineAmount < 0 ||
-        !Number.isSafeInteger(source.renewalCount) ||
-        source.renewalCount < 0
-      ) {
+      const archived = archiveFieldsPresent(source);
+      if (archived.length > 0) {
         addFinding(findings, {
           severity: "ERROR",
-          code: "LOAN_OPERATIONAL_DATA_INVALID",
+          code: "LEGACY_METADATA_DESTINATION_UNRESOLVED",
           entityType: "LOAN",
           entityId: id,
-          message: "Fine amount or renewal count is invalid.",
+          message: `Legacy metadata has no approved target destination: ${archived.join(", ")}.`,
           remediation:
-            "Reconcile fine_amount and renewal_count before migration.",
+            "Implement and approve an authenticated audit/records destination before circulation cutover; archive-only loss is forbidden.",
         });
-      }
-      const operational = operationalFieldsPresent(source);
-      if (operational.length > 0) {
-        addFinding(findings, {
-          severity: options.allowArchivedUnsupportedOperationalFields
-            ? "WARNING"
-            : "ERROR",
-          code: "OPERATIONAL_FIELDS_NOT_IN_TARGET",
-          entityType: "LOAN",
-          entityId: id,
-          message: `Target schema cannot represent: ${operational.join(", ")}.`,
-          remediation: options.allowArchivedUnsupportedOperationalFields
-            ? "Confirm the machine-readable legacy archive is an accepted retention boundary."
-            : "Extend the target domain or explicitly approve archival before planning again.",
-        });
-      } else {
-        const archived = archiveFieldsPresent(source);
-        if (archived.length > 0) {
-          addFinding(findings, {
-            severity: "WARNING",
-            code: "LEGACY_METADATA_ARCHIVED",
-            entityType: "LOAN",
-            entityId: id,
-            message: `Non-domain metadata is retained only in evidence: ${archived.join(", ")}.`,
-            remediation:
-              "Retain the signed plan evidence according to institutional records policy.",
-          });
-        }
       }
 
       if (source.status === "PENDING") {
@@ -498,6 +625,7 @@ export function buildPlan(
           returnedAt: null,
           rejectedAt: null,
           version: 0,
+          renewalCount: 0,
           createdAt,
           updatedAt: updatedAt ?? createdAt,
         });
@@ -555,7 +683,8 @@ export function buildPlan(
           dueAt,
           returnedAt: null,
           rejectedAt: null,
-          version: 1,
+          version: 1 + source.renewalCount,
+          renewalCount: source.renewalCount,
           createdAt,
           updatedAt: updatedAt ?? requestedAt,
         };
@@ -572,6 +701,8 @@ export function buildPlan(
       const returnedAt = endOfUtcDay(source.returnDate);
       if (
         !returnedAt ||
+        (typeof source.returnDate === "string" &&
+          source.returnDate > capturedAt.slice(0, 10)) ||
         new Date(returnedAt).valueOf() < new Date(requestedAt).valueOf()
       ) {
         addFinding(findings, {
@@ -595,7 +726,8 @@ export function buildPlan(
         dueAt,
         returnedAt,
         rejectedAt: null,
-        version: 2,
+        version: 2 + source.renewalCount,
+        renewalCount: source.renewalCount,
         createdAt,
         updatedAt: updatedAt ?? returnedAt,
       };
@@ -642,6 +774,69 @@ export function buildPlan(
 
   targetLoans.sort((a, b) => a.id.localeCompare(b.id));
   copies.sort((a, b) => a.id.localeCompare(b.id));
+
+  const fines: TargetFine[] = [];
+  const fineLedgerEntries: TargetFineLedgerEntry[] = [];
+  for (const loan of targetLoans) {
+    const source = sourceLoanById.get(loan.id);
+    const fineMinor = fineMinorByLoanId.get(loan.id);
+    if (!source || fineMinor === undefined || fineMinor === 0n) continue;
+
+    const assessedAt = normalizeTimestamp(source.updatedAt);
+    if (
+      !assessedAt ||
+      !loan.checkedOutAt ||
+      !loan.dueAt ||
+      new Date(assessedAt).valueOf() <= new Date(loan.dueAt).valueOf()
+    ) {
+      addFinding(findings, {
+        severity: "ERROR",
+        code: "FINE_ASSESSMENT_TIMESTAMP_INVALID",
+        entityType: "LOAN",
+        entityId: loan.id,
+        message:
+          "A nonzero fine has no explicit legacy updated_at after the mapped due timestamp.",
+        remediation:
+          "Recover the authoritative fine assessment timestamp; the migration will not invent or backdate one.",
+      });
+      continue;
+    }
+
+    const fineId = uuidV5(
+      namespace,
+      `${branchId}/${loan.id}/legacy-fine/MAD`,
+    );
+    const ledgerEntryId = uuidV5(
+      namespace,
+      `${branchId}/${fineId}/assessment/0`,
+    );
+    const amount = Number(fineMinor);
+    fines.push({
+      id: fineId,
+      loanId: loan.id,
+      memberId: loan.memberId,
+      currency: "MAD",
+      balanceMinor: amount,
+      status: "OPEN",
+      version: 0,
+      createdAt: assessedAt,
+      updatedAt: assessedAt,
+    });
+    fineLedgerEntries.push({
+      id: ledgerEntryId,
+      fineId,
+      fineVersion: 0,
+      entryType: "ASSESSMENT",
+      deltaMinor: amount,
+      actorFingerprint: HISTORICAL_FINANCE_ACTOR_FINGERPRINT,
+      reason: HISTORICAL_FINE_REASON,
+      externalReference: null,
+      occurredAt: assessedAt,
+      createdAt: assessedAt,
+    });
+  }
+  fines.sort((a, b) => a.id.localeCompare(b.id));
+  fineLedgerEntries.sort((a, b) => a.id.localeCompare(b.id));
 
   const editions: EditionReconciliation[] = [...books.values()]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -690,9 +885,7 @@ export function buildPlan(
       fieldsNotRepresentedInTarget: {
         borrowedBy: record.borrowedBy,
         returnedBy: record.returnedBy,
-        fineAmount: record.fineAmount,
         notes: record.notes,
-        renewalCount: record.renewalCount,
         lastReminderSent: record.lastReminderSent,
         updatedBy: record.updatedBy,
       },
@@ -701,6 +894,15 @@ export function buildPlan(
 
   findings.sort(compareFindings);
   const hasErrors = findings.some((finding) => finding.severity === "ERROR");
+  const renewalCountTotal = [...sourceLoanById.values()].reduce(
+    (total, record) => total + BigInt(record.renewalCount),
+    0n,
+  );
+  const sourceFineMinorValues = [...fineMinorByLoanId.values()];
+  const fineBalanceMinorTotal = sourceFineMinorValues.reduce(
+    (total, amount) => total + amount,
+    0n,
+  );
   const draft: MigrationPlanWithoutHash = {
     schemaVersion: PLAN_SCHEMA,
     mode: "DRY_RUN_PLAN",
@@ -708,9 +910,14 @@ export function buildPlan(
       capturedAt,
       database: snapshot.source.database,
       serverVersion: snapshot.source.serverVersion,
+      sourceContractVersion: snapshot.source.contractVersion,
       snapshotSha256: sha256(snapshot),
       bookCount: snapshot.books.length,
       borrowRecordCount: snapshot.borrowRecords.length,
+      renewalCountTotal: renewalCountTotal.toString(),
+      nonzeroFineCount: sourceFineMinorValues.filter((amount) => amount > 0n)
+        .length,
+      fineBalanceMinorTotal: fineBalanceMinorTotal.toString(),
     },
     policy: {
       branchId,
@@ -721,14 +928,23 @@ export function buildPlan(
         options.allowSyntheticHistoricalCopyAssignment === true
           ? "DETERMINISTIC_FEASIBLE"
           : "BLOCK_AMBIGUOUS",
-      unsupportedOperationalFields:
-        options.allowArchivedUnsupportedOperationalFields === true
-          ? "ARCHIVE_WITH_WARNING"
-          : "BLOCK",
+      legacyFineCurrency: "MAD",
+      legacyNullFineAmount: "NO_FINE",
+      legacyFineBalanceMeaning:
+        "CURRENT_OUTSTANDING_AS_INITIAL_ASSESSMENT",
+      fineAssessmentTimestamp: "LEGACY_UPDATED_AT",
+      historicalFinanceActor: "MIGRATION_PRINCIPAL",
+      historicalFinanceActorFingerprint:
+        HISTORICAL_FINANCE_ACTOR_FINGERPRINT,
       timestampDateResolution: "UTC_END_OF_DAY",
       historicalOutboxEvents: "NONE",
     },
-    target: { copies, loans: targetLoans },
+    target: {
+      copies,
+      loans: targetLoans,
+      fines,
+      fineLedgerEntries,
+    },
     legacyLoanArchive: archive,
     findings,
     reconciliation: {
@@ -761,6 +977,27 @@ export function buildPlan(
           ),
           details:
             "Legacy counters are checked against active loans per edition.",
+        },
+        {
+          name: "renewal_counts_preserved",
+          passed:
+            targetLoans.reduce(
+              (total, loan) => total + BigInt(loan.renewalCount),
+              0n,
+            ) === renewalCountTotal,
+          details: `${renewalCountTotal.toString()} total renewal(s) preserved`,
+        },
+        {
+          name: "outstanding_fines_preserved",
+          passed:
+            fines.length ===
+              sourceFineMinorValues.filter((amount) => amount > 0n).length &&
+            fines.reduce(
+              (total, fine) => total + BigInt(fine.balanceMinor),
+              0n,
+            ) === fineBalanceMinorTotal &&
+            fineLedgerEntries.length === fines.length,
+          details: `${fineBalanceMinorTotal.toString()} MAD minor unit(s) preserved in ${fines.length} immutable assessment(s)`,
         },
       ],
       editions,
@@ -798,6 +1035,10 @@ function isExactIsoTimestamp(value: unknown): value is string {
   return typeof value === "string" && normalizeTimestamp(value) === value;
 }
 
+function isCanonicalUuid(value: unknown): value is string {
+  return isUuid(value) && value === value.toLowerCase();
+}
+
 function validatePlanSemantics(plan: MigrationPlan): void {
   assertPlan(plan.mode === "DRY_RUN_PLAN", "mode must be DRY_RUN_PLAN");
   assertPlan(
@@ -809,6 +1050,10 @@ function validatePlanSemantics(plan: MigrationPlan): void {
       plan.source.bookCount >= 0 &&
       Number.isSafeInteger(plan.source.borrowRecordCount) &&
       plan.source.borrowRecordCount >= 0 &&
+      /^[0-9]+$/.test(plan.source.renewalCountTotal) &&
+      Number.isSafeInteger(plan.source.nonzeroFineCount) &&
+      plan.source.nonzeroFineCount >= 0 &&
+      /^[0-9]+$/.test(plan.source.fineBalanceMinorTotal) &&
       isExactIsoTimestamp(plan.source.capturedAt),
     "source counts or capture timestamp are invalid",
   );
@@ -818,30 +1063,114 @@ function validatePlanSemantics(plan: MigrationPlan): void {
     "identifier preservation policy is absent",
   );
   assertPlan(
-    plan.policy.historicalOutboxEvents === "NONE",
-    "historical outbox policy must be NONE",
+    plan.policy.historicalOutboxEvents === "NONE" &&
+      (plan.policy.historicalCopyAssignment === "BLOCK_AMBIGUOUS" ||
+        plan.policy.historicalCopyAssignment === "DETERMINISTIC_FEASIBLE") &&
+      plan.policy.timestampDateResolution === "UTC_END_OF_DAY" &&
+      plan.policy.legacyFineCurrency === "MAD" &&
+      plan.policy.legacyNullFineAmount === "NO_FINE" &&
+      plan.policy.legacyFineBalanceMeaning ===
+        "CURRENT_OUTSTANDING_AS_INITIAL_ASSESSMENT" &&
+      plan.policy.fineAssessmentTimestamp === "LEGACY_UPDATED_AT" &&
+      plan.policy.historicalFinanceActor === "MIGRATION_PRINCIPAL" &&
+      plan.policy.historicalFinanceActorFingerprint ===
+        HISTORICAL_FINANCE_ACTOR_FINGERPRINT,
+    "historical finance/outbox policy is invalid",
   );
-  assertPlan(isUuid(plan.policy.branchId), "branch id is invalid");
+  assertPlan(isCanonicalUuid(plan.policy.branchId), "branch id is invalid");
   assertPlan(
-    isUuid(plan.policy.deterministicUuidNamespace),
+    isCanonicalUuid(plan.policy.deterministicUuidNamespace),
     "copy UUID namespace is invalid",
   );
   assertPlan(
     Array.isArray(plan.target?.copies) &&
       Array.isArray(plan.target?.loans) &&
+      Array.isArray(plan.target?.fines) &&
+      Array.isArray(plan.target?.fineLedgerEntries) &&
       Array.isArray(plan.findings) &&
       Array.isArray(plan.legacyLoanArchive) &&
       Array.isArray(plan.reconciliation?.checks) &&
       Array.isArray(plan.reconciliation?.editions),
     "required arrays are absent",
   );
+  assertPlan(
+    plan.target.copies.length <= MAX_TARGET_ROWS &&
+      plan.target.loans.length <= MAX_TARGET_ROWS &&
+      plan.target.fines.length <= MAX_TARGET_ROWS &&
+      plan.target.fineLedgerEntries.length <= MAX_TARGET_ROWS,
+    "target row count exceeds the migration safety envelope",
+  );
+  assertPlan(
+    typeof plan.source.database === "string" &&
+      plan.source.database.length > 0 &&
+      plan.source.database.length <= 128 &&
+      typeof plan.source.serverVersion === "string" &&
+      plan.source.serverVersion.length > 0 &&
+      plan.source.serverVersion.length <= 128 &&
+      plan.source.sourceContractVersion ===
+        "legacy-circulation-source/pg18-v1",
+    "source identity metadata is invalid",
+  );
+  for (const finding of plan.findings) {
+    assertPlan(
+      isPlainObject(finding) &&
+        ["ERROR", "WARNING", "INFO"].includes(
+          finding.severity as string,
+        ) &&
+        typeof finding.code === "string" &&
+        /^[A-Z][A-Z0-9_]{2,100}$/.test(finding.code) &&
+        ["SNAPSHOT", "BOOK", "LOAN", "EDITION"].includes(
+          finding.entityType as string,
+        ) &&
+        (finding.entityId === null ||
+          isCanonicalUuid(finding.entityId)) &&
+        typeof finding.message === "string" &&
+        finding.message.length > 0 &&
+        finding.message.length <= 1_000 &&
+        typeof finding.remediation === "string" &&
+        finding.remediation.length > 0 &&
+        finding.remediation.length <= 1_000,
+      "finding evidence is malformed",
+    );
+  }
+  const expectedCheckNames = [
+    "available_counter_matches_active_loans",
+    "copy_count_equals_inventory_total",
+    "no_error_findings",
+    "all_legacy_loans_mapped",
+    "outstanding_fines_preserved",
+    "renewal_counts_preserved",
+  ].sort();
+  const actualCheckNames = plan.reconciliation.checks
+    .map((check) => check.name)
+    .sort();
+  assertPlan(
+    actualCheckNames.length === expectedCheckNames.length &&
+      actualCheckNames.every(
+        (name, index) => name === expectedCheckNames[index],
+      ) &&
+      plan.reconciliation.checks.every(
+        (check) =>
+          typeof check.passed === "boolean" &&
+          typeof check.details === "string" &&
+          check.details.length > 0 &&
+          check.details.length <= 1_000,
+      ),
+    "reconciliation checks are malformed or incomplete",
+  );
 
   const copiesById = new Map<string, TargetCopy>();
   const copiesByBarcode = new Set<string>();
   const copiesByEdition = new Map<string, TargetCopy[]>();
   for (const copy of plan.target.copies) {
-    assertPlan(isUuid(copy.id), `copy ${String(copy.id)} id is invalid`);
-    assertPlan(isUuid(copy.editionId), `copy ${copy.id} edition id is invalid`);
+    assertPlan(
+      isCanonicalUuid(copy.id),
+      `copy ${String(copy.id)} id is invalid`,
+    );
+    assertPlan(
+      isCanonicalUuid(copy.editionId),
+      `copy ${copy.id} edition id is invalid`,
+    );
     assertPlan(
       copy.branchId === plan.policy.branchId,
       `copy ${copy.id} branch differs from the plan branch`,
@@ -860,7 +1189,9 @@ function validatePlanSemantics(plan: MigrationPlan): void {
     );
     assertPlan(
       isExactIsoTimestamp(copy.createdAt) &&
-        isExactIsoTimestamp(copy.updatedAt),
+        isExactIsoTimestamp(copy.updatedAt) &&
+        new Date(copy.updatedAt).valueOf() >=
+          new Date(copy.createdAt).valueOf(),
       `copy ${copy.id} timestamps are invalid`,
     );
     assertPlan(!copiesById.has(copy.id), `copy ${copy.id} is duplicated`);
@@ -878,7 +1209,7 @@ function validatePlanSemantics(plan: MigrationPlan): void {
   const reconciliationEditionIds = new Set<string>();
   for (const edition of plan.reconciliation.editions) {
     assertPlan(
-      isUuid(edition.editionId) &&
+      isCanonicalUuid(edition.editionId) &&
         !reconciliationEditionIds.has(edition.editionId),
       `edition reconciliation ${String(edition.editionId)} is invalid or duplicated`,
     );
@@ -952,19 +1283,36 @@ function validatePlanSemantics(plan: MigrationPlan): void {
   }
 
   const loanIds = new Set<string>();
+  const loansById = new Map<string, TargetLoan>();
   const activeCopyIds = new Set<string>();
   const openMemberEditions = new Set<string>();
+  const intervalsByCopy = new Map<
+    string,
+    Array<{ loanId: string; start: number; end: number }>
+  >();
   for (const loan of plan.target.loans) {
     assertPlan(
-      isUuid(loan.id) && isUuid(loan.memberId) && isUuid(loan.editionId),
+      isCanonicalUuid(loan.id) &&
+        isCanonicalUuid(loan.memberId) &&
+        isCanonicalUuid(loan.editionId),
       `loan ${String(loan.id)} identifiers are invalid`,
     );
     assertPlan(!loanIds.has(loan.id), `loan ${loan.id} is duplicated`);
     loanIds.add(loan.id);
+    loansById.set(loan.id, loan);
     assertPlan(
       isExactIsoTimestamp(loan.requestedAt) &&
         isExactIsoTimestamp(loan.createdAt) &&
-        isExactIsoTimestamp(loan.updatedAt),
+        isExactIsoTimestamp(loan.updatedAt) &&
+        new Date(loan.createdAt).valueOf() <=
+          new Date(loan.requestedAt).valueOf() &&
+        new Date(loan.updatedAt).valueOf() >=
+          new Date(loan.requestedAt).valueOf() &&
+        new Date(loan.updatedAt).valueOf() >=
+          new Date(loan.createdAt).valueOf() &&
+        Number.isSafeInteger(loan.renewalCount) &&
+        loan.renewalCount >= 0 &&
+        loan.renewalCount <= MAX_RENEWAL_COUNT,
       `loan ${loan.id} timestamps are invalid`,
     );
     const openKey = `${loan.memberId}:${loan.editionId}`;
@@ -982,7 +1330,8 @@ function validatePlanSemantics(plan: MigrationPlan): void {
           loan.dueAt === null &&
           loan.returnedAt === null &&
           loan.rejectedAt === null &&
-          loan.version === 0,
+          loan.version === 0 &&
+          loan.renewalCount === 0,
         `requested loan ${loan.id} state is invalid`,
       );
       continue;
@@ -993,7 +1342,7 @@ function validatePlanSemantics(plan: MigrationPlan): void {
     );
     assertPlan(
       loan.copyId !== null &&
-        isUuid(loan.copyId) &&
+        isCanonicalUuid(loan.copyId) &&
         isExactIsoTimestamp(loan.checkedOutAt) &&
         isExactIsoTimestamp(loan.dueAt),
       `physical loan ${loan.id} has incomplete copy/timestamp state`,
@@ -1009,9 +1358,9 @@ function validatePlanSemantics(plan: MigrationPlan): void {
     );
     if (loan.status === "ACTIVE") {
       assertPlan(
-        loan.returnedAt === null &&
+          loan.returnedAt === null &&
           loan.rejectedAt === null &&
-          loan.version === 1 &&
+          loan.version === 1 + loan.renewalCount &&
           copy?.status === "ON_LOAN" &&
           !activeCopyIds.has(loan.copyId),
         `active loan ${loan.id} state or copy exclusivity is invalid`,
@@ -1019,12 +1368,35 @@ function validatePlanSemantics(plan: MigrationPlan): void {
       activeCopyIds.add(loan.copyId);
     } else {
       assertPlan(
-        isExactIsoTimestamp(loan.returnedAt) &&
+          isExactIsoTimestamp(loan.returnedAt) &&
           loan.rejectedAt === null &&
-          loan.version === 2 &&
+          loan.version === 2 + loan.renewalCount &&
           new Date(loan.returnedAt).valueOf() >=
             new Date(loan.checkedOutAt).valueOf(),
         `returned loan ${loan.id} state is invalid`,
+      );
+    }
+    const copyIntervals = intervalsByCopy.get(loan.copyId) ?? [];
+    copyIntervals.push({
+      loanId: loan.id,
+      start: new Date(loan.checkedOutAt).valueOf(),
+      end:
+        loan.status === "ACTIVE"
+          ? Number.POSITIVE_INFINITY
+          : new Date(loan.returnedAt!).valueOf(),
+    });
+    intervalsByCopy.set(loan.copyId, copyIntervals);
+  }
+
+  for (const [copyId, intervals] of intervalsByCopy) {
+    intervals.sort(
+      (left, right) =>
+        left.start - right.start || left.loanId.localeCompare(right.loanId),
+    );
+    for (let index = 1; index < intervals.length; index += 1) {
+      assertPlan(
+        intervals[index - 1]!.end <= intervals[index]!.start,
+        `copy ${copyId} has overlapping historical loan intervals`,
       );
     }
   }
@@ -1034,15 +1406,119 @@ function validatePlanSemantics(plan: MigrationPlan): void {
       (copy.status === "ON_LOAN") === activeCopyIds.has(copy.id),
       `copy ${copy.id} current status differs from active-loan ownership`,
     );
+    if (copy.status === "ON_LOAN") {
+      const loan = plan.target.loans.find(
+        (candidate) =>
+          candidate.status === "ACTIVE" && candidate.copyId === copy.id,
+      );
+      assertPlan(
+        loan !== undefined &&
+          copy.updatedAt === loan.checkedOutAt &&
+          new Date(copy.createdAt).valueOf() <=
+            new Date(loan.checkedOutAt).valueOf(),
+        `copy ${copy.id} timestamps differ from its active loan`,
+      );
+    }
   }
+
+  const fineIds = new Set<string>();
+  const fineLoanIds = new Set<string>();
+  const finesById = new Map<string, TargetFine>();
+  for (const fine of plan.target.fines) {
+    const loan = loansById.get(fine.loanId);
+    assertPlan(
+      isCanonicalUuid(fine.id) &&
+        loan !== undefined &&
+        (loan.status === "ACTIVE" || loan.status === "RETURNED") &&
+        fine.memberId === loan.memberId,
+      `fine ${String(fine.id)} has invalid loan/member identity`,
+    );
+    assertPlan(
+      !fineIds.has(fine.id) && !fineLoanIds.has(fine.loanId),
+      `fine ${fine.id} is duplicated for its id or loan`,
+    );
+    assertPlan(
+      fine.id ===
+        uuidV5(
+          plan.policy.deterministicUuidNamespace,
+          `${plan.policy.branchId}/${fine.loanId}/legacy-fine/MAD`,
+        ),
+      `fine ${fine.id} is not the deterministic legacy fine id`,
+    );
+    assertPlan(
+      fine.currency === "MAD" &&
+        Number.isSafeInteger(fine.balanceMinor) &&
+        fine.balanceMinor > 0 &&
+        BigInt(fine.balanceMinor) <= MAX_FINE_MINOR &&
+        fine.status === "OPEN" &&
+        fine.version === 0 &&
+        isExactIsoTimestamp(fine.createdAt) &&
+        fine.updatedAt === fine.createdAt &&
+        loan.dueAt !== null &&
+        new Date(fine.createdAt).valueOf() > new Date(loan.dueAt).valueOf(),
+      `fine ${fine.id} state, amount, or timestamp is invalid`,
+    );
+    fineIds.add(fine.id);
+    fineLoanIds.add(fine.loanId);
+    finesById.set(fine.id, fine);
+  }
+
+  const ledgerIds = new Set<string>();
+  const ledgerFineIds = new Set<string>();
+  for (const entry of plan.target.fineLedgerEntries) {
+    const fine = finesById.get(entry.fineId);
+    assertPlan(
+      isCanonicalUuid(entry.id) &&
+        fine !== undefined &&
+        !ledgerIds.has(entry.id) &&
+        !ledgerFineIds.has(entry.fineId),
+      `fine ledger entry ${String(entry.id)} is invalid or duplicated`,
+    );
+    assertPlan(
+      entry.id ===
+        uuidV5(
+          plan.policy.deterministicUuidNamespace,
+          `${plan.policy.branchId}/${entry.fineId}/assessment/0`,
+        ),
+      `fine ledger entry ${entry.id} is not deterministic`,
+    );
+    assertPlan(
+      entry.fineVersion === 0 &&
+        entry.entryType === "ASSESSMENT" &&
+        entry.deltaMinor === fine.balanceMinor &&
+        entry.actorFingerprint ===
+          plan.policy.historicalFinanceActorFingerprint &&
+        entry.reason === HISTORICAL_FINE_REASON &&
+        entry.externalReference === null &&
+        entry.occurredAt === fine.createdAt &&
+        entry.createdAt === entry.occurredAt,
+      `fine ledger entry ${entry.id} does not exactly represent its assessment`,
+    );
+    ledgerIds.add(entry.id);
+    ledgerFineIds.add(entry.fineId);
+  }
+  assertPlan(
+    ledgerFineIds.size === fineIds.size,
+    "every migrated fine must have exactly one assessment ledger entry",
+  );
 
   const archivedLoanIds = new Set<string>();
   for (const archived of plan.legacyLoanArchive) {
     assertPlan(
-      isUuid(archived.loanId) &&
+      isCanonicalUuid(archived.loanId) &&
         !archivedLoanIds.has(archived.loanId) &&
         /^[0-9a-f]{64}$/.test(archived.sourceRowSha256),
       `legacy archive ${String(archived.loanId)} is invalid or duplicated`,
+    );
+    const fields = archived.fieldsNotRepresentedInTarget;
+    assertPlan(
+      isPlainObject(fields) &&
+        Object.keys(fields).sort().join(",") ===
+          "borrowedBy,lastReminderSent,notes,returnedBy,updatedBy" &&
+        Object.values(fields).every(
+          (field) => field === null || typeof field === "string",
+        ),
+      `legacy archive ${archived.loanId} fields are malformed`,
     );
     archivedLoanIds.add(archived.loanId);
   }
@@ -1063,6 +1539,21 @@ function validatePlanSemantics(plan: MigrationPlan): void {
     assertPlan(
       plan.legacyLoanArchive.length === plan.source.borrowRecordCount,
       "READY plan does not archive every source loan",
+    );
+    assertPlan(
+      plan.target.loans.reduce(
+        (total, loan) => total + BigInt(loan.renewalCount),
+        0n,
+      ) === BigInt(plan.source.renewalCountTotal),
+      "READY plan does not preserve the source renewal total",
+    );
+    assertPlan(
+      plan.target.fines.length === plan.source.nonzeroFineCount &&
+        plan.target.fines.reduce(
+          (total, fine) => total + BigInt(fine.balanceMinor),
+          0n,
+        ) === BigInt(plan.source.fineBalanceMinorTotal),
+      "READY plan does not preserve every nonzero legacy fine balance",
     );
     for (const loanId of loanIds) {
       assertPlan(

@@ -2,11 +2,17 @@ package com.mundiapolis.library.circulation.application.port.outbound
 
 import com.mundiapolis.library.circulation.application.model.CirculationOutboxEvent
 import com.mundiapolis.library.circulation.application.model.CommandOperation
+import com.mundiapolis.library.circulation.application.model.BrokerPublishAcknowledgement
+import com.mundiapolis.library.circulation.application.model.ClaimedOutboxEvent
+import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.FineCommandResult
 import com.mundiapolis.library.circulation.application.model.FineOutboxEvent
 import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
+import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
+import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
+import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
 import com.mundiapolis.library.circulation.application.model.StoredIdempotencyResult
 import com.mundiapolis.library.circulation.application.model.StoredFineIdempotencyResult
 import com.mundiapolis.library.circulation.domain.model.CopyId
@@ -100,6 +106,44 @@ fun interface OutboxEventStore {
 
 fun interface FineOutboxEventStore {
     fun append(event: FineOutboxEvent)
+}
+
+interface OutboxDeliveryStore {
+    fun claimBatch(
+        owner: String,
+        now: Instant,
+        leaseExpiresAt: Instant,
+        batchSize: Int,
+    ): List<ClaimedOutboxEvent>
+
+    fun markPublished(
+        owner: String,
+        event: ClaimedOutboxEvent,
+        acknowledgement: BrokerPublishAcknowledgement,
+        publishedAt: Instant,
+    ): Boolean
+
+    fun recordFailure(
+        owner: String,
+        event: ClaimedOutboxEvent,
+        code: OutboxFailureCode,
+        failedAt: Instant,
+        nextAttemptAt: Instant,
+        maximumAttempts: Int,
+        blockImmediately: Boolean,
+    ): OutboxFailureDisposition
+
+    fun deletePublishedBefore(cutoff: Instant, batchSize: Int): Int
+
+    fun statistics(now: Instant): OutboxDeliveryStatistics
+}
+
+fun interface EventContractEncoder {
+    fun encode(event: ClaimedOutboxEvent): EncodedOutboxEvent
+}
+
+fun interface BrokerEventPublisher {
+    fun publish(event: EncodedOutboxEvent): BrokerPublishAcknowledgement
 }
 
 fun interface TimeProvider {

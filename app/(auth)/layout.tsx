@@ -10,7 +10,7 @@
 
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/security/auth-guards";
 
 /**
  * Authentication layout component.
@@ -23,9 +23,9 @@ import { getSession } from "@/lib/session";
  */
 const Layout = async ({ children }: { children: ReactNode }) => {
   // Check for an existing session to prevent authenticated users from re-authenticating.
-  const session = await getSession();
+  const guard = await requireApprovedUser();
 
-  if (session) {
+  if (guard.ok) {
     // Redirect to home if already logged in.
     redirect("/");
   }

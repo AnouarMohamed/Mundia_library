@@ -1,7 +1,11 @@
 ALTER TABLE circulation_loan
-    ADD COLUMN renewal_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN renewal_count INTEGER NOT NULL DEFAULT 0;
+
+-- [jooq ignore start]
+ALTER TABLE circulation_loan
     ADD CONSTRAINT ck_circulation_loan_renewal_count
-        CHECK (renewal_count BETWEEN 0 AND 100);
+        CHECK (renewal_count BETWEEN 0 AND 100) NOT VALID;
+-- [jooq ignore stop]
 
 CREATE TABLE circulation_fine (
     id UUID PRIMARY KEY,
@@ -138,6 +142,97 @@ CREATE TRIGGER trg_circulation_fine_protect_identity
     BEFORE UPDATE ON circulation_fine
     FOR EACH ROW
     EXECUTE FUNCTION protect_circulation_fine_identity();
+
+CREATE FUNCTION validate_circulation_fine_ledger_consistency()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    target_fine_id UUID;
+    current_fine_version BIGINT;
+    current_fine_balance BIGINT;
+    ledger_count BIGINT;
+    minimum_version BIGINT;
+    maximum_version BIGINT;
+    ledger_balance NUMERIC;
+    minimum_running_balance NUMERIC;
+    maximum_running_balance NUMERIC;
+BEGIN
+    IF TG_TABLE_NAME = 'circulation_fine' THEN
+        target_fine_id := NEW.id;
+    ELSE
+        target_fine_id := NEW.fine_id;
+    END IF;
+
+    EXECUTE format(
+        'SELECT version, balance_minor FROM %I.circulation_fine WHERE id = $1',
+        TG_TABLE_SCHEMA
+    )
+    INTO current_fine_version, current_fine_balance
+    USING target_fine_id;
+
+    IF current_fine_version IS NULL THEN
+        RAISE EXCEPTION 'circulation fine ledger has no owning fine'
+            USING ERRCODE = '23514';
+    END IF;
+
+    EXECUTE format(
+        'SELECT
+            COUNT(*),
+            MIN(fine_version),
+            MAX(fine_version),
+            COALESCE(SUM(delta_minor), 0),
+            MIN(running_balance),
+            MAX(running_balance)
+        FROM (
+            SELECT
+                fine_version,
+                delta_minor,
+                SUM(delta_minor) OVER (
+                    ORDER BY fine_version
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS running_balance
+            FROM %I.circulation_fine_ledger_entry
+            WHERE fine_id = $1
+        ) ledger',
+        TG_TABLE_SCHEMA
+    )
+    INTO
+        ledger_count,
+        minimum_version,
+        maximum_version,
+        ledger_balance,
+        minimum_running_balance,
+        maximum_running_balance
+    USING target_fine_id;
+
+    IF ledger_count = 0
+        OR minimum_version <> 0
+        OR maximum_version <> current_fine_version
+        OR current_fine_version <> ledger_count - 1
+        OR ledger_balance <> current_fine_balance
+        OR minimum_running_balance < 0
+        OR maximum_running_balance > 1000000000000
+    THEN
+        RAISE EXCEPTION 'circulation fine balance/version does not match its immutable ledger'
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER trg_circulation_fine_ledger_consistency_from_fine
+    AFTER INSERT OR UPDATE ON circulation_fine
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_circulation_fine_ledger_consistency();
+
+CREATE CONSTRAINT TRIGGER trg_circulation_fine_ledger_consistency_from_entry
+    AFTER INSERT ON circulation_fine_ledger_entry
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_circulation_fine_ledger_consistency();
 -- [jooq ignore stop]
 
 ALTER TABLE circulation_idempotency
@@ -150,10 +245,6 @@ ALTER TABLE circulation_idempotency
     ADD COLUMN ledger_entry_type VARCHAR(16),
     ADD COLUMN ledger_delta_minor BIGINT,
     ADD COLUMN fine_version BIGINT;
-
-UPDATE circulation_idempotency
-SET renewal_count = 0
-WHERE completed_at IS NOT NULL;
 
 -- [jooq ignore start]
 ALTER TABLE circulation_idempotency
@@ -170,23 +261,23 @@ ALTER TABLE circulation_idempotency
                 'RECORD_FINE_PAYMENT',
                 'ADJUST_FINE'
             )
-        ),
+        ) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_renewal_count
-        CHECK (renewal_count IS NULL OR renewal_count BETWEEN 0 AND 100),
+        CHECK (renewal_count IS NULL OR renewal_count BETWEEN 0 AND 100) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_currency
-        CHECK (currency IS NULL OR currency ~ '^[A-Z]{3}$'),
+        CHECK (currency IS NULL OR currency ~ '^[A-Z]{3}$') NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_fine_balance
         CHECK (
             fine_balance_minor IS NULL
             OR fine_balance_minor BETWEEN 0 AND 1000000000000
-        ),
+        ) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_fine_status
-        CHECK (fine_status IS NULL OR fine_status IN ('OPEN', 'SETTLED')),
+        CHECK (fine_status IS NULL OR fine_status IN ('OPEN', 'SETTLED')) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_ledger_entry_type
         CHECK (
             ledger_entry_type IS NULL
             OR ledger_entry_type IN ('ASSESSMENT', 'PAYMENT', 'ADJUSTMENT')
-        ),
+        ) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_ledger_delta
         CHECK (
             ledger_delta_minor IS NULL
@@ -194,9 +285,9 @@ ALTER TABLE circulation_idempotency
                 ledger_delta_minor BETWEEN -1000000000000 AND 1000000000000
                 AND ledger_delta_minor <> 0
             )
-        ),
+        ) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_fine_version
-        CHECK (fine_version IS NULL OR fine_version >= 0),
+        CHECK (fine_version IS NULL OR fine_version >= 0) NOT VALID,
     ADD CONSTRAINT ck_circulation_idempotency_actor_completion
         CHECK (
             (
@@ -241,7 +332,6 @@ ALTER TABLE circulation_idempotency
                         AND loan_status IS NOT NULL
                         AND requested_at IS NOT NULL
                         AND loan_version IS NOT NULL
-                        AND renewal_count IS NOT NULL
                         AND fine_id IS NULL
                         AND currency IS NULL
                         AND fine_balance_minor IS NULL
@@ -260,7 +350,7 @@ ALTER TABLE circulation_idempotency
                                 AND due_at IS NULL
                                 AND returned_at IS NULL
                                 AND loan_version = 0
-                                AND renewal_count = 0
+                                AND COALESCE(renewal_count, 0) = 0
                             )
                             OR
                             (
@@ -358,5 +448,5 @@ ALTER TABLE circulation_idempotency
                     )
                 )
             )
-        );
+        ) NOT VALID;
 -- [jooq ignore stop]

@@ -20,6 +20,10 @@ cd services
 compilation. Integration tests start an isolated PostgreSQL container and verify
 that Flyway and the persistence adapter work together.
 
+The packaged application defaults `spring.flyway.enabled` to `false`.
+`bootRun` explicitly opts into Flyway for the single-role local database; this
+local convenience is not part of the container runtime contract.
+
 ## Run locally
 
 Start PostgreSQL:
@@ -40,6 +44,24 @@ export AUTH_AUDIENCE=circulation-api
 The local database defaults are defined in `compose.yaml`. Production must
 provide all database and identity settings through its secret/configuration
 manager.
+
+Production schema changes use the same immutable application image in a
+one-shot mode that starts neither Spring nor HTTP:
+
+```bash
+APP_MIGRATION_ONLY=true \
+DATABASE_MIGRATION_URL=jdbc:postgresql://database.example/circulation \
+DATABASE_MIGRATION_USERNAME=circulation_migrator \
+DATABASE_MIGRATION_PASSWORD='from-a-secret-manager' \
+java -jar circulation-service.jar
+```
+
+All three dedicated migration variables are mandatory. Runtime
+`DATABASE_URL`, `DATABASE_USERNAME`, and `DATABASE_PASSWORD` are never used as
+fallbacks. A JDBC URL containing user or password parameters is rejected so a
+driver cannot echo credentials. Invalid maintenance-mode values, conflicting
+maintenance modes, validation failures, or migration failures exit non-zero
+without printing connection exceptions.
 
 Health probes:
 

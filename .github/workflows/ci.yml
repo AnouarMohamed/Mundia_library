@@ -33,6 +33,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  platform:
+    name: Platform Contract
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Create isolated validation environment
+        run: |
+          python3 -m venv /tmp/mundia-platform-validation
+          /tmp/mundia-platform-validation/bin/pip install \
+            --disable-pip-version-check \
+            --no-deps \
+            --only-binary=:all: \
+            --require-hashes \
+            -r platform/requirements-validation-ci-py312-linux-x86_64.txt
+
+      - name: Verify required render tools
+        run: |
+          command -v helm
+          command -v kubectl
+          helm version --short
+          kubectl version --client
+
+      - name: Validate platform contract
+        env:
+          PATH: /tmp/mundia-platform-validation/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+        run: platform/scripts/validate.sh
+
   quality:
     name: Quality (Lint, Typecheck, Test, E2E, Build)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -40,7 +79,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
         env:
           POSTGRES_USER: library
           POSTGRES_PASSWORD: library
@@ -56,13 +95,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -93,13 +133,13 @@ jobs:
       - name: Playwright E2E
         env:
           DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
-          NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
-          AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-e2e-secret-ci-e2e-secret' }}
+          NEXTAUTH_SECRET: ci-e2e-secret-ci-e2e-secret
+          AUTH_SECRET: ci-e2e-secret-ci-e2e-secret
           NEXTAUTH_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3100
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3100
           NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
-          IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
+          IMAGEKIT_PRIVATE_KEY: ci-build-private-key
           ENABLE_WORKFLOWS: "false"
           E2E_USER_EMAIL: test@user.com
           E2E_USER_PASSWORD: "12345678"
@@ -114,22 +154,95 @@ jobs:
         env:
           APP_ENV: development
           DATABASE_URL: postgresql://library:library@127.0.0.1:5432/library
-          NEXTAUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
-          AUTH_SECRET: ${{ secrets['NEXTAUTH_SECRET'] || 'ci-build-secret' }}
+          NEXTAUTH_SECRET: ci-build-secret
+          AUTH_SECRET: ci-build-secret
           NEXTAUTH_URL: http://localhost:3000
           NEXT_PUBLIC_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_PROD_API_ENDPOINT: http://localhost:3000
           NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
-          IMAGEKIT_PRIVATE_KEY: ${{ secrets['IMAGEKIT_PRIVATE_KEY'] || 'ci-build-private-key' }}
-          UPSTASH_REDIS_URL: ${{ secrets['UPSTASH_REDIS_URL'] || 'https://example.upstash.io' }}
-          UPSTASH_REDIS_TOKEN: ${{ secrets['UPSTASH_REDIS_TOKEN'] || 'ci-build-token' }}
-          QSTASH_URL: ${{ secrets['QSTASH_URL'] || 'https://qstash.upstash.io' }}
-          QSTASH_TOKEN: ${{ secrets['QSTASH_TOKEN'] || 'ci-build-token' }}
-          BREVO_API_KEY: ${{ secrets['BREVO_API_KEY'] || 'ci-build-token' }}
-          BREVO_SENDER_EMAIL: ${{ secrets['BREVO_SENDER_EMAIL'] || 'noreply@example.com' }}
-          RESEND_TOKEN: ${{ secrets['RESEND_TOKEN'] || 'ci-build-token' }}
+          IMAGEKIT_PRIVATE_KEY: ci-build-private-key
+          UPSTASH_REDIS_URL: https://example.upstash.io
+          UPSTASH_REDIS_TOKEN: ci-build-token
+          QSTASH_URL: https://qstash.upstash.io
+          QSTASH_TOKEN: ci-build-token
+          BREVO_API_KEY: ci-build-token
+          BREVO_SENDER_EMAIL: noreply@example.com
+          RESEND_TOKEN: ci-build-token
           ENABLE_WORKFLOWS: "false"
         run: npm run build
+
+  circulation-migration-tool:
+    name: Circulation Migration Tool (PostgreSQL 18)
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
+        env:
+          POSTGRES_USER: library
+          POSTGRES_PASSWORD: library
+          POSTGRES_DB: circulation_migration_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U library -d circulation_migration_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: tools/circulation-migration
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@f236b35da9d031e13b1005234ebe4392ed54c580 # v5.0.0
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit complete dependency graph
+        run: npm audit --audit-level=low
+
+      - name: Typecheck and isolated tests
+        run: npm run check
+
+      - name: Build the reviewed migration runner
+        working-directory: services
+        run: ./gradlew :circulation-service:bootJar --no-daemon
+
+      - name: Apply circulation Flyway migrations 1 through 5
+        working-directory: services
+        env:
+          APP_MIGRATION_ONLY: "true"
+          DATABASE_MIGRATION_URL: jdbc:postgresql://127.0.0.1:5432/circulation_migration_ci
+          DATABASE_MIGRATION_USERNAME: library
+          DATABASE_MIGRATION_PASSWORD: library
+        run: java -jar circulation-service/build/libs/circulation-service.jar
+
+      - name: Rehearse exact migration against fresh PostgreSQL 18
+        env:
+          CIRCULATION_MIGRATION_REQUIRE_INTEGRATION: "true"
+          CIRCULATION_MIGRATION_TEST_URL: postgresql://library:library@127.0.0.1:5432/circulation_migration_ci
+          CIRCULATION_MIGRATION_TEST_DATABASE: circulation_migration_ci
+        run: npm run test:integration
 
   migration:
     name: Fresh Database Migration
@@ -137,7 +250,7 @@ jobs:
     timeout-minutes: 10
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
         env:
           POSTGRES_USER: library
           POSTGRES_PASSWORD: library
@@ -156,13 +269,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
-          cache: npm
-          cache-dependency-path: package-lock.json
+          package-manager-cache: false
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
@@ -189,15 +303,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@f236b35da9d031e13b1005234ebe4392ed54c580 # v5.0.0
 
       - name: Set up Java
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: temurin
           java-version: "25"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@f236b35da9d031e13b1005234ebe4392ed54c580 # v5.0.0
 
       - name: Compile, test, and package
         working-directory: services
@@ -212,6 +328,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4

@@ -26,6 +26,9 @@
   "exclude": [
     "node_modules",
     "scripts/**/*",
+    "services/**/*",
+    "tools/**/*",
+    "platform/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",
     "database/migrate-from-csv.ts",

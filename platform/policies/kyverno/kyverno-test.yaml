@@ -6,6 +6,7 @@ policies:
   - restrict-service-exposure.yaml
   - require-tls-ingress.yaml
 resources:
+  - tests/namespace.yaml
   - tests/unsafe-service.yaml
   - tests/secure-ingress.yaml
 results:
@@ -19,4 +20,3 @@ results:
     resource: secure-ingress
     kind: Ingress
     result: pass
-

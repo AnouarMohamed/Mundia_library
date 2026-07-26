@@ -9,6 +9,5 @@ spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "mundia-service.selectorLabels" . | nindent 6 }}
+      {{- include "mundia-service.runtimeSelectorLabels" . | nindent 6 }}
 {{- end }}
-

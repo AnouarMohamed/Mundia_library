@@ -18,7 +18,7 @@ class JooqFineOutboxEventStore(
 ) : FineOutboxEventStore {
     override fun append(event: FineOutboxEvent) {
         val result = event.result
-        val payload = linkedMapOf<String, Any>(
+        val payload = linkedMapOf<String, Any?>(
             "fineId" to result.fineId.value.toString(),
             "loanId" to result.loanId.value.toString(),
             "memberId" to result.memberId.value.toString(),
@@ -29,6 +29,8 @@ class JooqFineOutboxEventStore(
             "ledgerEntryId" to result.ledgerEntryId.value.toString(),
             "ledgerEntryType" to result.ledgerEntryType.name,
             "ledgerDeltaMinor" to result.ledgerDeltaMinor,
+            "actorFingerprint" to event.actorFingerprint,
+            "externalReference" to event.externalReference,
             "occurredAt" to result.occurredAt.toString(),
         )
         val headers = mapOf(

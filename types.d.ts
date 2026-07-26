@@ -34,6 +34,10 @@ interface SessionUser {
  */
 interface Session {
   user?: SessionUser;
+  /** Authentication path used to create this encrypted BFF session. */
+  authenticationMethod?: "institutional-oidc" | "local-credentials";
+  /** Opaque database binding used to reject revoked institutional sessions. */
+  federatedBindingId?: string;
   /** ISO timestamp of session expiration. */
   expires: string;
 }

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "seeded-inventory-cutover-blocker/v1",
+  "status": "BLOCKED",
+  "capturedAt": "2026-07-26T06:15:02.771Z",
+  "sourceKind": "deterministic-local-seed",
+  "containsPersonalData": false,
+  "reason": "Legacy available-copy counters cannot be explained by active loans and the legacy schema has no physical-copy identity or unavailable-copy status.",
+  "requiredDecision": "For every listed edition, a librarian must either correct available_copies to the proven physical inventory and capture a new snapshot, or identify each unavailable physical copy and approve a reviewed ordinal-to-status mapping extension (for example LOST or DAMAGED) before this tool may create an applicable plan.",
+  "editions": [
+    {
+      "editionId": "8f45a8ad-e0e1-437e-8987-5bcbaca24bd9",
+      "sourceTotalCopies": 501,
+      "sourceAvailableCopies": 500,
+      "sourceOpenLoans": 0,
+      "unexplainedUnavailableCopies": 1
+    },
+    {
+      "editionId": "9084986f-456c-449b-ae6e-59ef1f26b129",
+      "sourceTotalCopies": 18,
+      "sourceAvailableCopies": 16,
+      "sourceOpenLoans": 0,
+      "unexplainedUnavailableCopies": 2
+    },
+    {
+      "editionId": "b4ed06bf-02b2-42c4-8886-b3847af02cca",
+      "sourceTotalCopies": 89,
+      "sourceAvailableCopies": 87,
+      "sourceOpenLoans": 0,
+      "unexplainedUnavailableCopies": 2
+    },
+    {
+      "editionId": "d125678e-80d7-4ba8-97a6-cc6ee4b980ef",
+      "sourceTotalCopies": 121,
+      "sourceAvailableCopies": 120,
+      "sourceOpenLoans": 0,
+      "unexplainedUnavailableCopies": 1
+    },
+    {
+      "editionId": "fe03e013-53b8-4574-9ca8-caec69a9b16c",
+      "sourceTotalCopies": 321,
+      "sourceAvailableCopies": 318,
+      "sourceOpenLoans": 0,
+      "unexplainedUnavailableCopies": 3
+    }
+  ],
+  "evidenceSha256": "aa8bd89c05d362434958c05c4f36dadf0a33520415acff1f9ee716a7bbd241c1"
+}

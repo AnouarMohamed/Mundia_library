@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a
         env:
           POSTGRES_USER: postgres
           POSTGRES_DB: library_management
@@ -34,9 +34,12 @@ jobs:
           --health-retries 5
 
     env:
+      APP_ENV: test
       DATABASE_URL: postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
       NEXTAUTH_SECRET: ci-load-secret
+      AUTH_SECRET: ci-load-secret
       NEXTAUTH_URL: http://127.0.0.1:3000
+      AUTH_TRUST_HOST: "true"
       NEXT_PUBLIC_API_ENDPOINT: http://127.0.0.1:3000
       NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3000
       NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
@@ -50,11 +53,14 @@ jobs:
       RESEND_TOKEN: ci-load-token
       ENABLE_WORKFLOWS: "false"
       DISABLE_RATE_LIMIT: "true"
+      ALLOW_TEST_FIXTURES: "true"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6

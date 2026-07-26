@@ -10,7 +10,7 @@ on:
       - .github/labeler.yml
 
 permissions:
-  issues: write
+  contents: read
 
 concurrency:
   group: repo-label-sync
@@ -21,6 +21,8 @@ jobs:
     name: Create and update standard labels
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      issues: write
 
     steps:
       - name: Sync labels

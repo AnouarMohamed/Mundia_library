@@ -52,6 +52,32 @@ updates:
         patterns:
           - "*"
 
+  - package-ecosystem: npm
+    directory: /tools/circulation-migration
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:20"
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    labels:
+      - dependencies
+      - migration
+      - security
+    commit-message:
+      prefix: deps
+      include: scope
+    groups:
+      migration-tool-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
+
   - package-ecosystem: gradle
     directory: /services
     schedule:

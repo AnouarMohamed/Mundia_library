@@ -240,6 +240,8 @@ class FineCommandService(
                 eventVersion = 1,
                 occurredAt = now,
                 result = result,
+                actorFingerprint = owner.fingerprint,
+                externalReference = entry.externalReference,
             ),
         )
         idempotencyStore.complete(owner, key, operation, result, now)

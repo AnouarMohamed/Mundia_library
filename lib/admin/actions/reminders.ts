@@ -2,11 +2,11 @@ import { db } from "@/database/drizzle";
 import { borrowRecords, users, books } from "@/database/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { sendEmailWithFallback } from "@/lib/services/email-service";
-import { requireAdmin } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 import { logError, logInfo } from "@/lib/security/logger";
 
 const assertAdmin = async () => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("automation.execute");
   if (!guard.ok) {
     throw new Error(guard.message);
   }

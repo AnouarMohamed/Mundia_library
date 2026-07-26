@@ -1,10 +1,10 @@
 /**
  * AuthForm Component
- * 
+ *
  * A generic, highly reusable authentication form component built with React Hook Form and Zod.
- * It handles both Sign In and Sign Up flows by dynamically rendering fields based on the 
+ * It handles both Sign In and Sign Up flows by dynamically rendering fields based on the
  * provided Zod schema and default values.
- * 
+ *
  * Features:
  * - Type-safe form handling using Generics.
  * - Integrated validation via @hookform/resolvers/zod.
@@ -12,7 +12,7 @@
  * - Specialized handling for file uploads (university card).
  * - Automatic toast notifications for success/error states.
  * - Tailwind-based styling for consistent UI.
- * 
+ *
  * @template T - The shape of the form data, extending FieldValues.
  */
 
@@ -54,7 +54,7 @@ interface Props<T extends FieldValues> {
   schema: ZodType<T>;
   /** Initial values for the form fields. */
   defaultValues: T;
-  /** 
+  /**
    * Async submission handler.
    * @param data - The validated form data.
    * @returns A promise resolving to a success flag and optional error messages.
@@ -66,6 +66,12 @@ interface Props<T extends FieldValues> {
   >;
   /** Determines the UI text and redirect logic (Sign In vs Sign Up). */
   type: "SIGN_IN" | "SIGN_UP";
+  /** Allows a composed sign-in page to provide a single shared heading. */
+  showHeader?: boolean;
+  /** Controls the legacy sign-in/sign-up cross-link. */
+  showAlternateLink?: boolean;
+  /** Optional submit copy for local compatibility authentication. */
+  submitLabel?: string;
 }
 
 const AuthForm = <T extends FieldValues>({
@@ -73,6 +79,9 @@ const AuthForm = <T extends FieldValues>({
   schema,
   defaultValues,
   onSubmit,
+  showHeader = true,
+  showAlternateLink = true,
+  submitLabel,
 }: Props<T>) => {
   const router = useRouter();
   const isSignIn = type === "SIGN_IN";
@@ -91,7 +100,7 @@ const AuthForm = <T extends FieldValues>({
    */
   const handleSubmit: SubmitHandler<T> = async (data) => {
     const result = await onSubmit(data);
-    
+
     if (result.success) {
       if (isSignIn) showToast.auth.signInSuccess();
       else showToast.auth.signUpSuccess();
@@ -117,17 +126,18 @@ const AuthForm = <T extends FieldValues>({
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div>
-        <h1 className="text-2xl font-semibold text-[var(--mundia-ink)]">
-          {isSignIn ? "Sign in" : "Create account"}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--mundia-muted)]">
-          {isSignIn
-            ? "Access your library account"
-            : "Register for a library account"}
-        </p>
-      </div>
+      {showHeader && (
+        <div>
+          <h1 className="text-2xl font-semibold text-[var(--mundia-ink)]">
+            {isSignIn ? "Sign in" : "Create account"}
+          </h1>
+          <p className="mt-1 text-sm text-[var(--mundia-muted)]">
+            {isSignIn
+              ? "Access your library account"
+              : "Register for a library account"}
+          </p>
+        </div>
+      )}
 
       {/* Main Form Section */}
       <Form {...form}>
@@ -208,24 +218,24 @@ const AuthForm = <T extends FieldValues>({
               ? isSignIn
                 ? "Signing in..."
                 : "Signing up..."
-              : isSignIn
-                ? "Sign In"
-                : "Create Account"}
+              : (submitLabel ?? (isSignIn ? "Sign In" : "Create Account"))}
             {!isSubmitting && <ArrowRight className="size-4" />}
           </Button>
         </form>
       </Form>
 
       {/* Footer / Redirection Section */}
-      <p className="text-center text-sm text-[var(--mundia-muted)]">
-        {isSignIn ? "New student? " : "Already have an account? "}
-        <Link
-          href={isSignIn ? "/sign-up" : "/sign-in"}
-          className="font-semibold text-[var(--mundia-navy)] hover:underline"
-        >
-          {isSignIn ? "Create an account" : "Sign in"}
-        </Link>
-      </p>
+      {showAlternateLink && (
+        <p className="text-center text-sm text-[var(--mundia-muted)]">
+          {isSignIn ? "New student? " : "Already have an account? "}
+          <Link
+            href={isSignIn ? "/sign-up" : "/sign-in"}
+            className="font-semibold text-[var(--mundia-navy)] hover:underline"
+          >
+            {isSignIn ? "Create an account" : "Sign in"}
+          </Link>
+        </p>
+      )}
     </div>
   );
 };

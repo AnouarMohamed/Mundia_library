@@ -8,7 +8,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-library_management}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data_v18:/var/lib/postgresql
     healthcheck:
@@ -43,7 +43,7 @@ services:
       NEXT_PUBLIC_PROD_API_ENDPOINT: ${NEXT_PUBLIC_PROD_API_ENDPOINT:-http://localhost:3000}
       ENABLE_WORKFLOWS: ${ENABLE_WORKFLOWS:-false}
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
 
   migrate:
     build:
@@ -76,16 +76,18 @@ services:
     command: npm run seed
 
   adminer:
-    image: adminer:4.8.1-standalone
+    image: adminer:4.8.1-standalone@sha256:34d37131366c5aa84e1693dbed48593ed6f95fb450b576c1a7a59d3a9c9e8802
     container_name: library_adminer
     restart: unless-stopped
+    profiles:
+      - tools
     depends_on:
       db:
         condition: service_healthy
     environment:
       ADMINER_DEFAULT_SERVER: db
     ports:
-      - "${ADMINER_PORT:-8080}:8080"
+      - "127.0.0.1:${ADMINER_PORT:-8080}:8080"
 
 volumes:
   # A new volume avoids attempting an unsupported in-place PostgreSQL 15 -> 18

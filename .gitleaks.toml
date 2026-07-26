@@ -1,0 +1,19 @@
+title = "Mundiapolis Library secret-scanning policy"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "External Secret references and unresolved OIDC ARN placeholders are identifiers, not credentials."
+  condition = "AND"
+  regexTarget = "line"
+  paths = [
+    '''^platform/(?:gitops/environments/(?:dev|staging|prod)/values-circulation\.yaml|helm/mundia-service/values\.yaml|terraform/environments/(?:dev|staging|prod)/terraform\.tfvars\.example)$''',
+  ]
+  regexes = [
+    '''^\s*remoteKey:\s+mundia/(?:dev|staging|prod)/circulation/oidc\s*$''',
+    '''^\s*oidc_secret_arn\s+=\s+"arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/(?:dev|staging|prod)/circulation/oidc"\s*$''',
+  ]

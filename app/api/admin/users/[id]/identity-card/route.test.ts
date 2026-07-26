@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAdminRouteAccess = vi.hoisted(() => vi.fn());
+const requireAdminCapabilityRouteAccess = vi.hoisted(() => vi.fn());
 const rateLimit = vi.hoisted(() => vi.fn());
 const logAdminAction = vi.hoisted(() => vi.fn());
 const select = vi.hoisted(() => vi.fn());
@@ -10,7 +10,7 @@ const normalizeImage = vi.hoisted(() =>
 );
 
 vi.mock("@/lib/admin/route-guard", () => ({
-  requireAdminRouteAccess,
+  requireAdminCapabilityRouteAccess,
 }));
 
 vi.mock("@/lib/ratelimit", () => ({
@@ -81,7 +81,7 @@ describe("GET admin identity evidence", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
-    requireAdminRouteAccess.mockResolvedValue({
+    requireAdminCapabilityRouteAccess.mockResolvedValue({
       ok: true,
       user: { id: "admin-id" },
     });
@@ -89,7 +89,7 @@ describe("GET admin identity evidence", () => {
   });
 
   it("rejects non-admin callers before reading evidence", async () => {
-    requireAdminRouteAccess.mockResolvedValue({
+    requireAdminCapabilityRouteAccess.mockResolvedValue({
       ok: false,
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     });

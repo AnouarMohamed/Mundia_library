@@ -6,6 +6,7 @@ replicaCount: 2
 env:
   APP_ENV: dev
   PORT: "8080"
+  SPRING_FLYWAY_ENABLED: "false"
 externalSecret:
   targetName: circulation-runtime
   data:
@@ -27,7 +28,43 @@ externalSecret:
     - secretKey: AUTH_AUDIENCE
       remoteKey: mundia/dev/circulation/oidc
       property: audience
+migration:
+  enabled: true
+  networkPolicy:
+    enabled: true
+    egressCidrs:
+      - cidr: 10.40.0.0/16
+        ports:
+          - protocol: TCP
+            port: 5432
+  cleanup:
+    enabled: true
+    apiServerCidrs:
+      - REPLACE_DEV_KUBERNETES_API_SERVICE_IP/32
+  externalSecret:
+    enabled: true
+    targetName: circulation-migration
+    data:
+      - secretKey: DATABASE_MIGRATION_URL
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: jdbc_url
+      - secretKey: DATABASE_MIGRATION_USERNAME
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: username
+      - secretKey: DATABASE_MIGRATION_PASSWORD
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: password
 networkPolicy:
+  ingressPeers:
+    - namespace: ingress-nginx
+      podLabels:
+        app.kubernetes.io/component: controller
+    - namespace: monitoring
+      podLabels:
+        app.kubernetes.io/name: prometheus
+    - namespace: mundia-dev
+      podLabels:
+        mundiapolis.io/allow-circulation: "true"
   egressCidrs:
     - cidr: 10.40.0.0/16
       ports:
@@ -39,4 +76,3 @@ networkPolicy:
           port: 9094
         - protocol: TCP
           port: 6379
-

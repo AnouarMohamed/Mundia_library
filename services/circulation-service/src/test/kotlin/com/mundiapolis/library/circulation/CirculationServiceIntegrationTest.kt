@@ -102,6 +102,23 @@ class CirculationServiceIntegrationTest {
                 status { isOk() }
             }
 
+        mockMvc.get("/actuator/prometheus")
+            .andExpect {
+                status { isUnauthorized() }
+            }
+
+        mockMvc.get("/actuator/prometheus") {
+            with(jwt().authorities(SimpleGrantedAuthority("SCOPE_circulation.read")))
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        mockMvc.get("/actuator/prometheus") {
+            with(jwt().authorities(SimpleGrantedAuthority("SCOPE_circulation.operations.read")))
+        }.andExpect {
+            status { isOk() }
+        }
+
         mockMvc.get("/api/v1/circulation/status")
             .andExpect {
                 status { isUnauthorized() }

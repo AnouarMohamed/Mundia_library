@@ -89,6 +89,8 @@ data class FineOutboxEvent(
     val eventVersion: Int,
     val occurredAt: Instant,
     val result: FineCommandResult,
+    val actorFingerprint: String,
+    val externalReference: String?,
 )
 
 class InvalidFineAmountException :

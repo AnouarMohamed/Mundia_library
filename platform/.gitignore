@@ -1,4 +1,6 @@
 **/.terraform/
+**/__pycache__/
+**/*.pyc
 **/*.tfstate
 **/*.tfstate.*
 **/*.tfplan

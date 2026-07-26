@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getExportStats } from "@/lib/admin/actions/data-export";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
  */
 export async function GET(_request: NextRequest) {
   try {
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess("exports.read");
     if (!guard.ok) {
       return guard.response;
     }

@@ -10,7 +10,9 @@
     "autoscaling",
     "podDisruptionBudget",
     "networkPolicy",
-    "externalSecret"
+    "externalSecret",
+    "env",
+    "migration"
   ],
   "properties": {
     "environment": {
@@ -51,6 +53,19 @@
       "minimum": 1024,
       "maximum": 65535
     },
+    "env": {
+      "type": "object",
+      "required": ["SPRING_FLYWAY_ENABLED"],
+      "properties": {
+        "SPRING_FLYWAY_ENABLED": {
+          "type": "string",
+          "const": "false"
+        }
+      },
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"]
+      }
+    },
     "resources": {
       "type": "object",
       "required": ["requests", "limits"]
@@ -74,9 +89,16 @@
     },
     "networkPolicy": {
       "type": "object",
-      "required": ["enabled", "egressCidrs"],
+      "required": ["enabled", "ingressPeers", "egressCidrs"],
       "properties": {
         "enabled": { "type": "boolean" },
+        "ingressPeers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["namespace", "podLabels"]
+          }
+        },
         "egressCidrs": {
           "type": "array",
           "items": {
@@ -93,9 +115,268 @@
         "enabled": { "type": "boolean" },
         "data": {
           "type": "array",
-          "minItems": 1
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["secretKey", "remoteKey", "property"],
+            "properties": {
+              "secretKey": {
+                "type": "string",
+                "not": {
+                  "pattern": "^DATABASE_MIGRATION_"
+                }
+              },
+              "remoteKey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "property": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
+    },
+    "migration": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "activeDeadlineSeconds",
+        "backoffLimit",
+        "ttlSecondsAfterFinished",
+        "tmpSizeLimit",
+        "serviceAccount",
+        "networkPolicy",
+        "cleanup",
+        "externalSecret",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "const": true
+        },
+        "activeDeadlineSeconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 1800
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "ttlSecondsAfterFinished": {
+          "type": "integer",
+          "minimum": 300,
+          "maximum": 86400
+        },
+        "tmpSizeLimit": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+        },
+        "serviceAccount": {
+          "type": "object",
+          "required": ["create", "name", "automountToken"],
+          "properties": {
+            "create": {
+              "type": "boolean",
+              "const": true
+            },
+            "name": {
+              "type": "string"
+            },
+            "automountToken": {
+              "type": "boolean",
+              "const": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "networkPolicy": {
+          "type": "object",
+          "required": ["enabled", "egressCidrs"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "const": true
+            },
+            "egressCidrs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["cidr", "ports"],
+                "properties": {
+                  "cidr": {
+                    "type": "string",
+                    "minLength": 3
+                  },
+                  "ports": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["protocol", "port"],
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "const": "TCP"
+                        },
+                        "port": {
+                          "type": "integer",
+                          "const": 5432
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "cleanup": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "activeDeadlineSeconds",
+            "backoffLimit",
+            "ttlSecondsAfterFinished",
+            "tokenExpirationSeconds",
+            "apiServerCidrs",
+            "resources"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "const": true
+            },
+            "activeDeadlineSeconds": {
+              "type": "integer",
+              "minimum": 30,
+              "maximum": 300
+            },
+            "backoffLimit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "ttlSecondsAfterFinished": {
+              "type": "integer",
+              "minimum": 300,
+              "maximum": 86400
+            },
+            "tokenExpirationSeconds": {
+              "type": "integer",
+              "minimum": 600,
+              "maximum": 900
+            },
+            "apiServerCidrs": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 3,
+                "not": {
+                  "enum": ["0.0.0.0/0", "::/0"]
+                }
+              }
+            },
+            "resources": {
+              "type": "object",
+              "required": ["requests", "limits"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "externalSecret": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "refreshInterval",
+            "secretStoreRef",
+            "targetName",
+            "creationPolicy",
+            "deletionPolicy",
+            "data"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "const": true
+            },
+            "refreshInterval": {
+              "type": "string",
+              "minLength": 2
+            },
+            "secretStoreRef": {
+              "type": "object",
+              "required": ["name", "kind"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["SecretStore", "ClusterSecretStore"]
+                }
+              }
+            },
+            "targetName": {
+              "type": "string",
+              "minLength": 3
+            },
+            "creationPolicy": {
+              "type": "string",
+              "enum": ["Owner"]
+            },
+            "deletionPolicy": {
+              "type": "string",
+              "enum": ["Retain"]
+            },
+            "data": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "required": ["secretKey", "remoteKey", "property"],
+                "properties": {
+                  "secretKey": {
+                    "type": "string",
+                    "enum": [
+                      "DATABASE_MIGRATION_URL",
+                      "DATABASE_MIGRATION_USERNAME",
+                      "DATABASE_MIGRATION_PASSWORD"
+                    ]
+                  },
+                  "remoteKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "property": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "required": ["requests", "limits"]
+        }
+      },
+      "additionalProperties": false
     },
     "ingress": {
       "type": "object",
@@ -103,4 +384,3 @@
     }
   }
 }
-

@@ -12,7 +12,7 @@ import ratelimit from "@/lib/ratelimit";
 import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import { desc, asc, eq, and, or, like, sql } from "drizzle-orm";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import {
   getClientIp,
   normalizeTextParam,
@@ -41,7 +41,9 @@ export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   try {
     // Authenticate before consuming an administrator-scoped limiter bucket.
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "users.manage_status",
+    );
     if (!guard.ok) {
       return guard.response;
     }

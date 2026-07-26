@@ -74,11 +74,18 @@ test("rendered documents enforce nonce-bound scripts", async ({ page }) => {
   expect(policy).toContain("'strict-dynamic'");
   expect(policy).not.toMatch(/script-src[^;]*'unsafe-inline'/);
 
-  const scriptNonces = await page
-    .locator("script")
-    .evaluateAll((scripts) => scripts.map((script) => script.nonce));
-  expect(scriptNonces.length).toBeGreaterThan(0);
-  expect(scriptNonces.every((scriptNonce) => scriptNonce === nonce)).toBe(true);
+  // Inspect the server-delivered document rather than the hydrated DOM:
+  // `strict-dynamic` intentionally permits a trusted nonced bootstrap script
+  // to add descendant scripts that do not repeat the nonce attribute.
+  const documentHtml = (await response?.text()) ?? "";
+  const initialScripts = documentHtml.match(/<script\b[^>]*>/gi) ?? [];
+  expect(initialScripts.length).toBeGreaterThan(0);
+  expect(
+    initialScripts.every(
+      (script) =>
+        script.match(/\bnonce=["']([^"']+)["']/i)?.[1] === nonce,
+    ),
+  ).toBe(true);
   expect(cspViolations).toEqual([]);
 });
 
@@ -106,9 +113,12 @@ test("normal user cannot open admin", async ({ page }) => {
   await signIn(page, e2eUser);
   await expect(page).not.toHaveURL(/\/sign-in/);
 
-  await page.goto("/admin");
-
-  await expect(page).not.toHaveURL(/\/admin(?:\/|$)/);
+  // Assert the server-side authorization decision directly. A browser
+  // navigation can be aborted while Next.js replaces the RSC frame during the
+  // redirect, which is unrelated to whether the guard denied access.
+  const response = await page.request.get("/admin", { maxRedirects: 0 });
+  expect([303, 307, 308]).toContain(response.status());
+  expect(response.headers().location).toBe("/");
 });
 
 test("normal user cannot fetch another user's borrow records", async ({

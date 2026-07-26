@@ -108,7 +108,9 @@ class JooqIdempotencyStore(
                 checkedOutAt = checkedOutAt?.toInstant(),
                 dueAt = dueAt?.toInstant(),
                 returnedAt = returnedAt?.toInstant(),
-                renewalCount = requireNotNull(renewalCount),
+                // V3 records predate the renewal field. Their only valid historical
+                // value is zero; V4+ completions persist the explicit count.
+                renewalCount = renewalCount ?: 0,
                 version = requireNotNull(loanVersion),
             )
         }

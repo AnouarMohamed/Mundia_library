@@ -1,6 +1,7 @@
 package com.mundiapolis.library.circulation.domain.model
 
 import java.time.Instant
+import java.util.Currency
 
 enum class FineStatus {
     OPEN,
@@ -24,7 +25,9 @@ data class Fine private constructor(
     val createdAt: Instant,
 ) {
     init {
-        require(CURRENCY_PATTERN.matches(currency)) { "Currency must be an uppercase ISO 4217 code" }
+        require(isSupportedCurrency(currency)) {
+            "Currency must be an ISO 4217 currency with minor units"
+        }
         require(balanceMinor in 0..MAX_AMOUNT_MINOR) { "Fine balance is outside the supported range" }
         require(version >= 0) { "Fine version cannot be negative" }
         require(
@@ -63,6 +66,16 @@ data class Fine private constructor(
     companion object {
         const val MAX_AMOUNT_MINOR = 1_000_000_000_000L
         private val CURRENCY_PATTERN = Regex("[A-Z]{3}")
+
+        private fun isSupportedCurrency(code: String): Boolean =
+            CURRENCY_PATTERN.matches(code) &&
+                (
+                    runCatching { Currency.getInstance(code) }
+                        .getOrNull()
+                        ?.defaultFractionDigits
+                        ?.let { it >= 0 }
+                        ?: false
+                )
 
         fun assess(
             id: FineId,

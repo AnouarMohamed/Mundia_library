@@ -141,7 +141,11 @@ class CirculationCommandService(
 
     override fun renew(command: RenewLoanCommand): CommandExecution {
         val operation = CommandOperation.RENEW_LOAN
-        val fingerprint = fingerprint(operation, command.loanId.value.toString())
+        val fingerprint = fingerprint(
+            operation,
+            command.loanId.value.toString(),
+            authorizationBinding(command.principal),
+        )
 
         return executeIdempotently(
             command.principal.idempotencyOwner,
@@ -194,6 +198,13 @@ class CirculationCommandService(
         }
     }
 
+    private fun authorizationBinding(principal: CommandPrincipal): String =
+        if (principal.canActOnBehalf) {
+            "on-behalf"
+        } else {
+            "member:${principal.membershipId?.value ?: "missing"}"
+        }
+
     private fun executeIdempotently(
         owner: IdempotencyOwner,
         key: IdempotencyKey,
@@ -233,6 +244,7 @@ class CirculationCommandService(
                 eventVersion = 1,
                 occurredAt = now,
                 result = result,
+                actorFingerprint = owner.fingerprint,
             ),
         )
         idempotencyStore.complete(owner, key, operation, result, now)

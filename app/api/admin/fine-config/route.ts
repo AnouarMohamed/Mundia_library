@@ -3,7 +3,7 @@ import {
   getDailyFineAmount,
   setDailyFineAmount,
 } from "@/lib/admin/actions/config";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import { logAdminAction } from "@/lib/admin/audit";
 import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
@@ -18,7 +18,9 @@ export const runtime = "nodejs";
  */
 export async function GET(_request: NextRequest) {
   try {
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "fines.manage_policy",
+    );
     if (!guard.ok) {
       return guard.response;
     }
@@ -54,7 +56,9 @@ export async function POST(request: NextRequest) {
     });
     if (sameOriginResponse) return sameOriginResponse;
 
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "fines.manage_policy",
+    );
     if (!guard.ok) {
       return guard.response;
     }

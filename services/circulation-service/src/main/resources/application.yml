@@ -1,13 +1,26 @@
 server:
   port: ${PORT:8080}
   shutdown: graceful
-  forward-headers-strategy: framework
+  # The platform edge must normalize routing metadata. Never trust client-supplied
+  # Forwarded/X-Forwarded-* headers inside this service.
+  forward-headers-strategy: none
+  max-http-request-header-size: 16KB
   compression:
     enabled: true
+  tomcat:
+    connection-timeout: 5s
+    keep-alive-timeout: 15s
+    max-keep-alive-requests: 100
+    max-http-form-post-size: 16KB
+    max-swallow-size: 16KB
+    max-parameter-count: 32
 
 spring:
   application:
     name: circulation-service
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   lifecycle:
     timeout-per-shutdown-phase: 30s
   threads:
@@ -25,9 +38,12 @@ spring:
       validation-timeout: 1000
       max-lifetime: 1500000
   flyway:
-    enabled: true
+    enabled: ${SPRING_FLYWAY_ENABLED:false}
     clean-disabled: true
     validate-on-migrate: true
+    # Runtime images fail safe with in-process migrations disabled. The
+    # migration-only entrypoint invokes bundled Flyway directly with its
+    # dedicated schema-owner credential contract.
   jooq:
     sql-dialect: postgres
 
@@ -38,6 +54,35 @@ app:
     maximum-renewals: ${MAXIMUM_RENEWALS:2}
     fine-currency: ${FINE_CURRENCY:MAD}
     idempotency-retention: ${IDEMPOTENCY_RETENTION:P1D}
+  outbox:
+    enabled: ${OUTBOX_DELIVERY_ENABLED:false}
+    instance-id: ${OUTBOX_INSTANCE_ID:${HOSTNAME:local}}
+    topic: ${OUTBOX_TOPIC:mundia.circulation.events.v1}
+    schema-subject: ${OUTBOX_SCHEMA_SUBJECT:mundia.circulation.v1.CirculationEvent}
+    poll-interval: ${OUTBOX_POLL_INTERVAL:PT0.5S}
+    lease-duration: ${OUTBOX_LEASE_DURATION:PT1M30S}
+    batch-size: ${OUTBOX_BATCH_SIZE:10}
+    maximum-attempts: ${OUTBOX_MAXIMUM_ATTEMPTS:20}
+    retry-base-delay: ${OUTBOX_RETRY_BASE_DELAY:PT1S}
+    retry-maximum-delay: ${OUTBOX_RETRY_MAXIMUM_DELAY:PT5M}
+    published-retention: ${OUTBOX_PUBLISHED_RETENTION:P30D}
+    cleanup-interval: ${OUTBOX_CLEANUP_INTERVAL:PT1H}
+    cleanup-batch-size: ${OUTBOX_CLEANUP_BATCH_SIZE:1000}
+    maximum-event-bytes: ${OUTBOX_MAXIMUM_EVENT_BYTES:262144}
+    kafka:
+      bootstrap-servers: ${OUTBOX_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      security-protocol: ${OUTBOX_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+      allow-insecure-transport: ${OUTBOX_KAFKA_ALLOW_INSECURE_TRANSPORT:false}
+      sasl-mechanism: ${OUTBOX_KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      sasl-jaas-config: ${OUTBOX_KAFKA_SASL_JAAS_CONFIG:}
+      truststore-location: ${OUTBOX_KAFKA_TRUSTSTORE_LOCATION:}
+      truststore-password: ${OUTBOX_KAFKA_TRUSTSTORE_PASSWORD:}
+      keystore-location: ${OUTBOX_KAFKA_KEYSTORE_LOCATION:}
+      keystore-password: ${OUTBOX_KAFKA_KEYSTORE_PASSWORD:}
+      key-password: ${OUTBOX_KAFKA_KEY_PASSWORD:}
+      delivery-timeout: ${OUTBOX_KAFKA_DELIVERY_TIMEOUT:PT5S}
+      request-timeout: ${OUTBOX_KAFKA_REQUEST_TIMEOUT:PT3S}
+      maximum-block: ${OUTBOX_KAFKA_MAXIMUM_BLOCK:PT1S}
   security:
     jwt:
       issuer: ${AUTH_ISSUER_URI}

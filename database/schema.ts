@@ -10,6 +10,10 @@ import {
   numeric,
   timestamp,
   uuid,
+  check,
+  index,
+  primaryKey,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -30,6 +34,25 @@ export const userStatusEnum = pgEnum("status", [
  * - ADMIN: Administrative access (approve requests, manage catalog, analytics).
  */
 export const userRoleEnum = pgEnum("role", ["USER", "ADMIN"]);
+
+/**
+ * High-risk administrative capabilities enforced in addition to the ADMIN
+ * role. The values are stored as constrained text so adding a capability is a
+ * reviewed schema change without PostgreSQL enum deployment restrictions.
+ */
+export const adminCapabilityValues = [
+  "identity_evidence.read",
+  "users.manage_status",
+  "roles.manage_admin",
+  "exports.read",
+  "fines.manage_policy",
+  "fines.recalculate",
+  "automation.execute",
+  "bulk.execute",
+  "capabilities.manage",
+] as const;
+
+export type AdminCapability = (typeof adminCapabilityValues)[number];
 
 /**
  * Enumeration of borrow record statuses.
@@ -78,14 +101,12 @@ export const users = pgTable("users", {
   /** URL or reference to the user's university ID card image. */
   universityCard: text("university_card").notNull(),
   /** Current account approval status. */
-  status: userStatusEnum("status")
-    .notNull()
-    .default("PENDING"),
+  status: userStatusEnum("status").notNull().default("PENDING"),
   /** Assigned role determining access levels. */
   role: userRoleEnum("role").notNull().default("USER"),
   /** Date of the user's last interaction with the platform. */
   lastActivityDate: date("last_activity_date", { mode: "string" }).default(
-    sql`CURRENT_DATE`
+    sql`CURRENT_DATE`,
   ),
   /** Timestamp of the last successful login. */
   lastLogin: timestamp("last_login", { mode: "date", withTimezone: true }),
@@ -95,6 +116,134 @@ export const users = pgTable("users", {
     withTimezone: true,
   }).defaultNow(),
 });
+
+/**
+ * Pre-provisioned institutional identities.
+ *
+ * The OIDC issuer and subject are the only lookup key. Email is deliberately
+ * not a key and provider tokens are never stored in this table.
+ */
+export const federatedIdentities = pgTable(
+  "federated_identities",
+  {
+    /** Opaque revocable session binding carried in encrypted BFF sessions. */
+    bindingId: uuid("binding_id")
+      .notNull()
+      .defaultRandom()
+      .unique("federated_identities_binding_id_unique"),
+    /** Exact OIDC issuer string; never normalized by the application. */
+    issuer: text("issuer").notNull(),
+    /** Provider-stable OIDC subject scoped to the exact issuer. */
+    subject: text("subject").notNull(),
+    /** Stable local account used for application authorization. */
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Provisioning timestamp. Provider credentials and tokens are not stored. */
+    createdAt: timestamp("created_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (identity) => [
+    primaryKey({
+      columns: [identity.issuer, identity.subject],
+      name: "federated_identities_issuer_subject_pk",
+    }),
+    unique("federated_identities_issuer_user_unique").on(
+      identity.issuer,
+      identity.userId,
+    ),
+    index("federated_identities_user_idx").on(identity.userId),
+    check(
+      "federated_identities_issuer_length",
+      sql`char_length(${identity.issuer}) between 1 and 2048`,
+    ),
+    check(
+      "federated_identities_subject_length",
+      sql`char_length(${identity.subject}) between 1 and 1024`,
+    ),
+  ],
+);
+
+/**
+ * Append-only grants for high-risk administrative capabilities.
+ *
+ * A grant may only transition once from active to revoked. Database triggers
+ * enforce that lifecycle and append the corresponding audit event.
+ */
+export const adminCapabilityAssignments = pgTable(
+  "admin_capability_assignments",
+  {
+    id: uuid("id").notNull().primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    capability: varchar("capability", { length: 64 })
+      .$type<AdminCapability>()
+      .notNull(),
+    grantedBy: uuid("granted_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    grantReason: varchar("grant_reason", { length: 500 }).notNull(),
+    grantedAt: timestamp("granted_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    revokedAt: timestamp("revoked_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    revokedBy: uuid("revoked_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    revokeReason: varchar("revoke_reason", { length: 500 }),
+  },
+  (assignment) => [
+    check(
+      "admin_capability_assignments_capability_valid",
+      sql`${assignment.capability} IN (${sql.raw(
+        adminCapabilityValues
+          .map((capability) => `'${capability.replaceAll("'", "''")}'`)
+          .join(", "),
+      )})`,
+    ),
+    check(
+      "admin_capability_assignments_grant_reason_valid",
+      sql`char_length(btrim(${assignment.grantReason})) BETWEEN 10 AND 500`,
+    ),
+    check(
+      "admin_capability_assignments_expiry_valid",
+      sql`${assignment.expiresAt} IS NULL OR ${assignment.expiresAt} > ${assignment.grantedAt}`,
+    ),
+    check(
+      "admin_capability_assignments_revocation_valid",
+      sql`(
+        ${assignment.revokedAt} IS NULL
+        AND ${assignment.revokedBy} IS NULL
+        AND ${assignment.revokeReason} IS NULL
+      ) OR (
+        ${assignment.revokedAt} IS NOT NULL
+        AND ${assignment.revokedBy} IS NOT NULL
+        AND char_length(btrim(${assignment.revokeReason})) BETWEEN 10 AND 500
+        AND ${assignment.revokedAt} >= ${assignment.grantedAt}
+      )`,
+    ),
+    index("admin_capability_assignments_user_lookup_idx").on(
+      assignment.userId,
+      assignment.capability,
+      assignment.expiresAt,
+    ),
+  ],
+);
 
 /**
  * Books table containing the library's catalog.
@@ -178,16 +327,14 @@ export const borrowRecords = pgTable("borrow_records", {
   /** Actual return date. */
   returnDate: date("return_date", { mode: "string" }),
   /** Current status of the borrow lifecycle. */
-  status: borrowStatusEnum("status")
-    .notNull()
-    .default("BORROWED"),
+  status: borrowStatusEnum("status").notNull().default("BORROWED"),
   /** Name or ID of the person who authorized the borrow (if applicable). */
   borrowedBy: text("borrowed_by"),
   /** Name or ID of the person who processed the return (if applicable). */
   returnedBy: text("returned_by"),
   /** Accumulated fine amount for overdue returns. */
   fineAmount: numeric("fine_amount", { precision: 10, scale: 2 }).default(
-    "0.00"
+    "0.00",
   ),
   /** Administrative or student notes regarding the loan. */
   notes: text("notes"),
@@ -281,9 +428,7 @@ export const adminRequests = pgTable("admin_requests", {
   /** Reason provided by the user for why they need admin access. */
   requestReason: text("request_reason").notNull(),
   /** Current status of the request. */
-  status: requestStatusEnum("status")
-    .notNull()
-    .default("PENDING"),
+  status: requestStatusEnum("status").notNull().default("PENDING"),
   /** ID of the administrator who reviewed this request. */
   reviewedBy: uuid("reviewed_by").references(() => users.id),
   /** Timestamp of when the review occurred. */
@@ -344,9 +489,7 @@ export const renewalRequests = pgTable("renewal_requests", {
     .notNull()
     .references(() => users.id),
   /** Status of the renewal request. */
-  status: requestStatusEnum("status")
-    .notNull()
-    .default("PENDING"),
+  status: requestStatusEnum("status").notNull().default("PENDING"),
   /** Reason provided by the student for needing more time. */
   requestReason: text("request_reason"),
   /** Feedback from the admin if the renewal was denied. */

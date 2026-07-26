@@ -4,6 +4,7 @@ import jakarta.validation.constraints.AssertTrue
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.validation.annotation.Validated
 import java.time.Duration
+import java.util.Currency
 
 @Validated
 @ConfigurationProperties("app.circulation")
@@ -14,23 +15,39 @@ data class CirculationPolicyProperties(
     val fineCurrency: String,
     val idempotencyRetention: Duration,
 ) {
-    @get:AssertTrue(message = "default loan period must be positive")
-    val isDefaultLoanPeriodPositive: Boolean
-        get() = !defaultLoanPeriod.isZero && !defaultLoanPeriod.isNegative
+    @get:AssertTrue(message = "default loan period must be between one second and 365 days")
+    val isDefaultLoanPeriodValid: Boolean
+        get() = defaultLoanPeriod.isBoundedPositiveDuration()
 
-    @get:AssertTrue(message = "renewal period must be positive")
-    val isRenewalPeriodPositive: Boolean
-        get() = !renewalPeriod.isZero && !renewalPeriod.isNegative
+    @get:AssertTrue(message = "renewal period must be between one second and 365 days")
+    val isRenewalPeriodValid: Boolean
+        get() = renewalPeriod.isBoundedPositiveDuration()
 
     @get:AssertTrue(message = "maximum renewals must be between 1 and 100")
     val isMaximumRenewalsValid: Boolean
         get() = maximumRenewals in 1..100
 
-    @get:AssertTrue(message = "fine currency must be a three-letter uppercase ISO 4217 code")
+    @get:AssertTrue(message = "fine currency must be an ISO 4217 currency with minor units")
     val isFineCurrencyValid: Boolean
-        get() = Regex("[A-Z]{3}").matches(fineCurrency)
+        get() {
+            if (!Regex("[A-Z]{3}").matches(fineCurrency)) {
+                return false
+            }
+            return runCatching { Currency.getInstance(fineCurrency) }
+                .getOrNull()
+                ?.defaultFractionDigits
+                ?.let { it >= 0 }
+                ?: false
+        }
 
-    @get:AssertTrue(message = "idempotency retention must be positive")
-    val isIdempotencyRetentionPositive: Boolean
-        get() = !idempotencyRetention.isZero && !idempotencyRetention.isNegative
+    @get:AssertTrue(message = "idempotency retention must be between one second and 365 days")
+    val isIdempotencyRetentionValid: Boolean
+        get() = idempotencyRetention.isBoundedPositiveDuration()
+
+    private fun Duration.isBoundedPositiveDuration(): Boolean =
+        !isZero && !isNegative && this <= MAX_POLICY_DURATION
+
+    private companion object {
+        val MAX_POLICY_DURATION: Duration = Duration.ofDays(365)
+    }
 }

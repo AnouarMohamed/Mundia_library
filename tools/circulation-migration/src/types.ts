@@ -1,10 +1,21 @@
-export const SNAPSHOT_SCHEMA = "legacy-circulation-snapshot/v1" as const;
-export const PLAN_SCHEMA = "circulation-migration-plan/v1" as const;
-export const RECONCILIATION_SCHEMA = "circulation-reconciliation/v1" as const;
+export const SNAPSHOT_SCHEMA = "legacy-circulation-snapshot/v2" as const;
+export const PLAN_SCHEMA = "circulation-migration-plan/v2" as const;
+export const RECONCILIATION_SCHEMA = "circulation-reconciliation/v2" as const;
 
 export type LegacyBorrowStatus = "PENDING" | "BORROWED" | "RETURNED";
-export type TargetCopyStatus = "AVAILABLE" | "ON_LOAN";
-export type TargetLoanStatus = "REQUESTED" | "ACTIVE" | "RETURNED";
+export type TargetCopyStatus =
+  | "AVAILABLE"
+  | "ON_LOAN"
+  | "RESERVED"
+  | "LOST"
+  | "DAMAGED"
+  | "WITHDRAWN";
+export type TargetLoanStatus =
+  | "REQUESTED"
+  | "ACTIVE"
+  | "RETURNED"
+  | "REJECTED"
+  | "CANCELLED";
 export type FindingSeverity = "ERROR" | "WARNING" | "INFO";
 
 export interface LegacyBook {
@@ -40,6 +51,8 @@ export interface LegacySnapshot {
   source: {
     database: string;
     serverVersion: string;
+    contractVersion: "legacy-circulation-source/pg18-v1";
+    transactionIsolation: "SERIALIZABLE_READ_ONLY_DEFERRABLE";
   };
   books: LegacyBook[];
   borrowRecords: LegacyBorrowRecord[];
@@ -51,7 +64,7 @@ export interface TargetCopy {
   branchId: string;
   barcode: string;
   status: TargetCopyStatus;
-  shelfLocation: null;
+  shelfLocation: string | null;
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -67,10 +80,36 @@ export interface TargetLoan {
   checkedOutAt: string | null;
   dueAt: string | null;
   returnedAt: string | null;
-  rejectedAt: null;
+  rejectedAt: string | null;
+  version: number;
+  renewalCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TargetFine {
+  id: string;
+  loanId: string;
+  memberId: string;
+  currency: string;
+  balanceMinor: number;
+  status: string;
   version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TargetFineLedgerEntry {
+  id: string;
+  fineId: string;
+  fineVersion: number;
+  entryType: string;
+  deltaMinor: number;
+  actorFingerprint: string;
+  reason: string | null;
+  externalReference: string | null;
+  occurredAt: string;
+  createdAt: string;
 }
 
 export interface Finding {
@@ -88,9 +127,7 @@ export interface LegacyLoanArchive {
   fieldsNotRepresentedInTarget: {
     borrowedBy: string | null;
     returnedBy: string | null;
-    fineAmount: string | null;
     notes: string | null;
-    renewalCount: number;
     lastReminderSent: string | null;
     updatedBy: string | null;
   };
@@ -121,9 +158,13 @@ export interface MigrationPlanWithoutHash {
     capturedAt: string;
     database: string;
     serverVersion: string;
+    sourceContractVersion: "legacy-circulation-source/pg18-v1";
     snapshotSha256: string;
     bookCount: number;
     borrowRecordCount: number;
+    renewalCountTotal: string;
+    nonzeroFineCount: number;
+    fineBalanceMinorTotal: string;
   };
   policy: {
     branchId: string;
@@ -131,13 +172,20 @@ export interface MigrationPlanWithoutHash {
     bookIdMapsToEditionId: true;
     userIdMapsToMemberId: true;
     historicalCopyAssignment: "BLOCK_AMBIGUOUS" | "DETERMINISTIC_FEASIBLE";
-    unsupportedOperationalFields: "BLOCK" | "ARCHIVE_WITH_WARNING";
+    legacyFineCurrency: "MAD";
+    legacyNullFineAmount: "NO_FINE";
+    legacyFineBalanceMeaning: "CURRENT_OUTSTANDING_AS_INITIAL_ASSESSMENT";
+    fineAssessmentTimestamp: "LEGACY_UPDATED_AT";
+    historicalFinanceActor: "MIGRATION_PRINCIPAL";
+    historicalFinanceActorFingerprint: string;
     timestampDateResolution: "UTC_END_OF_DAY";
     historicalOutboxEvents: "NONE";
   };
   target: {
     copies: TargetCopy[];
     loans: TargetLoan[];
+    fines: TargetFine[];
+    fineLedgerEntries: TargetFineLedgerEntry[];
   };
   legacyLoanArchive: LegacyLoanArchive[];
   findings: Finding[];
@@ -153,7 +201,11 @@ export interface MigrationPlan extends MigrationPlanWithoutHash {
 }
 
 export interface RowMismatch {
-  table: "circulation_copy" | "circulation_loan";
+  table:
+    | "circulation_copy"
+    | "circulation_loan"
+    | "circulation_fine"
+    | "circulation_fine_ledger_entry";
   rowId: string;
   kind: "MISSING" | "UNEXPECTED" | "FIELD_MISMATCH";
   differingFields: string[];
@@ -175,12 +227,19 @@ export interface ReconciliationReportWithoutHash {
     actualCopies: number;
     expectedLoans: number;
     actualLoans: number;
+    expectedFines: number;
+    actualFines: number;
+    expectedFineLedgerEntries: number;
+    actualFineLedgerEntries: number;
   };
   mismatches: RowMismatch[];
   application?: {
     transactionOutcome: "COMMITTED" | "ROLLED_BACK";
+    transactionFinishedAt: string;
     insertedCopies: number;
     insertedLoans: number;
+    insertedFines: number;
+    insertedFineLedgerEntries: number;
   };
 }
 

@@ -55,6 +55,16 @@ spec:
                       - dev
                       - staging
                       - prod
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - migration
+                      - migration-cleanup
       validate:
         message: Every application container needs CPU/memory requests and limits plus startup, readiness, and liveness probes.
         pattern:
@@ -73,6 +83,41 @@ spec:
                   "?*": "?*"
                 livenessProbe:
                   "?*": "?*"
+    - name: require-resources-for-maintenance-jobs
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchExpressions:
+                  - key: mundiapolis.io/environment
+                    operator: In
+                    values:
+                      - dev
+                      - staging
+                      - prod
+              selector:
+                matchExpressions:
+                  - key: app.kubernetes.io/component
+                    operator: In
+                    values:
+                      - migration
+                      - migration-cleanup
+      validate:
+        message: Maintenance jobs need bounded resources and must not expose network ports.
+        pattern:
+          spec:
+            restartPolicy: Never
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"
+                X(ports): "null"
     - name: deny-host-access-and-privileged
       match:
         any:
@@ -101,4 +146,3 @@ spec:
                   =(privileged): false
                 =(ports):
                   - X(hostPort): "null"
-

@@ -6,7 +6,7 @@ import { db } from "@/database/drizzle";
 import { users } from "@/database/schema";
 import config from "@/lib/config";
 import { logAdminAction } from "@/lib/admin/audit";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import ratelimit from "@/lib/ratelimit";
 import { getClientIp, isUuid } from "@/lib/security/api-request";
 import { logError, logWarn } from "@/lib/security/logger";
@@ -140,7 +140,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "identity_evidence.read",
+    );
     if (!guard.ok) return guard.response;
 
     const ip = await getClientIp();

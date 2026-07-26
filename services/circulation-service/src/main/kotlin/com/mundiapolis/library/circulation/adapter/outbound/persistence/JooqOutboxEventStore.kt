@@ -30,6 +30,7 @@ class JooqOutboxEventStore(
             "returnedAt" to result.returnedAt?.toString(),
             "renewalCount" to result.renewalCount,
             "loanVersion" to result.version,
+            "actorFingerprint" to event.actorFingerprint,
         )
         val headers = mapOf(
             "contentType" to "application/json",

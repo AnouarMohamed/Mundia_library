@@ -1,0 +1,71 @@
+{{- if and .Values.migration.enabled .Values.migration.cleanup.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  labels:
+    {{- include "mundia-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration-cleanup
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  labels:
+    {{- include "mundia-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration-cleanup
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups:
+      - external-secrets.io
+    resources:
+      - externalsecrets
+    resourceNames:
+      - {{ include "mundia-service.fullname" . }}-migration
+    verbs:
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    resourceNames:
+      - {{ .Values.migration.externalSecret.targetName }}
+    verbs:
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  labels:
+    {{- include "mundia-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration-cleanup
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+{{- end }}

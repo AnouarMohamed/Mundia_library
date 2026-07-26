@@ -1,10 +1,10 @@
 /**
  * Authentication Server Actions
- * 
+ *
  * This module provides server-side logic for student authentication and registration.
  * It integrates with NextAuth for session management, handles secure password hashing,
  * implements rate limiting to prevent abuse, and manages onboarding workflows.
- * 
+ *
  * Key Features:
  * - Credentials-based sign in.
  * - Secure student registration with bcrypt password hashing.
@@ -29,16 +29,25 @@ import { signInSchema, signUpSchema } from "@/lib/validations";
 
 /**
  * Authenticates a user using email and password credentials.
- * 
+ *
  * This action handles the standard sign-in flow, including rate limiting
  * based on the requester's IP address.
- * 
+ *
  * @param params - Object containing user email and password.
  * @returns A promise resolving to a success flag and an optional error message.
  */
 export const signInWithCredentials = async (
-  params: Pick<AuthCredentials, "email" | "password">
+  params: Pick<AuthCredentials, "email" | "password">,
 ) => {
+  if (!config.env.localCredentialsEnabled) {
+    logInfo("auth.local_credentials_disabled");
+    return {
+      success: false,
+      error:
+        "Password sign-in is available only in local development and tests.",
+    };
+  }
+
   const parsedCredentials = signInSchema.safeParse(params);
   if (!parsedCredentials.success) {
     return { success: false, error: "Invalid email or password." };
@@ -76,8 +85,24 @@ export const signInWithCredentials = async (
 };
 
 /**
+ * Starts the institutional OIDC authorization-code flow. The destination is a
+ * fixed local path; untrusted callback URLs are never accepted by this action.
+ */
+export const signInWithInstitutionalOidc = async () => {
+  if (!config.env.oidc.enabled) {
+    logError(
+      "auth.institutional_oidc_unavailable",
+      new Error("Institutional OIDC is not configured"),
+    );
+    return;
+  }
+
+  await signIn("institutional-oidc", { redirectTo: "/" });
+};
+
+/**
  * Registers a new student account in the system.
- * 
+ *
  * Flow:
  * 1. Validates the University ID (must be a positive 8-digit integer).
  * 2. Hashes the password using bcrypt.
@@ -85,7 +110,7 @@ export const signInWithCredentials = async (
  * 4. Inserts the new user record with transient error retries.
  * 5. Triggers an onboarding workflow if enabled.
  * 6. Leaves the account pending until admin approval.
- * 
+ *
  * @param params - The full registration data for the student.
  * @returns A promise resolving to a success flag, or an error object with field-specific feedback.
  */
@@ -177,7 +202,7 @@ export const signUp = async (params: AuthCredentials) => {
             .where(eq(users.universityId, universityId))
             .limit(1),
         ]),
-      { retries: 2, delayMs: 300 }
+      { retries: 2, delayMs: 300 },
     );
 
     if (existingUser.length > 0) {
@@ -208,7 +233,7 @@ export const signUp = async (params: AuthCredentials) => {
           password: hashedPassword,
           universityCard,
         }),
-      { retries: 2, delayMs: 300 }
+      { retries: 2, delayMs: 300 },
     );
 
     logInfo("auth.signup_pending_account_created", {
@@ -227,7 +252,8 @@ export const signUp = async (params: AuthCredentials) => {
       return {
         success: false,
         error: "universityId",
-        fieldError: "University ID is too large. Maximum allowed 8-digit number.",
+        fieldError:
+          "University ID is too large. Maximum allowed 8-digit number.",
       };
     }
 
@@ -251,13 +277,15 @@ export const signUp = async (params: AuthCredentials) => {
         return {
           success: false,
           error: "email",
-          fieldError: "This email is already registered. Please use a different email or sign in.",
+          fieldError:
+            "This email is already registered. Please use a different email or sign in.",
         };
       } else if (error.message.includes("university_id")) {
         return {
           success: false,
           error: "universityId",
-          fieldError: "This University ID is already registered. Please use a different ID or contact support if this is your ID.",
+          fieldError:
+            "This University ID is already registered. Please use a different ID or contact support if this is your ID.",
         };
       }
     }

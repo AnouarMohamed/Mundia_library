@@ -1,7 +1,7 @@
 name: PR Size Labeler
 
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: pr-size-${{ github.event.pull_request.number }}
@@ -19,8 +18,13 @@ concurrency:
 jobs:
   size:
     name: Label pull request size
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
 
     steps:
       - name: Apply size label

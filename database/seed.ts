@@ -1,7 +1,13 @@
 import dummyBooks from "../dummybooks.json";
-import { books, users } from "@/database/schema";
+import {
+  adminCapabilityAssignments,
+  adminCapabilityValues,
+  books,
+  users,
+} from "@/database/schema";
 import { config } from "dotenv";
 import { hashPassword } from "@/lib/security/password";
+import { eq } from "drizzle-orm";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -58,6 +64,27 @@ const seedGuestUsers = async (db: Db) => {
         },
       });
   }
+
+  const [fixtureAdmin] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, "test@admin.com"))
+    .limit(1);
+  if (!fixtureAdmin) {
+    throw new Error("Local fixture administrator was not created");
+  }
+
+  await db
+    .insert(adminCapabilityAssignments)
+    .values(
+      adminCapabilityValues.map((capability) => ({
+        userId: fixtureAdmin.id,
+        capability,
+        grantedBy: fixtureAdmin.id,
+        grantReason: "Explicit local/test fixture default",
+      })),
+    )
+    .onConflictDoNothing();
 };
 
 const seed = async (db: Db) => {

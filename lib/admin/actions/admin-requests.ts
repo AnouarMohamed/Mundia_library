@@ -2,13 +2,13 @@
 
 import { randomUUID } from "crypto";
 import { db } from "@/database/drizzle";
-import { adminRequests, users } from "@/database/schema";
+import { adminRequests, auditLogs, users } from "@/database/schema";
 import { eq, and, desc } from "drizzle-orm";
 import {
   guardToActionError,
-  requireAdmin,
   requireSelfOrAdmin,
 } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 import { logAdminAction } from "@/lib/admin/audit";
 import { logError } from "@/lib/security/logger";
 import { isUuid } from "@/lib/security/api-request";
@@ -17,6 +17,8 @@ const adminRequestMutationErrors = new Set([
   "Admin request not found",
   "This request has already been processed",
   "User not found",
+  "Administrators cannot approve their own access request",
+  "Only approved users can become administrators",
 ]);
 
 const safeAdminRequestMutationError = (error: unknown, fallback: string) =>
@@ -173,7 +175,7 @@ export async function createAdminRequest(
  */
 export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
-    const guard = await requireAdmin();
+    const guard = await requireAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const requests = await db
@@ -214,7 +216,7 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
  */
 export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
-    const guard = await requireAdmin();
+    const guard = await requireAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const requests = await db
@@ -263,7 +265,7 @@ export async function approveAdminRequest(
       return { success: false, error: "Invalid request ID" };
     }
 
-    const guard = await requireAdmin();
+    const guard = await requireAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const result = await db.transaction(async (tx) => {
@@ -273,6 +275,7 @@ export async function approveAdminRequest(
           status: adminRequests.status,
           userEmail: users.email,
           userFullName: users.fullName,
+          userStatus: users.status,
         })
         .from(adminRequests)
         .innerJoin(users, eq(adminRequests.userId, users.id))
@@ -285,6 +288,14 @@ export async function approveAdminRequest(
 
       if (request.status !== "PENDING") {
         throw new Error("This request has already been processed");
+      }
+      if (request.userId === guard.user.id) {
+        throw new Error(
+          "Administrators cannot approve their own access request",
+        );
+      }
+      if (request.userStatus !== "APPROVED") {
+        throw new Error("Only approved users can become administrators");
       }
 
       const reviewedAt = new Date();
@@ -329,6 +340,17 @@ export async function approveAdminRequest(
         throw new Error("User not found");
       }
 
+      await tx.insert(auditLogs).values({
+        userId: guard.user.id,
+        action: "APPROVE_ADMIN_REQUEST",
+        targetId: requestId,
+        targetType: "ADMIN_REQUEST",
+        details: JSON.stringify({
+          userId: request.userId,
+          capabilitiesGranted: [],
+        }),
+      });
+
       return {
         userId: request.userId,
         request: {
@@ -338,14 +360,6 @@ export async function approveAdminRequest(
         },
       };
     });
-
-    await logAdminAction(
-      guard.user.id,
-      "APPROVE_ADMIN_REQUEST",
-      requestId,
-      "ADMIN_REQUEST",
-      { userId: result.userId },
-    );
 
     return {
       success: true,
@@ -381,7 +395,7 @@ export async function rejectAdminRequest(
       return { success: false, error: "Rejection reason is too long" };
     }
 
-    const guard = await requireAdmin();
+    const guard = await requireAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const result = await db.transaction(async (tx) => {

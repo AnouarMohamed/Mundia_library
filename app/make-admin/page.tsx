@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSession } from "@/lib/session";
+import { requireApprovedUser } from "@/lib/security/auth-guards";
 
 /**
  * Request admin access by submitting a short justification.
@@ -16,11 +16,12 @@ const Page = async ({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) => {
   const params = await searchParams;
-  const session = await getSession();
+  const guard = await requireApprovedUser();
 
-  if (!session?.user?.id) {
+  if (!guard.ok) {
     redirect("/sign-in");
   }
+  const currentUser = guard.user;
 
   return (
     <main className="root-container">
@@ -129,7 +130,7 @@ const Page = async ({
                   <div className="mb-3 rounded-lg border border-gray-600 bg-gray-800/20 p-3 sm:mb-4 sm:p-4">
                     <p className="text-xs text-light-100 sm:text-sm">
                       <strong className="text-light-200">Current User:</strong>{" "}
-                      {session.user.email}
+                      {currentUser.email}
                     </p>
                   </div>
                 </div>
@@ -146,12 +147,8 @@ const Page = async ({
                       redirect("/make-admin?error=failed");
                     }
 
-                    if (!session.user?.id) {
-                      redirect("/make-admin?error=failed");
-                    }
-
                     const result = await createAdminRequest(
-                      session.user.id,
+                      currentUser.id,
                       requestReason
                     );
 
@@ -222,4 +219,3 @@ const Page = async ({
 };
 
 export default Page;
-

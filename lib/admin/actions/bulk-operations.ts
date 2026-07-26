@@ -5,11 +5,17 @@ import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, inArray, and } from "drizzle-orm";
 import {
   guardToActionError,
-  requireAdmin,
 } from "@/lib/security/auth-guards";
+import {
+  requireAdminCapabilities,
+  requireAdminCapability,
+} from "@/lib/security/admin-capabilities";
 import { logAdminAction } from "@/lib/admin/audit";
 import { approveBorrowRequest, rejectBorrowRequest } from "@/lib/admin/actions/borrow";
-import { updateUserRole } from "@/lib/admin/actions/user";
+import {
+  updateUserRole,
+  updateUserStatus,
+} from "@/lib/admin/actions/user";
 
 const MAX_BULK_ITEMS = 100;
 
@@ -24,7 +30,7 @@ export async function bulkUpdateBooks(
   bookIds: string[],
   updates: { isActive?: boolean }
 ) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return guardToActionError(guard);
 
   if (!hasSafeBatchSize(bookIds)) {
@@ -72,7 +78,7 @@ export async function bulkUpdateBooks(
  * Bulk delete books after validation.
  */
 export async function bulkDeleteBooks(bookIds: string[]) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return guardToActionError(guard);
 
   if (!hasSafeBatchSize(bookIds)) {
@@ -147,7 +153,10 @@ export async function bulkUpdateUsers(
   userIds: string[],
   updates: { status?: "PENDING" | "APPROVED" | "REJECTED" }
 ) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapabilities([
+    "bulk.execute",
+    "users.manage_status",
+  ]);
   if (!guard.ok) return guardToActionError(guard);
 
   if (!hasSafeBatchSize(userIds)) {
@@ -158,29 +167,36 @@ export async function bulkUpdateUsers(
   }
 
   try {
-    const safeUpdates: {
-      status?: "PENDING" | "APPROVED" | "REJECTED";
-    } = {};
     if (
-      updates.status === "PENDING" ||
-      updates.status === "APPROVED" ||
-      updates.status === "REJECTED"
+      updates.status !== "PENDING" &&
+      updates.status !== "APPROVED" &&
+      updates.status !== "REJECTED"
     ) {
-      safeUpdates.status = updates.status;
-    }
-    if (Object.keys(safeUpdates).length === 0) {
       return { success: false, message: "No supported updates supplied" };
     }
 
-    await db
-      .update(users)
-      .set({
-        ...safeUpdates,
-      })
-      .where(inArray(users.id, userIds));
+    if (userIds.includes(guard.user.id)) {
+      return {
+        success: false,
+        message: "Bulk status changes cannot target the acting administrator",
+      };
+    }
+
+    const results = [];
+    for (const userId of userIds) {
+      results.push(await updateUserStatus(userId, updates.status));
+    }
+    const failures = results.filter((result) => !result.success);
+    if (failures.length > 0) {
+      return {
+        success: false,
+        message: `${failures.length} user status update(s) failed`,
+      };
+    }
+
     await logAdminAction(guard.user.id, "BULK_UPDATE_USERS", undefined, "USER", {
       userIds,
-      updates: safeUpdates,
+      updates: { status: updates.status },
     });
 
     return {
@@ -214,6 +230,12 @@ export async function bulkRejectUsers(userIds: string[]) {
  * Bulk grant admin role to users.
  */
 export async function bulkMakeAdminUsers(userIds: string[]) {
+  const guard = await requireAdminCapabilities([
+    "bulk.execute",
+    "roles.manage_admin",
+  ]);
+  if (!guard.ok) return guardToActionError(guard);
+
   if (!hasSafeBatchSize(userIds)) {
     return {
       success: false,
@@ -238,6 +260,12 @@ export async function bulkMakeAdminUsers(userIds: string[]) {
  * Bulk remove admin role from users.
  */
 export async function bulkRemoveAdminUsers(userIds: string[]) {
+  const guard = await requireAdminCapabilities([
+    "bulk.execute",
+    "roles.manage_admin",
+  ]);
+  if (!guard.ok) return guardToActionError(guard);
+
   if (!hasSafeBatchSize(userIds)) {
     return {
       success: false,
@@ -263,7 +291,7 @@ export async function bulkRemoveAdminUsers(userIds: string[]) {
  * Bulk approve borrow requests.
  */
 export async function bulkApproveBorrowRequests(recordIds: string[]) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return guardToActionError(guard);
 
   if (!hasSafeBatchSize(recordIds)) {
@@ -311,7 +339,7 @@ export async function bulkApproveBorrowRequests(recordIds: string[]) {
  * Bulk reject borrow requests.
  */
 export async function bulkRejectBorrowRequests(recordIds: string[]) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return guardToActionError(guard);
 
   if (!hasSafeBatchSize(recordIds)) {
@@ -360,7 +388,7 @@ export async function bulkRejectBorrowRequests(recordIds: string[]) {
  * Fetch aggregate stats for bulk operations.
  */
 export async function getBulkOperationStats() {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return guardToActionError(guard);
 
   const [totalBooks, totalUsers, pendingRequests, activeBorrows] =
@@ -393,7 +421,7 @@ export async function validateBulkBookOperation(
   bookIds: string[],
   operation: string
 ) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return { valid: false, message: guard.message };
 
   if (bookIds.length === 0) {
@@ -430,7 +458,7 @@ export async function validateBulkUserOperation(
   userIds: string[],
   operation: string
 ) {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("bulk.execute");
   if (!guard.ok) return { valid: false, message: guard.message };
 
   if (userIds.length === 0) {

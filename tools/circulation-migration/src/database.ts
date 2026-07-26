@@ -7,10 +7,12 @@ import {
   type MigrationPlan,
   type ReconciliationReport,
   type TargetCopy,
+  type TargetFine,
+  type TargetFineLedgerEntry,
   type TargetLoan,
 } from "./types.js";
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const LOCAL_HOSTS = new Set(["127.0.0.1", "[::1]"]);
 const WRITE_ACK = "TARGET_ONLY_NO_DUAL_WRITE";
 const INSERT_BATCH_SIZE = 500;
 
@@ -25,6 +27,15 @@ function asIso(value: string | Date | null): string | null {
   return new Date(value).toISOString();
 }
 
+function asSafeInteger(value: string | number, field: string): number {
+  const parsed =
+    typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`Target ${field} is outside JavaScript's exact integer range`);
+  }
+  return parsed;
+}
+
 export function assertLocalPostgresUrl(connectionString: string): URL {
   let parsed: URL;
   try {
@@ -37,13 +48,16 @@ export function assertLocalPostgresUrl(connectionString: string): URL {
   }
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) {
     throw new TypeError(
-      "Refusing database URL: only localhost, 127.0.0.1, or ::1 is permitted",
+      "Refusing database URL: only literal 127.0.0.1 or [::1] is permitted",
     );
   }
-  if (parsed.search !== "") {
+  if (parsed.search !== "" || parsed.hash !== "") {
     throw new TypeError(
-      "Database URL query parameters are forbidden because they can override connection safety",
+      "Database URL query parameters and fragments are forbidden because they can create parsing ambiguity",
     );
+  }
+  if (parsed.username.length === 0) {
+    throw new TypeError("Database URL must name an explicit least-privilege role");
   }
   if (decodeURIComponent(parsed.pathname).replace(/^\//, "") === "") {
     throw new TypeError("Database URL must name a database");
@@ -67,11 +81,18 @@ async function connect(
     );
   }
   const config: ClientConfig = {
-    connectionString,
+    host:
+      parsed.hostname === "[::1]"
+        ? "::1"
+        : parsed.hostname,
+    port: parsed.port === "" ? 5432 : Number(parsed.port),
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database: databaseName(parsed),
     application_name: applicationName,
     ssl: false,
     connectionTimeoutMillis: 5_000,
-    query_timeout: 30_000,
+    query_timeout: 120_000,
   };
   const client = new Client(config);
   await client.connect();
@@ -111,6 +132,86 @@ function assertExpectedIdentity(
   }
 }
 
+const LEGACY_SOURCE_COLUMNS = [
+  "books.available_copies:integer:true",
+  "books.created_at:timestamp with time zone:false",
+  "books.id:uuid:true",
+  "books.total_copies:integer:true",
+  "books.updated_at:timestamp with time zone:false",
+  "borrow_records.book_id:uuid:true",
+  "borrow_records.borrow_date:timestamp with time zone:true",
+  "borrow_records.borrowed_by:text:false",
+  "borrow_records.created_at:timestamp with time zone:false",
+  "borrow_records.due_date:date:false",
+  "borrow_records.fine_amount:numeric(10,2):false",
+  "borrow_records.id:uuid:true",
+  "borrow_records.last_reminder_sent:timestamp with time zone:false",
+  "borrow_records.notes:text:false",
+  "borrow_records.renewal_count:integer:true",
+  "borrow_records.return_date:date:false",
+  "borrow_records.returned_by:text:false",
+  "borrow_records.status:borrow_status:true",
+  "borrow_records.updated_at:timestamp with time zone:false",
+  "borrow_records.updated_by:text:false",
+  "borrow_records.user_id:uuid:true",
+].sort();
+
+async function verifyLegacySchema(client: Client): Promise<void> {
+  const expectedKeys = new Set(
+    LEGACY_SOURCE_COLUMNS.map((column) => column.split(":", 1)[0]),
+  );
+  const columns = await client.query<{
+    table_name: string;
+    column_name: string;
+    formatted_type: string;
+    not_null: boolean;
+  }>(`
+    SELECT
+      relation.relname AS table_name,
+      attribute.attname AS column_name,
+      pg_catalog.format_type(attribute.atttypid, attribute.atttypmod) AS formatted_type,
+      attribute.attnotnull AS not_null
+    FROM pg_catalog.pg_attribute AS attribute
+    JOIN pg_catalog.pg_class AS relation ON relation.oid = attribute.attrelid
+    JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = ANY($1::text[])
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+  `, [["books", "borrow_records"]]);
+  const actual = columns.rows
+    .filter((row) =>
+      expectedKeys.has(`${row.table_name}.${row.column_name}`),
+    )
+    .map(
+      (row) =>
+        `${row.table_name}.${row.column_name}:${row.formatted_type}:${String(row.not_null)}`,
+    )
+    .sort();
+  if (
+    actual.length !== LEGACY_SOURCE_COLUMNS.length ||
+    actual.some((column, index) => column !== LEGACY_SOURCE_COLUMNS[index])
+  ) {
+    throw new Error(
+      "Legacy source column signature differs from the reviewed snapshot contract",
+    );
+  }
+  const statuses = await client.query<{ status: string }>(`
+    SELECT enum_value.enumlabel AS status
+    FROM pg_catalog.pg_enum AS enum_value
+    WHERE enum_value.enumtypid = 'public.borrow_status'::regtype
+    ORDER BY enum_value.enumsortorder
+  `);
+  if (
+    statuses.rows.map((row) => row.status).join(",") !==
+    "PENDING,BORROWED,RETURNED"
+  ) {
+    throw new Error(
+      "Legacy borrow_status enum differs from the reviewed lifecycle contract",
+    );
+  }
+}
+
 export async function snapshotLegacy(options: {
   sourceUrl: string;
   expectedDatabase: string;
@@ -122,13 +223,22 @@ export async function snapshotLegacy(options: {
   );
   try {
     await client.query(
-      "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY DEFERRABLE",
+      "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE",
     );
-    await client.query("SET LOCAL statement_timeout = '30s'");
+    await client.query("SET LOCAL statement_timeout = '120s'");
     await client.query("SET LOCAL lock_timeout = '5s'");
-    await client.query("SET LOCAL idle_in_transaction_session_timeout = '30s'");
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '5min'");
+    await client.query(
+      "LOCK TABLE public.books, public.borrow_records IN ACCESS SHARE MODE",
+    );
     const actual = await identity(client);
     assertExpectedIdentity(actual, options.expectedDatabase);
+    if (actual.serverVersionNumber < 180_000) {
+      throw new Error(
+        `Source PostgreSQL ${actual.serverVersion} is below the PostgreSQL 18 migration baseline`,
+      );
+    }
+    await verifyLegacySchema(client);
 
     const captured = await client.query<{ captured_at: Date }>(
       "SELECT transaction_timestamp() AS captured_at",
@@ -199,6 +309,8 @@ export async function snapshotLegacy(options: {
       source: {
         database: actual.database,
         serverVersion: actual.serverVersion,
+        contractVersion: "legacy-circulation-source/pg18-v1",
+        transactionIsolation: "SERIALIZABLE_READ_ONLY_DEFERRABLE",
       },
       books: books.rows.map((row) => ({
         id: row.id,
@@ -234,21 +346,255 @@ export async function snapshotLegacy(options: {
   }
 }
 
+const TARGET_PHASE2_COLUMNS = [
+  "circulation_copy.barcode:character varying(64):true",
+  "circulation_copy.branch_id:uuid:true",
+  "circulation_copy.created_at:timestamp with time zone:true",
+  "circulation_copy.edition_id:uuid:true",
+  "circulation_copy.id:uuid:true",
+  "circulation_copy.shelf_location:character varying(128):false",
+  "circulation_copy.status:character varying(32):true",
+  "circulation_copy.updated_at:timestamp with time zone:true",
+  "circulation_copy.version:bigint:true",
+  "circulation_fine.balance_minor:bigint:true",
+  "circulation_fine.created_at:timestamp with time zone:true",
+  "circulation_fine.currency:character(3):true",
+  "circulation_fine.id:uuid:true",
+  "circulation_fine.loan_id:uuid:true",
+  "circulation_fine.member_id:uuid:true",
+  "circulation_fine.status:character varying(16):true",
+  "circulation_fine.updated_at:timestamp with time zone:true",
+  "circulation_fine.version:bigint:true",
+  "circulation_fine_ledger_entry.actor_fingerprint:character(64):true",
+  "circulation_fine_ledger_entry.created_at:timestamp with time zone:true",
+  "circulation_fine_ledger_entry.delta_minor:bigint:true",
+  "circulation_fine_ledger_entry.entry_type:character varying(16):true",
+  "circulation_fine_ledger_entry.external_reference:character varying(128):false",
+  "circulation_fine_ledger_entry.fine_id:uuid:true",
+  "circulation_fine_ledger_entry.fine_version:bigint:true",
+  "circulation_fine_ledger_entry.id:uuid:true",
+  "circulation_fine_ledger_entry.occurred_at:timestamp with time zone:true",
+  "circulation_fine_ledger_entry.reason:character varying(500):false",
+  "circulation_loan.checked_out_at:timestamp with time zone:false",
+  "circulation_loan.copy_id:uuid:false",
+  "circulation_loan.created_at:timestamp with time zone:true",
+  "circulation_loan.due_at:timestamp with time zone:false",
+  "circulation_loan.edition_id:uuid:true",
+  "circulation_loan.id:uuid:true",
+  "circulation_loan.member_id:uuid:true",
+  "circulation_loan.rejected_at:timestamp with time zone:false",
+  "circulation_loan.renewal_count:integer:true",
+  "circulation_loan.requested_at:timestamp with time zone:true",
+  "circulation_loan.returned_at:timestamp with time zone:false",
+  "circulation_loan.status:character varying(32):true",
+  "circulation_loan.updated_at:timestamp with time zone:true",
+  "circulation_loan.version:bigint:true",
+].sort();
+
+const REQUIRED_TARGET_CONSTRAINTS = new Set([
+  "ck_circulation_loan_renewal_count",
+  "ck_circulation_fine_currency",
+  "ck_circulation_fine_balance",
+  "ck_circulation_fine_status",
+  "ck_circulation_fine_state",
+  "ck_circulation_fine_version",
+  "ck_circulation_fine_timestamps",
+  "circulation_fine_loan_id_fkey",
+  "uq_circulation_fine_ledger_version",
+  "ck_circulation_fine_ledger_version",
+  "ck_circulation_fine_ledger_type",
+  "ck_circulation_fine_ledger_delta",
+  "ck_circulation_fine_ledger_actor",
+  "ck_circulation_fine_ledger_shape",
+  "ck_circulation_fine_ledger_timestamps",
+  "circulation_fine_ledger_entry_fine_id_fkey",
+]);
+const TARGET_FLYWAY_CHECKSUMS = [
+  1_823_238_944,
+  1_736_558_870,
+  1_710_092_712,
+  424_313_616,
+  2_132_266_084,
+] as const;
+
 async function verifyTargetSchema(client: Client): Promise<void> {
-  const result = await client.query<{
-    copy_table: string | null;
-    loan_table: string | null;
-  }>(`
-    SELECT
-      to_regclass('public.circulation_copy')::text AS copy_table,
-      to_regclass('public.circulation_loan')::text AS loan_table
-  `);
-  const row = result.rows[0];
-  if (!row?.copy_table || !row.loan_table) {
+  const historyTable = await client.query<{ table_name: string | null }>(
+    "SELECT to_regclass('public.flyway_schema_history')::text AS table_name",
+  );
+  if (!historyTable.rows[0]?.table_name) {
     throw new Error(
-      "Target circulation schema is absent; apply the service Flyway migrations first",
+      "Target Flyway history is absent; only the reviewed circulation phase-2 schema is accepted",
     );
   }
+  const history = await client.query<{
+    version: string;
+    checksum: number | null;
+    success: boolean;
+  }>(`
+    SELECT version::text, checksum, success
+    FROM public.flyway_schema_history
+    WHERE version IS NOT NULL
+    ORDER BY installed_rank
+  `);
+  if (
+    history.rows.length !== 5 ||
+    history.rows.some(
+      (row, index) =>
+        row.version !== String(index + 1) ||
+        row.checksum !== TARGET_FLYWAY_CHECKSUMS[index] ||
+        row.success !== true,
+    )
+  ) {
+    throw new Error(
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 5",
+    );
+  }
+
+  const columns = await client.query<{
+    table_name: string;
+    column_name: string;
+    formatted_type: string;
+    not_null: boolean;
+  }>(`
+    SELECT
+      relation.relname AS table_name,
+      attribute.attname AS column_name,
+      pg_catalog.format_type(attribute.atttypid, attribute.atttypmod) AS formatted_type,
+      attribute.attnotnull AS not_null
+    FROM pg_catalog.pg_attribute AS attribute
+    JOIN pg_catalog.pg_class AS relation
+      ON relation.oid = attribute.attrelid
+    JOIN pg_catalog.pg_namespace AS namespace
+      ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = ANY($1::text[])
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+    ORDER BY relation.relname, attribute.attname
+  `, [
+    [
+      "circulation_copy",
+      "circulation_loan",
+      "circulation_fine",
+      "circulation_fine_ledger_entry",
+    ],
+  ]);
+  const actualColumns = columns.rows
+    .map(
+      (row) =>
+        `${row.table_name}.${row.column_name}:${row.formatted_type}:${String(row.not_null)}`,
+    )
+    .sort();
+  if (
+    actualColumns.length !== TARGET_PHASE2_COLUMNS.length ||
+    actualColumns.some(
+      (column, index) => column !== TARGET_PHASE2_COLUMNS[index],
+    )
+  ) {
+    throw new Error(
+      "Target circulation table signature differs from the reviewed phase-2 contract",
+    );
+  }
+
+  const constraints = await client.query<{
+    constraint_name: string;
+    validated: boolean;
+  }>(`
+    SELECT target_constraint.conname AS constraint_name, target_constraint.convalidated AS validated
+    FROM pg_catalog.pg_constraint AS target_constraint
+    JOIN pg_catalog.pg_class AS relation
+      ON relation.oid = target_constraint.conrelid
+    JOIN pg_catalog.pg_namespace AS namespace
+      ON namespace.oid = relation.relnamespace
+    WHERE namespace.nspname = 'public'
+      AND relation.relname = ANY($1::text[])
+  `, [
+    [
+      "circulation_loan",
+      "circulation_fine",
+      "circulation_fine_ledger_entry",
+    ],
+  ]);
+  const validConstraintNames = new Set(
+    constraints.rows
+      .filter((row) => row.validated)
+      .map((row) => row.constraint_name),
+  );
+  for (const name of REQUIRED_TARGET_CONSTRAINTS) {
+    if (!validConstraintNames.has(name)) {
+      throw new Error(
+        `Target circulation phase-2 constraint is absent or unvalidated: ${name}`,
+      );
+    }
+  }
+
+  const triggers = await client.query<{
+    trigger_name: string;
+    enabled: string;
+    function_name: string;
+  }>(`
+    SELECT
+      trigger.tgname AS trigger_name,
+      trigger.tgenabled AS enabled,
+      procedure.proname AS function_name
+    FROM pg_catalog.pg_trigger AS trigger
+    JOIN pg_catalog.pg_class AS relation ON relation.oid = trigger.tgrelid
+    JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
+    JOIN pg_catalog.pg_proc AS procedure ON procedure.oid = trigger.tgfoid
+    WHERE namespace.nspname = 'public'
+      AND NOT trigger.tgisinternal
+      AND trigger.tgname = ANY($1::text[])
+  `, [
+    [
+      "trg_circulation_fine_ledger_no_update_delete",
+      "trg_circulation_fine_ledger_no_truncate",
+      "trg_circulation_fine_protect_identity",
+      "trg_circulation_fine_ledger_consistency_from_fine",
+      "trg_circulation_fine_ledger_consistency_from_entry",
+    ],
+  ]);
+  const expectedTriggers = new Map([
+    [
+      "trg_circulation_fine_ledger_no_update_delete",
+      "reject_circulation_fine_ledger_mutation",
+    ],
+    [
+      "trg_circulation_fine_ledger_no_truncate",
+      "reject_circulation_fine_ledger_mutation",
+    ],
+    [
+      "trg_circulation_fine_protect_identity",
+      "protect_circulation_fine_identity",
+    ],
+    [
+      "trg_circulation_fine_ledger_consistency_from_fine",
+      "validate_circulation_fine_ledger_consistency",
+    ],
+    [
+      "trg_circulation_fine_ledger_consistency_from_entry",
+      "validate_circulation_fine_ledger_consistency",
+    ],
+  ]);
+  for (const [name, functionName] of expectedTriggers) {
+    const trigger = triggers.rows.find((row) => row.trigger_name === name);
+    if (trigger?.enabled !== "O" || trigger.function_name !== functionName) {
+      throw new Error(
+        `Target circulation phase-2 integrity trigger is absent or disabled: ${name}`,
+      );
+    }
+  }
+}
+
+async function lockTargetSchema(client: Client): Promise<void> {
+  await client.query(`
+    LOCK TABLE
+      public.flyway_schema_history,
+      public.circulation_copy,
+      public.circulation_loan,
+      public.circulation_fine,
+      public.circulation_fine_ledger_entry
+    IN ACCESS SHARE MODE
+  `);
 }
 
 function chunks<T>(rows: T[]): T[][] {
@@ -342,6 +688,7 @@ async function insertLoans(
           returned_at,
           rejected_at,
           version,
+          renewal_count,
           created_at,
           updated_at
         )
@@ -357,6 +704,7 @@ async function insertLoans(
           row.returned_at,
           row.rejected_at,
           row.version,
+          row.renewal_count,
           row.created_at,
           row.updated_at
         FROM jsonb_to_recordset($1::jsonb) AS row(
@@ -371,6 +719,7 @@ async function insertLoans(
           returned_at timestamptz,
           rejected_at timestamptz,
           version bigint,
+          renewal_count integer,
           created_at timestamptz,
           updated_at timestamptz
         )
@@ -390,8 +739,139 @@ async function insertLoans(
             returned_at: loan.returnedAt,
             rejected_at: loan.rejectedAt,
             version: loan.version,
+            renewal_count: loan.renewalCount,
             created_at: loan.createdAt,
             updated_at: loan.updatedAt,
+          })),
+        ),
+      ],
+    );
+    inserted += result.rowCount ?? 0;
+  }
+  return inserted;
+}
+
+async function insertFines(
+  client: Client,
+  fines: TargetFine[],
+): Promise<number> {
+  let inserted = 0;
+  for (const batch of chunks(fines)) {
+    const result = await client.query(
+      `
+        INSERT INTO public.circulation_fine (
+          id,
+          loan_id,
+          member_id,
+          currency,
+          balance_minor,
+          status,
+          version,
+          created_at,
+          updated_at
+        )
+        SELECT
+          row.id,
+          row.loan_id,
+          row.member_id,
+          row.currency,
+          row.balance_minor,
+          row.status,
+          row.version,
+          row.created_at,
+          row.updated_at
+        FROM jsonb_to_recordset($1::jsonb) AS row(
+          id uuid,
+          loan_id uuid,
+          member_id uuid,
+          currency char(3),
+          balance_minor bigint,
+          status varchar(16),
+          version bigint,
+          created_at timestamptz,
+          updated_at timestamptz
+        )
+        ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        JSON.stringify(
+          batch.map((fine) => ({
+            id: fine.id,
+            loan_id: fine.loanId,
+            member_id: fine.memberId,
+            currency: fine.currency,
+            balance_minor: fine.balanceMinor,
+            status: fine.status,
+            version: fine.version,
+            created_at: fine.createdAt,
+            updated_at: fine.updatedAt,
+          })),
+        ),
+      ],
+    );
+    inserted += result.rowCount ?? 0;
+  }
+  return inserted;
+}
+
+async function insertFineLedgerEntries(
+  client: Client,
+  entries: TargetFineLedgerEntry[],
+): Promise<number> {
+  let inserted = 0;
+  for (const batch of chunks(entries)) {
+    const result = await client.query(
+      `
+        INSERT INTO public.circulation_fine_ledger_entry (
+          id,
+          fine_id,
+          fine_version,
+          entry_type,
+          delta_minor,
+          actor_fingerprint,
+          reason,
+          external_reference,
+          occurred_at,
+          created_at
+        )
+        SELECT
+          row.id,
+          row.fine_id,
+          row.fine_version,
+          row.entry_type,
+          row.delta_minor,
+          row.actor_fingerprint,
+          row.reason,
+          row.external_reference,
+          row.occurred_at,
+          row.created_at
+        FROM jsonb_to_recordset($1::jsonb) AS row(
+          id uuid,
+          fine_id uuid,
+          fine_version bigint,
+          entry_type varchar(16),
+          delta_minor bigint,
+          actor_fingerprint char(64),
+          reason varchar(500),
+          external_reference varchar(128),
+          occurred_at timestamptz,
+          created_at timestamptz
+        )
+        ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        JSON.stringify(
+          batch.map((entry) => ({
+            id: entry.id,
+            fine_id: entry.fineId,
+            fine_version: entry.fineVersion,
+            entry_type: entry.entryType,
+            delta_minor: entry.deltaMinor,
+            actor_fingerprint: entry.actorFingerprint,
+            reason: entry.reason,
+            external_reference: entry.externalReference,
+            occurred_at: entry.occurredAt,
+            created_at: entry.createdAt,
           })),
         ),
       ],
@@ -404,8 +884,16 @@ async function insertLoans(
 async function targetRows(
   client: Client,
   editionIds: string[],
-): Promise<{ copies: TargetCopy[]; loans: TargetLoan[] }> {
-  if (editionIds.length === 0) return { copies: [], loans: [] };
+  expectedFineIds: string[],
+): Promise<{
+  copies: TargetCopy[];
+  loans: TargetLoan[];
+  fines: TargetFine[];
+  fineLedgerEntries: TargetFineLedgerEntry[];
+}> {
+  if (editionIds.length === 0) {
+    return { copies: [], loans: [], fines: [], fineLedgerEntries: [] };
+  }
   const copies = await client.query<{
     id: string;
     edition_id: string;
@@ -446,6 +934,7 @@ async function targetRows(
     returned_at: Date | null;
     rejected_at: Date | null;
     version: string;
+    renewal_count: number;
     created_at: Date;
     updated_at: Date;
   }>(
@@ -462,6 +951,7 @@ async function targetRows(
         returned_at,
         rejected_at,
         version::text,
+        renewal_count,
         created_at,
         updated_at
       FROM public.circulation_loan
@@ -470,6 +960,82 @@ async function targetRows(
     `,
     [editionIds],
   );
+  const loanIds = loans.rows.map((row) => row.id);
+  const fines = await client.query<{
+    id: string;
+    loan_id: string;
+    member_id: string;
+    currency: string;
+    balance_minor: string;
+    status: string;
+    version: string;
+    created_at: Date;
+    updated_at: Date;
+  }>(
+    `
+      SELECT
+        id::text,
+        loan_id::text,
+        member_id::text,
+        currency,
+        balance_minor::text,
+        status,
+        version::text,
+        created_at,
+        updated_at
+      FROM public.circulation_fine
+      WHERE loan_id = ANY($1::uuid[])
+      ORDER BY id
+    `,
+    [loanIds],
+  );
+  const fineIds = [
+    ...new Set([...fines.rows.map((row) => row.id), ...expectedFineIds]),
+  ];
+  const fineLedgerEntries =
+    fineIds.length === 0
+      ? { rows: [] as Array<{
+          id: string;
+          fine_id: string;
+          fine_version: string;
+          entry_type: string;
+          delta_minor: string;
+          actor_fingerprint: string;
+          reason: string | null;
+          external_reference: string | null;
+          occurred_at: Date;
+          created_at: Date;
+        }> }
+      : await client.query<{
+          id: string;
+          fine_id: string;
+          fine_version: string;
+          entry_type: string;
+          delta_minor: string;
+          actor_fingerprint: string;
+          reason: string | null;
+          external_reference: string | null;
+          occurred_at: Date;
+          created_at: Date;
+        }>(
+          `
+            SELECT
+              id::text,
+              fine_id::text,
+              fine_version::text,
+              entry_type,
+              delta_minor::text,
+              actor_fingerprint,
+              reason,
+              external_reference,
+              occurred_at,
+              created_at
+            FROM public.circulation_fine_ledger_entry
+            WHERE fine_id = ANY($1::uuid[])
+            ORDER BY id
+          `,
+          [fineIds],
+        );
   return {
     copies: copies.rows.map((row) => ({
       id: row.id,
@@ -477,8 +1043,8 @@ async function targetRows(
       branchId: row.branch_id,
       barcode: row.barcode,
       status: row.status,
-      shelfLocation: row.shelf_location as null,
-      version: Number(row.version),
+      shelfLocation: row.shelf_location,
+      version: asSafeInteger(row.version, "copy.version"),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
     })),
@@ -492,10 +1058,43 @@ async function targetRows(
       checkedOutAt: asIso(row.checked_out_at),
       dueAt: asIso(row.due_at),
       returnedAt: asIso(row.returned_at),
-      rejectedAt: row.rejected_at as null,
-      version: Number(row.version),
+      rejectedAt: asIso(row.rejected_at),
+      version: asSafeInteger(row.version, "loan.version"),
+      renewalCount: asSafeInteger(
+        row.renewal_count,
+        "loan.renewal_count",
+      ),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
+    })),
+    fines: fines.rows.map((row) => ({
+      id: row.id,
+      loanId: row.loan_id,
+      memberId: row.member_id,
+      currency: row.currency,
+      balanceMinor: asSafeInteger(row.balance_minor, "fine.balance_minor"),
+      status: row.status,
+      version: asSafeInteger(row.version, "fine.version"),
+      createdAt: row.created_at.toISOString(),
+      updatedAt: row.updated_at.toISOString(),
+    })),
+    fineLedgerEntries: fineLedgerEntries.rows.map((row) => ({
+      id: row.id,
+      fineId: row.fine_id,
+      fineVersion: asSafeInteger(
+        row.fine_version,
+        "fine_ledger_entry.fine_version",
+      ),
+      entryType: row.entry_type,
+      deltaMinor: asSafeInteger(
+        row.delta_minor,
+        "fine_ledger_entry.delta_minor",
+      ),
+      actorFingerprint: row.actor_fingerprint,
+      reason: row.reason,
+      externalReference: row.external_reference,
+      occurredAt: row.occurred_at.toISOString(),
+      createdAt: row.created_at.toISOString(),
     })),
   };
 }
@@ -523,19 +1122,33 @@ export async function reconcileTarget(options: {
   );
   try {
     await client.query(
-      "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY DEFERRABLE",
+      "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE",
     );
-    await client.query("SET LOCAL statement_timeout = '30s'");
+    await client.query("SET LOCAL statement_timeout = '120s'");
+    await client.query("SET LOCAL lock_timeout = '5s'");
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '5min'");
     const actualIdentity = await identity(client);
     assertExpectedIdentity(actualIdentity, options.expectedDatabase);
+    if (actualIdentity.serverVersionNumber < 180_000) {
+      throw new Error(
+        `Target PostgreSQL ${actualIdentity.serverVersion} is below the PostgreSQL 18 production baseline`,
+      );
+    }
+    await lockTargetSchema(client);
     await verifyTargetSchema(client);
-    const rows = await targetRows(client, editions(plan));
+    const rows = await targetRows(
+      client,
+      editions(plan),
+      plan.target.fines.map((fine) => fine.id),
+    );
     const observedAt = new Date().toISOString();
     await client.query("COMMIT");
     return reconcile({
       plan,
       actualCopies: rows.copies,
       actualLoans: rows.loans,
+      actualFines: rows.fines,
+      actualFineLedgerEntries: rows.fineLedgerEntries,
       observedAt,
       database: actualIdentity.database,
       serverVersion: actualIdentity.serverVersion,
@@ -570,12 +1183,20 @@ export async function applyPlan(options: {
     options.expectedDatabase,
     "mundia_circulation_apply",
   );
+  let advisoryLockHeld = false;
   try {
+    // Acquire the session lock before BEGIN. A SERIALIZABLE transaction takes
+    // its snapshot at the first statement, so waiting on an xact advisory lock
+    // inside the transaction can leave a concurrent replay with a stale
+    // snapshot and a 40001 serialization failure.
+    await client.query("SET statement_timeout = '120s'");
+    await client.query("SET lock_timeout = '10s'");
+    await client.query("SELECT pg_advisory_lock(612458993, 20260726)");
+    advisoryLockHeld = true;
     await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
-    await client.query("SET LOCAL statement_timeout = '60s'");
+    await client.query("SET LOCAL statement_timeout = '120s'");
     await client.query("SET LOCAL lock_timeout = '10s'");
-    await client.query("SET LOCAL idle_in_transaction_session_timeout = '60s'");
-    await client.query("SELECT pg_advisory_xact_lock(612458993, 20260726)");
+    await client.query("SET LOCAL idle_in_transaction_session_timeout = '10min'");
     const actualIdentity = await identity(client);
     assertExpectedIdentity(actualIdentity, options.expectedDatabase);
     if (actualIdentity.serverVersionNumber < 180_000) {
@@ -583,45 +1204,80 @@ export async function applyPlan(options: {
         `Target PostgreSQL ${actualIdentity.serverVersion} is below the PostgreSQL 18 production baseline`,
       );
     }
+    await lockTargetSchema(client);
     await verifyTargetSchema(client);
     const insertedCopies = await insertCopies(client, plan.target.copies);
     const insertedLoans = await insertLoans(client, plan.target.loans);
-    const rows = await targetRows(client, editions(plan));
-    const report = reconcile({
+    const insertedFines = await insertFines(client, plan.target.fines);
+    const insertedFineLedgerEntries = await insertFineLedgerEntries(
+      client,
+      plan.target.fineLedgerEntries,
+    );
+    const rows = await targetRows(
+      client,
+      editions(plan),
+      plan.target.fines.map((fine) => fine.id),
+    );
+    const observedAt = new Date().toISOString();
+    const comparison = reconcile({
       plan,
       actualCopies: rows.copies,
       actualLoans: rows.loans,
-      observedAt: new Date().toISOString(),
+      actualFines: rows.fines,
+      actualFineLedgerEntries: rows.fineLedgerEntries,
+      observedAt,
       database: actualIdentity.database,
       serverVersion: actualIdentity.serverVersion,
-      application: {
-        transactionOutcome: "COMMITTED",
-        insertedCopies,
-        insertedLoans,
-      },
     });
-    if (report.status !== "MATCH") {
+    if (comparison.status !== "MATCH") {
       await client.query("ROLLBACK");
       return reconcile({
         plan,
         actualCopies: rows.copies,
         actualLoans: rows.loans,
-        observedAt: report.observedAt,
+        actualFines: rows.fines,
+        actualFineLedgerEntries: rows.fineLedgerEntries,
+        observedAt,
         database: actualIdentity.database,
         serverVersion: actualIdentity.serverVersion,
         application: {
           transactionOutcome: "ROLLED_BACK",
+          transactionFinishedAt: new Date().toISOString(),
           insertedCopies,
           insertedLoans,
+          insertedFines,
+          insertedFineLedgerEntries,
         },
       });
     }
     await client.query("COMMIT");
-    return report;
+    return reconcile({
+      plan,
+      actualCopies: rows.copies,
+      actualLoans: rows.loans,
+      actualFines: rows.fines,
+      actualFineLedgerEntries: rows.fineLedgerEntries,
+      observedAt,
+      database: actualIdentity.database,
+      serverVersion: actualIdentity.serverVersion,
+      application: {
+        transactionOutcome: "COMMITTED",
+        transactionFinishedAt: new Date().toISOString(),
+        insertedCopies,
+        insertedLoans,
+        insertedFines,
+        insertedFineLedgerEntries,
+      },
+    });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
   } finally {
+    if (advisoryLockHeld) {
+      await client
+        .query("SELECT pg_advisory_unlock(612458993, 20260726)")
+        .catch(() => undefined);
+    }
     await client.end();
   }
 }

@@ -6,7 +6,7 @@ import {
   exportUsers,
   type ExportFormat,
 } from "@/lib/admin/actions/data-export";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import { logAdminAction } from "@/lib/admin/audit";
 import { logError } from "@/lib/security/logger";
 import { enforceSameOriginRequest } from "@/lib/security/same-origin";
@@ -46,7 +46,7 @@ export async function POST(
     const sameOriginResponse = enforceSameOriginRequest(request);
     if (sameOriginResponse) return sameOriginResponse;
 
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess("exports.read");
     if (!guard.ok) {
       return guard.response;
     }

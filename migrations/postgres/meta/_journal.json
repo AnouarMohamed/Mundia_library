@@ -50,6 +50,20 @@
       "when": 1785033952000,
       "tag": "0010_protect_audit_history",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785033953000,
+      "tag": "0011_add_federated_identities",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785033954000,
+      "tag": "0012_add_admin_capabilities",
+      "breakpoints": true
     }
   ]
 }

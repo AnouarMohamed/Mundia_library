@@ -15,6 +15,9 @@ portable:
   stateless services.
 - External Secrets Operator is the only supported path from a cloud secret
   manager to short-lived Kubernetes Secrets.
+- Schema migrations run as isolated, digest-identical PreSync Jobs. Runtime
+  pods never receive schema-owner credentials, and a least-privilege cleanup
+  hook removes the migration ExternalSecret and target Secret before rollout.
 - OpenTelemetry is the telemetry boundary. Applications do not depend on a
   vendor-specific agent.
 - Kyverno admission policies and Pod Security Admission reject common unsafe
@@ -118,6 +121,9 @@ platform/scripts/validate.sh --release
 
 Release mode intentionally fails while `REPLACE_*`, `.invalid`, example
 backends, unapproved image digests, or other decision blockers remain.
+It also fails closed unless Terraform or OpenTofu, kubeconform, and the Kyverno
+CLI are installed; local mode reports those missing checks without blocking
+review of the templates.
 
 ## Bootstrap order
 

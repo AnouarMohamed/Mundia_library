@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateOverdueFines } from "@/lib/admin/actions/borrow";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
     });
     if (sameOriginResponse) return sameOriginResponse;
 
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "fines.recalculate",
+    );
     if (!guard.ok) {
       return guard.response;
     }

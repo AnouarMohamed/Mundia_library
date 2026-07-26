@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: pr-labeler-${{ github.event.pull_request.number }}
@@ -21,10 +20,13 @@ jobs:
     name: Label changed areas
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Apply area labels
         uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ github.token }}
           sync-labels: true

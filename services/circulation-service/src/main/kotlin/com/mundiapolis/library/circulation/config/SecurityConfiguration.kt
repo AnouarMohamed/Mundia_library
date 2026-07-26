@@ -25,6 +25,8 @@ class SecurityConfiguration {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
                 it.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                it.requestMatchers("/actuator/**")
+                    .hasAuthority("SCOPE_circulation.operations.read")
                 it.anyRequest().authenticated()
             }
             .oauth2ResourceServer { it.jwt {} }

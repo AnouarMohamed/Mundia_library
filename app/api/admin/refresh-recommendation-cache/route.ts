@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refreshRecommendationCache } from "@/lib/admin/actions/recommendations";
 import { revalidateRecommendationsTag } from "@/lib/cache/revalidate";
-import { requireAdminRouteAccess } from "@/lib/admin/route-guard";
+import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 import { enforceSameOriginRequest } from "@/lib/security/same-origin";
 
 /**
@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
     });
     if (sameOriginResponse) return sameOriginResponse;
 
-    const guard = await requireAdminRouteAccess();
+    const guard = await requireAdminCapabilityRouteAccess(
+      "automation.execute",
+    );
     if (!guard.ok) {
       return guard.response;
     }

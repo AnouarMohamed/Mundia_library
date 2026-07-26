@@ -74,6 +74,7 @@ data "aws_iam_policy_document" "kms" {
       "kms:Encrypt*",
       "kms:GenerateDataKey*",
       "kms:ReEncrypt*",
+      "kms:Describe*",
     ]
     resources = ["*"]
     principals {
@@ -329,9 +330,12 @@ resource "aws_eks_pod_identity_association" "vpc_cni" {
 }
 
 resource "aws_eks_addon" "vpc_cni" {
-  cluster_name                = aws_eks_cluster.this.name
-  addon_name                  = "vpc-cni"
-  addon_version               = var.addon_versions["vpc-cni"]
+  cluster_name  = aws_eks_cluster.this.name
+  addon_name    = "vpc-cni"
+  addon_version = var.addon_versions["vpc-cni"]
+  configuration_values = jsonencode({
+    enableNetworkPolicy = "true"
+  })
   resolve_conflicts_on_create = "NONE"
   resolve_conflicts_on_update = "PRESERVE"
   tags                        = local.common_tags

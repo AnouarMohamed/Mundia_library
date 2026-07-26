@@ -47,6 +47,11 @@ are implemented in the repository:
   projections, append-only audit storage, and expanded CI security gates.
 - A fresh PostgreSQL 18 database is migrated, inspected, seeded, and exercised
   by synchronized approval/return races in CI.
+- The BFF contains a fail-closed generic OIDC client foundation with
+  authorization code, PKCE, state, nonce, exact issuer/subject provisioning,
+  verified-domain defenses, and no provider-token persistence. Staging and
+  production reject legacy credentials. Real tenant integration, privileged
+  MFA, recovery, logout, and adversarial provider tests remain release gates.
 - `services/circulation-service` implements request, deterministic copy
   allocation/approval, and return as caller-bound idempotent commands. State,
   exact replay results, and versioned outbox events commit atomically.

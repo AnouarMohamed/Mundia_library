@@ -14,6 +14,7 @@ import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
 import com.mundiapolis.library.circulation.application.model.PaymentReference
+import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineCommand
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
@@ -26,6 +27,7 @@ import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanCom
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
+import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import com.mundiapolis.library.circulation.domain.model.FineLedgerEntryType
 import com.mundiapolis.library.circulation.domain.model.FineStatus
@@ -43,6 +45,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -106,6 +109,9 @@ class CirculationPhase2IntegrationTest {
     @Autowired
     private lateinit var dataSource: DataSource
 
+    @Autowired
+    private lateinit var transactionRunner: TransactionRunner
+
     @BeforeEach
     fun cleanCommandData() {
         dsl.execute("ALTER TABLE circulation_fine_ledger_entry DISABLE TRIGGER USER")
@@ -158,15 +164,22 @@ class CirculationPhase2IntegrationTest {
         assertThat(firstRenewal.renewalCount).isOne()
         assertThat(firstRenewal.version).isEqualTo(2)
 
-        mockMvc.post("$LOANS_PATH/${active.value}/renew") {
-            with(jwtFor("renew-staff", RENEW_ON_BEHALF_SCOPE))
-            header(IDEMPOTENCY_HEADER, "renew-staff-${UUID.randomUUID()}")
-        }.andExpect {
-            status { isOk() }
-            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
-            jsonPath("$.renewalCount") { value(2) }
-            jsonPath("$.version") { value(3) }
+        val distinctKeyRenewals = runConcurrently(CONCURRENT_COMMANDS) { index ->
+            renewLoan.renew(
+                RenewLoanCommand(
+                    loanId = active,
+                    idempotencyKey =
+                        IdempotencyKey.parse("renew-distinct-$index-${UUID.randomUUID()}"),
+                    principal = selfPrincipal(memberId, "renew-member"),
+                ),
+            )
         }
+        assertThat(distinctKeyRenewals.count { it.isSuccess }).isOne()
+        assertThat(
+            distinctKeyRenewals.count {
+                it.exceptionOrNull() is RenewalLimitReachedException
+            },
+        ).isEqualTo(CONCURRENT_COMMANDS - 1)
 
         mockMvc.post("$LOANS_PATH/${active.value}/renew") {
             with(jwtFor("renew-staff", RENEW_ON_BEHALF_SCOPE))
@@ -230,7 +243,61 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
-    fun `V4 upgrades completed and pending V3 idempotency records on PostgreSQL 18`() {
+    fun `command transactions use read committed with bounded lock and statement waits`() {
+        val settings = transactionRunner.required {
+            dsl.fetchSingle(
+                """
+                SELECT
+                    current_setting('transaction_isolation') AS isolation,
+                    current_setting('lock_timeout') AS lock_timeout,
+                    current_setting('statement_timeout') AS statement_timeout,
+                    current_setting('idle_in_transaction_session_timeout') AS idle_timeout
+                """.trimIndent(),
+            )
+        }
+
+        assertThat(settings.get("isolation", String::class.java)).isEqualTo("read committed")
+        assertThat(settings.get("lock_timeout", String::class.java)).isEqualTo("3s")
+        assertThat(settings.get("statement_timeout", String::class.java)).isEqualTo("10s")
+        assertThat(settings.get("idle_timeout", String::class.java)).isEqualTo("10s")
+    }
+
+    @Test
+    fun `renewal replay is bound to the current membership authorization context`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val active = createActiveLoan(memberId)
+        val key = "renew-authorization-context-${UUID.randomUUID()}"
+
+        mockMvc.post("$LOANS_PATH/${active.value}/renew") {
+            with(jwtFor("renew-context-actor", RENEW_ON_BEHALF_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.renewalCount") { value(1) }
+        }
+
+        mockMvc.post("$LOANS_PATH/${active.value}/renew") {
+            with(jwtFor("renew-context-actor", RENEW_SCOPE, UUID.randomUUID()))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("idempotency_key_conflict") }
+        }
+
+        val persisted = dsl.selectFrom(CIRCULATION_LOAN)
+            .where(CIRCULATION_LOAN.ID.eq(active.value))
+            .fetchSingle()
+        assertThat(persisted.renewalCount).isOne()
+        assertThat(
+            dsl.selectFrom(OUTBOX_EVENT)
+                .where(OUTBOX_EVENT.AGGREGATE_TYPE.eq("loan"))
+                .fetch(),
+        ).hasSize(3)
+    }
+
+    @Test
+    fun `phase2 migrations upgrade V3 idempotency without rewriting existing rows`() {
         val schema = "phase2_upgrade_${UUID.randomUUID().toString().replace("-", "")}"
         try {
             Flyway.configure()
@@ -323,8 +390,8 @@ class CirculationPhase2IntegrationTest {
                         """.trimIndent(),
                     ).use { result ->
                         assertThat(result.next()).isTrue()
-                        assertThat(result.getInt("renewal_count")).isZero()
-                        assertThat(result.wasNull()).isFalse()
+                        result.getInt("renewal_count")
+                        assertThat(result.wasNull()).isTrue()
                     }
                     statement.executeQuery(
                         """
@@ -350,6 +417,19 @@ class CirculationPhase2IntegrationTest {
                     ).use { result ->
                         assertThat(result.next()).isTrue()
                         assertThat(result.getInt("table_count")).isEqualTo(2)
+                    }
+                    statement.executeQuery(
+                        """
+                        SELECT COUNT(*) AS invalid_constraint_count
+                        FROM pg_constraint constraint_record
+                        JOIN pg_namespace namespace_record
+                          ON namespace_record.oid = constraint_record.connamespace
+                        WHERE namespace_record.nspname = '$schema'
+                          AND NOT constraint_record.convalidated
+                        """.trimIndent(),
+                    ).use { result ->
+                        assertThat(result.next()).isTrue()
+                        assertThat(result.getInt("invalid_constraint_count")).isZero()
                     }
                 }
             }
@@ -470,18 +550,18 @@ class CirculationPhase2IntegrationTest {
         val assessed = assessFine.assess(
             AssessFineCommand(
                 loanId = active,
-                amountMinor = 5_000,
+                amountMinor = 50,
                 reason = FineNarrative.parse("Overdue return"),
                 idempotencyKey = IdempotencyKey.parse("assess-overdraw-${UUID.randomUUID()}"),
                 principal = staff,
             ),
         )
 
-        val payments = runConcurrently(2) { index ->
+        val payments = runConcurrently(CONCURRENT_COMMANDS) { index ->
             recordFinePayment.recordPayment(
                 RecordFinePaymentCommand(
                     fineId = assessed.result.fineId,
-                    amountMinor = 3_000,
+                    amountMinor = 1,
                     externalReference = PaymentReference.parse("PAY-$index-${UUID.randomUUID()}"),
                     idempotencyKey =
                         IdempotencyKey.parse("concurrent-payment-$index-${UUID.randomUUID()}"),
@@ -490,26 +570,30 @@ class CirculationPhase2IntegrationTest {
             )
         }
 
-        assertThat(payments.count { it.isSuccess }).isOne()
-        assertThat(payments.count { it.exceptionOrNull() is FineBalanceConflictException }).isOne()
+        assertThat(payments.count { it.isSuccess }).isEqualTo(50)
+        assertThat(payments.count { it.exceptionOrNull() is FineBalanceConflictException })
+            .isEqualTo(50)
         val fine = dsl.selectFrom(CIRCULATION_FINE)
             .where(CIRCULATION_FINE.ID.eq(assessed.result.fineId.value))
             .fetchSingle()
-        assertThat(fine.balanceMinor).isEqualTo(2_000)
-        assertThat(fine.version).isOne()
-        assertThat(
-            dsl.selectFrom(CIRCULATION_FINE_LEDGER_ENTRY)
-                .where(
-                    CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID.eq(assessed.result.fineId.value),
-                )
-                .fetch(CIRCULATION_FINE_LEDGER_ENTRY.DELTA_MINOR),
-        ).containsExactlyInAnyOrder(5_000, -3_000)
+        assertThat(fine.balanceMinor).isZero()
+        assertThat(fine.status).isEqualTo(FineStatus.SETTLED.name)
+        assertThat(fine.version).isEqualTo(50)
+        val ledgerEntries = dsl.selectFrom(CIRCULATION_FINE_LEDGER_ENTRY)
+            .where(CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID.eq(assessed.result.fineId.value))
+            .orderBy(CIRCULATION_FINE_LEDGER_ENTRY.FINE_VERSION)
+            .fetch()
+        assertThat(ledgerEntries).hasSize(51)
+        assertThat(ledgerEntries.map { it.fineVersion }).containsExactlyElementsOf(
+            (0L..50L).toList(),
+        )
+        assertThat(ledgerEntries.sumOf { requireNotNull(it.deltaMinor) }).isZero()
         assertThat(
             dsl.selectFrom(OUTBOX_EVENT)
                 .where(OUTBOX_EVENT.AGGREGATE_TYPE.eq("fine"))
                 .fetch(),
-        ).hasSize(2)
-        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(4)
+        ).hasSize(51)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(53)
     }
 
     @Test
@@ -610,6 +694,9 @@ class CirculationPhase2IntegrationTest {
             "circulation.fine.adjusted",
         )
         assertThat(fineEvents.map { it.aggregateVersion }).containsExactly(0L, 1L, 2L)
+        assertThat(fineEvents[1].payload?.data())
+            .contains("\"externalReference\"")
+            .contains(paymentReference.value)
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(5)
 
         val entryId = entries.first().id
@@ -631,6 +718,132 @@ class CirculationPhase2IntegrationTest {
         }.isInstanceOf(DataAccessException::class.java)
             .hasMessageContaining("immutable")
         assertThat(dsl.fetchCount(CIRCULATION_FINE_LEDGER_ENTRY)).isEqualTo(3)
+    }
+
+    @Test
+    fun `deferred ledger invariant rejects direct SQL balance and ledger bypasses`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val active = createActiveLoan(memberId)
+        val assessed = assessFine.assess(
+            AssessFineCommand(
+                loanId = active,
+                amountMinor = 5_000,
+                reason = FineNarrative.parse("Overdue return"),
+                idempotencyKey = IdempotencyKey.parse("assess-ledger-guard-${UUID.randomUUID()}"),
+                principal = administrativePrincipal("ledger-guard-staff"),
+            ),
+        )
+        val fineId = assessed.result.fineId.value
+        val now = Instant.now().atOffset(ZoneOffset.UTC)
+
+        assertThatThrownBy {
+            dsl.transaction { configuration ->
+                configuration.dsl()
+                    .update(CIRCULATION_FINE)
+                    .set(CIRCULATION_FINE.BALANCE_MINOR, 4_900)
+                    .set(CIRCULATION_FINE.UPDATED_AT, now)
+                    .where(CIRCULATION_FINE.ID.eq(fineId))
+                    .execute()
+            }
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining("does not match its immutable ledger")
+
+        assertThatThrownBy {
+            dsl.transaction { configuration ->
+                configuration.dsl()
+                    .insertInto(CIRCULATION_FINE_LEDGER_ENTRY)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ID, UUID.randomUUID())
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID, fineId)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_VERSION, 1L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ENTRY_TYPE, "ADJUSTMENT")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.DELTA_MINOR, -100L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ACTOR_FINGERPRINT, "e".repeat(64))
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.REASON, "Unpaired direct ledger entry")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.OCCURRED_AT, now)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.CREATED_AT, now)
+                    .execute()
+            }
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining("does not match its immutable ledger")
+
+        assertThatThrownBy {
+            dsl.transaction { configuration ->
+                val tx = configuration.dsl()
+                tx.update(CIRCULATION_FINE)
+                    .set(CIRCULATION_FINE.BALANCE_MINOR, 4_900)
+                    .set(CIRCULATION_FINE.VERSION, 1L)
+                    .set(CIRCULATION_FINE.UPDATED_AT, now)
+                    .where(CIRCULATION_FINE.ID.eq(fineId))
+                    .execute()
+                tx.insertInto(CIRCULATION_FINE_LEDGER_ENTRY)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ID, UUID.randomUUID())
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID, fineId)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_VERSION, 1L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ENTRY_TYPE, "ADJUSTMENT")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.DELTA_MINOR, -50L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ACTOR_FINGERPRINT, "e".repeat(64))
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.REASON, "Mismatched direct delta")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.OCCURRED_AT, now)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.CREATED_AT, now)
+                    .execute()
+            }
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining("does not match its immutable ledger")
+
+        assertThatThrownBy {
+            dsl.transaction { configuration ->
+                val tx = configuration.dsl()
+                tx.update(CIRCULATION_FINE)
+                    .set(CIRCULATION_FINE.BALANCE_MINOR, 4_900)
+                    .set(CIRCULATION_FINE.VERSION, 2L)
+                    .set(CIRCULATION_FINE.UPDATED_AT, now)
+                    .where(CIRCULATION_FINE.ID.eq(fineId))
+                    .execute()
+                tx.insertInto(CIRCULATION_FINE_LEDGER_ENTRY)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ID, UUID.randomUUID())
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID, fineId)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.FINE_VERSION, 2L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ENTRY_TYPE, "ADJUSTMENT")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.DELTA_MINOR, -100L)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.ACTOR_FINGERPRINT, "e".repeat(64))
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.REASON, "Skipped direct ledger version")
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.OCCURRED_AT, now)
+                    .set(CIRCULATION_FINE_LEDGER_ENTRY.CREATED_AT, now)
+                    .execute()
+            }
+        }.isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining("does not match its immutable ledger")
+
+        val persistedFine = dsl.selectFrom(CIRCULATION_FINE)
+            .where(CIRCULATION_FINE.ID.eq(fineId))
+            .fetchSingle()
+        assertThat(persistedFine.balanceMinor).isEqualTo(5_000)
+        assertThat(persistedFine.version).isZero()
+        assertThat(
+            dsl.selectFrom(CIRCULATION_FINE_LEDGER_ENTRY)
+                .where(CIRCULATION_FINE_LEDGER_ENTRY.FINE_ID.eq(fineId))
+                .fetch(),
+        ).hasSize(1)
+    }
+
+    @Test
+    fun `oversized command bodies are rejected before JSON binding`() {
+        val oversizedReason = "a".repeat(17 * 1024)
+
+        mockMvc.post(FINES_PATH) {
+            with(jwtFor("body-limit-assessor", ASSESS_FINE_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """{"loanId":"${UUID.randomUUID()}","amountMinor":100,"reason":"$oversizedReason"}"""
+            header(IDEMPOTENCY_HEADER, "oversized-command-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isContentTooLarge() }
+            content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
+            jsonPath("$.code") { value("payload_too_large") }
+        }
+
+        assertThat(dsl.fetchCount(CIRCULATION_FINE)).isZero()
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isZero()
     }
 
     private fun createActiveLoan(memberId: MemberId): LoanId {

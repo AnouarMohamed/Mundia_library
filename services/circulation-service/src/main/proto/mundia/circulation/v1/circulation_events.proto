@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package mundia.circulation.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.mundiapolis.library.circulation.contract.v1";
+option java_outer_classname = "CirculationEventsProto";
+
+// Immutable v1 broker contract. Field numbers and enum values are never reused.
+// Consumers deduplicate by event_id; transport delivery is at least once.
+message CirculationEvent {
+  string event_id = 1;
+  string event_type = 2;
+  uint32 event_version = 3;
+  string aggregate_type = 4;
+  string aggregate_id = 5;
+  uint64 aggregate_version = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  optional string trace_id = 8;
+
+  oneof payload {
+    LoanEvent loan = 20;
+    FineEvent fine = 21;
+  }
+
+  reserved 9 to 19;
+}
+
+message LoanEvent {
+  string loan_id = 1;
+  string member_id = 2;
+  string edition_id = 3;
+  optional string copy_id = 4;
+  LoanStatus status = 5;
+  google.protobuf.Timestamp requested_at = 6;
+  optional google.protobuf.Timestamp checked_out_at = 7;
+  optional google.protobuf.Timestamp due_at = 8;
+  optional google.protobuf.Timestamp returned_at = 9;
+  uint32 renewal_count = 10;
+  uint64 loan_version = 11;
+}
+
+enum LoanStatus {
+  LOAN_STATUS_UNSPECIFIED = 0;
+  LOAN_STATUS_REQUESTED = 1;
+  LOAN_STATUS_ACTIVE = 2;
+  LOAN_STATUS_RETURNED = 3;
+  LOAN_STATUS_REJECTED = 4;
+  LOAN_STATUS_CANCELLED = 5;
+}
+
+message FineEvent {
+  string fine_id = 1;
+  string loan_id = 2;
+  string member_id = 3;
+  string currency = 4;
+  uint64 balance_minor = 5;
+  FineStatus status = 6;
+  uint64 fine_version = 7;
+  string ledger_entry_id = 8;
+  FineLedgerEntryType ledger_entry_type = 9;
+  sint64 ledger_delta_minor = 10;
+}
+
+enum FineStatus {
+  FINE_STATUS_UNSPECIFIED = 0;
+  FINE_STATUS_OPEN = 1;
+  FINE_STATUS_PAID = 2;
+  FINE_STATUS_VOID = 3;
+}
+
+enum FineLedgerEntryType {
+  FINE_LEDGER_ENTRY_TYPE_UNSPECIFIED = 0;
+  FINE_LEDGER_ENTRY_TYPE_ASSESSMENT = 1;
+  FINE_LEDGER_ENTRY_TYPE_PAYMENT = 2;
+  FINE_LEDGER_ENTRY_TYPE_ADJUSTMENT = 3;
+}

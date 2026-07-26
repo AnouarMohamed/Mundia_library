@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.jooq.codegen)
+    alias(libs.plugins.protobuf)
 }
 
 java {
@@ -37,10 +38,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("com.google.protobuf:protobuf-java:${libs.versions.protobuf.get()}")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.apache.kafka:kafka-clients")
 
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql")
+    // Spring Boot 4.1.0 manages 42.7.11, which is affected by
+    // CVE-2026-54291. Keep this explicit until the managed BOM is updated.
+    runtimeOnly("org.postgresql:postgresql:42.7.12")
 
     jooqCodegen("org.jooq:jooq-meta-extensions:${libs.versions.jooq.get()}")
     jooqCodegen("com.h2database:h2:2.4.240")
@@ -50,8 +55,15 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-kafka")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
+    }
 }
 
 jooq {
@@ -102,8 +114,17 @@ tasks.withType<KotlinCompile>().configureEach {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    dependsOn(tasks.named("bootJar"))
+    environment("SPRING_FLYWAY_ENABLED", "true")
 }
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
     archiveFileName = "circulation-service.jar"
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    environment(
+        "SPRING_FLYWAY_ENABLED",
+        System.getenv("SPRING_FLYWAY_ENABLED") ?: "true",
+    )
 }

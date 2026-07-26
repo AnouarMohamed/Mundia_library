@@ -12,6 +12,7 @@ Every production deployment needs:
 - Production environment variables.
 - Applied schema changes.
 - At least one approved admin user.
+- Pre-provisioned issuer/subject mappings for authorized users.
 - Monitoring access to application logs and database health.
 
 ## Required Production Environment
@@ -24,6 +25,11 @@ DATABASE_URL=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 AUTH_TRUST_HOST=true
+ENABLE_LOCAL_CREDENTIALS=false
+OIDC_ISSUER=https://identity.example.edu/exact-tenant
+OIDC_CLIENT_ID=
+OIDC_CLIENT_SECRET=
+OIDC_ALLOWED_EMAIL_DOMAINS=student.example.edu,staff.example.edu
 NEXT_PUBLIC_API_ENDPOINT=
 NEXT_PUBLIC_PROD_API_ENDPOINT=
 ```
@@ -85,8 +91,12 @@ DATABASE_URL="production-url" npm run db:migrate
 ```
 
 4. Confirm `/api/health` reports database connectivity in preview.
-5. Deploy application code.
-6. Run smoke tests.
+5. Provision or verify exact institutional identity mappings as documented in
+   [Institutional OIDC](./OIDC_IDENTITY.md).
+6. Rotate `AUTH_SECRET`/`NEXTAUTH_SECRET` at the coordinated identity cutover so
+   sessions issued before authentication-method binding cannot survive.
+7. Deploy application code.
+8. Run smoke tests.
 
 Do not use `npm run db:push` for production. It is a local development escape
 hatch only; reviewed migrations are the production release path.
@@ -160,6 +170,10 @@ docker compose --profile tools run --rm seed
 - Put the app behind HTTPS.
 - Set `NEXTAUTH_URL` to the public HTTPS URL.
 - Set `AUTH_TRUST_HOST=true` behind a reverse proxy.
+- Register the exact HTTPS Auth.js callback URL:
+  `/api/auth/callback/institutional-oidc`.
+- Set `ENABLE_LOCAL_CREDENTIALS=false`; staging and production fail startup if
+  it is enabled or if institutional OIDC settings are incomplete.
 - Run migrations as a separate release step before the app rolls forward.
 
 ## Option 3: Standalone Package

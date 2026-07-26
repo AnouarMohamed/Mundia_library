@@ -17,11 +17,12 @@ spec:
       maxSurge: 25%
   selector:
     matchLabels:
-      {{- include "mundia-service.selectorLabels" . | nindent 6 }}
+      {{- include "mundia-service.runtimeSelectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "mundia-service.labels" . | nindent 8 }}
+        app.kubernetes.io/component: runtime
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -105,7 +106,7 @@ spec:
           whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
           labelSelector:
             matchLabels:
-              {{- include "mundia-service.selectorLabels" . | nindent 14 }}
+              {{- include "mundia-service.runtimeSelectorLabels" . | nindent 14 }}
       {{- end }}
       {{- if .Values.podAntiAffinity.enabled }}
       affinity:
@@ -116,5 +117,5 @@ spec:
                 topologyKey: {{ .Values.podAntiAffinity.topologyKey }}
                 labelSelector:
                   matchLabels:
-                    {{- include "mundia-service.selectorLabels" . | nindent 20 }}
+                    {{- include "mundia-service.runtimeSelectorLabels" . | nindent 20 }}
       {{- end }}

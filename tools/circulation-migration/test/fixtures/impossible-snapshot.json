@@ -1,9 +1,11 @@
 {
-  "schemaVersion": "legacy-circulation-snapshot/v1",
+  "schemaVersion": "legacy-circulation-snapshot/v2",
   "capturedAt": "2026-07-26T10:00:00.000Z",
   "source": {
     "database": "legacy_library",
-    "serverVersion": "18.0"
+    "serverVersion": "18.0",
+    "contractVersion": "legacy-circulation-source/pg18-v1",
+    "transactionIsolation": "SERIALIZABLE_READ_ONLY_DEFERRABLE"
   },
   "books": [
     {

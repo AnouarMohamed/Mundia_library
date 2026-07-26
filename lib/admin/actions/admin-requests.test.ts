@@ -6,7 +6,7 @@ import {
 } from "./admin-requests";
 
 const mocks = vi.hoisted(() => ({
-  requireAdmin: vi.fn(),
+  requireAdminCapability: vi.fn(),
   logAdminAction: vi.fn(),
   logError: vi.fn(),
 }));
@@ -17,8 +17,12 @@ vi.mock("@/database/drizzle", () => ({
   },
 }));
 
+vi.mock("@/lib/security/admin-capabilities", () => ({
+  requireAdminCapability: mocks.requireAdminCapability,
+}));
+
 vi.mock("@/lib/security/auth-guards", () => ({
-  requireAdmin: mocks.requireAdmin,
+  requireAdmin: vi.fn(),
   requireSelfOrAdmin: vi.fn(),
   guardToActionError: vi.fn((guard) => ({
     success: false,
@@ -75,7 +79,7 @@ const approvedRequest = {
 describe("admin access request decisions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireAdmin.mockResolvedValue({
+    mocks.requireAdminCapability.mockResolvedValue({
       ok: true,
       user: { id: adminId, role: "ADMIN", status: "APPROVED" },
     });
@@ -90,6 +94,7 @@ describe("admin access request decisions", () => {
             status: "PENDING",
             userEmail: "user@example.com",
             userFullName: "Example User",
+            userStatus: "APPROVED",
           },
         ]),
       ),
@@ -97,6 +102,9 @@ describe("admin access request decisions", () => {
         .fn()
         .mockReturnValueOnce(updateQuery([approvedRequest]))
         .mockReturnValueOnce(updateQuery([{ id: userId }])),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockResolvedValue({}),
+      }),
     };
     (db.transaction as any).mockImplementation(async (callback: any) =>
       callback(tx),
@@ -112,13 +120,7 @@ describe("admin access request decisions", () => {
       userFullName: "Example User",
     });
     expect(tx.update).toHaveBeenCalledTimes(2);
-    expect(mocks.logAdminAction).toHaveBeenCalledWith(
-      adminId,
-      "APPROVE_ADMIN_REQUEST",
-      requestId,
-      "ADMIN_REQUEST",
-      { userId },
-    );
+    expect(tx.insert).toHaveBeenCalledTimes(1);
   });
 
   it("does not promote the user when another decision wins the request transition", async () => {
@@ -130,10 +132,14 @@ describe("admin access request decisions", () => {
             status: "PENDING",
             userEmail: "user@example.com",
             userFullName: "Example User",
+            userStatus: "APPROVED",
           },
         ]),
       ),
       update: vi.fn().mockReturnValueOnce(updateQuery([])),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockResolvedValue({}),
+      }),
     };
     (db.transaction as any).mockImplementation(async (callback: any) =>
       callback(tx),
@@ -158,6 +164,7 @@ describe("admin access request decisions", () => {
             status: "PENDING",
             userEmail: "user@example.com",
             userFullName: "Example User",
+            userStatus: "APPROVED",
           },
         ]),
       ),
@@ -165,6 +172,9 @@ describe("admin access request decisions", () => {
         .fn()
         .mockReturnValueOnce(updateQuery([approvedRequest]))
         .mockReturnValueOnce(updateQuery([])),
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockResolvedValue({}),
+      }),
     };
     (db.transaction as any).mockImplementation(async (callback: any) =>
       callback(tx),

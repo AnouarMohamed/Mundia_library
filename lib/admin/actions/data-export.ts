@@ -1,14 +1,14 @@
 import { db } from "@/database/drizzle";
 import { books, users, borrowRecords } from "@/database/schema";
 import { eq, sql, desc, and, gte, lt, count } from "drizzle-orm";
-import { requireAdmin } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 
 // Export types
 export type ExportFormat = "csv" | "json" | "pdf";
 export type ExportType = "books" | "users" | "borrows" | "analytics";
 
 const assertAdmin = async () => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("exports.read");
   if (!guard.ok) {
     throw new Error(guard.message);
   }

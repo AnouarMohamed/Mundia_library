@@ -1,0 +1,84 @@
+{{- if and .Values.migration.enabled .Values.migration.cleanup.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  labels:
+    {{- include "mundia-service.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration-cleanup
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ .Values.migration.cleanup.activeDeadlineSeconds }}
+  backoffLimit: {{ .Values.migration.cleanup.backoffLimit }}
+  completions: 1
+  parallelism: 1
+  ttlSecondsAfterFinished: {{ .Values.migration.cleanup.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "mundia-service.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration-cleanup
+    spec:
+      serviceAccountName: {{ include "mundia-service.fullname" . }}-migration-cleanup
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: cleanup
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          env:
+            - name: APP_MIGRATION_SECRET_CLEANUP_ONLY
+              value: "true"
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: MIGRATION_EXTERNAL_SECRET_NAME
+              value: {{ include "mundia-service.fullname" . }}-migration
+            - name: MIGRATION_SECRET_NAME
+              value: {{ .Values.migration.externalSecret.targetName }}
+          resources:
+            {{- toYaml .Values.migration.cleanup.resources | nindent 12 }}
+          volumeMounts:
+            - name: api-access
+              mountPath: /var/run/secrets/migration-cleanup
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: api-access
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  expirationSeconds: {{ .Values.migration.cleanup.tokenExpirationSeconds }}
+                  path: token
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ .Values.migration.tmpSizeLimit }}
+{{- end }}

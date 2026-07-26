@@ -2,9 +2,9 @@ import { db } from "@/database/drizzle";
 import { books, borrowRecords, users } from "@/database/schema";
 import { eq, desc, sql, and, inArray, notInArray } from "drizzle-orm";
 import {
-  requireAdmin,
   requireSelfOrAdmin,
 } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 import { logError } from "@/lib/security/logger";
 
 // Types for recommendations
@@ -28,7 +28,7 @@ export interface RecommendationStats {
 }
 
 const assertAdmin = async () => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("automation.execute");
   if (!guard.ok) {
     throw new Error(guard.message);
   }

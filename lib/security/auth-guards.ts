@@ -18,8 +18,8 @@
 
 import { auth } from "@/auth";
 import { db } from "@/database/drizzle";
-import { users } from "@/database/schema";
-import { eq } from "drizzle-orm";
+import { federatedIdentities, users } from "@/database/schema";
+import { and, eq } from "drizzle-orm";
 import {
   forbiddenResponse,
   unauthorizedResponse,
@@ -31,6 +31,13 @@ import { NextResponse } from "next/server";
 export type AppRole = "USER" | "ADMIN";
 /** Valid account lifecycle statuses. */
 export type AccountStatus = "PENDING" | "APPROVED" | "REJECTED";
+type SessionAuthenticationMethod =
+  | "institutional-oidc"
+  | "local-credentials";
+type BindingAwareSession = Session & {
+  authenticationMethod?: SessionAuthenticationMethod;
+  federatedBindingId?: string;
+};
 
 /**
  * Standardized authenticated user object returned by guards.
@@ -70,16 +77,43 @@ export type AuthGuardResult = AuthGuardSuccess | AuthGuardFailure;
  * @param userId - Unique identifier of the user.
  * @returns The user record or null if not found.
  */
-const getFreshUserState = async (userId: string) => {
+const currentUserProjection = {
+  id: users.id,
+  email: users.email,
+  fullName: users.fullName,
+  role: users.role,
+  status: users.status,
+  universityId: users.universityId,
+};
+
+const getFreshUserState = async (
+  userId: string,
+  authenticationMethod: SessionAuthenticationMethod | undefined,
+  federatedBindingId: string | undefined,
+) => {
+  if (authenticationMethod === "institutional-oidc") {
+    if (!federatedBindingId) return null;
+
+    const row = await db
+      .select(currentUserProjection)
+      .from(users)
+      .innerJoin(
+        federatedIdentities,
+        and(
+          eq(federatedIdentities.userId, users.id),
+          eq(federatedIdentities.bindingId, federatedBindingId),
+        ),
+      )
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    return row[0] ?? null;
+  }
+
+  if (authenticationMethod !== "local-credentials") return null;
+
   const row = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      fullName: users.fullName,
-      role: users.role,
-      status: users.status,
-      universityId: users.universityId,
-    })
+    .select(currentUserProjection)
     .from(users)
     .where(eq(users.id, userId))
     .limit(1);
@@ -119,12 +153,21 @@ export const requireUser = async (): Promise<AuthGuardResult> => {
       message: "Authentication required",
     };
   }
+  const bindingAwareSession = session as BindingAwareSession;
 
   // Step 2: Verify user still exists in DB
-  const user = await getFreshUserState(session.user.id);
+  const user = await getFreshUserState(
+    session.user.id,
+    bindingAwareSession.authenticationMethod,
+    bindingAwareSession.federatedBindingId,
+  );
 
   if (!user) {
-    logWarn("auth.user_missing", { userId: session.user.id });
+    logWarn("auth.session_binding_or_user_missing", {
+      userId: session.user.id,
+      authenticationMethod:
+        bindingAwareSession.authenticationMethod ?? "missing",
+    });
     return {
       ok: false,
       status: 401,

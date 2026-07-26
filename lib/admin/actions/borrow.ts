@@ -27,6 +27,7 @@ import {
   guardToActionError,
   requireAdmin,
 } from "@/lib/security/auth-guards";
+import { requireAdminCapability } from "@/lib/security/admin-capabilities";
 import { logError } from "@/lib/security/logger";
 
 const safeBorrowOperationError = (
@@ -282,14 +283,15 @@ export const rejectBorrowRequest = async (recordId: string) => {
  * @returns List of updated records and their calculated fines.
  */
 export const updateOverdueFines = async (customFineAmount?: number) => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("fines.recalculate");
   if (!guard.ok) return [guardToActionError(guard)];
 
   const today = new Date();
 
   // Dynamic import to resolve circular dependency with config.ts
-  const { getDailyFineAmount } = await import("./config");
-  const dailyFineAmount = customFineAmount || (await getDailyFineAmount());
+  const { getDailyFineAmountForCalculation } = await import("./config");
+  const dailyFineAmount =
+    customFineAmount || (await getDailyFineAmountForCalculation());
 
   const overdueRecords = await db
     .select({
@@ -359,13 +361,14 @@ export const updateOverdueFines = async (customFineAmount?: number) => {
  * @returns Detailed results of the recalculation.
  */
 export const forceUpdateOverdueFines = async (customFineAmount?: number) => {
-  const guard = await requireAdmin();
+  const guard = await requireAdminCapability("fines.recalculate");
   if (!guard.ok) return [guardToActionError(guard)];
 
   const today = new Date();
 
-  const { getDailyFineAmount } = await import("./config");
-  const dailyFineAmount = customFineAmount || (await getDailyFineAmount());
+  const { getDailyFineAmountForCalculation } = await import("./config");
+  const dailyFineAmount =
+    customFineAmount || (await getDailyFineAmountForCalculation());
 
   const overdueRecords = await db
     .select({

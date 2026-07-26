@@ -49,6 +49,7 @@ containerPort: 8080
 env:
   APP_ENV: dev
   PORT: "8080"
+  SPRING_FLYWAY_ENABLED: "false"
 
 externalSecret:
   enabled: true
@@ -78,6 +79,65 @@ externalSecret:
     - secretKey: AUTH_AUDIENCE
       remoteKey: mundia/dev/circulation/oidc
       property: audience
+
+migration:
+  enabled: true
+  activeDeadlineSeconds: 600
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  tmpSizeLimit: 64Mi
+  serviceAccount:
+    create: true
+    name: ""
+    automountToken: false
+  networkPolicy:
+    enabled: true
+    egressCidrs:
+      - cidr: 10.40.0.0/16
+        ports:
+          - protocol: TCP
+            port: 5432
+  cleanup:
+    enabled: true
+    activeDeadlineSeconds: 120
+    backoffLimit: 1
+    ttlSecondsAfterFinished: 3600
+    tokenExpirationSeconds: 600
+    apiServerCidrs:
+      - REPLACE_DEV_KUBERNETES_API_SERVICE_IP/32
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  externalSecret:
+    enabled: true
+    refreshInterval: 5m
+    secretStoreRef:
+      name: aws-secrets-manager
+      kind: ClusterSecretStore
+    targetName: circulation-migration
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    data:
+      - secretKey: DATABASE_MIGRATION_URL
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: jdbc_url
+      - secretKey: DATABASE_MIGRATION_USERNAME
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: username
+      - secretKey: DATABASE_MIGRATION_PASSWORD
+        remoteKey: mundia/dev/circulation/postgres-migration
+        property: password
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 resources:
   requests:
@@ -146,11 +206,16 @@ podAntiAffinity:
 
 networkPolicy:
   enabled: true
-  ingressNamespaces:
-    - ingress-nginx
-    - monitoring
-  ingressPodLabels: {}
-  allowSameNamespace: true
+  ingressPeers:
+    - namespace: ingress-nginx
+      podLabels:
+        app.kubernetes.io/component: controller
+    - namespace: monitoring
+      podLabels:
+        app.kubernetes.io/name: prometheus
+    - namespace: mundia-dev
+      podLabels:
+        mundiapolis.io/allow-circulation: "true"
   egressCidrs:
     - cidr: 10.40.0.0/16
       ports:
