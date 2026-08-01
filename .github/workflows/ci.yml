@@ -59,6 +59,8 @@ jobs:
             --only-binary=:all: \
             --require-hashes \
             -r platform/requirements-validation-ci-py312-linux-x86_64.txt
+          /tmp/mundia-platform-validation/bin/python -c \
+            'import yaml; print(f"PyYAML {yaml.__version__} ready")'
 
       - name: Verify required render tools
         run: |
@@ -70,6 +72,7 @@ jobs:
       - name: Validate platform contract
         env:
           PATH: /tmp/mundia-platform-validation/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          PLATFORM_VALIDATION_PYTHON: /tmp/mundia-platform-validation/bin/python
         run: platform/scripts/validate.sh
 
   quality:

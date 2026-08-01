@@ -34,7 +34,7 @@ jobs:
           --health-retries 5
 
     env:
-      APP_ENV: test
+      APP_ENV: staging
       DATABASE_URL: postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
       NEXTAUTH_SECRET: ci-load-secret
       AUTH_SECRET: ci-load-secret
@@ -44,16 +44,20 @@ jobs:
       NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3000
       NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
       IMAGEKIT_PRIVATE_KEY: ci-load-private-key
-      UPSTASH_REDIS_URL: https://example.upstash.io
-      UPSTASH_REDIS_TOKEN: ci-load-token
+      UPSTASH_REDIS_URL: http://127.0.0.1:8079
+      UPSTASH_REDIS_TOKEN: ci-local-redis-token
       QSTASH_URL: https://qstash.upstash.io
       QSTASH_TOKEN: ci-load-token
       BREVO_API_KEY: ci-load-token
       BREVO_SENDER_EMAIL: noreply@example.com
       RESEND_TOKEN: ci-load-token
       ENABLE_WORKFLOWS: "false"
-      DISABLE_RATE_LIMIT: "true"
       ALLOW_TEST_FIXTURES: "true"
+      OIDC_ISSUER: https://identity.example.test/tenant
+      OIDC_CLIENT_ID: ci-load-client
+      OIDC_CLIENT_SECRET: ci-load-client-secret
+      OIDC_ALLOWED_EMAIL_DOMAINS: example.test
+      ENABLE_LOCAL_CREDENTIALS: "false"
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
@@ -81,12 +85,44 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Start app
+      - name: Start app and run load test
         run: |
+          set -euo pipefail
+
+          node scripts/upstash-redis-mock.mjs > /tmp/upstash-redis-mock.log 2>&1 &
+          CACHE_PID=$!
           npm run start > /tmp/next-nightly-server.log 2>&1 &
+          SERVER_PID=$!
+
+          cleanup() {
+            if kill -0 "$SERVER_PID" >/dev/null 2>&1; then
+              kill "$SERVER_PID" >/dev/null 2>&1 || true
+              wait "$SERVER_PID" 2>/dev/null || true
+            fi
+            if kill -0 "$CACHE_PID" >/dev/null 2>&1; then
+              kill "$CACHE_PID" >/dev/null 2>&1 || true
+              wait "$CACHE_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -sf "http://127.0.0.1:8079/health" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          if ! curl -sf "http://127.0.0.1:8079/health" >/dev/null; then
+            echo "Local Redis test double failed to start"
+            cat /tmp/upstash-redis-mock.log
+            exit 1
+          fi
+
           for i in {1..60}; do
             if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
               echo "API server is ready"
+              node scripts/nightly-load-test.mjs
               exit 0
             fi
             sleep 2
@@ -94,9 +130,6 @@ jobs:
           echo "Server failed to start"
           cat /tmp/next-nightly-server.log
           exit 1
-
-      - name: Run load test
-        run: node scripts/nightly-load-test.mjs
 
       - name: Upload load test artifacts
         if: always()
@@ -107,3 +140,4 @@ jobs:
             artifacts/perf/nightly-load-report.json
             artifacts/perf/nightly-load-report.md
             /tmp/next-nightly-server.log
+            /tmp/upstash-redis-mock.log

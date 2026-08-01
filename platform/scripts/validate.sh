@@ -4,6 +4,7 @@ export PYTHONDONTWRITEBYTECODE=1
 
 platform_dir="$(cd "${BASH_SOURCE[0]%/*}/.." && pwd)"
 repository_dir="$(cd "${platform_dir}/.." && pwd)"
+validation_python="${PLATFORM_VALIDATION_PYTHON:-python3}"
 release_argument=()
 release_mode=false
 if [[ "${1:-}" == "--release" ]]; then
@@ -37,8 +38,8 @@ fi
 
 cd "${repository_dir}"
 
-python3 platform/scripts/validate_repository.py "${release_argument[@]}"
-python3 -m unittest discover -s platform/tests -p "test_*.py"
+"${validation_python}" platform/scripts/validate_repository.py "${release_argument[@]}"
+"${validation_python}" -m unittest discover -s platform/tests -p "test_*.py"
 
 for environment in dev staging prod; do
   helm lint platform/helm/mundia-service \

@@ -60,7 +60,7 @@ jobs:
           --health-retries 5
 
     env:
-      APP_ENV: test
+      APP_ENV: staging
       DATABASE_URL: postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
       NEXTAUTH_SECRET: ci-bench-secret
       AUTH_SECRET: ci-bench-secret
@@ -70,16 +70,20 @@ jobs:
       NEXT_PUBLIC_PROD_API_ENDPOINT: http://127.0.0.1:3000
       NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: https://example.com
       IMAGEKIT_PRIVATE_KEY: ci-build-private-key
-      UPSTASH_REDIS_URL: https://example.upstash.io
-      UPSTASH_REDIS_TOKEN: ci-build-token
+      UPSTASH_REDIS_URL: http://127.0.0.1:8079
+      UPSTASH_REDIS_TOKEN: ci-local-redis-token
       QSTASH_URL: https://qstash.upstash.io
       QSTASH_TOKEN: ci-build-token
       BREVO_API_KEY: ci-build-token
       BREVO_SENDER_EMAIL: noreply@example.com
       RESEND_TOKEN: ci-build-token
       ENABLE_WORKFLOWS: "false"
-      DISABLE_RATE_LIMIT: "true"
       ALLOW_TEST_FIXTURES: "true"
+      OIDC_ISSUER: https://identity.example.test/tenant
+      OIDC_CLIENT_ID: ci-benchmark-client
+      OIDC_CLIENT_SECRET: ci-benchmark-client-secret
+      OIDC_ALLOWED_EMAIL_DOMAINS: example.test
+      ENABLE_LOCAL_CREDENTIALS: "false"
       NEXT_TELEMETRY_DISABLED: "1"
       BENCH_BASE_URL: http://127.0.0.1:3000
       BENCH_WARMUP: "5"
@@ -116,6 +120,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          node scripts/upstash-redis-mock.mjs > /tmp/upstash-redis-mock.log 2>&1 &
+          CACHE_PID=$!
           npm run start > /tmp/next-server.log 2>&1 &
           SERVER_PID=$!
 
@@ -124,8 +130,25 @@ jobs:
               kill "$SERVER_PID" >/dev/null 2>&1 || true
               wait "$SERVER_PID" 2>/dev/null || true
             fi
+            if kill -0 "$CACHE_PID" >/dev/null 2>&1; then
+              kill "$CACHE_PID" >/dev/null 2>&1 || true
+              wait "$CACHE_PID" 2>/dev/null || true
+            fi
           }
           trap cleanup EXIT
+
+          for i in {1..30}; do
+            if curl -sf "http://127.0.0.1:8079/health" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          if ! curl -sf "http://127.0.0.1:8079/health" >/dev/null; then
+            echo "Local Redis test double failed to start"
+            cat /tmp/upstash-redis-mock.log
+            exit 1
+          fi
 
           for i in {1..60}; do
             if curl -sf "http://127.0.0.1:3000/api/books?limit=1" >/dev/null; then
@@ -158,4 +181,6 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: next-server-log
-          path: /tmp/next-server.log
+          path: |
+            /tmp/next-server.log
+            /tmp/upstash-redis-mock.log
