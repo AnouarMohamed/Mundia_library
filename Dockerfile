@@ -5,6 +5,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 FROM base AS deps
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund
+RUN npm run deps:build-native
 
 FROM base AS builder
 ARG NEXT_PUBLIC_API_ENDPOINT
@@ -31,16 +32,19 @@ COPY database ./database
 COPY migrations ./migrations
 COPY dummybooks.json ./dummybooks.json
 
-FROM base AS runner
-ENV NODE_ENV=production
-ENV APP_ENV=production
-ENV HOSTNAME=0.0.0.0
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+FROM base AS runner-files
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 RUN rm -rf ./node_modules/next/node_modules/postcss
 COPY --from=builder /app/node_modules/postcss ./node_modules/next/node_modules/postcss
-USER node
+
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:af85d11ce7ef10172855a6e3649e3e8125b1b9e3ca41849ec2918036f05cb212 AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV APP_ENV=production
+ENV HOSTNAME=0.0.0.0
+COPY --from=runner-files --chown=65532:65532 /app /app
+USER 65532:65532
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["server.js"]

@@ -1,0 +1,12 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata:
+  name: mundia-policy-test-values
+namespaceSelector:
+  - name: mundia-prod
+    labels:
+      mundiapolis.io/environment: prod
+  - name: mundia-prod-migrations
+    labels:
+      mundiapolis.io/environment: prod
+      mundiapolis.io/purpose: migrations

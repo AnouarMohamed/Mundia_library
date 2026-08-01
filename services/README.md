@@ -97,8 +97,25 @@ tokens may omit that claim only when granted the separate
 
 Copy allocation is stable by barcode and identifier. Loan state, copy state,
 the idempotency result, and one versioned outbox event commit in the same
-PostgreSQL transaction. Publishing the outbox is deliberately outside this
-slice.
+PostgreSQL transaction.
+
+## Outbox delivery
+
+When `APP_OUTBOX_ENABLED=true`, the service leases unpublished rows with
+`FOR UPDATE SKIP LOCKED`, validates their JSON payload against the v1 event
+contract, encodes Protobuf, and waits for a Kafka acknowledgement before
+marking the row published. Leases expire after a process crash, retries are
+bounded with backoff, irrecoverable contract violations are blocked for
+operator action, and published rows are retained before cleanup. Producer
+idempotence is enabled, but the database-to-broker boundary is intentionally
+documented as **at least once**: every consumer must use `event_id` as its inbox
+deduplication key.
+
+The broker topic and ACL must already exist; the producer is not authorized to
+administer topics. The platform supplies private TLS/SASL connectivity and the
+approved schema subject. Broker selection, schema-registry deployment, consumer
+inboxes, replay drills, and production retention/partition sizing remain
+release evidence—not application defaults.
 
 ## Container build
 

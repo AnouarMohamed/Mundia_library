@@ -5,4 +5,4 @@ resources:
   - require-secure-workloads.yaml
   - restrict-service-exposure.yaml
   - require-tls-ingress.yaml
-
+  - restrict-external-secrets.yaml

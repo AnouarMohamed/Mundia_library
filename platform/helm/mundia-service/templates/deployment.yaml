@@ -1,8 +1,10 @@
 {{- include "mundia-service.validate" . }}
+{{- if .Values.runtime.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "mundia-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
 spec:
@@ -119,3 +121,4 @@ spec:
                   matchLabels:
                     {{- include "mundia-service.runtimeSelectorLabels" . | nindent 20 }}
       {{- end }}
+{{- end }}

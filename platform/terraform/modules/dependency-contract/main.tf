@@ -1,10 +1,11 @@
 locals {
   secret_arns = {
-    postgres = var.postgres_secret_arn
-    kafka    = var.kafka_secret_arn
-    redis    = var.redis_secret_arn
-    oidc     = var.oidc_secret_arn
-    otel     = var.otel_secret_arn
+    postgres           = var.postgres_secret_arn
+    postgres_migration = var.postgres_migration_secret_arn
+    kafka              = var.kafka_secret_arn
+    redis              = var.redis_secret_arn
+    oidc               = var.oidc_secret_arn
+    otel               = var.otel_secret_arn
   }
 
   endpoints = {

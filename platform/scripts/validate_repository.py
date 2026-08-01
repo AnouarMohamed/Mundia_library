@@ -182,17 +182,26 @@ def _external_remote_keys(resource: dict[str, Any]) -> set[str]:
 def render_environment(environment: str) -> tuple[list[dict[str, Any]], list[str]]:
     if shutil.which("kubectl") is None:
         return [], ["kubectl is required to render Kustomize + Helm environment overlays"]
-    output, failure = run_checked(
-        [
-            "kubectl",
-            "kustomize",
-            "--enable-helm",
-            f"platform/gitops/environments/{environment}",
-        ]
-    )
-    if failure:
-        return [], [failure]
-    return load_documents(output, f"rendered {environment}")
+    documents: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for layer, path in (
+        ("platform", f"platform/gitops/platform/environments/{environment}"),
+        ("migration", f"platform/gitops/migrations/environments/{environment}"),
+        ("workload", f"platform/gitops/environments/{environment}"),
+    ):
+        output, failure = run_checked(
+            ["kubectl", "kustomize", "--enable-helm", path]
+        )
+        if failure:
+            errors.append(failure)
+            continue
+        rendered, parse_errors = load_documents(
+            output,
+            f"rendered {environment} {layer} layer",
+        )
+        documents.extend(rendered)
+        errors.extend(parse_errors)
+    return documents, errors
 
 
 def validate_environment(environment: str, release: bool = False) -> list[str]:
@@ -201,6 +210,7 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         return errors
     index = _resource_index(documents)
     expected_namespace = f"mundia-{environment}"
+    expected_migration_namespace = f"{expected_namespace}-migrations"
 
     namespace = index.get(("Namespace", expected_namespace))
     labels = (namespace or {}).get("metadata", {}).get("labels", {})
@@ -208,14 +218,33 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         errors.append(f"{environment}: expected Namespace {expected_namespace}")
     elif labels.get("pod-security.kubernetes.io/enforce") != "restricted":
         errors.append(f"{environment}: namespace must enforce restricted Pod Security")
+    migration_namespace = index.get(("Namespace", expected_migration_namespace))
+    migration_labels = (migration_namespace or {}).get("metadata", {}).get("labels", {})
+    if not migration_namespace:
+        errors.append(
+            f"{environment}: expected migration Namespace {expected_migration_namespace}"
+        )
+    elif (
+        migration_labels.get("pod-security.kubernetes.io/enforce") != "restricted"
+        or migration_labels.get("mundiapolis.io/purpose") != "migrations"
+    ):
+        errors.append(
+            f"{environment}: migration namespace must be restricted and purpose-labelled"
+        )
 
-    stores = [item for item in documents if item.get("kind") == "ClusterSecretStore"]
-    if len(stores) != 1:
-        errors.append(f"{environment}: expected exactly one ClusterSecretStore")
-    elif stores[0].get("spec", {}).get("conditions", [{}])[0].get("namespaces") != [
-        expected_namespace
-    ]:
-        errors.append(f"{environment}: ClusterSecretStore scope is not environment-local")
+    cluster_stores = [
+        item for item in documents if item.get("kind") == "ClusterSecretStore"
+    ]
+    if cluster_stores:
+        errors.append(f"{environment}: ClusterSecretStore is forbidden")
+    stores = [item for item in documents if item.get("kind") == "SecretStore"]
+    store_namespaces = {
+        str(item.get("metadata", {}).get("namespace")) for item in stores
+    }
+    if store_namespaces != {expected_namespace, expected_migration_namespace}:
+        errors.append(
+            f"{environment}: runtime and migration namespaces each require one local SecretStore"
+        )
 
     deployments = [item for item in documents if item.get("kind") == "Deployment"]
     if not deployments:
@@ -242,6 +271,25 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         if ("NetworkPolicy", name) not in index:
             errors.append(f"{source}: matching NetworkPolicy is missing")
 
+    circulation_network_policy = index.get(
+        ("NetworkPolicy", "circulation-mundia-service"), {}
+    )
+    otel_peers = [
+        peer
+        for rule in circulation_network_policy.get("spec", {}).get("egress", [])
+        for peer in rule.get("to", [])
+        if peer.get("podSelector", {}).get("matchLabels", {}).get(
+            "app.kubernetes.io/name"
+        )
+        == "otel-gateway-collector"
+    ]
+    if len(otel_peers) != 1 or otel_peers[0].get("namespaceSelector", {}).get(
+        "matchLabels", {}
+    ).get("kubernetes.io/metadata.name") != "monitoring":
+        errors.append(
+            f"{environment}: OTLP egress must select the monitoring namespace and gateway pod"
+        )
+
     circulation_name = "circulation-mundia-service"
     migration_name = f"{circulation_name}-migration"
     circulation = index.get(("Deployment", circulation_name), {})
@@ -264,6 +312,16 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
 
     runtime_external_secret = index.get(("ExternalSecret", circulation_name), {})
     migration_external_secret = index.get(("ExternalSecret", migration_name), {})
+    for purpose, external_secret in (
+        ("runtime", runtime_external_secret),
+        ("migration", migration_external_secret),
+    ):
+        store_ref = external_secret.get("spec", {}).get("secretStoreRef", {})
+        if store_ref != {"name": "aws-secrets-manager", "kind": "SecretStore"}:
+            errors.append(
+                f"{environment}: {purpose} ExternalSecret must use the "
+                "platform-owned namespace SecretStore"
+            )
     runtime_secret_target = (
         runtime_external_secret.get("spec", {}).get("target", {}).get("name")
     )
@@ -274,6 +332,14 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         errors.append(f"{environment}: runtime ExternalSecret is missing")
     if not migration_external_secret:
         errors.append(f"{environment}: migration ExternalSecret is missing")
+    if runtime_external_secret.get("metadata", {}).get("namespace") != expected_namespace:
+        errors.append(f"{environment}: runtime ExternalSecret escaped its runtime namespace")
+    if migration_external_secret.get("metadata", {}).get("namespace") != (
+        expected_migration_namespace
+    ):
+        errors.append(
+            f"{environment}: migration ExternalSecret must be in the isolated migration namespace"
+        )
     if not runtime_secret_target or not migration_secret_target:
         errors.append(f"{environment}: ExternalSecret targets must be explicit")
     elif runtime_secret_target == migration_secret_target:
@@ -301,6 +367,20 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         errors.append(
             f"{environment}: runtime and migration credentials share a remote secret"
         )
+    environment_segment = "prod" if environment == "prod" else environment
+    allowed_runtime_remote_keys = {
+        f"mundia/{environment_segment}/circulation/postgres",
+        f"mundia/{environment_segment}/circulation/oidc",
+        f"mundia/{environment_segment}/circulation/kafka",
+        f"mundia/{environment_segment}/circulation/redis",
+    }
+    runtime_remote_keys = _external_remote_keys(runtime_external_secret)
+    if not runtime_remote_keys or not runtime_remote_keys <= allowed_runtime_remote_keys:
+        errors.append(f"{environment}: runtime ExternalSecret references an unapproved key")
+    if _external_remote_keys(migration_external_secret) != {
+        f"mundia/{environment_segment}/circulation/postgres-migration"
+    }:
+        errors.append(f"{environment}: migration ExternalSecret key is not exact")
     if runtime_secret_refs != [runtime_secret_target]:
         errors.append(
             f"{environment}/Deployment/{circulation_name}: runtime pod must mount "
@@ -317,6 +397,10 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         errors.append(f"{environment}: pre-sync migration Job is missing")
     else:
         job_source = f"{environment}/Job/{migration_name}"
+        if migration_job.get("metadata", {}).get("namespace") != (
+            expected_migration_namespace
+        ):
+            errors.append(f"{job_source}: migration Job is not namespace-isolated")
         annotations = migration_job.get("metadata", {}).get("annotations", {})
         if annotations.get("argocd.argoproj.io/hook") != "PreSync":
             errors.append(f"{job_source}: Argo CD PreSync hook is required")
@@ -426,6 +510,10 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
         errors.append(f"{environment}: migration credential cleanup Job is missing")
     else:
         cleanup_source = f"{environment}/Job/{cleanup_name}"
+        if cleanup_job.get("metadata", {}).get("namespace") != (
+            expected_migration_namespace
+        ):
+            errors.append(f"{cleanup_source}: cleanup Job is not namespace-isolated")
         cleanup_annotations = cleanup_job.get("metadata", {}).get("annotations", {})
         if cleanup_annotations.get("argocd.argoproj.io/hook") != "PreSync":
             errors.append(f"{cleanup_source}: Argo CD PreSync hook is required")
@@ -637,6 +725,7 @@ def validate_terraform_contract() -> list[str]:
             "production_invariants",
             'var.environment == "dev" || !var.endpoint_public_access',
             "external_secrets_identity",
+            "postgres_migration_secret_arn",
         ],
     }
     for relative, fragments in required_fragments.items():
@@ -650,6 +739,66 @@ def validate_terraform_contract() -> list[str]:
     )
     for path in forbidden:
         errors.append(f"{path.relative_to(REPOSITORY_ROOT)}: Terraform state is committed")
+    return errors
+
+
+def validate_gitops_boundaries() -> list[str]:
+    errors: list[str] = []
+    project_path = PLATFORM_ROOT / "gitops" / "bootstrap" / "argocd-projects.yaml"
+    projects, parse_errors = load_documents(
+        project_path.read_text(encoding="utf-8"),
+        str(project_path.relative_to(REPOSITORY_ROOT)),
+    )
+    errors.extend(parse_errors)
+    index = _resource_index(projects)
+    workload = index.get(("AppProject", "mundia-workloads"), {})
+    if workload.get("spec", {}).get("clusterResourceWhitelist"):
+        errors.append("mundia-workloads AppProject must not manage cluster resources")
+    allowed_namespace_kinds = {
+        (item.get("group", ""), item.get("kind", ""))
+        for item in workload.get("spec", {}).get("namespaceResourceWhitelist", [])
+    }
+    forbidden_workload_kinds = {
+        ("", "Secret"),
+        ("batch", "Job"),
+        ("external-secrets.io", "SecretStore"),
+        ("rbac.authorization.k8s.io", "Role"),
+        ("rbac.authorization.k8s.io", "RoleBinding"),
+    }
+    if allowed_namespace_kinds & forbidden_workload_kinds:
+        errors.append(
+            "mundia-workloads AppProject may not manage Secrets, SecretStores, or RBAC"
+        )
+
+    applications_path = (
+        PLATFORM_ROOT / "gitops" / "bootstrap" / "environment-applications.yaml"
+    )
+    applications, application_errors = load_documents(
+        applications_path.read_text(encoding="utf-8"),
+        str(applications_path.relative_to(REPOSITORY_ROOT)),
+    )
+    errors.extend(application_errors)
+    application_index = _resource_index(applications)
+    for environment in ENVIRONMENTS:
+        platform_application = application_index.get(
+            ("Application", f"mundia-{environment}-platform"), {}
+        )
+        migration_application = application_index.get(
+            ("Application", f"mundia-{environment}-migrations"), {}
+        )
+        workload_application = application_index.get(
+            ("Application", f"mundia-{environment}"), {}
+        )
+        if platform_application.get("spec", {}).get("project") != "platform-addons":
+            errors.append(f"{environment}: platform layer is not platform-owned")
+        if migration_application.get("spec", {}).get("project") != "platform-addons":
+            errors.append(f"{environment}: migration layer is not platform-owned")
+        if migration_application.get("spec", {}).get("destination", {}).get(
+            "namespace"
+        ) != f"mundia-{environment}-migrations":
+            errors.append(f"{environment}: migration layer is not namespace-isolated")
+        if workload_application.get("spec", {}).get("project") != "mundia-workloads":
+            errors.append(f"{environment}: workload layer is not workload-isolated")
     return errors
 
 
@@ -707,6 +856,8 @@ def validate_release_inputs() -> list[str]:
     release_paths = [
         *sorted((PLATFORM_ROOT / "gitops" / "bootstrap").glob("*.yaml")),
         *sorted((PLATFORM_ROOT / "gitops" / "environments").rglob("*.yaml")),
+        *sorted((PLATFORM_ROOT / "gitops" / "migrations").rglob("*.yaml")),
+        *sorted((PLATFORM_ROOT / "gitops" / "platform").rglob("*.yaml")),
         *sorted((PLATFORM_ROOT / "policies" / "kyverno").glob("*.yaml")),
     ]
     unresolved = re.compile(
@@ -733,6 +884,7 @@ def validate(release: bool = False) -> list[str]:
     errors: list[str] = []
     errors.extend(validate_raw_yaml())
     errors.extend(validate_terraform_contract())
+    errors.extend(validate_gitops_boundaries())
     errors.extend(validate_service_migration_contract())
     for environment in ENVIRONMENTS:
         errors.extend(validate_environment(environment, release=release))

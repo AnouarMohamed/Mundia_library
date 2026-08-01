@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM eclipse-temurin:25-jdk-alpine@sha256:5ecfde8e5ecde5954ea3721155b345ef56c1d579b940c761318ad4c05959a151 AS builder
+FROM eclipse-temurin:25-jdk-noble@sha256:3eb81ed94d8c1a34422f19f8188548bdf02cae69c91d0328afdbb7abed90f617 AS builder
 WORKDIR /workspace
 
 COPY gradlew gradlew.bat settings.gradle.kts settings-gradle.lockfile build.gradle.kts gradle.properties ./
@@ -18,9 +18,15 @@ RUN --mount=type=cache,target=/root/.gradle \
 FROM eclipse-temurin:25-jre-alpine@sha256:28db6fdf60e38945e43d840c0333aeaec66c15943070104f7586fd3c9d1665b0 AS runtime
 WORKDIR /app
 
-RUN addgroup -S mundia && adduser -S -G mundia -u 10001 mundia
+RUN apk add --no-cache --upgrade \
+        libexpat=2.8.2-r0 \
+        p11-kit=0.26.2-r0 \
+        p11-kit-trust=0.26.2-r0 \
+    && addgroup -S -g 10001 app \
+    && adduser -S -D -H -u 10001 -G app app \
+    && rm -f /bin/ash /bin/sh /sbin/apk /bin/busybox
 
-COPY --from=builder --chown=mundia:mundia \
+COPY --from=builder --chown=10001:10001 \
     /workspace/circulation-service/build/libs/circulation-service.jar \
     /app/circulation-service.jar
 

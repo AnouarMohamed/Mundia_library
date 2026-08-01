@@ -2,7 +2,8 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "mundia-service.fullname" . }}-migration
+  name: {{ include "mundia-service.migrationName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration

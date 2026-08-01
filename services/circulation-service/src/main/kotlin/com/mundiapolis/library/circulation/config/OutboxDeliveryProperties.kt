@@ -22,6 +22,7 @@ data class OutboxDeliveryProperties(
     val cleanupInterval: Duration,
     val cleanupBatchSize: Int,
     val maximumEventBytes: Int,
+    val maximumPendingAge: Duration,
     val kafka: KafkaProperties,
 ) {
     @get:AssertTrue(message = "enabled outbox delivery configuration is unsafe or inconsistent")
@@ -43,14 +44,15 @@ data class OutboxDeliveryProperties(
                 cleanupInterval !in MIN_CLEANUP_INTERVAL..MAX_CLEANUP_INTERVAL ||
                 cleanupBatchSize !in 1..MAX_CLEANUP_BATCH_SIZE ||
                 maximumEventBytes !in MIN_EVENT_BYTES..MAX_EVENT_BYTES ||
+                maximumPendingAge !in MINIMUM_PENDING_AGE..MAXIMUM_PENDING_AGE ||
                 !kafka.isSafe()
             ) {
                 return false
             }
 
             val worstCaseDelivery = runCatching {
-                kafka.maximumBlock.multipliedBy(batchSize.toLong())
-                    .plus(kafka.deliveryTimeout)
+                kafka.maximumBlock.plus(kafka.deliveryTimeout)
+                    .multipliedBy(batchSize.toLong())
                     .plus(LEASE_SAFETY_MARGIN)
             }.getOrNull() ?: return false
             return leaseDuration in worstCaseDelivery..MAX_LEASE_DURATION
@@ -117,6 +119,8 @@ data class OutboxDeliveryProperties(
         val MIN_KAFKA_TIMEOUT: Duration = Duration.ofMillis(100)
         val MAX_KAFKA_TIMEOUT: Duration = Duration.ofMinutes(2)
         val MAX_LEASE_DURATION: Duration = Duration.ofMinutes(15)
+        val MINIMUM_PENDING_AGE: Duration = Duration.ofSeconds(10)
+        val MAXIMUM_PENDING_AGE: Duration = Duration.ofDays(1)
         val LEASE_SAFETY_MARGIN: Duration = Duration.ofSeconds(10)
         const val MAX_BATCH_SIZE = 100
         const val MAX_CLEANUP_BATCH_SIZE = 10_000

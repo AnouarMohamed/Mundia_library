@@ -18,8 +18,12 @@ SET next_attempt_at = created_at
 WHERE next_attempt_at IS NULL;
 
 ALTER TABLE outbox_event
-    ALTER COLUMN next_attempt_at SET NOT NULL,
-    ALTER COLUMN next_attempt_at SET DEFAULT CURRENT_TIMESTAMP,
+    ALTER COLUMN next_attempt_at SET NOT NULL;
+
+ALTER TABLE outbox_event
+    ALTER COLUMN next_attempt_at SET DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE outbox_event
     ADD CONSTRAINT ck_outbox_delivery_attempts
         CHECK (
             (delivery_attempts = 0 AND last_attempt_at IS NULL)

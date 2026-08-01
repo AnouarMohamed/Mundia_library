@@ -5,18 +5,48 @@ metadata:
 policies:
   - restrict-service-exposure.yaml
   - require-tls-ingress.yaml
+  - restrict-external-secrets.yaml
 resources:
   - tests/namespace.yaml
   - tests/unsafe-service.yaml
   - tests/secure-ingress.yaml
+  - tests/secret-namespaces.yaml
+  - tests/approved-runtime-external-secret.yaml
+  - tests/redirected-migration-secret.yaml
+variables: tests/values.yaml
 results:
   - policy: mundia-restrict-service-exposure
     rule: deny-nodeport-and-loadbalancer
-    resource: unsafe-service
+    resources: [unsafe-service]
     kind: Service
     result: fail
   - policy: mundia-require-tls-ingress
     rule: require-tls-for-every-host
-    resource: secure-ingress
+    resources: [secure-ingress]
     kind: Ingress
     result: pass
+  - policy: mundia-restrict-external-secrets
+    rule: require-platform-owned-namespace-store
+    resources: [circulation-mundia-service]
+    kind: ExternalSecret
+    result: pass
+  - policy: mundia-restrict-external-secrets
+    rule: require-exact-secret-targets
+    resources: [circulation-mundia-service]
+    kind: ExternalSecret
+    result: pass
+  - policy: mundia-restrict-external-secrets
+    rule: restrict-prod-runtime-secret-keys
+    resources: [circulation-mundia-service]
+    kind: ExternalSecret
+    result: pass
+  - policy: mundia-restrict-external-secrets
+    rule: require-exact-secret-targets
+    resources: [circulation-mundia-service-migration]
+    kind: ExternalSecret
+    result: fail
+  - policy: mundia-restrict-external-secrets
+    rule: restrict-migration-and-platform-secret-keys
+    resources: [circulation-mundia-service-migration]
+    kind: ExternalSecret
+    result: fail

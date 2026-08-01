@@ -3,6 +3,11 @@ variable "postgres_secret_arn" {
   description = "Secrets Manager ARN holding service-specific PostgreSQL URL/user/password."
 }
 
+variable "postgres_migration_secret_arn" {
+  type        = string
+  description = "Secrets Manager ARN holding dedicated short-lived schema-owner PostgreSQL credentials."
+}
+
 variable "kafka_secret_arn" {
   type        = string
   description = "Secrets Manager ARN holding TLS/SASL Kafka client material."

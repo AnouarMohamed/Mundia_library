@@ -63,16 +63,17 @@ module "cluster" {
 module "dependencies" {
   source = "../dependency-contract"
 
-  postgres_secret_arn       = var.dependency_contract.postgres_secret_arn
-  kafka_secret_arn          = var.dependency_contract.kafka_secret_arn
-  redis_secret_arn          = var.dependency_contract.redis_secret_arn
-  oidc_secret_arn           = var.dependency_contract.oidc_secret_arn
-  otel_secret_arn           = var.dependency_contract.otel_secret_arn
-  object_storage_bucket_arn = var.dependency_contract.object_storage_bucket_arn
-  opensearch_endpoint       = var.dependency_contract.opensearch_endpoint
-  oidc_issuer_url           = var.dependency_contract.oidc_issuer_url
-  oidc_jwks_url             = var.dependency_contract.oidc_jwks_url
-  otel_exporter_endpoint    = var.dependency_contract.otel_exporter_endpoint
+  postgres_secret_arn           = var.dependency_contract.postgres_secret_arn
+  postgres_migration_secret_arn = var.dependency_contract.postgres_migration_secret_arn
+  kafka_secret_arn              = var.dependency_contract.kafka_secret_arn
+  redis_secret_arn              = var.dependency_contract.redis_secret_arn
+  oidc_secret_arn               = var.dependency_contract.oidc_secret_arn
+  otel_secret_arn               = var.dependency_contract.otel_secret_arn
+  object_storage_bucket_arn     = var.dependency_contract.object_storage_bucket_arn
+  opensearch_endpoint           = var.dependency_contract.opensearch_endpoint
+  oidc_issuer_url               = var.dependency_contract.oidc_issuer_url
+  oidc_jwks_url                 = var.dependency_contract.oidc_jwks_url
+  otel_exporter_endpoint        = var.dependency_contract.otel_exporter_endpoint
 }
 
 data "aws_iam_policy_document" "external_secrets" {

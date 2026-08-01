@@ -7,6 +7,9 @@ env:
   APP_ENV: dev
   PORT: "8080"
   SPRING_FLYWAY_ENABLED: "false"
+  OUTBOX_DELIVERY_ENABLED: "true"
+  OUTBOX_KAFKA_SECURITY_PROTOCOL: SASL_SSL
+  OUTBOX_KAFKA_ALLOW_INSECURE_TRANSPORT: "false"
 externalSecret:
   targetName: circulation-runtime
   data:
@@ -28,8 +31,18 @@ externalSecret:
     - secretKey: AUTH_AUDIENCE
       remoteKey: mundia/dev/circulation/oidc
       property: audience
+    - secretKey: OUTBOX_KAFKA_BOOTSTRAP_SERVERS
+      remoteKey: mundia/dev/circulation/kafka
+      property: bootstrap_servers
+    - secretKey: OUTBOX_KAFKA_SASL_MECHANISM
+      remoteKey: mundia/dev/circulation/kafka
+      property: sasl_mechanism
+    - secretKey: OUTBOX_KAFKA_SASL_JAAS_CONFIG
+      remoteKey: mundia/dev/circulation/kafka
+      property: sasl_jaas_config
 migration:
-  enabled: true
+  enabled: false
+  managedByPlatform: true
   networkPolicy:
     enabled: true
     egressCidrs:

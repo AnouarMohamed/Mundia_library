@@ -6,10 +6,8 @@
   "engines": {
     "node": ">=24.17.0 <25"
   },
-  "allowScripts": {
-    "esbuild@0.28.1": true
-  },
   "scripts": {
+    "deps:build-native": "npm rebuild esbuild --ignore-scripts=false",
     "cli": "tsx src/cli.ts",
     "test": "tsx --test test/*.test.ts",
     "test:integration": "CIRCULATION_MIGRATION_REQUIRE_INTEGRATION=true tsx --test test/database.integration.test.ts",

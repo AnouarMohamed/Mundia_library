@@ -389,6 +389,29 @@ const TARGET_PHASE2_COLUMNS = [
   "circulation_loan.status:character varying(32):true",
   "circulation_loan.updated_at:timestamp with time zone:true",
   "circulation_loan.version:bigint:true",
+  "outbox_event.aggregate_id:uuid:true",
+  "outbox_event.aggregate_type:character varying(100):true",
+  "outbox_event.aggregate_version:bigint:true",
+  "outbox_event.blocked_at:timestamp with time zone:false",
+  "outbox_event.broker_offset:bigint:false",
+  "outbox_event.broker_partition:integer:false",
+  "outbox_event.broker_topic:character varying(249):false",
+  "outbox_event.created_at:timestamp with time zone:true",
+  "outbox_event.delivery_attempts:integer:true",
+  "outbox_event.event_type:character varying(160):true",
+  "outbox_event.event_version:integer:true",
+  "outbox_event.headers:jsonb:true",
+  "outbox_event.id:uuid:true",
+  "outbox_event.last_attempt_at:timestamp with time zone:false",
+  "outbox_event.last_error_code:character varying(64):false",
+  "outbox_event.lease_expires_at:timestamp with time zone:false",
+  "outbox_event.lease_owner:character varying(100):false",
+  "outbox_event.lease_token:uuid:false",
+  "outbox_event.next_attempt_at:timestamp with time zone:true",
+  "outbox_event.occurred_at:timestamp with time zone:true",
+  "outbox_event.payload:jsonb:true",
+  "outbox_event.published_at:timestamp with time zone:false",
+  "outbox_event.trace_id:character varying(64):false",
 ].sort();
 
 const REQUIRED_TARGET_CONSTRAINTS = new Set([
@@ -408,6 +431,11 @@ const REQUIRED_TARGET_CONSTRAINTS = new Set([
   "ck_circulation_fine_ledger_shape",
   "ck_circulation_fine_ledger_timestamps",
   "circulation_fine_ledger_entry_fine_id_fkey",
+  "ck_outbox_delivery_attempts",
+  "ck_outbox_delivery_lease",
+  "ck_outbox_delivery_publication",
+  "ck_outbox_delivery_blocked",
+  "ck_outbox_delivery_error_code",
 ]);
 const TARGET_FLYWAY_CHECKSUMS = [
   1_823_238_944,
@@ -415,6 +443,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   1_710_092_712,
   424_313_616,
   2_132_266_084,
+  136_632_738,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -437,7 +466,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     ORDER BY installed_rank
   `);
   if (
-    history.rows.length !== 5 ||
+    history.rows.length !== 6 ||
     history.rows.some(
       (row, index) =>
         row.version !== String(index + 1) ||
@@ -446,7 +475,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 5",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 6",
     );
   }
 
@@ -477,6 +506,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
+      "outbox_event",
     ],
   ]);
   const actualColumns = columns.rows
@@ -513,6 +543,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
+      "outbox_event",
     ],
   ]);
   const validConstraintNames = new Set(
@@ -592,7 +623,8 @@ async function lockTargetSchema(client: Client): Promise<void> {
       public.circulation_copy,
       public.circulation_loan,
       public.circulation_fine,
-      public.circulation_fine_ledger_entry
+      public.circulation_fine_ledger_entry,
+      public.outbox_event
     IN ACCESS SHARE MODE
   `);
 }

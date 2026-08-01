@@ -15,9 +15,11 @@ portable:
   stateless services.
 - External Secrets Operator is the only supported path from a cloud secret
   manager to short-lived Kubernetes Secrets.
-- Schema migrations run as isolated, digest-identical PreSync Jobs. Runtime
-  pods never receive schema-owner credentials, and a least-privilege cleanup
-  hook removes the migration ExternalSecret and target Secret before rollout.
+- Schema migrations run as isolated, digest-identical PreSync Jobs in a
+  separate `mundia-<environment>-migrations` namespace owned by the protected
+  platform Argo project. The workload project cannot create Jobs, RBAC, secret
+  stores, or resources in that namespace. A least-privilege cleanup hook removes
+  the migration ExternalSecret and target Secret before runtime rollout.
 - OpenTelemetry is the telemetry boundary. Applications do not depend on a
   vendor-specific agent.
 - Kyverno admission policies and Pod Security Admission reject common unsafe
@@ -83,6 +85,12 @@ private. Internet egress is denied by workload NetworkPolicies except for
 explicit TLS destinations; production should route unavoidable internet egress
 through an inspected egress gateway.
 
+Deleting the Kubernetes migration Secret is containment, not database
+credential revocation. The deployment pipeline must rotate or disable the
+schema-owner database credential after every migration run, wait for External
+Secrets deletion to complete, and record both actions. A failed cleanup or
+failed rotation blocks workload promotion.
+
 ## Environment isolation
 
 Dev, staging, and production are separate Terraform state roots and should use
@@ -137,7 +145,9 @@ review of the templates.
 5. Install Argo CD out of band using its verified upstream artifact, then apply
    only the matching root Application.
 6. Allow Argo CD to install the approved platform add-ons and policies before
-   application workloads.
+   application workloads. Sync the protected migration Application before its
+   matching runtime Application; never grant the workload project access to the
+   migration namespace.
 7. Provision managed data services through separate reviewed modules/pipelines,
    populate Secrets Manager, and pass only ARNs/endpoints through the dependency
    contract.

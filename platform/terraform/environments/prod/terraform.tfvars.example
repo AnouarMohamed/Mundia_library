@@ -26,6 +26,7 @@ configuration = {
 
   dependency_contract = {
     postgres_secret_arn         = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/prod/circulation/postgres"
+    postgres_migration_secret_arn = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/prod/circulation/postgres-migration"
     kafka_secret_arn            = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/prod/circulation/kafka"
     redis_secret_arn            = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/prod/circulation/redis"
     oidc_secret_arn             = "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:mundia/prod/circulation/oidc"

@@ -14,14 +14,27 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: mundia-prod
       server: https://kubernetes.default.svc
-  clusterResourceWhitelist:
+  # Workload Git can never create cluster-scoped resources or secret stores.
+  # Platform resources are owned by the separately protected platform project.
+  namespaceResourceWhitelist:
     - group: ""
-      kind: Namespace
+      kind: Service
+    - group: ""
+      kind: ServiceAccount
+    - group: apps
+      kind: Deployment
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
     - group: external-secrets.io
-      kind: ClusterSecretStore
-  namespaceResourceBlacklist:
-    - group: ""
-      kind: Secret
+      kind: ExternalSecret
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: policy
+      kind: PodDisruptionBudget
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -49,7 +62,18 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: monitoring
       server: https://kubernetes.default.svc
+    - namespace: mundia-dev
+      server: https://kubernetes.default.svc
+    - namespace: mundia-staging
+      server: https://kubernetes.default.svc
+    - namespace: mundia-prod
+      server: https://kubernetes.default.svc
+    - namespace: mundia-dev-migrations
+      server: https://kubernetes.default.svc
+    - namespace: mundia-staging-migrations
+      server: https://kubernetes.default.svc
+    - namespace: mundia-prod-migrations
+      server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"
-

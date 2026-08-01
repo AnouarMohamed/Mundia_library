@@ -1,8 +1,9 @@
-{{- if .Values.podDisruptionBudget.enabled }}
+{{- if and .Values.runtime.enabled .Values.podDisruptionBudget.enabled }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "mundia-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
 spec:

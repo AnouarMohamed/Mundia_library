@@ -164,8 +164,14 @@ docker compose --profile tools run --rm seed
 ### Production Docker Notes
 
 - Provide secrets through the platform secret manager, not image layers.
-- The runtime image sets `APP_ENV=production` and runs as an unprivileged user;
-  missing production configuration is a startup failure.
+- The runtime image sets `APP_ENV=production` and runs as an unprivileged user.
+- The web runtime is a digest-pinned distroless Node.js 24 image: it contains
+  neither a package manager nor a shell. Build tooling remains confined to the
+  discarded builder stages.
+- The circulation runtime is a digest-pinned Java 25 Alpine image with patched
+  OS libraries, no usable runtime shell or package manager, and a dedicated
+  unprivileged UID. Both runtime images are scanned in CI; missing production
+  configuration is a startup failure.
 - Use a managed PostgreSQL service for real production.
 - Put the app behind HTTPS.
 - Set `NEXTAUTH_URL` to the public HTTPS URL.

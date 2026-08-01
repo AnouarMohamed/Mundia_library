@@ -38,7 +38,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("com.google.protobuf:protobuf-java:${libs.versions.protobuf.get()}")
+    implementation("com.google.protobuf:protobuf-java:${libs.versions.protobuf.java.get()}")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.apache.kafka:kafka-clients")
 
@@ -62,7 +62,14 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.get()}"
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.java.get()}"
+    }
+    // Spring Boot configures the grpc generator when it reacts to the
+    // protobuf plugin. This contract currently defines messages only, but the
+    // generator artifact must still be exact rather than resolving `null`.
+    plugins {
+        maybeCreate("grpc").artifact =
+            "io.grpc:protoc-gen-grpc-java:${libs.versions.grpc.java.get()}"
     }
 }
 

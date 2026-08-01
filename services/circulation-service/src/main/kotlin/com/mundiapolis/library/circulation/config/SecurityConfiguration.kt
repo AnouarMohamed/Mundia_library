@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.JwtValidators
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration(proxyBeanMethods = false)
@@ -36,7 +37,10 @@ class SecurityConfiguration {
 
     @Bean
     fun jwtDecoder(properties: JwtProperties): JwtDecoder {
-        val decoder = NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri).build()
+        val decoder =
+            NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri)
+                .jwsAlgorithm(SignatureAlgorithm.RS256)
+                .build()
         val issuerValidator = JwtValidators.createDefaultWithIssuer(properties.issuer)
         val audienceValidator = OAuth2TokenValidator<Jwt> { jwt ->
             if (jwt.audience?.contains(properties.audience) == true) {
@@ -51,9 +55,26 @@ class SecurityConfiguration {
                 )
             }
         }
+        val typeValidator = OAuth2TokenValidator<Jwt> { jwt ->
+            if (jwt.headers["typ"] == "JWT") {
+                OAuth2TokenValidatorResult.success()
+            } else {
+                OAuth2TokenValidatorResult.failure(
+                    OAuth2Error(
+                        "invalid_token",
+                        "JWT typ header must be JWT",
+                        null,
+                    ),
+                )
+            }
+        }
 
         decoder.setJwtValidator(
-            DelegatingOAuth2TokenValidator(issuerValidator, audienceValidator),
+            DelegatingOAuth2TokenValidator(
+                issuerValidator,
+                audienceValidator,
+                typeValidator,
+            ),
         )
         return decoder
     }

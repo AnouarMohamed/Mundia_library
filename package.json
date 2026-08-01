@@ -5,12 +5,8 @@
   "engines": {
     "node": ">=24.17.0 <25"
   },
-  "allowScripts": {
-    "esbuild@0.28.1": true,
-    "fsevents": false,
-    "unrs-resolver@1.11.1": true
-  },
   "scripts": {
+    "deps:build-native": "npm rebuild esbuild sharp unrs-resolver --ignore-scripts=false",
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "next build",

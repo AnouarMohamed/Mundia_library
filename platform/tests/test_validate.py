@@ -44,6 +44,35 @@ class PlatformValidationTest(unittest.TestCase):
     def test_application_artifact_defaults_runtime_flyway_off(self) -> None:
         self.assertEqual([], VALIDATION.validate_service_migration_contract())
 
+    def test_workload_git_cannot_manage_platform_secret_or_rbac_boundaries(self) -> None:
+        self.assertEqual([], VALIDATION.validate_gitops_boundaries())
+
+    def test_suffixed_helm_resource_names_remain_valid_at_maximum_fullname(self) -> None:
+        result = subprocess.run(
+            [
+                "helm",
+                "template",
+                "long-release",
+                str(PLATFORM_ROOT / "helm" / "mundia-service"),
+                "--set",
+                f"fullnameOverride={'a' * 63}",
+            ],
+            cwd=PLATFORM_ROOT.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
+        documents, errors = VALIDATION.load_documents(result.stdout, "long-name chart")
+        self.assertEqual([], errors)
+        names = [
+            document.get("metadata", {}).get("name", "")
+            for document in documents
+            if document.get("metadata", {}).get("name")
+        ]
+        self.assertTrue(names)
+        self.assertFalse([name for name in names if len(name) > 63], names)
+
     def test_runtime_pods_never_receive_migration_credentials(self) -> None:
         for environment in VALIDATION.ENVIRONMENTS:
             with self.subTest(environment=environment):

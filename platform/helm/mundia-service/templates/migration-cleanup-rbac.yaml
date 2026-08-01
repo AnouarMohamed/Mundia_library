@@ -2,7 +2,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  name: {{ include "mundia-service.migrationCleanupName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration-cleanup
@@ -14,11 +15,13 @@ metadata:
     helm.sh/hook-weight: "-20"
     helm.sh/hook-delete-policy: before-hook-creation
 automountServiceAccountToken: false
+{{- if not .Values.migration.cleanup.rbacManagedByPlatform }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  name: {{ include "mundia-service.migrationCleanupName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration-cleanup
@@ -35,7 +38,7 @@ rules:
     resources:
       - externalsecrets
     resourceNames:
-      - {{ include "mundia-service.fullname" . }}-migration
+      - {{ include "mundia-service.migrationName" . }}
     verbs:
       - delete
   - apiGroups:
@@ -50,7 +53,8 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  name: {{ include "mundia-service.migrationCleanupName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration-cleanup
@@ -64,8 +68,10 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  name: {{ include "mundia-service.migrationCleanupName" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+    name: {{ include "mundia-service.migrationCleanupName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- end }}

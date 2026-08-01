@@ -225,10 +225,24 @@ const scrubUndefined = <T extends Record<string, unknown>>(value: T): T => {
 // Validate environment variables.
 const parsedEnv = envSchema.safeParse(envData);
 const isServer = typeof window === "undefined";
+const isProductionBuild =
+  process.env.NEXT_PHASE === "phase-production-build";
 
 if (isServer && process.env.NODE_ENV === "production" && !process.env.APP_ENV) {
   throw new Error(
     "APP_ENV must be explicitly set for a production runtime or production build",
+  );
+}
+
+if (
+  isServer &&
+  process.env.NODE_ENV === "production" &&
+  !isProductionBuild &&
+  process.env.APP_ENV !== "staging" &&
+  process.env.APP_ENV !== "production"
+) {
+  throw new Error(
+    "A production runtime requires APP_ENV=staging or APP_ENV=production",
   );
 }
 

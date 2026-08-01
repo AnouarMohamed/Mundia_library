@@ -31,10 +31,10 @@ class JooqOutboxDeliveryStore(
                 FROM outbox_event AS candidate
                 WHERE candidate.published_at IS NULL
                   AND candidate.blocked_at IS NULL
-                  AND candidate.next_attempt_at <= ?
+                  AND candidate.next_attempt_at <= CAST(? AS timestamp with time zone)
                   AND (
                       candidate.lease_expires_at IS NULL
-                      OR candidate.lease_expires_at <= ?
+                      OR candidate.lease_expires_at <= CAST(? AS timestamp with time zone)
                   )
                   AND NOT EXISTS (
                       SELECT 1
@@ -45,15 +45,15 @@ class JooqOutboxDeliveryStore(
                         AND earlier.published_at IS NULL
                   )
                 ORDER BY candidate.next_attempt_at, candidate.created_at, candidate.id
-                LIMIT ?
+                LIMIT CAST(? AS integer)
                 FOR UPDATE OF candidate SKIP LOCKED
             )
             UPDATE outbox_event AS event
             SET lease_owner = ?,
-                lease_token = ?,
-                lease_expires_at = ?,
+                lease_token = CAST(? AS uuid),
+                lease_expires_at = CAST(? AS timestamp with time zone),
                 delivery_attempts = event.delivery_attempts + 1,
-                last_attempt_at = ?
+                last_attempt_at = CAST(? AS timestamp with time zone)
             FROM candidates
             WHERE event.id = candidates.id
             RETURNING
@@ -111,7 +111,7 @@ class JooqOutboxDeliveryStore(
         dsl.execute(
             """
             UPDATE outbox_event
-            SET published_at = ?,
+            SET published_at = CAST(? AS timestamp with time zone),
                 broker_topic = ?,
                 broker_partition = ?,
                 broker_offset = ?,
@@ -119,11 +119,11 @@ class JooqOutboxDeliveryStore(
                 lease_token = NULL,
                 lease_expires_at = NULL,
                 last_error_code = NULL
-            WHERE id = ?
+            WHERE id = CAST(? AS uuid)
               AND published_at IS NULL
               AND blocked_at IS NULL
               AND lease_owner = ?
-              AND lease_token = ?
+              AND lease_token = CAST(? AS uuid)
             """.trimIndent(),
             publishedAt.toOffsetDateTime(),
             acknowledgement.topic,
@@ -151,13 +151,13 @@ class JooqOutboxDeliveryStore(
                 lease_token = NULL,
                 lease_expires_at = NULL,
                 last_error_code = ?,
-                next_attempt_at = ?,
-                blocked_at = CASE WHEN ? THEN ? ELSE NULL END
-            WHERE id = ?
+                next_attempt_at = CAST(? AS timestamp with time zone),
+                blocked_at = CASE WHEN CAST(? AS boolean) THEN CAST(? AS timestamp with time zone) ELSE NULL END
+            WHERE id = CAST(? AS uuid)
               AND published_at IS NULL
               AND blocked_at IS NULL
               AND lease_owner = ?
-              AND lease_token = ?
+              AND lease_token = CAST(? AS uuid)
             RETURNING blocked_at
             """.trimIndent(),
             code.name,
@@ -185,9 +185,9 @@ class JooqOutboxDeliveryStore(
             WHERE id IN (
                 SELECT id
                 FROM outbox_event
-                WHERE published_at < ?
+                WHERE published_at < CAST(? AS timestamp with time zone)
                 ORDER BY published_at, id
-                LIMIT ?
+                LIMIT CAST(? AS integer)
             )
             """.trimIndent(),
             cutoff.toOffsetDateTime(),
@@ -204,7 +204,7 @@ class JooqOutboxDeliveryStore(
                 COUNT(*) FILTER (
                     WHERE published_at IS NULL
                       AND blocked_at IS NULL
-                      AND lease_expires_at > ?
+                      AND lease_expires_at > CAST(? AS timestamp with time zone)
                 ) AS leased,
                 COUNT(*) FILTER (WHERE blocked_at IS NOT NULL) AS blocked,
                 MIN(created_at) FILTER (

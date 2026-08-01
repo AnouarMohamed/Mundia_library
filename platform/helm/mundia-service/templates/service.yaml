@@ -1,7 +1,9 @@
+{{- if .Values.runtime.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "mundia-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
 spec:
@@ -13,3 +15,4 @@ spec:
       port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
+{{- end }}

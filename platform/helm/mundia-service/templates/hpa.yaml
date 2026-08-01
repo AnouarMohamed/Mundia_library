@@ -1,8 +1,9 @@
-{{- if .Values.autoscaling.enabled }}
+{{- if and .Values.runtime.enabled .Values.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "mundia-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
 spec:
@@ -28,4 +29,3 @@ spec:
           type: Utilization
           averageUtilization: {{ .Values.autoscaling.memoryTargetUtilization }}
 {{- end }}
-

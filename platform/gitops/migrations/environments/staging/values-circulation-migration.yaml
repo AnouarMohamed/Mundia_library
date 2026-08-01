@@ -1,0 +1,33 @@
+environment: staging
+runtime:
+  enabled: false
+image:
+  repository: REPLACE_APPROVED_REGISTRY/mundiapolis/circulation-service
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+externalSecret:
+  enabled: false
+migration:
+  enabled: true
+  managedByPlatform: true
+  networkPolicy:
+    egressCidrs:
+      - cidr: 10.50.0.0/16
+        ports:
+          - protocol: TCP
+            port: 5432
+  cleanup:
+    rbacManagedByPlatform: false
+    apiServerCidrs:
+      - REPLACE_STAGING_KUBERNETES_API_SERVICE_IP/32
+  externalSecret:
+    targetName: circulation-migration
+    data:
+      - secretKey: DATABASE_MIGRATION_URL
+        remoteKey: mundia/staging/circulation/postgres-migration
+        property: jdbc_url
+      - secretKey: DATABASE_MIGRATION_USERNAME
+        remoteKey: mundia/staging/circulation/postgres-migration
+        property: username
+      - secretKey: DATABASE_MIGRATION_PASSWORD
+        remoteKey: mundia/staging/circulation/postgres-migration
+        property: password

@@ -69,6 +69,7 @@ app:
     cleanup-interval: ${OUTBOX_CLEANUP_INTERVAL:PT1H}
     cleanup-batch-size: ${OUTBOX_CLEANUP_BATCH_SIZE:1000}
     maximum-event-bytes: ${OUTBOX_MAXIMUM_EVENT_BYTES:262144}
+    maximum-pending-age: ${OUTBOX_MAXIMUM_PENDING_AGE:PT5M}
     kafka:
       bootstrap-servers: ${OUTBOX_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
       security-protocol: ${OUTBOX_KAFKA_SECURITY_PROTOCOL:SASL_SSL}

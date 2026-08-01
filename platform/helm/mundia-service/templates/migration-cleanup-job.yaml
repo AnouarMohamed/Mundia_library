@@ -2,7 +2,8 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "mundia-service.fullname" . }}-migration-cleanup
+  name: {{ include "mundia-service.migrationCleanupName" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
     app.kubernetes.io/component: migration-cleanup
@@ -25,7 +26,7 @@ spec:
         {{- include "mundia-service.labels" . | nindent 8 }}
         app.kubernetes.io/component: migration-cleanup
     spec:
-      serviceAccountName: {{ include "mundia-service.fullname" . }}-migration-cleanup
+      serviceAccountName: {{ include "mundia-service.migrationCleanupName" . }}
       automountServiceAccountToken: false
       enableServiceLinks: false
       restartPolicy: Never
@@ -53,7 +54,7 @@ spec:
                   apiVersion: v1
                   fieldPath: metadata.namespace
             - name: MIGRATION_EXTERNAL_SECRET_NAME
-              value: {{ include "mundia-service.fullname" . }}-migration
+              value: {{ include "mundia-service.migrationName" . }}
             - name: MIGRATION_SECRET_NAME
               value: {{ .Values.migration.externalSecret.targetName }}
           resources:

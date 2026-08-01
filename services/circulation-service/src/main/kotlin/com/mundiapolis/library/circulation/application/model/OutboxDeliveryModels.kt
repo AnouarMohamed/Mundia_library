@@ -60,3 +60,15 @@ enum class OutboxFailureDisposition {
     BLOCKED,
     CLAIM_LOST,
 }
+
+data class OutboxDeliveryCycle(
+    val claimed: Int,
+    val published: Int,
+    val retryScheduled: Int,
+    val blocked: Int,
+    val claimLost: Int,
+)
+
+class BrokerPublishException(
+    val failureCode: OutboxFailureCode,
+) : RuntimeException("Broker publish failed")

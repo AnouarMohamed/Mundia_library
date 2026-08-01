@@ -7,6 +7,7 @@ import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.gen
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.OUTBOX_EVENT
 import com.mundiapolis.library.circulation.application.model.CommandPrincipal
+import com.mundiapolis.library.circulation.application.model.BrokerPublishAcknowledgement
 import com.mundiapolis.library.circulation.application.model.DuplicatePaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.FineBalanceConflictException
 import com.mundiapolis.library.circulation.application.model.FineNarrative
@@ -28,6 +29,7 @@ import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUse
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
+import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import com.mundiapolis.library.circulation.domain.model.FineLedgerEntryType
 import com.mundiapolis.library.circulation.domain.model.FineStatus
@@ -112,6 +114,9 @@ class CirculationPhase2IntegrationTest {
     @Autowired
     private lateinit var transactionRunner: TransactionRunner
 
+    @Autowired
+    private lateinit var outboxDeliveryStore: OutboxDeliveryStore
+
     @BeforeEach
     fun cleanCommandData() {
         dsl.execute("ALTER TABLE circulation_fine_ledger_entry DISABLE TRIGGER USER")
@@ -133,6 +138,73 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `expired outbox lease is replayed and stale owner cannot acknowledge it`() {
+        createActiveLoan(MemberId(UUID.randomUUID()))
+        val claimTime = Instant.now().plusSeconds(5)
+        val firstClaim =
+            outboxDeliveryStore.claimBatch(
+                owner = "publisher-a",
+                now = claimTime,
+                leaseExpiresAt = claimTime.plusSeconds(30),
+                batchSize = 10,
+            )
+        assertThat(firstClaim).hasSize(1)
+
+        assertThat(
+            outboxDeliveryStore.claimBatch(
+                owner = "publisher-b",
+                now = claimTime.plusSeconds(1),
+                leaseExpiresAt = claimTime.plusSeconds(31),
+                batchSize = 10,
+            ),
+        ).isEmpty()
+
+        val replay =
+            outboxDeliveryStore.claimBatch(
+                owner = "publisher-b",
+                now = claimTime.plusSeconds(31),
+                leaseExpiresAt = claimTime.plusSeconds(61),
+                batchSize = 10,
+            ).single()
+        assertThat(replay.id).isEqualTo(firstClaim.single().id)
+        assertThat(replay.leaseToken).isNotEqualTo(firstClaim.single().leaseToken)
+        assertThat(replay.deliveryAttempt).isEqualTo(2)
+
+        val acknowledgement =
+            BrokerPublishAcknowledgement(
+                topic = "mundia.circulation.events.v1",
+                partition = 0,
+                offset = 1,
+            )
+        assertThat(
+            outboxDeliveryStore.markPublished(
+                owner = "publisher-a",
+                event = firstClaim.single(),
+                acknowledgement = acknowledgement,
+                publishedAt = claimTime.plusSeconds(32),
+            ),
+        ).isFalse()
+        assertThat(
+            outboxDeliveryStore.markPublished(
+                owner = "publisher-b",
+                event = replay,
+                acknowledgement = acknowledgement,
+                publishedAt = claimTime.plusSeconds(32),
+            ),
+        ).isTrue()
+
+        val nextAggregateVersion =
+            outboxDeliveryStore.claimBatch(
+                owner = "publisher-b",
+                now = claimTime.plusSeconds(33),
+                leaseExpiresAt = claimTime.plusSeconds(63),
+                batchSize = 10,
+            ).single()
+        assertThat(nextAggregateVersion.aggregateVersion)
+            .isGreaterThan(replay.aggregateVersion)
+    }
+
+    @Test
     fun `renewal is member-bound idempotent serialized and policy limited`() {
         val memberId = MemberId(UUID.randomUUID())
         val active = createActiveLoan(memberId)
@@ -142,8 +214,16 @@ class CirculationPhase2IntegrationTest {
             with(jwtFor("wrong-member", RENEW_SCOPE, UUID.randomUUID()))
             header(IDEMPOTENCY_HEADER, "renew-cross-member-${UUID.randomUUID()}")
         }.andExpect {
-            status { isForbidden() }
-            jsonPath("$.code") { value("member_access_denied") }
+            status { isNotFound() }
+            jsonPath("$.code") { value("loan_not_found") }
+        }
+
+        mockMvc.post("$LOANS_PATH/${UUID.randomUUID()}/renew") {
+            with(jwtFor("wrong-member", RENEW_SCOPE, UUID.randomUUID()))
+            header(IDEMPOTENCY_HEADER, "renew-missing-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("loan_not_found") }
         }
 
         val renewals = runOneHundredConcurrently {

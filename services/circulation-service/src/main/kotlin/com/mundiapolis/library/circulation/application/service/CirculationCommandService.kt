@@ -194,7 +194,9 @@ class CirculationCommandService(
         val authenticatedMembership = principal.membershipId
             ?: throw MissingMembershipClaimException()
         if (authenticatedMembership != loan.memberId) {
-            throw MemberAccessDeniedException()
+            // A self-service caller must not be able to distinguish another
+            // member's loan identifier from one that does not exist.
+            throw LoanNotFoundException(loan.id)
         }
     }
 

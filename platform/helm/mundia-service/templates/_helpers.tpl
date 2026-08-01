@@ -10,6 +10,22 @@
 {{- end }}
 {{- end }}
 
+{{- define "mundia-service.suffixedName" -}}
+{{- $root := index . 0 -}}
+{{- $suffix := index . 1 -}}
+{{- $maximumBaseLength := int (sub 62 (len $suffix)) -}}
+{{- $base := include "mundia-service.fullname" $root | trunc $maximumBaseLength | trimSuffix "-" -}}
+{{- printf "%s-%s" $base $suffix | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{- define "mundia-service.migrationName" -}}
+{{- include "mundia-service.suffixedName" (list . "migration") -}}
+{{- end }}
+
+{{- define "mundia-service.migrationCleanupName" -}}
+{{- include "mundia-service.suffixedName" (list . "migration-cleanup") -}}
+{{- end }}
+
 {{- define "mundia-service.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" }}
 app.kubernetes.io/name: {{ include "mundia-service.name" . }}
@@ -39,30 +55,33 @@ app.kubernetes.io/component: runtime
 {{- end }}
 
 {{- define "mundia-service.migrationServiceAccountName" -}}
-{{- default (printf "%s-migration" (include "mundia-service.fullname" .)) .Values.migration.serviceAccount.name }}
+{{- default (include "mundia-service.migrationName" .) .Values.migration.serviceAccount.name }}
 {{- end }}
 
 {{- define "mundia-service.validate" -}}
+{{- if and (not .Values.runtime.enabled) (not .Values.migration.enabled) }}
+{{- fail "at least one of runtime.enabled or migration.enabled must be true" }}
+{{- end }}
 {{- if not (regexMatch "^sha256:[a-f0-9]{64}$" .Values.image.digest) }}
 {{- fail "image.digest must be an immutable sha256 digest" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (lt (int .Values.replicaCount) 3) }}
+{{- if and .Values.runtime.enabled (eq .Values.environment "prod") (lt (int .Values.replicaCount) 3) }}
 {{- fail "production requires at least three replicas" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (not .Values.autoscaling.enabled) }}
+{{- if and .Values.runtime.enabled (eq .Values.environment "prod") (not .Values.autoscaling.enabled) }}
 {{- fail "production requires autoscaling" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (not .Values.podDisruptionBudget.enabled) }}
+{{- if and .Values.runtime.enabled (eq .Values.environment "prod") (not .Values.podDisruptionBudget.enabled) }}
 {{- fail "production requires a PodDisruptionBudget" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (not .Values.networkPolicy.enabled) }}
+{{- if and .Values.runtime.enabled (eq .Values.environment "prod") (not .Values.networkPolicy.enabled) }}
 {{- fail "production requires a NetworkPolicy" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (not .Values.externalSecret.enabled) }}
+{{- if and .Values.runtime.enabled (eq .Values.environment "prod") (not .Values.externalSecret.enabled) }}
 {{- fail "production requires External Secrets" }}
 {{- end }}
-{{- if and (eq .Values.environment "prod") (not .Values.migration.enabled) }}
-{{- fail "production requires the pre-sync migration Job" }}
+{{- if and .Values.runtime.enabled (not .Values.migration.enabled) (not .Values.migration.managedByPlatform) }}
+{{- fail "runtime-only releases must declare migration.managedByPlatform=true" }}
 {{- end }}
 {{- if .Values.migration.enabled }}
 {{- if not .Values.migration.externalSecret.enabled }}
@@ -95,22 +114,24 @@ app.kubernetes.io/component: runtime
 {{- fail "migration cleanup may not use unrestricted API-server egress" }}
 {{- end }}
 {{- end }}
-{{- if eq .Values.externalSecret.targetName .Values.migration.externalSecret.targetName }}
+{{- if and .Values.runtime.enabled (eq .Values.externalSecret.targetName .Values.migration.externalSecret.targetName) }}
 {{- fail "runtime and migration ExternalSecrets must have different target names" }}
 {{- end }}
-{{- if ne (index .Values.env "SPRING_FLYWAY_ENABLED" | toString) "false" }}
+{{- if and .Values.runtime.enabled (ne (index .Values.env "SPRING_FLYWAY_ENABLED" | toString) "false") }}
 {{- fail "runtime pods must set SPRING_FLYWAY_ENABLED=false when migration mode is enabled" }}
 {{- end }}
-{{- if hasKey .Values.env "APP_MIGRATION_ONLY" }}
+{{- if and .Values.runtime.enabled (hasKey .Values.env "APP_MIGRATION_ONLY") }}
 {{- fail "APP_MIGRATION_ONLY belongs only on the migration Job" }}
 {{- end }}
 {{- end }}
-{{- if and .Values.ingress.enabled (empty .Values.ingress.tls) }}
+{{- if and .Values.runtime.enabled .Values.ingress.enabled (empty .Values.ingress.tls) }}
 {{- fail "an enabled ingress requires TLS configuration" }}
 {{- end }}
+{{- if .Values.runtime.enabled }}
 {{- range .Values.networkPolicy.egressCidrs }}
 {{- if and (eq $.Values.environment "prod") (eq .cidr "0.0.0.0/0") }}
 {{- fail "production NetworkPolicy may not allow 0.0.0.0/0" }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

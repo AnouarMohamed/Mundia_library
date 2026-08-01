@@ -17,7 +17,7 @@ item needs an owner, evidence, and approval before a production apply.
 | Redis | product/tier, TLS/auth, failover, eviction policy, cache-loss behavior | data/SRE |
 | Object storage | buckets, KMS keys, versioning, lifecycle, malware/quarantine workflow | security/platform |
 | OpenSearch | private domain, TLS/auth, capacity, index lifecycle, rebuild procedure | search/SRE |
-| External Secrets | approved chart and digest, secret path policy, rotation and revocation test | security/platform |
+| External Secrets | approved chart and digest, exact secret path/target admission policy, namespace-isolated migration credential, cleanup plus database-side rotation/revocation test | security/platform/data |
 | Telemetry | backend, TLS/auth, PII filtering, retention, sampling, alert ownership | SRE/security |
 | Add-ons | verified versions/digests for Argo CD, CNI, DNS, CSI, ingress, cert-manager, OTel, Kyverno | platform |
 | Capacity | measured workload model, pod requests/limits, DB pools, broker partitions, 2×/5× tests | performance/SRE |
@@ -38,4 +38,3 @@ item needs an owner, evidence, and approval before a production apply.
 - Production has tested backups and a timed restore, not merely enabled
   backups.
 - SLO alerts and dashboards page an accountable team before public traffic.
-

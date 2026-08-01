@@ -69,7 +69,7 @@ class ProtobufOutboxEventEncoder(
 
     private fun encodeLoan(event: ClaimedOutboxEvent, payload: JsonNode): LoanEvent {
         requireContract(payload.isObject)
-        requireContract(payload.fieldNames().asSequence().all(LOAN_PAYLOAD_FIELDS::contains))
+        requireContract(payload.propertyNames().all(LOAN_PAYLOAD_FIELDS::contains))
 
         val loanId = payload.requiredUuid("loanId")
         val status = payload.requiredText("status").toLoanStatus()
@@ -98,7 +98,7 @@ class ProtobufOutboxEventEncoder(
 
     private fun encodeFine(event: ClaimedOutboxEvent, payload: JsonNode): FineEvent {
         requireContract(payload.isObject)
-        requireContract(payload.fieldNames().asSequence().all(FINE_PAYLOAD_FIELDS::contains))
+        requireContract(payload.propertyNames().all(FINE_PAYLOAD_FIELDS::contains))
 
         val fineId = payload.requiredUuid("fineId")
         val fineVersion = payload.requiredNonNegativeLong("fineVersion")
@@ -137,8 +137,8 @@ class ProtobufOutboxEventEncoder(
 
     private fun JsonNode.requiredText(field: String): String {
         val value = get(field)
-        requireContract(value != null && value.isTextual)
-        val text = value.textValue()
+        requireContract(value != null && value.isString)
+        val text = value.stringValue()
         requireContract(text.isNotBlank() && text.length <= MAX_TEXT_LENGTH && text.none(Char::isISOControl))
         return text
     }
@@ -147,7 +147,7 @@ class ProtobufOutboxEventEncoder(
         val raw = requiredText(field)
         val value = runCatching { UUID.fromString(raw) }.getOrNull()
         requireContract(value != null && value.toString() == raw.lowercase())
-        return value
+        return requireNotNull(value)
     }
 
     private fun JsonNode.optionalUuid(field: String): UUID? =
@@ -169,8 +169,8 @@ class ProtobufOutboxEventEncoder(
         if (value.isNull) {
             return null
         }
-        requireContract(value.isTextual)
-        val text = value.textValue()
+        requireContract(value.isString)
+        val text = value.stringValue()
         requireContract(text.isNotBlank() && text.length <= MAX_TEXT_LENGTH && text.none(Char::isISOControl))
         return text
     }

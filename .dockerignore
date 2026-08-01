@@ -1,7 +1,13 @@
 .git
 .gitignore
+.github
+.agents
+.cursor
 .next
 node_modules
+**/node_modules
+**/build
+**/.gradle
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
@@ -10,6 +16,11 @@ pnpm-debug.log*
 .vercel
 coverage
 dist
+docs
+platform
+release
+services
+tools
 *.tsbuildinfo
 .devrun.log
 screenshots

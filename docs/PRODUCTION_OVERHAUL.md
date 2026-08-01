@@ -37,7 +37,7 @@ The detailed decisions are in
 
 ## Implemented checkpoint
 
-As of 2026-07-26, Phase 0 containment and the first circulation vertical slice
+As of 2026-08-01, Phase 0 containment and the first circulation vertical slice
 are implemented in the repository:
 
 - The legacy application uses transaction-capable PostgreSQL everywhere,
@@ -53,15 +53,24 @@ are implemented in the repository:
   production reject legacy credentials. Real tenant integration, privileged
   MFA, recovery, logout, and adversarial provider tests remain release gates.
 - `services/circulation-service` implements request, deterministic copy
-  allocation/approval, and return as caller-bound idempotent commands. State,
-  exact replay results, and versioned outbox events commit atomically.
+  allocation/approval, return, and renewal as caller-bound idempotent commands.
+  State, exact replay results, and versioned outbox events commit atomically.
 - The service validates issuer, audience, and scopes, binds self-service
   requests to a UUID membership claim, isolates idempotency by authenticated
   actor/client, and has real PostgreSQL 18 tests for 100-way command races and
   cross-principal replay isolation.
+- The circulation outbox now has crash-recoverable leasing, bounded retries,
+  poison-event blocking, Protobuf v1 encoding, synchronous Kafka acknowledgement,
+  lag/blocked health and metrics, retention cleanup, and a lease-expiry recovery
+  integration test. Delivery remains correctly classified as at least once.
+- GitOps now isolates runtime, platform, and migration layers. Schema-owner
+  credentials and Jobs live in protected `*-migrations` namespaces; the
+  workload Argo project cannot manage Jobs, RBAC, secret stores, or those
+  namespaces. Admission policy fixes approved secret names, remote keys, stores,
+  and target Secret names.
 
 This checkpoint is not general availability. The platform/IdP, complete
-circulation domain, event relay/inboxes, remaining domain extractions, data
+circulation domain, consumer inboxes, remaining domain extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.
 

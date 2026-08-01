@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const managedKeys = [
   "NODE_ENV",
+  "NEXT_PHASE",
   "APP_ENV",
   "DATABASE_URL",
   "AUTH_SECRET",
@@ -69,6 +70,27 @@ describe.sequential("production configuration", () => {
     await expect(import("@/lib/config")).rejects.toThrow(
       /APP_ENV must be explicitly set/,
     );
+  });
+
+  it.each(["development", "test"])(
+    "rejects APP_ENV=%s in a production runtime",
+    async (appEnvironment) => {
+      process.env.NODE_ENV = "production";
+      process.env.APP_ENV = appEnvironment;
+      delete process.env.NEXT_PHASE;
+
+      await expect(import("@/lib/config")).rejects.toThrow(
+        /production runtime requires APP_ENV=staging or APP_ENV=production/,
+      );
+    },
+  );
+
+  it("permits an explicit local tier only during the Next production build phase", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.APP_ENV = "development";
+    process.env.NEXT_PHASE = "phase-production-build";
+
+    await expect(import("@/lib/config")).resolves.toBeDefined();
   });
 
   it("rejects production without distributed rate-limit storage", async () => {

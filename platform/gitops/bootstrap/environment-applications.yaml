@@ -1,6 +1,54 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  name: mundia-dev-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/platform/environments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-dev-migrations
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/migrations/environments/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-dev-migrations
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
   name: mundia-dev
   namespace: argocd
   finalizers:
@@ -22,6 +70,54 @@ spec:
       - CreateNamespace=false
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-staging-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/platform/environments/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-staging-migrations
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/migrations/environments/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-staging-migrations
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -51,6 +147,54 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  name: mundia-prod-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/platform/environments/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-prod
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mundia-prod-migrations
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-addons
+  source:
+    repoURL: REPLACE_GIT_REPOSITORY_URL
+    targetRevision: REPLACE_REVIEWED_GIT_COMMIT_SHA
+    path: platform/gitops/migrations/environments/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mundia-prod-migrations
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
   name: mundia-prod
   namespace: argocd
   finalizers:
@@ -72,4 +216,3 @@ spec:
       - CreateNamespace=false
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
-

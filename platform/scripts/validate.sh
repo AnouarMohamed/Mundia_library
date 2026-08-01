@@ -47,6 +47,12 @@ for environment in dev staging prod; do
     --namespace "mundia-${environment}" \
     -f "platform/gitops/environments/${environment}/values-circulation.yaml" \
     >/dev/null
+  helm lint platform/helm/mundia-service \
+    -f "platform/gitops/migrations/environments/${environment}/values-circulation-migration.yaml"
+  helm template circulation platform/helm/mundia-service \
+    --namespace "mundia-${environment}-migrations" \
+    -f "platform/gitops/migrations/environments/${environment}/values-circulation-migration.yaml" \
+    >/dev/null
 done
 
 if command -v terraform >/dev/null 2>&1; then
@@ -59,9 +65,14 @@ fi
 
 if command -v kubeconform >/dev/null 2>&1; then
   for environment in dev staging prod; do
-    kubectl kustomize --enable-helm \
-      "platform/gitops/environments/${environment}" |
-      kubeconform -strict -summary -ignore-missing-schemas
+    for render_path in \
+      "platform/gitops/platform/environments/${environment}" \
+      "platform/gitops/migrations/environments/${environment}" \
+      "platform/gitops/environments/${environment}"; do
+      kubectl kustomize --enable-helm \
+        "${render_path}" |
+        kubeconform -strict -summary -ignore-missing-schemas
+    done
   done
 else
   echo "notice: kubeconform is unavailable; Kubernetes schema check skipped" >&2

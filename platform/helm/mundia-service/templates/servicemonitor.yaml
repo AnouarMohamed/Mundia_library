@@ -1,8 +1,9 @@
-{{- if .Values.observability.serviceMonitor.enabled }}
+{{- if and .Values.runtime.enabled .Values.observability.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "mundia-service.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "mundia-service.labels" . | nindent 4 }}
 spec:
@@ -16,4 +17,3 @@ spec:
       scrapeTimeout: {{ .Values.observability.serviceMonitor.scrapeTimeout }}
       scheme: http
 {{- end }}
-
