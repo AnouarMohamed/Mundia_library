@@ -3,6 +3,7 @@ package com.mundiapolis.library.circulation
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_COPY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_IDEMPOTENCY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_MEMBER_ELIGIBILITY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.OUTBOX_EVENT
 import com.mundiapolis.library.circulation.application.model.CommandExecution
 import com.mundiapolis.library.circulation.application.model.CommandPrincipal
@@ -91,10 +92,32 @@ class CirculationServiceIntegrationTest {
 
     @BeforeEach
     fun cleanCommandData() {
-        dsl.deleteFrom(OUTBOX_EVENT).execute()
-        dsl.deleteFrom(CIRCULATION_IDEMPOTENCY).execute()
-        dsl.deleteFrom(CIRCULATION_LOAN).execute()
-        dsl.deleteFrom(CIRCULATION_COPY).execute()
+        dsl.execute("ALTER TABLE circulation_fine_ledger_entry DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_inventory_audit_entry DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_consumer_inbox DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_member_eligibility DISABLE TRIGGER USER")
+        try {
+            dsl.execute(
+                """
+                TRUNCATE TABLE
+                    circulation_fine_ledger_entry,
+                    circulation_fine,
+                    circulation_inventory_audit_entry,
+                    circulation_consumer_inbox,
+                    circulation_member_eligibility,
+                    outbox_event,
+                    circulation_idempotency,
+                    circulation_inventory_idempotency,
+                    circulation_loan,
+                    circulation_copy
+                """.trimIndent(),
+            )
+        } finally {
+            dsl.execute("ALTER TABLE circulation_fine_ledger_entry ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_inventory_audit_entry ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_consumer_inbox ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_member_eligibility ENABLE TRIGGER USER")
+        }
     }
 
     @Test
@@ -157,6 +180,7 @@ class CirculationServiceIntegrationTest {
         val editionId = UUID.randomUUID()
         val requestBody = requestJson(memberId, editionId)
         val key = "request-http-${UUID.randomUUID()}"
+        seedEligible(MemberId(memberId))
 
         mockMvc.post(LOANS_PATH) {
             contentType = MediaType.APPLICATION_JSON
@@ -256,6 +280,7 @@ class CirculationServiceIntegrationTest {
     fun `self service membership claim fails closed while staff scope permits on behalf`() {
         val targetMemberId = UUID.randomUUID()
         val requestBody = requestJson(targetMemberId, UUID.randomUUID())
+        seedEligible(MemberId(targetMemberId))
 
         mockMvc.post(LOANS_PATH) {
             with(jwtFor("missing-claim-user", REQUEST_SCOPE))
@@ -315,7 +340,7 @@ class CirculationServiceIntegrationTest {
                 memberId = memberId,
                 editionId = EditionId(UUID.randomUUID()),
                 idempotencyKey = IdempotencyKey.parse("request-http-reject-${UUID.randomUUID()}"),
-                principal = selfPrincipal(memberId, "http-rejected-member"),
+                principal = eligibleSelfPrincipal(memberId, "http-rejected-member"),
             ),
         )
         val path = "$LOANS_PATH/${requested.result.loanId.value}/reject"
@@ -373,7 +398,7 @@ class CirculationServiceIntegrationTest {
                 memberId = memberId,
                 editionId = EditionId(UUID.randomUUID()),
                 idempotencyKey = IdempotencyKey.parse("request-http-cancel-${UUID.randomUUID()}"),
-                principal = selfPrincipal(memberId, "http-cancel-member"),
+                principal = eligibleSelfPrincipal(memberId, "http-cancel-member"),
             ),
         )
         val path = "$LOANS_PATH/${requested.result.loanId.value}/cancel"
@@ -426,7 +451,7 @@ class CirculationServiceIntegrationTest {
                 memberId = delegatedMember,
                 editionId = EditionId(UUID.randomUUID()),
                 idempotencyKey = IdempotencyKey.parse("request-staff-cancel-${UUID.randomUUID()}"),
-                principal = selfPrincipal(delegatedMember, "delegated-member"),
+                principal = eligibleSelfPrincipal(delegatedMember, "delegated-member"),
             ),
         )
         mockMvc.post("$LOANS_PATH/${delegatedRequest.result.loanId.value}/cancel") {
@@ -449,6 +474,8 @@ class CirculationServiceIntegrationTest {
         val secondMemberId = UUID.randomUUID()
         val firstBody = requestJson(firstMemberId, UUID.randomUUID())
         val secondBody = requestJson(secondMemberId, UUID.randomUUID())
+        seedEligible(MemberId(firstMemberId))
+        seedEligible(MemberId(secondMemberId))
 
         val firstResponse = mockMvc.post(LOANS_PATH) {
             with(jwtFor("principal-one", REQUEST_SCOPE, firstMemberId, "web-client-one"))
@@ -497,6 +524,7 @@ class CirculationServiceIntegrationTest {
         val memberId = UUID.randomUUID()
         val body = requestJson(memberId, UUID.randomUUID())
         val sharedKey = "cross-principal-replay-${UUID.randomUUID()}"
+        seedEligible(MemberId(memberId))
 
         mockMvc.post(LOANS_PATH) {
             with(jwtFor("staff-principal-one", ON_BEHALF_SCOPE))
@@ -532,7 +560,7 @@ class CirculationServiceIntegrationTest {
                 memberId = memberId,
                 editionId = editionId,
                 idempotencyKey = IdempotencyKey.parse("request-no-copy-${UUID.randomUUID()}"),
-                principal = selfPrincipal(memberId, "no-copy-member"),
+                principal = eligibleSelfPrincipal(memberId, "no-copy-member"),
             ),
         )
         val approveKey = IdempotencyKey.parse("approve-no-copy-${UUID.randomUUID()}")
@@ -573,7 +601,7 @@ class CirculationServiceIntegrationTest {
                 memberId = memberId,
                 editionId = EditionId(UUID.randomUUID()),
                 idempotencyKey = IdempotencyKey.parse("request-rejection-${UUID.randomUUID()}"),
-                principal = selfPrincipal(memberId, "rejected-member"),
+                principal = eligibleSelfPrincipal(memberId, "rejected-member"),
             ),
         )
         val rejectionKey = IdempotencyKey.parse("reject-concurrency-${UUID.randomUUID()}")
@@ -628,13 +656,13 @@ class CirculationServiceIntegrationTest {
                 memberId = memberId,
                 editionId = EditionId(UUID.randomUUID()),
                 idempotencyKey = IdempotencyKey.parse("request-cancellation-${UUID.randomUUID()}"),
-                principal = selfPrincipal(memberId, "cancelled-member"),
+                principal = eligibleSelfPrincipal(memberId, "cancelled-member"),
             ),
         )
         val command = CancelLoanCommand(
             loanId = requested.result.loanId,
             idempotencyKey = IdempotencyKey.parse("cancel-concurrency-${UUID.randomUUID()}"),
-            principal = selfPrincipal(memberId, "cancelled-member"),
+            principal = eligibleSelfPrincipal(memberId, "cancelled-member"),
         )
 
         val cancellations = runOneHundredConcurrently { cancelLoan.cancel(command) }
@@ -680,7 +708,7 @@ class CirculationServiceIntegrationTest {
         val branchId = UUID.randomUUID()
         val firstCopyId = UUID.randomUUID()
         val secondCopyId = UUID.randomUUID()
-        val memberPrincipal = selfPrincipal(memberId, "concurrent-member")
+        val memberPrincipal = eligibleSelfPrincipal(memberId, "concurrent-member")
         val staffPrincipal = administrativePrincipal("concurrent-staff")
         seedCopy(secondCopyId, editionId.value, branchId, "B-0002")
         seedCopy(firstCopyId, editionId.value, branchId, "A-0001")
@@ -822,6 +850,25 @@ class CirculationServiceIntegrationTest {
             membershipId = memberId,
             canActOnBehalf = false,
         )
+
+    private fun eligibleSelfPrincipal(memberId: MemberId, subject: String): CommandPrincipal {
+        seedEligible(memberId)
+        return selfPrincipal(memberId, subject)
+    }
+
+    private fun seedEligible(memberId: MemberId) {
+        val now = Instant.now().atOffset(ZoneOffset.UTC)
+        dsl.insertInto(CIRCULATION_MEMBER_ELIGIBILITY)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID, memberId.value)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.STATUS, "ELIGIBLE")
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.REASON_CODE, null as String?)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION, 0L)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_OCCURRED_AT, now)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.CREATED_AT, now)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.UPDATED_AT, now)
+            .onConflictDoNothing()
+            .execute()
+    }
 
     private fun administrativePrincipal(subject: String): CommandPrincipal =
         CommandPrincipal(

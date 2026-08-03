@@ -356,6 +356,17 @@ const TARGET_PHASE2_COLUMNS = [
   "circulation_copy.status:character varying(32):true",
   "circulation_copy.updated_at:timestamp with time zone:true",
   "circulation_copy.version:bigint:true",
+  "circulation_consumer_inbox.aggregate_id:uuid:true",
+  "circulation_consumer_inbox.aggregate_type:character varying(100):true",
+  "circulation_consumer_inbox.aggregate_version:bigint:true",
+  "circulation_consumer_inbox.consumer_name:character varying(100):true",
+  "circulation_consumer_inbox.disposition:character varying(32):true",
+  "circulation_consumer_inbox.event_id:uuid:true",
+  "circulation_consumer_inbox.event_type:character varying(160):true",
+  "circulation_consumer_inbox.event_version:integer:true",
+  "circulation_consumer_inbox.payload_sha256:character(64):true",
+  "circulation_consumer_inbox.processed_at:timestamp with time zone:true",
+  "circulation_consumer_inbox.received_at:timestamp with time zone:true",
   "circulation_inventory_audit_entry.actor_fingerprint:character(64):true",
   "circulation_inventory_audit_entry.barcode:character varying(64):true",
   "circulation_inventory_audit_entry.branch_id:uuid:true",
@@ -405,6 +416,13 @@ const TARGET_PHASE2_COLUMNS = [
   "circulation_loan.status:character varying(32):true",
   "circulation_loan.updated_at:timestamp with time zone:true",
   "circulation_loan.version:bigint:true",
+  "circulation_member_eligibility.created_at:timestamp with time zone:true",
+  "circulation_member_eligibility.member_id:uuid:true",
+  "circulation_member_eligibility.reason_code:character varying(64):false",
+  "circulation_member_eligibility.source_occurred_at:timestamp with time zone:true",
+  "circulation_member_eligibility.source_version:bigint:true",
+  "circulation_member_eligibility.status:character varying(32):true",
+  "circulation_member_eligibility.updated_at:timestamp with time zone:true",
   "outbox_event.aggregate_id:uuid:true",
   "outbox_event.aggregate_type:character varying(100):true",
   "outbox_event.aggregate_version:bigint:true",
@@ -463,6 +481,22 @@ const REQUIRED_TARGET_CONSTRAINTS = new Set([
   "ck_outbox_delivery_publication",
   "ck_outbox_delivery_blocked",
   "ck_outbox_delivery_error_code",
+  "circulation_consumer_inbox_pkey",
+  "uq_circulation_consumer_inbox_aggregate_version",
+  "ck_circulation_consumer_inbox_consumer_name",
+  "ck_circulation_consumer_inbox_event_type",
+  "ck_circulation_consumer_inbox_event_version",
+  "ck_circulation_consumer_inbox_aggregate_type",
+  "ck_circulation_consumer_inbox_aggregate_version",
+  "ck_circulation_consumer_inbox_payload_sha256",
+  "ck_circulation_consumer_inbox_disposition",
+  "ck_circulation_consumer_inbox_timestamps",
+  "circulation_member_eligibility_pkey",
+  "ck_circulation_member_eligibility_status",
+  "ck_circulation_member_eligibility_reason",
+  "ck_circulation_member_eligibility_reason_shape",
+  "ck_circulation_member_eligibility_source_version",
+  "ck_circulation_member_eligibility_timestamps",
 ]);
 const TARGET_FLYWAY_CHECKSUMS = [
   1_823_238_944,
@@ -474,6 +508,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   -907_354_976,
   -1_922_605_307,
   740_925_932,
+  1_483_066_326,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -505,7 +540,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 9",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 10",
     );
   }
 
@@ -537,6 +572,8 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
+      "circulation_consumer_inbox",
+      "circulation_member_eligibility",
       "outbox_event",
     ],
   ]);
@@ -576,6 +613,8 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
+      "circulation_consumer_inbox",
+      "circulation_member_eligibility",
       "outbox_event",
     ],
   ]);
@@ -617,6 +656,10 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "trg_circulation_fine_ledger_consistency_from_entry",
       "trg_circulation_inventory_audit_no_update_delete",
       "trg_circulation_inventory_audit_no_truncate",
+      "trg_circulation_consumer_inbox_no_update_or_delete",
+      "trg_circulation_consumer_inbox_no_truncate",
+      "trg_circulation_member_eligibility_guard_update_or_delete",
+      "trg_circulation_member_eligibility_no_truncate",
     ],
   ]);
   const expectedTriggers = new Map([
@@ -648,6 +691,22 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "trg_circulation_inventory_audit_no_truncate",
       "reject_circulation_inventory_audit_mutation",
     ],
+    [
+      "trg_circulation_consumer_inbox_no_update_or_delete",
+      "reject_circulation_consumer_inbox_mutation",
+    ],
+    [
+      "trg_circulation_consumer_inbox_no_truncate",
+      "reject_circulation_consumer_inbox_mutation",
+    ],
+    [
+      "trg_circulation_member_eligibility_guard_update_or_delete",
+      "guard_circulation_member_eligibility_mutation",
+    ],
+    [
+      "trg_circulation_member_eligibility_no_truncate",
+      "reject_circulation_member_eligibility_truncate",
+    ],
   ]);
   for (const [name, functionName] of expectedTriggers) {
     const trigger = triggers.rows.find((row) => row.trigger_name === name);
@@ -667,6 +726,8 @@ async function lockTargetSchema(client: Client): Promise<void> {
       public.circulation_loan,
       public.circulation_fine,
       public.circulation_fine_ledger_entry,
+      public.circulation_consumer_inbox,
+      public.circulation_member_eligibility,
       public.outbox_event
     IN ACCESS SHARE MODE
   `);
