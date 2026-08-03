@@ -47,6 +47,7 @@ export async function GET() {
           and to_regclass('public.audit_logs') is not null
           and to_regclass('public.renewal_requests') is not null
           and to_regclass('public.notifications') is not null
+          and to_regclass('public.rate_limit_buckets') is not null
           and exists (
             select 1
             from pg_constraint
@@ -70,10 +71,14 @@ export async function GET() {
     }
   }
 
-  const cacheRequired = ["staging", "production"].includes(
+  const rateLimiting =
+    config.env.rateLimitBackend === "postgres"
+      ? database && schema
+      : cache;
+  const protectedTier = ["staging", "production"].includes(
     config.env.appEnvironment,
   );
-  const ready = database && schema && (!cacheRequired || cache);
+  const ready = database && schema && (!protectedTier || rateLimiting);
 
   // Aggregate health status metadata.
   const body = {
@@ -82,6 +87,7 @@ export async function GET() {
     schema,
     cache,
     redisConfigured,
+    rateLimiting,
     // Report the current deployment commit SHA if available.
     commit:
       process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_COMMIT_SHA,

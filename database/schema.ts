@@ -246,6 +246,49 @@ export const adminCapabilityAssignments = pgTable(
 );
 
 /**
+ * Distributed fixed-window security budgets for deployments without Redis.
+ * Identifiers are SHA-256 digests; raw account names and client addresses are
+ * never persisted.
+ */
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    scope: varchar("scope", { length: 64 }).notNull(),
+    identifierHash: varchar("identifier_hash", { length: 64 }).notNull(),
+    requestCount: integer("request_count").notNull().default(1),
+    windowStartedAt: timestamp("window_started_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", {
+      mode: "date",
+      withTimezone: true,
+    }).notNull(),
+  },
+  (bucket) => [
+    primaryKey({
+      columns: [bucket.scope, bucket.identifierHash],
+      name: "rate_limit_buckets_pkey",
+    }),
+    check(
+      "rate_limit_buckets_identifier_hash_valid",
+      sql`char_length(${bucket.identifierHash}) = 64`,
+    ),
+    check(
+      "rate_limit_buckets_request_count_positive",
+      sql`${bucket.requestCount} > 0`,
+    ),
+    check(
+      "rate_limit_buckets_window_valid",
+      sql`${bucket.expiresAt} > ${bucket.windowStartedAt}`,
+    ),
+    index("rate_limit_buckets_expiry_idx").on(bucket.expiresAt),
+  ],
+);
+
+/**
  * Books table containing the library's catalog.
  */
 export const books = pgTable("books", {
@@ -460,7 +503,7 @@ export const auditLogs = pgTable("audit_logs", {
   /** Short name of the action performed (e.g., "DELETE_BOOK"). */
   action: varchar("action", { length: 100 }).notNull(),
   /** ID of the entity affected by the action (if applicable). */
-  targetId: uuid("target_id"),
+  targetId: text("target_id"),
   /** Type of the entity affected (e.g., "BOOK", "USER"). */
   targetType: varchar("target_type", { length: 50 }),
   /** Detailed JSON-serialized information about the change. */

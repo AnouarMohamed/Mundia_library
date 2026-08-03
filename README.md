@@ -1,4 +1,4 @@
-# Mundiapolis Library
+# Mundiapolis Library 
 
 Production-grade university library platform for students, faculty, and library staff.
 

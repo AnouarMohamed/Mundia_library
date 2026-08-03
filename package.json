@@ -25,6 +25,7 @@
     "db:migrate-csv": "tsx database/migrate-from-csv.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:baseline-existing": "node scripts/baseline-existing-production.mjs",
     "db:verify-schema": "node scripts/verify-production-schema.mjs",
     "db:verify-concurrency": "node scripts/verify-concurrency-invariants.mjs",
     "db:push": "drizzle-kit push",

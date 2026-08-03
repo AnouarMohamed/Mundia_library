@@ -4,7 +4,9 @@ const managedKeys = [
   "NODE_ENV",
   "NEXT_PHASE",
   "APP_ENV",
+  "AUTH_MODE",
   "DATABASE_URL",
+  "RATE_LIMIT_BACKEND",
   "AUTH_SECRET",
   "NEXTAUTH_SECRET",
   "UPSTASH_REDIS_URL",
@@ -26,7 +28,9 @@ const originalValues = new Map(
 
 const setValidProductionEnvironment = () => {
   process.env.APP_ENV = "production";
+  process.env.AUTH_MODE = "oidc";
   process.env.DATABASE_URL = "postgresql://example:example@localhost/example";
+  process.env.RATE_LIMIT_BACKEND = "redis";
   process.env.AUTH_SECRET = "test-secret-with-sufficient-entropy";
   process.env.UPSTASH_REDIS_URL = "https://redis.example.test";
   process.env.UPSTASH_REDIS_TOKEN = "test-token";
@@ -99,6 +103,15 @@ describe.sequential("production configuration", () => {
     await expect(import("@/lib/config")).rejects.toThrow(/UPSTASH_REDIS_URL/);
   });
 
+  it("accepts PostgreSQL as the distributed rate-limit backend", async () => {
+    process.env.RATE_LIMIT_BACKEND = "postgres";
+    delete process.env.UPSTASH_REDIS_URL;
+    delete process.env.UPSTASH_REDIS_TOKEN;
+
+    const { default: config } = await import("@/lib/config");
+    expect(config.env.rateLimitBackend).toBe("postgres");
+  });
+
   it("rejects production security bypasses", async () => {
     process.env.DISABLE_RATE_LIMIT = "true";
 
@@ -122,11 +135,11 @@ describe.sequential("production configuration", () => {
     );
   });
 
-  it("forbids the legacy credentials provider in production", async () => {
+  it("forbids local credentials when the protected tier selects OIDC", async () => {
     process.env.ENABLE_LOCAL_CREDENTIALS = "true";
 
     await expect(import("@/lib/config")).rejects.toThrow(
-      /ENABLE_LOCAL_CREDENTIALS is forbidden/,
+      /ENABLE_LOCAL_CREDENTIALS is forbidden when AUTH_MODE=oidc/,
     );
   });
 
@@ -137,12 +150,48 @@ describe.sequential("production configuration", () => {
     await expect(import("@/lib/config")).rejects.toThrow(/OIDC_ISSUER/);
   });
 
-  it("forbids the legacy credentials provider in staging too", async () => {
+  it("requires an explicit authentication mode in protected tiers", async () => {
     process.env.APP_ENV = "staging";
+    delete process.env.AUTH_MODE;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /AUTH_MODE must be explicitly set/,
+    );
+  });
+
+  it("admits an explicit invitation-only local mode in production", async () => {
+    process.env.AUTH_MODE = "local";
+    process.env.ENABLE_LOCAL_CREDENTIALS = "true";
+    delete process.env.OIDC_ISSUER;
+    delete process.env.OIDC_CLIENT_ID;
+    delete process.env.OIDC_CLIENT_SECRET;
+    delete process.env.OIDC_ALLOWED_EMAIL_DOMAINS;
+
+    const { default: config } = await import("@/lib/config");
+    expect(config.env.localCredentialsEnabled).toBe(true);
+    expect(config.env.oidc.enabled).toBe(false);
+    expect(config.env.allowPublicSignup).toBe(false);
+  });
+
+  it("requires an explicit local-credential opt-in for local mode", async () => {
+    process.env.AUTH_MODE = "local";
+    delete process.env.ENABLE_LOCAL_CREDENTIALS;
+    delete process.env.OIDC_ISSUER;
+    delete process.env.OIDC_CLIENT_ID;
+    delete process.env.OIDC_CLIENT_SECRET;
+    delete process.env.OIDC_ALLOWED_EMAIL_DOMAINS;
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /ENABLE_LOCAL_CREDENTIALS=true is required/,
+    );
+  });
+
+  it("rejects mixed OIDC and local authorities in protected tiers", async () => {
+    process.env.AUTH_MODE = "local";
     process.env.ENABLE_LOCAL_CREDENTIALS = "true";
 
     await expect(import("@/lib/config")).rejects.toThrow(
-      /ENABLE_LOCAL_CREDENTIALS is forbidden/,
+      /OIDC configuration must be unset/,
     );
   });
 

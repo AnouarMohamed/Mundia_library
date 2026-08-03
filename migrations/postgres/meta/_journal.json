@@ -64,6 +64,13 @@
       "when": 1785033954000,
       "tag": "0012_add_admin_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785720000000,
+      "tag": "0013_add_postgres_rate_limits",
+      "breakpoints": true
     }
   ]
 }

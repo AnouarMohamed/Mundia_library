@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS "audit_logs" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "user_id" uuid NOT NULL REFERENCES "public"."users"("id"),
   "action" varchar(100) NOT NULL,
-  "target_id" uuid,
+  "target_id" text,
   "target_type" varchar(50),
   "details" text,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL
