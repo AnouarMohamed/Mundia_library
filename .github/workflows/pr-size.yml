@@ -1,7 +1,9 @@
 name: PR Size Labeler
 
 on:
-  pull_request:
+  # This workflow needs to label the PR. It never checks out or executes head
+  # code, and the job below remains restricted to same-repository branches.
+  pull_request_target:
     types:
       - opened
       - synchronize
