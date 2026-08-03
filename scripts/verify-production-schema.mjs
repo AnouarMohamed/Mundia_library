@@ -22,12 +22,13 @@ const requiredTables = [
   "borrow_records",
   "federated_identities",
   "notifications",
+  "rate_limit_buckets",
   "renewal_requests",
   "system_config",
   "users",
 ];
 const requiredUuidIdTables = requiredTables.filter(
-  (table) => table !== "federated_identities",
+  (table) => !["federated_identities", "rate_limit_buckets"].includes(table),
 );
 
 const requiredConstraints = [
@@ -47,6 +48,9 @@ const requiredConstraints = [
   "federated_identities_issuer_length",
   "federated_identities_issuer_user_unique",
   "federated_identities_subject_length",
+  "rate_limit_buckets_identifier_hash_valid",
+  "rate_limit_buckets_request_count_positive",
+  "rate_limit_buckets_window_valid",
 ];
 
 const requiredIndexes = [
@@ -57,6 +61,7 @@ const requiredIndexes = [
   "borrow_records_one_active_per_user_book_idx",
   "federated_identities_user_idx",
   "notifications_user_read_created_idx",
+  "rate_limit_buckets_expiry_idx",
   "renewal_requests_one_pending_per_loan_idx",
 ];
 

@@ -36,7 +36,9 @@ Production should set all local required variables plus the service integrations
 
 | Variable                            | Required when                                | Purpose                                               |
 | ----------------------------------- | -------------------------------------------- | ----------------------------------------------------- |
+| `AUTH_MODE`                         | Always in staging/production                 | Selects exactly one authority: `oidc` or `local`.     |
 | `DATABASE_URL`                      | Always                                       | Production PostgreSQL connection.                     |
+| `RATE_LIMIT_BACKEND`                | Always in production                         | Distributed limiter: `redis` or `postgres`.           |
 | `NEXTAUTH_SECRET` or `AUTH_SECRET`  | Always                                       | Session signing secret.                               |
 | `NEXTAUTH_URL`                      | Always                                       | Public production URL.                                |
 | `AUTH_TRUST_HOST`                   | Vercel, proxies, Docker behind reverse proxy | Allows Auth.js to trust forwarded host headers.       |
@@ -44,8 +46,8 @@ Production should set all local required variables plus the service integrations
 | `NEXT_PUBLIC_PROD_API_ENDPOINT`     | Always                                       | Production base URL used by browser code.             |
 | `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | Uploads enabled                              | ImageKit URL endpoint.                                |
 | `IMAGEKIT_PRIVATE_KEY`              | Uploads enabled                              | Server-side ImageKit private key.                     |
-| `UPSTASH_REDIS_URL`                 | Rate limiting, cache                         | Upstash Redis REST URL.                               |
-| `UPSTASH_REDIS_TOKEN`               | Rate limiting, cache                         | Upstash Redis token.                                  |
+| `UPSTASH_REDIS_URL`                 | `RATE_LIMIT_BACKEND=redis` or cache enabled  | Upstash Redis REST URL.                               |
+| `UPSTASH_REDIS_TOKEN`               | `RATE_LIMIT_BACKEND=redis` or cache enabled  | Upstash Redis token.                                  |
 | `QSTASH_URL`                        | Workflows enabled                            | Upstash Workflow base URL.                            |
 | `QSTASH_TOKEN`                      | Workflows enabled                            | Upstash QStash token.                                 |
 | `QSTASH_CURRENT_SIGNING_KEY`        | Workflows enabled in production              | Current signing key used to verify workflow requests. |
@@ -55,15 +57,25 @@ Production should set all local required variables plus the service integrations
 | `BREVO_SENDER_NAME`                 | Brevo email enabled                          | Sender display name.                                  |
 | `RESEND_TOKEN`                      | Resend fallback/workflow email enabled       | Resend API token.                                     |
 | `ENABLE_WORKFLOWS`                  | Background automation enabled                | Toggles workflow features.                            |
-| `OIDC_ISSUER`                       | Always in staging/production                 | Exact HTTPS issuer; matched byte-for-byte to `iss`.   |
-| `OIDC_CLIENT_ID`                    | Always in staging/production                 | Registered confidential BFF client ID.                |
-| `OIDC_CLIENT_SECRET`                | Always in staging/production                 | BFF client secret, sourced from the secret manager.   |
-| `OIDC_ALLOWED_EMAIL_DOMAINS`        | Always in staging/production                 | Exact comma-separated institutional email domains.    |
+| `OIDC_ISSUER`                       | `AUTH_MODE=oidc`                             | Exact HTTPS issuer; matched byte-for-byte to `iss`.   |
+| `OIDC_CLIENT_ID`                    | `AUTH_MODE=oidc`                             | Registered confidential BFF client ID.                |
+| `OIDC_CLIENT_SECRET`                | `AUTH_MODE=oidc`                             | BFF client secret, sourced from the secret manager.   |
+| `OIDC_ALLOWED_EMAIL_DOMAINS`        | `AUTH_MODE=oidc`                             | Exact comma-separated institutional email domains.    |
+| `ENABLE_LOCAL_CREDENTIALS`          | `AUTH_MODE=local`                            | Must be explicitly `true`; never enables signup.      |
 
-`ENABLE_LOCAL_CREDENTIALS` is a development/test-only compatibility flag.
-Staging and production reject `true` at startup. When omitted, local
-credentials remain available in development and test so the deterministic E2E
-fixtures still work. Public signup is also forbidden in protected tiers.
+Protected tiers admit exactly one authentication authority. `AUTH_MODE=oidc`
+requires the complete institutional OIDC configuration and rejects local
+credentials. `AUTH_MODE=local` requires an explicit
+`ENABLE_LOCAL_CREDENTIALS=true`, rejects OIDC configuration, and remains
+invitation-only because public signup is forbidden in protected tiers. Local
+mode is a transitional deployment option; privileged accounts still require
+distributed account/IP throttling, strong rotated passwords, and explicit
+administrative capability grants.
+
+Production rate limiting is always distributed. `RATE_LIMIT_BACKEND=redis`
+uses Upstash for rate limits and cache. `RATE_LIMIT_BACKEND=postgres` stores
+only SHA-256 identifier digests and atomic security budgets in PostgreSQL; the
+Redis cache then becomes optional and safely degrades to direct database reads.
 
 OIDC identities are never auto-linked by email. Before a user can sign in, an
 administrator must bind the exact issuer/subject tuple to an existing local
@@ -152,5 +164,7 @@ Before enabling a production deployment:
 6. Confirm ImageKit upload endpoints and keys are from the production ImageKit project.
 7. Confirm sender email is verified in the email provider.
 8. Confirm Redis credentials are active and scoped to the intended Upstash database.
-9. Confirm the OIDC issuer is exact, the registered callback is
-   `/api/auth/callback/institutional-oidc`, and local credentials are disabled.
+9. Confirm exactly one authentication mode is selected. For OIDC, verify the
+   exact issuer and `/api/auth/callback/institutional-oidc` callback. For local
+   mode, verify public signup and test fixtures are disabled and every standing
+   credential has been rotated.

@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import redis from "@/database/redis";
 import config from "@/lib/config";
+import { applyPostgresRateLimit } from "@/lib/security/postgres-rate-limit";
 
 const isRateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true";
 const isLocalEnvironment = ["development", "test"].includes(
@@ -48,6 +49,26 @@ ratelimit.limit = async (key: string) => {
       reset: Date.now() + 60000,
       pending: Promise.resolve(),
     };
+  }
+
+  if (config.env.rateLimitBackend === "postgres") {
+    try {
+      return await applyPostgresRateLimit({
+        scope: "public-api",
+        identifier: key,
+        limit: 200,
+        windowSeconds: 60,
+      });
+    } catch (error) {
+      console.error("PostgreSQL rate limit check failed:", error);
+      return {
+        success: false,
+        limit: 200,
+        remaining: 0,
+        reset: Date.now() + 60_000,
+        pending: Promise.resolve(),
+      };
+    }
   }
 
   if (!hasRedisConfig) {

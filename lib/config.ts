@@ -82,6 +82,12 @@ const envSchema = z.object({
     .enum(["development", "test", "staging", "production"])
     .default("development"),
 
+  /**
+   * Protected tiers must choose one authentication authority explicitly.
+   * Local mode is invitation-only: it never enables public signup.
+   */
+  authMode: z.enum(["oidc", "local"]).optional(),
+
   /** Base URL for the API (used in client-side requests). */
   apiEndpoint: z.string().url().default("http://localhost:3000"),
   /** Production-grade API endpoint (often the same as apiEndpoint). */
@@ -95,6 +101,9 @@ const envSchema = z.object({
 
   /** Primary database connection string (PostgreSQL). */
   databaseUrl: z.string().default(""),
+
+  /** Distributed production rate-limit store. */
+  rateLimitBackend: z.enum(["redis", "postgres"]).default("redis"),
 
   /** Upstash services for caching (Redis) and background task orchestration (QStash). */
   upstash: z.object({
@@ -171,6 +180,7 @@ const envSchema = z.object({
  */
 const envData = {
   appEnvironment: process.env.APP_ENV,
+  authMode: process.env.AUTH_MODE,
   apiEndpoint: process.env.NEXT_PUBLIC_API_ENDPOINT,
   prodApiEndpoint: process.env.NEXT_PUBLIC_PROD_API_ENDPOINT,
   imagekit: {
@@ -178,6 +188,7 @@ const envData = {
     privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
   },
   databaseUrl: process.env.DATABASE_URL,
+  rateLimitBackend: process.env.RATE_LIMIT_BACKEND,
   upstash: {
     redisUrl: process.env.UPSTASH_REDIS_URL,
     redisToken: process.env.UPSTASH_REDIS_TOKEN,
@@ -270,6 +281,7 @@ if (parsedEnv.success && isServer) {
   const protectedIdentityTier = ["staging", "production"].includes(
     parsedEnv.data.appEnvironment,
   );
+  const selectedAuthMode = parsedEnv.data.authMode;
   const oidcValuesPresent = [
     parsedEnv.data.oidc.issuer,
     parsedEnv.data.oidc.clientId,
@@ -284,15 +296,47 @@ if (parsedEnv.success && isServer) {
     missingOidc.push("OIDC_ALLOWED_EMAIL_DOMAINS");
   }
 
-  if ((protectedIdentityTier || oidcValuesPresent) && missingOidc.length > 0) {
+  if (protectedIdentityTier && !selectedAuthMode) {
+    throw new Error(
+      "AUTH_MODE must be explicitly set to oidc or local in staging and production",
+    );
+  }
+
+  if (
+    (selectedAuthMode === "oidc" ||
+      (!protectedIdentityTier && oidcValuesPresent)) &&
+    missingOidc.length > 0
+  ) {
     throw new Error(
       `Missing institutional OIDC configuration: ${missingOidc.join(", ")}`,
     );
   }
 
-  if (protectedIdentityTier && parsedEnv.data.enableLocalCredentials === true) {
+  if (
+    protectedIdentityTier &&
+    selectedAuthMode === "oidc" &&
+    parsedEnv.data.enableLocalCredentials === true
+  ) {
     throw new Error(
-      "ENABLE_LOCAL_CREDENTIALS is forbidden when APP_ENV is staging or production",
+      "ENABLE_LOCAL_CREDENTIALS is forbidden when AUTH_MODE=oidc",
+    );
+  }
+  if (
+    protectedIdentityTier &&
+    selectedAuthMode === "local" &&
+    parsedEnv.data.enableLocalCredentials !== true
+  ) {
+    throw new Error(
+      "ENABLE_LOCAL_CREDENTIALS=true is required when AUTH_MODE=local",
+    );
+  }
+  if (
+    protectedIdentityTier &&
+    selectedAuthMode === "local" &&
+    oidcValuesPresent
+  ) {
+    throw new Error(
+      "OIDC configuration must be unset when AUTH_MODE=local",
     );
   }
   if (protectedIdentityTier && parsedEnv.data.allowPublicSignup) {
@@ -312,8 +356,10 @@ if (
   if (!(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET)) {
     missing.push("AUTH_SECRET");
   }
-  if (!parsedEnv.data.upstash.redisUrl) missing.push("UPSTASH_REDIS_URL");
-  if (!parsedEnv.data.upstash.redisToken) missing.push("UPSTASH_REDIS_TOKEN");
+  if (parsedEnv.data.rateLimitBackend === "redis") {
+    if (!parsedEnv.data.upstash.redisUrl) missing.push("UPSTASH_REDIS_URL");
+    if (!parsedEnv.data.upstash.redisToken) missing.push("UPSTASH_REDIS_TOKEN");
+  }
   if (!parsedEnv.data.trustProxyHeaders)
     missing.push("TRUST_PROXY_HEADERS=true");
 
@@ -348,12 +394,22 @@ const config = {
       ? parsedEnv.data
       : (scrubUndefined(envData) as unknown as z.infer<typeof envSchema>);
     const localTier = ["development", "test"].includes(env.appEnvironment);
-    const oidcEnabled = Boolean(
+    const protectedTier = ["staging", "production"].includes(
+      env.appEnvironment,
+    );
+    const completeOidcConfiguration = Boolean(
       env.oidc?.issuer &&
       env.oidc.clientId &&
       env.oidc.clientSecret &&
       env.oidc.allowedEmailDomains.length > 0,
     );
+    const oidcEnabled =
+      completeOidcConfiguration &&
+      (!protectedTier || env.authMode === "oidc");
+    const protectedLocalCredentials =
+      protectedTier &&
+      env.authMode === "local" &&
+      env.enableLocalCredentials === true;
 
     return {
       ...env,
@@ -362,7 +418,8 @@ const config = {
         enabled: oidcEnabled,
       },
       localCredentialsEnabled:
-        localTier && env.enableLocalCredentials !== false,
+        (localTier && env.enableLocalCredentials !== false) ||
+        protectedLocalCredentials,
     };
   })(),
 };

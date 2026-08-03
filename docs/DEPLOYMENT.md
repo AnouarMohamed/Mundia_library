@@ -12,7 +12,8 @@ Every production deployment needs:
 - Production environment variables.
 - Applied schema changes.
 - At least one approved admin user.
-- Pre-provisioned issuer/subject mappings for authorized users.
+- Either pre-provisioned OIDC issuer/subject mappings or approved invite-only
+  local accounts with rotated passwords.
 - Monitoring access to application logs and database health.
 
 ## Required Production Environment
@@ -21,7 +22,9 @@ Minimum:
 
 ```bash
 APP_ENV=production
+AUTH_MODE=oidc
 DATABASE_URL=
+RATE_LIMIT_BACKEND=postgres
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=
 AUTH_TRUST_HOST=true
@@ -33,6 +36,22 @@ OIDC_ALLOWED_EMAIL_DOMAINS=student.example.edu,staff.example.edu
 NEXT_PUBLIC_API_ENDPOINT=
 NEXT_PUBLIC_PROD_API_ENDPOINT=
 ```
+
+If an institutional OIDC client is not yet available, protected deployments
+may use the explicit invitation-only mode below. It preserves production rate
+limits and disables both public signup and fixture provisioning:
+
+```bash
+APP_ENV=production
+AUTH_MODE=local
+ENABLE_LOCAL_CREDENTIALS=true
+ALLOW_PUBLIC_SIGNUP=false
+ALLOW_TEST_FIXTURES=false
+```
+
+Do not configure any `OIDC_*` value in local mode. Rotate every standing
+password before exposure to public traffic and migrate to `AUTH_MODE=oidc`
+when the institutional client is approved.
 
 Recommended for full product behavior:
 
@@ -53,6 +72,9 @@ ENABLE_WORKFLOWS=true
 ```
 
 Keep `ENABLE_WORKFLOWS=false` until QStash signing keys and email are verified.
+When an owned Redis service is unavailable, set
+`RATE_LIMIT_BACKEND=postgres`; migration `0013` provides the distributed
+security-budget table and Redis becomes an optional cache.
 
 ## Option 1: Vercel
 
@@ -79,6 +101,20 @@ The app uses `output: "standalone"` in `next.config.mjs`, but Vercel manages run
 ### Database Migration
 
 Do not rely on Vercel app startup to mutate production schema.
+
+If an existing production database predates the canonical Drizzle ledger,
+first run the guarded baseline preflight. It verifies the exact legacy tables,
+columns, and enums and refuses a non-empty ledger:
+
+```bash
+DATABASE_URL="production-url" npm run db:baseline-existing
+DATABASE_URL="production-url" npm run db:baseline-existing -- \
+  --apply --confirm-existing-schema
+```
+
+Never use the baseline command for a fresh database or to bypass a failed
+migration. It records only the four reviewed legacy entries; normal migration
+then applies hardening migration `0008` and every later migration.
 
 Preferred production migration flow:
 

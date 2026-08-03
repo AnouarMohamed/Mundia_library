@@ -36,6 +36,7 @@ jobs:
 
     env:
       APP_ENV: staging
+      AUTH_MODE: oidc
       DATABASE_URL: postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
       NEXTAUTH_SECRET: ci-bench-secret
       AUTH_SECRET: ci-bench-secret

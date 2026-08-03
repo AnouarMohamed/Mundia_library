@@ -6,6 +6,7 @@ import redis from "@/database/redis";
 import config from "@/lib/config";
 import { getClientIp } from "@/lib/security/api-request";
 import { logError, logWarn } from "@/lib/security/logger";
+import { applyPostgresRateLimit } from "@/lib/security/postgres-rate-limit";
 
 const hasRedisConfig = Boolean(
   config.env.upstash.redisUrl && config.env.upstash.redisToken,
@@ -36,6 +37,31 @@ const pseudonymize = (value: string) =>
  * trusted ingress IP budgets must allow an attempt.
  */
 export async function allowCredentialAttempt(email: string) {
+  if (config.env.rateLimitBackend === "postgres") {
+    try {
+      const ip = await getClientIp();
+      const [account, source] = await Promise.all([
+        applyPostgresRateLimit({
+          scope: "auth-account",
+          identifier: pseudonymize(email),
+          limit: 5,
+          windowSeconds: 15 * 60,
+        }),
+        applyPostgresRateLimit({
+          scope: "auth-ip",
+          identifier: pseudonymize(ip),
+          limit: 20,
+          windowSeconds: 15 * 60,
+        }),
+      ]);
+
+      return account.success && source.success;
+    } catch (error) {
+      logError("auth.postgres_rate_limit_failed", error);
+      return !failClosed;
+    }
+  }
+
   if (!hasRedisConfig) {
     if (failClosed) {
       logWarn("auth.rate_limit_unavailable");

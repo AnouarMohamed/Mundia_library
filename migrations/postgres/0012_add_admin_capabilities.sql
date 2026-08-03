@@ -133,7 +133,7 @@ BEGIN
       WHEN TG_OP = 'INSERT' THEN 'GRANT_ADMIN_CAPABILITY'
       ELSE 'REVOKE_ADMIN_CAPABILITY'
     END,
-    NEW."user_id",
+    NEW."user_id"::text,
     'USER',
     jsonb_build_object(
       'assignmentId', NEW."id",
