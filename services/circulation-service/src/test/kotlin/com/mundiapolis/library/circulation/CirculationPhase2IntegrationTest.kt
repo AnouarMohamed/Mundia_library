@@ -4,6 +4,8 @@ import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.gen
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_FINE
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_FINE_LEDGER_ENTRY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_IDEMPOTENCY
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_IDEMPOTENCY
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_AUDIT_ENTRY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.OUTBOX_EVENT
 import com.mundiapolis.library.circulation.application.model.CommandPrincipal
@@ -22,8 +24,14 @@ import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanC
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.AssessFineCommand
 import com.mundiapolis.library.circulation.application.port.inbound.AssessFineUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.ChangeCopyConditionCommand
+import com.mundiapolis.library.circulation.application.port.inbound.ChangeCopyConditionUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.RegisterCopyCommand
+import com.mundiapolis.library.circulation.application.port.inbound.RegisterCopyUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.RelocateCopyCommand
+import com.mundiapolis.library.circulation.application.port.inbound.RelocateCopyUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
@@ -31,11 +39,17 @@ import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanU
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
 import com.mundiapolis.library.circulation.domain.model.EditionId
+import com.mundiapolis.library.circulation.domain.model.BranchId
+import com.mundiapolis.library.circulation.domain.model.CopyBarcode
+import com.mundiapolis.library.circulation.domain.model.CopyId
+import com.mundiapolis.library.circulation.domain.model.CopyStatus
 import com.mundiapolis.library.circulation.domain.model.FineLedgerEntryType
 import com.mundiapolis.library.circulation.domain.model.FineStatus
 import com.mundiapolis.library.circulation.domain.model.LoanId
 import com.mundiapolis.library.circulation.domain.model.LoanStatus
 import com.mundiapolis.library.circulation.domain.model.MemberId
+import com.mundiapolis.library.circulation.domain.model.InventoryReason
+import com.mundiapolis.library.circulation.domain.model.ShelfLocation
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.flywaydb.core.Flyway
@@ -103,6 +117,15 @@ class CirculationPhase2IntegrationTest {
     private lateinit var adjustFine: AdjustFineUseCase
 
     @Autowired
+    private lateinit var registerCopy: RegisterCopyUseCase
+
+    @Autowired
+    private lateinit var changeCopyCondition: ChangeCopyConditionUseCase
+
+    @Autowired
+    private lateinit var relocateCopy: RelocateCopyUseCase
+
+    @Autowired
     private lateinit var mockMvc: MockMvc
 
     @Autowired
@@ -120,21 +143,240 @@ class CirculationPhase2IntegrationTest {
     @BeforeEach
     fun cleanCommandData() {
         dsl.execute("ALTER TABLE circulation_fine_ledger_entry DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_inventory_audit_entry DISABLE TRIGGER USER")
         try {
             dsl.execute(
                 """
                 TRUNCATE TABLE
                     circulation_fine_ledger_entry,
                     circulation_fine,
+                    circulation_inventory_audit_entry,
                     outbox_event,
                     circulation_idempotency,
+                    circulation_inventory_idempotency,
                     circulation_loan,
                     circulation_copy
                 """.trimIndent(),
             )
         } finally {
             dsl.execute("ALTER TABLE circulation_fine_ledger_entry ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_inventory_audit_entry ENABLE TRIGGER USER")
         }
+    }
+
+    @Test
+    fun `copy registration relocation and condition changes are replay safe and audited`() {
+        val copyId = CopyId(UUID.randomUUID())
+        val editionId = EditionId(UUID.randomUUID())
+        val branchId = BranchId(UUID.randomUUID())
+        val staff = administrativePrincipal("inventory-staff")
+        val registrationKey = IdempotencyKey.parse("register-copy-${UUID.randomUUID()}")
+        val registration = RegisterCopyCommand(
+            copyId = copyId,
+            editionId = editionId,
+            branchId = branchId,
+            barcode = CopyBarcode.parse("INV-${UUID.randomUUID()}"),
+            shelfLocation = ShelfLocation.parse("A-01"),
+            reason = InventoryReason.parse("New acquisition received"),
+            idempotencyKey = registrationKey,
+            principal = staff,
+        )
+
+        val registrations = runOneHundredConcurrently {
+            registerCopy.register(registration)
+        }
+        assertThat(registrations.count { !it.replayed }).isOne()
+        assertThat(registrations.count { it.replayed }).isEqualTo(CONCURRENT_COMMANDS - 1)
+        assertThat(registrations.map { it.result }.distinct()).hasSize(1)
+
+        assertThatThrownBy {
+            registerCopy.register(
+                registration.copy(
+                    reason = InventoryReason.parse("Different acquisition reason"),
+                ),
+            )
+        }.isInstanceOf(com.mundiapolis.library.circulation.application.model.IdempotencyKeyConflictException::class.java)
+
+        val relocated = relocateCopy.relocate(
+            RelocateCopyCommand(
+                copyId = copyId,
+                branchId = BranchId(UUID.randomUUID()),
+                shelfLocation = ShelfLocation.parse("B-12"),
+                reason = InventoryReason.parse("Moved to the science collection"),
+                idempotencyKey = IdempotencyKey.parse("relocate-copy-${UUID.randomUUID()}"),
+                principal = staff,
+            ),
+        )
+        val damaged = changeCopyCondition.changeCondition(
+            ChangeCopyConditionCommand(
+                copyId = copyId,
+                target = CopyStatus.DAMAGED,
+                reason = InventoryReason.parse("Binding damage verified by librarian"),
+                idempotencyKey = IdempotencyKey.parse("damage-copy-${UUID.randomUUID()}"),
+                principal = staff,
+            ),
+        )
+
+        assertThat(relocated.result.version).isOne()
+        assertThat(damaged.result.version).isEqualTo(2)
+        assertThat(damaged.result.status).isEqualTo(CopyStatus.DAMAGED)
+        assertThat(damaged.result.shelfLocation).isNull()
+        assertThat(dsl.fetchCount(CIRCULATION_INVENTORY_IDEMPOTENCY)).isEqualTo(3)
+        val auditEntries = dsl.selectFrom(CIRCULATION_INVENTORY_AUDIT_ENTRY)
+            .where(CIRCULATION_INVENTORY_AUDIT_ENTRY.COPY_ID.eq(copyId.value))
+            .orderBy(CIRCULATION_INVENTORY_AUDIT_ENTRY.COPY_VERSION)
+            .fetch()
+        assertThat(auditEntries.map { it.operation }).containsExactly(
+            "REGISTER_COPY",
+            "RELOCATE_COPY",
+            "CHANGE_COPY_CONDITION",
+        )
+        assertThat(auditEntries.map { it.actorFingerprint }).allMatch { it?.length == 64 }
+        assertThat(auditEntries.map { it.reason }).containsExactly(
+            "New acquisition received",
+            "Moved to the science collection",
+            "Binding damage verified by librarian",
+        )
+        assertThatThrownBy {
+            dsl.update(CIRCULATION_INVENTORY_AUDIT_ENTRY)
+                .set(CIRCULATION_INVENTORY_AUDIT_ENTRY.REASON, "tampered")
+                .where(CIRCULATION_INVENTORY_AUDIT_ENTRY.ID.eq(auditEntries.first().id))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+            .hasMessageContaining("immutable")
+        val events = dsl.selectFrom(OUTBOX_EVENT)
+            .where(OUTBOX_EVENT.AGGREGATE_TYPE.eq("copy"))
+            .orderBy(OUTBOX_EVENT.AGGREGATE_VERSION)
+            .fetch()
+        assertThat(events.map { it.eventType }).containsExactly(
+            "circulation.copy.registered",
+            "circulation.copy.relocated",
+            "circulation.copy.condition-changed",
+        )
+        assertThat(events.map { it.aggregateVersion }).containsExactly(0L, 1L, 2L)
+        assertThat(events.map { it.payload?.data() }).allMatch { payload ->
+            payload?.contains("actorFingerprint") == true && payload.contains("reason")
+        }
+    }
+
+    @Test
+    fun `one hundred competing approval and inventory edits preserve single copy ownership`() {
+        val copyId = CopyId(UUID.randomUUID())
+        val editionId = EditionId(UUID.randomUUID())
+        val staff = administrativePrincipal("inventory-race-staff")
+        registerCopy.register(
+            RegisterCopyCommand(
+                copyId = copyId,
+                editionId = editionId,
+                branchId = BranchId(UUID.randomUUID()),
+                barcode = CopyBarcode.parse("RACE-${UUID.randomUUID()}"),
+                shelfLocation = ShelfLocation.parse("R-01"),
+                reason = InventoryReason.parse("Race-test acquisition"),
+                idempotencyKey = IdempotencyKey.parse("register-race-${UUID.randomUUID()}"),
+                principal = staff,
+            ),
+        )
+        val memberId = MemberId(UUID.randomUUID())
+        val request = requestLoan.request(
+            RequestLoanCommand(
+                memberId = memberId,
+                editionId = editionId,
+                idempotencyKey = IdempotencyKey.parse("request-race-${UUID.randomUUID()}"),
+                principal = selfPrincipal(memberId, "inventory-race-member"),
+            ),
+        )
+
+        val outcomes = runConcurrently(CONCURRENT_COMMANDS) { index ->
+            if (index % 2 == 0) {
+                approveLoan.approve(
+                    ApproveLoanCommand(
+                        loanId = request.result.loanId,
+                        idempotencyKey =
+                            IdempotencyKey.parse("approve-inventory-race-$index-${UUID.randomUUID()}"),
+                        principal = staff,
+                    ),
+                )
+            } else {
+                changeCopyCondition.changeCondition(
+                    ChangeCopyConditionCommand(
+                        copyId = copyId,
+                        target = CopyStatus.DAMAGED,
+                        reason = InventoryReason.parse("Concurrent condition inspection $index"),
+                        idempotencyKey =
+                            IdempotencyKey.parse("condition-race-$index-${UUID.randomUUID()}"),
+                        principal = staff,
+                    ),
+                )
+            }
+        }
+
+        assertThat(outcomes.count { it.isSuccess }).isOne()
+        val copy = dsl.selectFrom(CIRCULATION_COPY)
+            .where(CIRCULATION_COPY.ID.eq(copyId.value))
+            .fetchSingle()
+        val loan = dsl.selectFrom(CIRCULATION_LOAN)
+            .where(CIRCULATION_LOAN.ID.eq(request.result.loanId.value))
+            .fetchSingle()
+        if (copy.status == CopyStatus.ON_LOAN.name) {
+            assertThat(loan.status).isEqualTo(LoanStatus.ACTIVE.name)
+            assertThat(loan.copyId).isEqualTo(copyId.value)
+        } else {
+            assertThat(copy.status).isEqualTo(CopyStatus.DAMAGED.name)
+            assertThat(loan.status).isEqualTo(LoanStatus.REQUESTED.name)
+            assertThat(loan.copyId).isNull()
+        }
+        assertThat(copy.version).isOne()
+        assertThat(dsl.fetchCount(CIRCULATION_INVENTORY_IDEMPOTENCY)).isEqualTo(
+            if (copy.status == CopyStatus.DAMAGED.name) 2 else 1,
+        )
+    }
+
+    @Test
+    fun `inventory HTTP commands enforce scope strict input and lifecycle conflicts`() {
+        val copyId = UUID.randomUUID()
+        val request =
+            """{"copyId":"$copyId","editionId":"${UUID.randomUUID()}","branchId":"${UUID.randomUUID()}","barcode":"HTTP-$copyId","shelfLocation":"A-02","reason":"New acquisition"}"""
+
+        mockMvc.post(COPIES_PATH) {
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+            header(IDEMPOTENCY_HEADER, "register-http-${UUID.randomUUID()}")
+        }.andExpect { status { isUnauthorized() } }
+
+        mockMvc.post(COPIES_PATH) {
+            with(jwtFor("wrong-inventory-scope", ASSESS_FINE_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+            header(IDEMPOTENCY_HEADER, "register-http-${UUID.randomUUID()}")
+        }.andExpect { status { isForbidden() } }
+
+        mockMvc.post(COPIES_PATH) {
+            with(jwtFor("inventory-registrar", REGISTER_INVENTORY_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = request
+            header(IDEMPOTENCY_HEADER, "register-http-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.status") { value("AVAILABLE") }
+            jsonPath("$.version") { value(0) }
+        }
+
+        mockMvc.post("$COPIES_PATH/$copyId/condition") {
+            with(jwtFor("inventory-condition", CONDITION_INVENTORY_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"status":"ON_LOAN","reason":"Attempted manual checkout"}"""
+            header(IDEMPOTENCY_HEADER, "condition-http-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("copy_state_conflict") }
+        }
+
+        mockMvc.post(COPIES_PATH) {
+            with(jwtFor("inventory-registrar", REGISTER_INVENTORY_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = request.dropLast(1) + ",\"unexpected\":true}"
+            header(IDEMPOTENCY_HEADER, "register-http-${UUID.randomUUID()}")
+        }.andExpect { status { isBadRequest() } }
     }
 
     @Test
@@ -1037,12 +1279,16 @@ class CirculationPhase2IntegrationTest {
     private companion object {
         const val LOANS_PATH = "/api/v1/circulation/loans"
         const val FINES_PATH = "/api/v1/circulation/fines"
+        const val COPIES_PATH = "/api/v1/circulation/copies"
         const val IDEMPOTENCY_HEADER = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED_HEADER = "Idempotency-Replayed"
         const val RENEW_SCOPE = "SCOPE_circulation.loan.renew"
         const val RENEW_ON_BEHALF_SCOPE = "SCOPE_circulation.loan.renew.on-behalf"
         const val ASSESS_FINE_SCOPE = "SCOPE_circulation.fine.assess"
         const val RECORD_PAYMENT_SCOPE = "SCOPE_circulation.fine.payment.record"
+        const val REGISTER_INVENTORY_SCOPE = "SCOPE_circulation.inventory.register"
+        const val CONDITION_INVENTORY_SCOPE =
+            "SCOPE_circulation.inventory.condition.update"
         const val CONCURRENT_COMMANDS = 100
         const val TEST_ISSUER = "https://issuer.example.test"
         const val TEST_CLIENT_ID = "circulation-phase2-integration-test"

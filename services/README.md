@@ -68,8 +68,9 @@ Health probes:
 - `GET /actuator/health/liveness`
 - `GET /actuator/health/readiness`
 
-All non-health HTTP endpoints require a valid bearer token. Domain endpoints
-also enforce explicit OAuth scopes.
+The immutable OpenAPI document is public at
+`GET /openapi/circulation-v1.json`. All other non-health HTTP endpoints require
+a valid bearer token, and domain endpoints enforce explicit OAuth scopes.
 
 ## Circulation command API
 
@@ -86,6 +87,12 @@ The first authoritative slice exposes:
 | Renew an eligible own loan | `POST /api/v1/circulation/loans/{loanId}/renew` | `circulation.loan.renew` |
 | Renew for another member | `POST /api/v1/circulation/loans/{loanId}/renew` | `circulation.loan.renew.on-behalf` |
 | Return a loan and release its copy | `POST /api/v1/circulation/loans/{loanId}/return` | `circulation.loan.return` |
+| Register a physical copy | `POST /api/v1/circulation/copies` | `circulation.inventory.register` |
+| Change an eligible copy condition | `POST /api/v1/circulation/copies/{copyId}/condition` | `circulation.inventory.condition.update` |
+| Relocate an available copy | `POST /api/v1/circulation/copies/{copyId}/relocations` | `circulation.inventory.relocate` |
+| Assess a fine | `POST /api/v1/circulation/fines` | `circulation.fine.assess` |
+| Record an external fine payment | `POST /api/v1/circulation/fines/{fineId}/payments` | `circulation.fine.payment.record` |
+| Apply an audited fine adjustment | `POST /api/v1/circulation/fines/{fineId}/adjustments` | `circulation.fine.adjust` |
 
 Every command requires an `Idempotency-Key` header containing 16–128 visible
 ASCII characters. A successful replay returns the original response snapshot
@@ -100,13 +107,20 @@ fail closed with HTTP 403 before any command transaction begins. Staff service
 tokens may omit that claim only when granted the separate
 `circulation.loan.request.on-behalf` scope.
 
-Copy allocation is stable by barcode and identifier. Loan state, copy state,
-the idempotency result, and one versioned outbox event commit in the same
-PostgreSQL transaction.
+Copy allocation is stable by barcode and identifier. Copy registration,
+condition changes, and relocation use a separate actor-bound idempotency store
+and an explicit state machine: staff cannot manually create `ON_LOAN` or
+`RESERVED`, mutate loaned/reserved copies, resurrect a withdrawn copy, or
+relocate anything except available inventory. Each command requires an audit
+reason and writes an append-only inventory audit entry with the actor
+fingerprint and before/after state. Loan/copy/fine state, exact replay result, immutable
+fine-ledger entry
+when applicable, and one versioned outbox event commit in the same PostgreSQL
+transaction.
 
 ## Outbox delivery
 
-When `APP_OUTBOX_ENABLED=true`, the service leases unpublished rows with
+When `OUTBOX_DELIVERY_ENABLED=true`, the service leases unpublished rows with
 `FOR UPDATE SKIP LOCKED`, validates their JSON payload against the v1 event
 contract, encodes Protobuf, and waits for a Kafka acknowledgement before
 marking the row published. Leases expire after a process crash, retries are

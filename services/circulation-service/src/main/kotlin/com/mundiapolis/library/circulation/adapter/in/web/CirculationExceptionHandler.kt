@@ -1,6 +1,10 @@
 package com.mundiapolis.library.circulation.adapter.`in`.web
 
 import com.mundiapolis.library.circulation.application.model.ConcurrentCirculationUpdateException
+import com.mundiapolis.library.circulation.application.model.ConcurrentInventoryUpdateException
+import com.mundiapolis.library.circulation.application.model.CopyAlreadyExistsException
+import com.mundiapolis.library.circulation.application.model.CopyNotFoundException
+import com.mundiapolis.library.circulation.application.model.CopyStateConflictException
 import com.mundiapolis.library.circulation.application.model.DuplicatePaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.FineBalanceConflictException
 import com.mundiapolis.library.circulation.application.model.FineNotFoundException
@@ -13,6 +17,7 @@ import com.mundiapolis.library.circulation.application.model.InvalidFineAdjustme
 import com.mundiapolis.library.circulation.application.model.InvalidFineAmountException
 import com.mundiapolis.library.circulation.application.model.InvalidFineNarrativeException
 import com.mundiapolis.library.circulation.application.model.InvalidIdempotencyKeyException
+import com.mundiapolis.library.circulation.application.model.InvalidInventoryInputException
 import com.mundiapolis.library.circulation.application.model.InvalidPaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.LoanNotEligibleForFineException
 import com.mundiapolis.library.circulation.application.model.LoanNotFoundException
@@ -34,6 +39,10 @@ class CirculationExceptionHandler {
     @ExceptionHandler(InvalidIdempotencyKeyException::class)
     fun invalidIdempotencyKey(exception: InvalidIdempotencyKeyException): ProblemDetail =
         problem(HttpStatus.BAD_REQUEST, "invalid_idempotency_key", exception.message)
+
+    @ExceptionHandler(InvalidInventoryInputException::class)
+    fun invalidInventoryInput(exception: InvalidInventoryInputException): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, "invalid_inventory_input", exception.message)
 
     @ExceptionHandler(
         InvalidFineAmountException::class,
@@ -68,6 +77,10 @@ class CirculationExceptionHandler {
     fun fineNotFound(exception: FineNotFoundException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "fine_not_found", exception.message)
 
+    @ExceptionHandler(CopyNotFoundException::class)
+    fun copyNotFound(exception: CopyNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "copy_not_found", exception.message)
+
     @ExceptionHandler(IdempotencyKeyConflictException::class)
     fun idempotencyConflict(exception: IdempotencyKeyConflictException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "idempotency_key_conflict", exception.message)
@@ -99,6 +112,18 @@ class CirculationExceptionHandler {
     @ExceptionHandler(DuplicatePaymentReferenceException::class)
     fun duplicatePaymentReference(exception: DuplicatePaymentReferenceException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "duplicate_payment_reference", exception.message)
+
+    @ExceptionHandler(CopyAlreadyExistsException::class)
+    fun copyAlreadyExists(exception: CopyAlreadyExistsException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "copy_already_exists", exception.message)
+
+    @ExceptionHandler(CopyStateConflictException::class)
+    fun copyStateConflict(exception: CopyStateConflictException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "copy_state_conflict", exception.message)
+
+    @ExceptionHandler(ConcurrentInventoryUpdateException::class)
+    fun concurrentInventoryUpdate(exception: ConcurrentInventoryUpdateException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "concurrent_inventory_update", exception.message)
 
     @ExceptionHandler(FinePersistenceConflictException::class)
     fun finePersistenceConflict(exception: FinePersistenceConflictException): ProblemDetail =

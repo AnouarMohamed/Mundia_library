@@ -1,20 +1,26 @@
 package com.mundiapolis.library.circulation.application.port.outbound
 
-import com.mundiapolis.library.circulation.application.model.CirculationOutboxEvent
-import com.mundiapolis.library.circulation.application.model.CommandOperation
 import com.mundiapolis.library.circulation.application.model.BrokerPublishAcknowledgement
+import com.mundiapolis.library.circulation.application.model.CirculationOutboxEvent
 import com.mundiapolis.library.circulation.application.model.ClaimedOutboxEvent
+import com.mundiapolis.library.circulation.application.model.CommandOperation
 import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.FineCommandResult
 import com.mundiapolis.library.circulation.application.model.FineOutboxEvent
 import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
+import com.mundiapolis.library.circulation.application.model.InventoryCommandResult
+import com.mundiapolis.library.circulation.application.model.InventoryAuditEntry
+import com.mundiapolis.library.circulation.application.model.InventoryOperation
+import com.mundiapolis.library.circulation.application.model.InventoryOutboxEvent
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
-import com.mundiapolis.library.circulation.application.model.StoredIdempotencyResult
 import com.mundiapolis.library.circulation.application.model.StoredFineIdempotencyResult
+import com.mundiapolis.library.circulation.application.model.StoredIdempotencyResult
+import com.mundiapolis.library.circulation.application.model.StoredInventoryIdempotencyResult
+import com.mundiapolis.library.circulation.domain.model.Copy
 import com.mundiapolis.library.circulation.domain.model.CopyId
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import com.mundiapolis.library.circulation.domain.model.Fine
@@ -38,9 +44,39 @@ interface LoanStore {
 }
 
 interface CopyStore {
+    fun create(copy: Copy, now: Instant): Boolean
+
+    fun lockById(id: CopyId): Copy?
+
+    fun update(copy: Copy, expectedVersion: Long, now: Instant): Boolean
+
     fun allocateAvailable(editionId: EditionId, now: Instant): CopyId?
 
     fun release(copyId: CopyId, now: Instant): Boolean
+}
+
+interface InventoryIdempotencyStore {
+    fun claim(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        operation: InventoryOperation,
+        requestFingerprint: String,
+        createdAt: Instant,
+        expiresAt: Instant,
+    ): Boolean
+
+    fun find(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+    ): StoredInventoryIdempotencyResult?
+
+    fun complete(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        operation: InventoryOperation,
+        result: InventoryCommandResult,
+        completedAt: Instant,
+    )
 }
 
 interface FineStore {
@@ -106,6 +142,14 @@ fun interface OutboxEventStore {
 
 fun interface FineOutboxEventStore {
     fun append(event: FineOutboxEvent)
+}
+
+fun interface InventoryOutboxEventStore {
+    fun append(event: InventoryOutboxEvent)
+}
+
+fun interface InventoryAuditStore {
+    fun append(entry: InventoryAuditEntry)
 }
 
 interface OutboxDeliveryStore {

@@ -356,6 +356,22 @@ const TARGET_PHASE2_COLUMNS = [
   "circulation_copy.status:character varying(32):true",
   "circulation_copy.updated_at:timestamp with time zone:true",
   "circulation_copy.version:bigint:true",
+  "circulation_inventory_audit_entry.actor_fingerprint:character(64):true",
+  "circulation_inventory_audit_entry.barcode:character varying(64):true",
+  "circulation_inventory_audit_entry.branch_id:uuid:true",
+  "circulation_inventory_audit_entry.copy_id:uuid:true",
+  "circulation_inventory_audit_entry.copy_status:character varying(32):true",
+  "circulation_inventory_audit_entry.copy_version:bigint:true",
+  "circulation_inventory_audit_entry.created_at:timestamp with time zone:true",
+  "circulation_inventory_audit_entry.edition_id:uuid:true",
+  "circulation_inventory_audit_entry.id:uuid:true",
+  "circulation_inventory_audit_entry.occurred_at:timestamp with time zone:true",
+  "circulation_inventory_audit_entry.operation:character varying(32):true",
+  "circulation_inventory_audit_entry.previous_branch_id:uuid:false",
+  "circulation_inventory_audit_entry.previous_shelf_location:character varying(128):false",
+  "circulation_inventory_audit_entry.previous_status:character varying(32):false",
+  "circulation_inventory_audit_entry.reason:character varying(500):true",
+  "circulation_inventory_audit_entry.shelf_location:character varying(128):false",
   "circulation_fine.balance_minor:bigint:true",
   "circulation_fine.created_at:timestamp with time zone:true",
   "circulation_fine.currency:character(3):true",
@@ -415,6 +431,17 @@ const TARGET_PHASE2_COLUMNS = [
 ].sort();
 
 const REQUIRED_TARGET_CONSTRAINTS = new Set([
+  "ck_circulation_copy_barcode_shape",
+  "ck_circulation_copy_shelf_location_shape",
+  "uq_circulation_inventory_audit_version",
+  "ck_circulation_inventory_audit_version",
+  "ck_circulation_inventory_audit_operation",
+  "ck_circulation_inventory_audit_status",
+  "ck_circulation_inventory_audit_actor",
+  "ck_circulation_inventory_audit_reason",
+  "ck_circulation_inventory_audit_shape",
+  "ck_circulation_inventory_audit_timestamps",
+  "circulation_inventory_audit_entry_copy_id_fkey",
   "ck_circulation_loan_renewal_count",
   "ck_circulation_fine_currency",
   "ck_circulation_fine_balance",
@@ -446,6 +473,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   136_632_738,
   -907_354_976,
   -1_922_605_307,
+  740_925_932,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -477,7 +505,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 8",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 9",
     );
   }
 
@@ -505,6 +533,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
   `, [
     [
       "circulation_copy",
+      "circulation_inventory_audit_entry",
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
@@ -542,6 +571,8 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       AND relation.relname = ANY($1::text[])
   `, [
     [
+      "circulation_copy",
+      "circulation_inventory_audit_entry",
       "circulation_loan",
       "circulation_fine",
       "circulation_fine_ledger_entry",
@@ -584,6 +615,8 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "trg_circulation_fine_protect_identity",
       "trg_circulation_fine_ledger_consistency_from_fine",
       "trg_circulation_fine_ledger_consistency_from_entry",
+      "trg_circulation_inventory_audit_no_update_delete",
+      "trg_circulation_inventory_audit_no_truncate",
     ],
   ]);
   const expectedTriggers = new Map([
@@ -606,6 +639,14 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     [
       "trg_circulation_fine_ledger_consistency_from_entry",
       "validate_circulation_fine_ledger_consistency",
+    ],
+    [
+      "trg_circulation_inventory_audit_no_update_delete",
+      "reject_circulation_inventory_audit_mutation",
+    ],
+    [
+      "trg_circulation_inventory_audit_no_truncate",
+      "reject_circulation_inventory_audit_mutation",
     ],
   ]);
   for (const [name, functionName] of expectedTriggers) {

@@ -30,7 +30,7 @@ operator acknowledgements.
 - The apply process receives a plan and a target URL only. It has no source
   connection and cannot write the legacy database.
 - Apply requires PostgreSQL 18 and exactly successful circulation Flyway
-  versions 1 through 8. It validates the target column signature, validated
+  versions 1 through 9. It validates the target column signature, validated
   constraints, and enabled immutable/consistency triggers before touching data.
 - Apply uses one serializable transaction, a PostgreSQL advisory lock, bounded
   timeouts, insert-only statements, and exact post-insert reconciliation across
@@ -79,7 +79,7 @@ CIRCULATION_MIGRATION_TEST_DATABASE=FRESH_DB \
 npm run test:integration
 ```
 
-CI must provision that fresh database, run circulation Flyway 1 through 8, and
+CI must provision that fresh database, run circulation Flyway 1 through 9, and
 set both test-only variables; it must not point this test at a shared database.
 `test:integration` fails rather than skips when either variable is absent.
 The ordinary `npm test` reports the database scenario as skipped when the
@@ -219,7 +219,7 @@ npm run cli -- plan \
 
 ### 2. Prepare the target
 
-Apply the circulation service's reviewed Flyway migrations 1 through 8 to a
+Apply the circulation service's reviewed Flyway migrations 1 through 9 to a
 fresh local PostgreSQL 18 target. Stop the circulation service writer. The
 target database role should have only:
 

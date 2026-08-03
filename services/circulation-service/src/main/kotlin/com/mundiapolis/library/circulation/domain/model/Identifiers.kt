@@ -12,6 +12,9 @@ value class CopyId(val value: UUID)
 value class EditionId(val value: UUID)
 
 @JvmInline
+value class BranchId(val value: UUID)
+
+@JvmInline
 value class MemberId(val value: UUID)
 
 @JvmInline
