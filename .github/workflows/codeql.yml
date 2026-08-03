@@ -55,6 +55,14 @@ jobs:
           distribution: temurin
           java-version: "25"
 
+      # Generate database bindings before CodeQL tracing starts. Instrumenting
+      # jOOQ's generator records the generator and SQL parser internals rather
+      # than product code, and makes this job grow with every Flyway migration.
+      - name: Generate jOOQ sources
+        if: matrix.language == 'java-kotlin'
+        working-directory: services
+        run: ./gradlew jooqCodegen --no-daemon
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@7188fc363630916deb702c7fdcf4e481b751f97a # v4
         with:
@@ -64,7 +72,7 @@ jobs:
       - name: Build Kotlin services
         if: matrix.language == 'java-kotlin'
         working-directory: services
-        run: ./gradlew clean classes --no-daemon
+        run: ./gradlew classes -x jooqCodegen --no-daemon
 
       - name: Autobuild JavaScript/TypeScript
         if: matrix.language == 'javascript-typescript'
