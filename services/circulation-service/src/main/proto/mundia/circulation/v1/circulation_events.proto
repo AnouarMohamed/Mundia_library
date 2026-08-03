@@ -23,6 +23,7 @@ message CirculationEvent {
   oneof payload {
     LoanEvent loan = 20;
     FineEvent fine = 21;
+    CopyEvent copy = 22;
   }
 
   reserved 9 to 19;
@@ -69,6 +70,28 @@ enum FineStatus {
   FINE_STATUS_OPEN = 1;
   FINE_STATUS_PAID = 2;
   FINE_STATUS_VOID = 3;
+  FINE_STATUS_SETTLED = 4;
+}
+
+message CopyEvent {
+  string copy_id = 1;
+  string edition_id = 2;
+  string branch_id = 3;
+  string barcode = 4;
+  CopyStatus status = 5;
+  optional string shelf_location = 6;
+  uint64 copy_version = 7;
+  string reason = 8;
+}
+
+enum CopyStatus {
+  COPY_STATUS_UNSPECIFIED = 0;
+  COPY_STATUS_AVAILABLE = 1;
+  COPY_STATUS_ON_LOAN = 2;
+  COPY_STATUS_RESERVED = 3;
+  COPY_STATUS_LOST = 4;
+  COPY_STATUS_DAMAGED = 5;
+  COPY_STATUS_WITHDRAWN = 6;
 }
 
 enum FineLedgerEntryType {

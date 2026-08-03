@@ -6,6 +6,8 @@ import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.port.outbound.EventContractEncoder
 import com.mundiapolis.library.circulation.config.OutboxDeliveryProperties
 import com.mundiapolis.library.circulation.contract.v1.CirculationEvent
+import com.mundiapolis.library.circulation.contract.v1.CopyEvent
+import com.mundiapolis.library.circulation.contract.v1.CopyStatus
 import com.mundiapolis.library.circulation.contract.v1.FineEvent
 import com.mundiapolis.library.circulation.contract.v1.FineLedgerEntryType
 import com.mundiapolis.library.circulation.contract.v1.FineStatus
@@ -43,6 +45,7 @@ class ProtobufOutboxEventEncoder(
                 when (event.aggregateType) {
                     LOAN_AGGREGATE -> setLoan(encodeLoan(event, payload))
                     FINE_AGGREGATE -> setFine(encodeFine(event, payload))
+                    COPY_AGGREGATE -> setCopy(encodeCopy(event, payload))
                     else -> throw OutboxContractException()
                 }
             }
@@ -123,6 +126,41 @@ class ProtobufOutboxEventEncoder(
             .setLedgerEntryId(payload.requiredUuid("ledgerEntryId").toString())
             .setLedgerEntryType(entryType)
             .setLedgerDeltaMinor(payload.requiredLong("ledgerDeltaMinor"))
+            .build()
+    }
+
+    private fun encodeCopy(event: ClaimedOutboxEvent, payload: JsonNode): CopyEvent {
+        requireContract(payload.isObject)
+        requireContract(payload.propertyNames().all(COPY_PAYLOAD_FIELDS::contains))
+
+        val copyId = payload.requiredUuid("copyId")
+        val copyVersion = payload.requiredNonNegativeLong("copyVersion")
+        val status = payload.requiredText("status").toCopyStatus()
+        requireContract(copyId == event.aggregateId)
+        requireContract(copyVersion == event.aggregateVersion)
+        requireContract(status in COPY_EVENT_STATUSES.getValue(event.eventType))
+        payload.validateActorFingerprint()
+        val barcode = payload.requiredText("barcode")
+        requireContract(BARCODE.matches(barcode))
+        val reason = payload.requiredText("reason")
+        requireContract(reason.length <= 500 && reason == reason.trim())
+
+        return CopyEvent.newBuilder()
+            .setCopyId(copyId.toString())
+            .setEditionId(payload.requiredUuid("editionId").toString())
+            .setBranchId(payload.requiredUuid("branchId").toString())
+            .setBarcode(barcode)
+            .setStatus(status)
+            .setCopyVersion(copyVersion)
+            .setReason(reason)
+            .apply {
+                payload.optionalText("shelfLocation")?.let { shelfLocation ->
+                    requireContract(
+                        shelfLocation.length <= 128 && shelfLocation == shelfLocation.trim(),
+                    )
+                    setShelfLocation(shelfLocation)
+                }
+            }
             .build()
     }
 
@@ -217,8 +255,19 @@ class ProtobufOutboxEventEncoder(
 
     private fun String.toFineStatus(): FineStatus = when (this) {
         "OPEN" -> FineStatus.FINE_STATUS_OPEN
+        "SETTLED" -> FineStatus.FINE_STATUS_SETTLED
         "PAID" -> FineStatus.FINE_STATUS_PAID
         "VOID" -> FineStatus.FINE_STATUS_VOID
+        else -> throw OutboxContractException()
+    }
+
+    private fun String.toCopyStatus(): CopyStatus = when (this) {
+        "AVAILABLE" -> CopyStatus.COPY_STATUS_AVAILABLE
+        "ON_LOAN" -> CopyStatus.COPY_STATUS_ON_LOAN
+        "RESERVED" -> CopyStatus.COPY_STATUS_RESERVED
+        "LOST" -> CopyStatus.COPY_STATUS_LOST
+        "DAMAGED" -> CopyStatus.COPY_STATUS_DAMAGED
+        "WITHDRAWN" -> CopyStatus.COPY_STATUS_WITHDRAWN
         else -> throw OutboxContractException()
     }
 
@@ -249,10 +298,12 @@ class ProtobufOutboxEventEncoder(
         const val CONTRACT_VERSION = 1
         const val LOAN_AGGREGATE = "loan"
         const val FINE_AGGREGATE = "fine"
+        const val COPY_AGGREGATE = "copy"
         const val MAX_TEXT_LENGTH = 512
         val TRACE_ID = Regex("[0-9a-f]{32}")
         val ACTOR_FINGERPRINT = Regex("[0-9a-f]{64}")
         val CURRENCY = Regex("[A-Z]{3}")
+        val BARCODE = Regex("[A-Za-z0-9][A-Za-z0-9._/-]{2,63}")
         val EVENT_TYPES = mapOf(
             "circulation.loan.requested" to LOAN_AGGREGATE,
             "circulation.loan.approved" to LOAN_AGGREGATE,
@@ -263,6 +314,9 @@ class ProtobufOutboxEventEncoder(
             "circulation.fine.assessed" to FINE_AGGREGATE,
             "circulation.fine.payment-recorded" to FINE_AGGREGATE,
             "circulation.fine.adjusted" to FINE_AGGREGATE,
+            "circulation.copy.registered" to COPY_AGGREGATE,
+            "circulation.copy.condition-changed" to COPY_AGGREGATE,
+            "circulation.copy.relocated" to COPY_AGGREGATE,
         )
         val LOAN_EVENT_STATUSES = mapOf(
             "circulation.loan.requested" to setOf(LoanStatus.LOAN_STATUS_REQUESTED),
@@ -276,6 +330,16 @@ class ProtobufOutboxEventEncoder(
             "circulation.fine.assessed" to FineLedgerEntryType.FINE_LEDGER_ENTRY_TYPE_ASSESSMENT,
             "circulation.fine.payment-recorded" to FineLedgerEntryType.FINE_LEDGER_ENTRY_TYPE_PAYMENT,
             "circulation.fine.adjusted" to FineLedgerEntryType.FINE_LEDGER_ENTRY_TYPE_ADJUSTMENT,
+        )
+        val COPY_EVENT_STATUSES = mapOf(
+            "circulation.copy.registered" to setOf(CopyStatus.COPY_STATUS_AVAILABLE),
+            "circulation.copy.condition-changed" to setOf(
+                CopyStatus.COPY_STATUS_AVAILABLE,
+                CopyStatus.COPY_STATUS_LOST,
+                CopyStatus.COPY_STATUS_DAMAGED,
+                CopyStatus.COPY_STATUS_WITHDRAWN,
+            ),
+            "circulation.copy.relocated" to setOf(CopyStatus.COPY_STATUS_AVAILABLE),
         )
         val LOAN_PAYLOAD_FIELDS = setOf(
             "loanId",
@@ -305,6 +369,17 @@ class ProtobufOutboxEventEncoder(
             "actorFingerprint",
             "externalReference",
             "occurredAt",
+        )
+        val COPY_PAYLOAD_FIELDS = setOf(
+            "copyId",
+            "editionId",
+            "branchId",
+            "barcode",
+            "status",
+            "shelfLocation",
+            "copyVersion",
+            "actorFingerprint",
+            "reason",
         )
     }
 }

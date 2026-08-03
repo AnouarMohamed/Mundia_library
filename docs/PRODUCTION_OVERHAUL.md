@@ -37,7 +37,7 @@ The detailed decisions are in
 
 ## Implemented checkpoint
 
-As of 2026-08-01, Phase 0 containment and the first circulation vertical slice
+As of 2026-08-03, Phase 0 containment and the first circulation vertical slice
 are implemented in the repository:
 
 - The legacy application uses transaction-capable PostgreSQL everywhere,
@@ -53,9 +53,15 @@ are implemented in the repository:
   production reject legacy credentials. Real tenant integration, privileged
   MFA, recovery, logout, and adversarial provider tests remain release gates.
 - `services/circulation-service` implements request, deterministic copy
-  allocation/approval, rejection, member cancellation, return, and renewal as caller-bound
-  idempotent commands.
-  State, exact replay results, and versioned outbox events commit atomically.
+  allocation/approval, rejection, member cancellation, return, renewal,
+  copy registration/condition/relocation, and immutable-ledger fine commands
+  as caller-bound idempotent commands.
+  State, exact replay results, append-only inventory/fine audit entries, and
+  versioned outbox events commit atomically.
+- The service publishes a machine-validated OpenAPI 3.1 contract whose route,
+  scope, idempotency, and transport field sets are checked against the Kotlin
+  controllers in tests. Copy inventory events extend the additive Protobuf v1
+  envelope; terminal fine payments now encode the domain `SETTLED` state.
 - The service validates issuer, audience, and scopes, binds self-service
   requests to a UUID membership claim, isolates idempotency by authenticated
   actor/client, and has real PostgreSQL 18 tests for 100-way command races and
@@ -70,8 +76,9 @@ are implemented in the repository:
   namespaces. Admission policy fixes approved secret names, remote keys, stores,
   and target Secret names.
 
-This checkpoint is not general availability. The platform/IdP, complete
-circulation domain, consumer inboxes, remaining domain extractions, data
+This checkpoint is not general availability. The platform/IdP, remaining
+circulation reservation/policy/eligibility reads, consumer inboxes, remaining domain
+extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.
 

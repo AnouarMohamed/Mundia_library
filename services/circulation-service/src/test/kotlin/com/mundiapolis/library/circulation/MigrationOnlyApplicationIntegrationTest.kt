@@ -94,6 +94,7 @@ class MigrationOnlyApplicationIntegrationTest {
                         "6",
                         "7",
                         "8",
+                        "9",
                     )
                 }
             }

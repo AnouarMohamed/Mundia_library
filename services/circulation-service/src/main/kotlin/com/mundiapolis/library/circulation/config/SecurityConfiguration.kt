@@ -26,6 +26,7 @@ class SecurityConfiguration {
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
                 it.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                it.requestMatchers("/openapi/circulation-v1.json").permitAll()
                 it.requestMatchers("/actuator/**")
                     .hasAuthority("SCOPE_circulation.operations.read")
                 it.anyRequest().authenticated()

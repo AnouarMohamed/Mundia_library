@@ -1,0 +1,565 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mundiapolis Circulation API",
+    "version": "1.0.0",
+    "description": "Authoritative version 1 command and operational-read contract for the circulation bounded context. All commands require an actor-scoped Idempotency-Key.",
+    "license": { "name": "MIT", "identifier": "MIT" }
+  },
+  "servers": [
+    { "url": "/", "description": "The same origin as the published contract" }
+  ],
+  "tags": [
+    { "name": "Loans", "description": "Idempotent loan lifecycle commands" },
+    { "name": "Inventory", "description": "Audited physical-copy inventory commands" },
+    { "name": "Fines", "description": "Idempotent fine and immutable-ledger commands" },
+    { "name": "Operations", "description": "Authenticated operational read models" }
+  ],
+  "paths": {
+    "/api/v1/circulation/status": {
+      "get": {
+        "operationId": "getCirculationStatus",
+        "tags": ["Operations"],
+        "summary": "Read the service status projection",
+        "x-required-scopes": ["circulation.read"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current status",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationStatus" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans": {
+      "post": {
+        "operationId": "requestLoan",
+        "tags": ["Loans"],
+        "summary": "Request a loan",
+        "x-required-scopes": ["circulation.loan.request", "circulation.loan.request.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RequestLoanRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/LoanCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/approve": {
+      "post": {
+        "operationId": "approveLoan",
+        "tags": ["Loans"],
+        "summary": "Approve a requested loan and allocate one copy",
+        "x-required-scopes": ["circulation.loan.approve"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/reject": {
+      "post": {
+        "operationId": "rejectLoan",
+        "tags": ["Loans"],
+        "summary": "Reject a requested loan",
+        "x-required-scopes": ["circulation.loan.reject"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/cancel": {
+      "post": {
+        "operationId": "cancelLoan",
+        "tags": ["Loans"],
+        "summary": "Cancel a requested loan",
+        "x-required-scopes": ["circulation.loan.cancel", "circulation.loan.cancel.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/return": {
+      "post": {
+        "operationId": "returnLoan",
+        "tags": ["Loans"],
+        "summary": "Return an active loan and release its copy",
+        "x-required-scopes": ["circulation.loan.return"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/renew": {
+      "post": {
+        "operationId": "renewLoan",
+        "tags": ["Loans"],
+        "summary": "Renew an eligible active loan",
+        "x-required-scopes": ["circulation.loan.renew", "circulation.loan.renew.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/copies": {
+      "post": {
+        "operationId": "registerCopy",
+        "tags": ["Inventory"],
+        "summary": "Register a physical copy in available inventory",
+        "x-required-scopes": ["circulation.inventory.register"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterCopyRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/InventoryCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/copies/{copyId}/condition": {
+      "post": {
+        "operationId": "changeCopyCondition",
+        "tags": ["Inventory"],
+        "summary": "Record an allowed physical-copy condition transition",
+        "x-required-scopes": ["circulation.inventory.condition.update"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/CopyId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeCopyConditionRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/InventoryCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/copies/{copyId}/relocations": {
+      "post": {
+        "operationId": "relocateCopy",
+        "tags": ["Inventory"],
+        "summary": "Move an available copy to a branch shelf",
+        "x-required-scopes": ["circulation.inventory.relocate"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/CopyId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RelocateCopyRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/InventoryCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/fines": {
+      "post": {
+        "operationId": "assessFine",
+        "tags": ["Fines"],
+        "summary": "Assess a fine against an eligible loan",
+        "x-required-scopes": ["circulation.fine.assess"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AssessFineRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/FineCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/fines/{fineId}/payments": {
+      "post": {
+        "operationId": "recordFinePayment",
+        "tags": ["Fines"],
+        "summary": "Record an externally settled fine payment",
+        "x-required-scopes": ["circulation.fine.payment.record"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/FineId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordFinePaymentRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/FineCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/fines/{fineId}/adjustments": {
+      "post": {
+        "operationId": "adjustFine",
+        "tags": ["Fines"],
+        "summary": "Apply an auditable fine adjustment",
+        "x-required-scopes": ["circulation.fine.adjust"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/FineId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdjustFineRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/FineCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "OIDC access token. Exact required scopes are listed by x-required-scopes on each operation."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Actor-scoped command key. Reuse with a different payload is rejected.",
+        "schema": { "type": "string", "minLength": 16, "maxLength": 128, "pattern": "^[!-~]+$" }
+      },
+      "LoanId": {
+        "name": "loanId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "CopyId": {
+        "name": "copyId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "FineId": {
+        "name": "fineId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "headers": {
+      "IdempotencyReplayed": {
+        "description": "True when the stored result for this actor and key was replayed.",
+        "required": true,
+        "schema": { "type": "boolean" }
+      },
+      "Location": {
+        "description": "Canonical path of the created resource.",
+        "required": true,
+        "schema": { "type": "string", "format": "uri-reference" }
+      }
+    },
+    "responses": {
+      "LoanCreated": {
+        "description": "Loan request created or its original result replayed",
+        "headers": {
+          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
+          "Location": { "$ref": "#/components/headers/Location" }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoanCommandResponse" } } }
+      },
+      "LoanCommandSucceeded": {
+        "description": "Loan command committed or its original result replayed",
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoanCommandResponse" } } }
+      },
+      "FineCreated": {
+        "description": "Fine created or its original result replayed",
+        "headers": {
+          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
+          "Location": { "$ref": "#/components/headers/Location" }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FineCommandResponse" } } }
+      },
+      "FineCommandSucceeded": {
+        "description": "Fine command committed or its original result replayed",
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FineCommandResponse" } } }
+      },
+      "InventoryCreated": {
+        "description": "Copy registered or its original result replayed",
+        "headers": {
+          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
+          "Location": { "$ref": "#/components/headers/Location" }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InventoryCommandResponse" } } }
+      },
+      "InventoryCommandSucceeded": {
+        "description": "Inventory command committed or its original result replayed",
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InventoryCommandResponse" } } }
+      },
+      "BadRequest": {
+        "description": "Malformed request or invalid command input",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid bearer token",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "Forbidden": {
+        "description": "Token lacks a required scope or may not act for the member",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "NotFound": {
+        "description": "Loan or fine does not exist",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "Conflict": {
+        "description": "Lifecycle, invariant, concurrency, or idempotency conflict",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      }
+    },
+    "schemas": {
+      "CirculationStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service", "activeLoans"],
+        "properties": {
+          "service": { "type": "string", "const": "circulation-service" },
+          "activeLoans": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "RequestLoanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "editionId"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "RegisterCopyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["copyId", "editionId", "branchId", "barcode", "shelfLocation", "reason"],
+        "properties": {
+          "copyId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "branchId": { "type": "string", "format": "uuid" },
+          "barcode": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{2,63}$" },
+          "shelfLocation": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+          "reason": { "$ref": "#/components/schemas/InventoryReason" }
+        }
+      },
+      "ChangeCopyConditionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "reason"],
+        "properties": {
+          "status": { "type": "string", "enum": ["AVAILABLE", "LOST", "DAMAGED", "WITHDRAWN"] },
+          "reason": { "$ref": "#/components/schemas/InventoryReason" }
+        }
+      },
+      "RelocateCopyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["branchId", "shelfLocation", "reason"],
+        "properties": {
+          "branchId": { "type": "string", "format": "uuid" },
+          "shelfLocation": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "reason": { "$ref": "#/components/schemas/InventoryReason" }
+        }
+      },
+      "InventoryReason": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500,
+        "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001F\\u007F]+$"
+      },
+      "InventoryCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["copyId", "editionId", "branchId", "barcode", "status", "shelfLocation", "version", "occurredAt"],
+        "properties": {
+          "copyId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "branchId": { "type": "string", "format": "uuid" },
+          "barcode": { "type": "string", "minLength": 3, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{2,63}$" },
+          "status": { "type": "string", "enum": ["AVAILABLE", "ON_LOAN", "RESERVED", "LOST", "DAMAGED", "WITHDRAWN"] },
+          "shelfLocation": { "type": ["string", "null"], "minLength": 1, "maxLength": 128 },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 },
+          "occurredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AssessFineRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["loanId", "amountMinor", "reason"],
+        "properties": {
+          "loanId": { "type": "string", "format": "uuid" },
+          "amountMinor": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1000000000000 },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001F\\u007F]+$" }
+        }
+      },
+      "RecordFinePaymentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amountMinor", "externalReference"],
+        "properties": {
+          "amountMinor": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1000000000000 },
+          "externalReference": { "type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[!-~]+$" }
+        }
+      },
+      "AdjustFineRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["deltaMinor", "reason"],
+        "properties": {
+          "deltaMinor": { "type": "integer", "format": "int64", "minimum": -1000000000000, "maximum": 1000000000000, "not": { "const": 0 } },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001F\\u007F]+$" }
+        }
+      },
+      "LoanCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["loanId", "memberId", "editionId", "copyId", "status", "requestedAt", "checkedOutAt", "dueAt", "returnedAt", "renewalCount", "version"],
+        "properties": {
+          "loanId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "copyId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string", "enum": ["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"] },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "checkedOutAt": { "type": ["string", "null"], "format": "date-time" },
+          "dueAt": { "type": ["string", "null"], "format": "date-time" },
+          "returnedAt": { "type": ["string", "null"], "format": "date-time" },
+          "renewalCount": { "type": "integer", "format": "int32", "minimum": 0, "maximum": 100 },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "FineCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fineId", "loanId", "memberId", "currency", "balanceMinor", "status", "version", "ledgerEntryId", "ledgerEntryType", "ledgerDeltaMinor", "occurredAt"],
+        "properties": {
+          "fineId": { "type": "string", "format": "uuid" },
+          "loanId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+          "balanceMinor": { "type": "integer", "format": "int64", "minimum": 0, "maximum": 1000000000000 },
+          "status": { "type": "string", "enum": ["OPEN", "SETTLED"] },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 },
+          "ledgerEntryId": { "type": "string", "format": "uuid" },
+          "ledgerEntryType": { "type": "string", "enum": ["ASSESSMENT", "PAYMENT", "ADJUSTMENT"] },
+          "ledgerDeltaMinor": { "type": "integer", "format": "int64", "minimum": -1000000000000, "maximum": 1000000000000 },
+          "occurredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "required": ["type", "title", "status"],
+        "properties": {
+          "type": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "status": { "type": "integer", "minimum": 400, "maximum": 599 },
+          "detail": { "type": "string" },
+          "instance": { "type": "string", "format": "uri-reference" },
+          "code": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+        }
+      }
+    }
+  }
+}

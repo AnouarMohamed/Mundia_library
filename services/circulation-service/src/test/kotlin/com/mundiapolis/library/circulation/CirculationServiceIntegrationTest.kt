@@ -106,10 +106,18 @@ class CirculationServiceIntegrationTest {
     }
 
     @Test
-    fun `health is public but circulation status requires authentication and scope`() {
+    fun `health and versioned contract are public but service data requires authentication and scope`() {
         mockMvc.get("/actuator/health/liveness")
             .andExpect {
                 status { isOk() }
+            }
+
+        mockMvc.get("/openapi/circulation-v1.json")
+            .andExpect {
+                status { isOk() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+                jsonPath("$.openapi") { value("3.1.0") }
+                jsonPath("$.info.version") { value("1.0.0") }
             }
 
         mockMvc.get("/actuator/prometheus")

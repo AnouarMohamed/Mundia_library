@@ -3,8 +3,13 @@ package com.mundiapolis.library.circulation.adapter.outbound.persistence
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_COPY
 import com.mundiapolis.library.circulation.application.model.ConcurrentCirculationUpdateException
 import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
+import com.mundiapolis.library.circulation.domain.model.BranchId
+import com.mundiapolis.library.circulation.domain.model.Copy
+import com.mundiapolis.library.circulation.domain.model.CopyBarcode
 import com.mundiapolis.library.circulation.domain.model.CopyId
+import com.mundiapolis.library.circulation.domain.model.CopyStatus
 import com.mundiapolis.library.circulation.domain.model.EditionId
+import com.mundiapolis.library.circulation.domain.model.ShelfLocation
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -15,6 +20,50 @@ import java.time.ZoneOffset
 class JooqCopyStore(
     private val dsl: DSLContext,
 ) : CopyStore {
+    override fun create(copy: Copy, now: Instant): Boolean =
+        dsl.insertInto(CIRCULATION_COPY)
+            .set(CIRCULATION_COPY.ID, copy.id.value)
+            .set(CIRCULATION_COPY.EDITION_ID, copy.editionId.value)
+            .set(CIRCULATION_COPY.BRANCH_ID, copy.branchId.value)
+            .set(CIRCULATION_COPY.BARCODE, copy.barcode.value)
+            .set(CIRCULATION_COPY.STATUS, copy.status.name)
+            .set(CIRCULATION_COPY.SHELF_LOCATION, copy.shelfLocation?.value)
+            .set(CIRCULATION_COPY.VERSION, copy.version)
+            .set(CIRCULATION_COPY.CREATED_AT, now.toOffsetDateTime())
+            .set(CIRCULATION_COPY.UPDATED_AT, now.toOffsetDateTime())
+            .onConflictDoNothing()
+            .execute() == 1
+
+    override fun lockById(id: CopyId): Copy? =
+        dsl.selectFrom(CIRCULATION_COPY)
+            .where(CIRCULATION_COPY.ID.eq(id.value))
+            .forUpdate()
+            .fetchOne()
+            ?.let { record ->
+                Copy.restore(
+                    id = CopyId(requireNotNull(record.id)),
+                    editionId = EditionId(requireNotNull(record.editionId)),
+                    branchId = BranchId(requireNotNull(record.branchId)),
+                    barcode = CopyBarcode.parse(requireNotNull(record.barcode)),
+                    status = CopyStatus.valueOf(requireNotNull(record.status)),
+                    shelfLocation = record.shelfLocation?.let(ShelfLocation::parse),
+                    version = requireNotNull(record.version),
+                )
+            }
+
+    override fun update(copy: Copy, expectedVersion: Long, now: Instant): Boolean =
+        dsl.update(CIRCULATION_COPY)
+            .set(CIRCULATION_COPY.BRANCH_ID, copy.branchId.value)
+            .set(CIRCULATION_COPY.STATUS, copy.status.name)
+            .set(CIRCULATION_COPY.SHELF_LOCATION, copy.shelfLocation?.value)
+            .set(CIRCULATION_COPY.VERSION, copy.version)
+            .set(CIRCULATION_COPY.UPDATED_AT, now.toOffsetDateTime())
+            .where(
+                CIRCULATION_COPY.ID.eq(copy.id.value)
+                    .and(CIRCULATION_COPY.VERSION.eq(expectedVersion)),
+            )
+            .execute() == 1
+
     override fun allocateAvailable(editionId: EditionId, now: Instant): CopyId? {
         val candidate = dsl
             .select(CIRCULATION_COPY.ID, CIRCULATION_COPY.VERSION)

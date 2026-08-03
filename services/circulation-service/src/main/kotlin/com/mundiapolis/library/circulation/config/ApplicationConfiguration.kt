@@ -9,6 +9,9 @@ import com.mundiapolis.library.circulation.application.port.outbound.FineOutboxE
 import com.mundiapolis.library.circulation.application.port.outbound.FineStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdempotencyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
+import com.mundiapolis.library.circulation.application.port.outbound.InventoryAuditStore
+import com.mundiapolis.library.circulation.application.port.outbound.InventoryIdempotencyStore
+import com.mundiapolis.library.circulation.application.port.outbound.InventoryOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.LoanStore
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
@@ -16,6 +19,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.Transaction
 import com.mundiapolis.library.circulation.application.service.CirculationCommandService
 import com.mundiapolis.library.circulation.application.service.FineCommandService
 import com.mundiapolis.library.circulation.application.service.GetCirculationStatusService
+import com.mundiapolis.library.circulation.application.service.InventoryCommandService
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import java.time.Instant
@@ -73,6 +77,27 @@ class ApplicationConfiguration {
         timeProvider = timeProvider,
         identifierGenerator = identifierGenerator,
         currency = policy.fineCurrency,
+        idempotencyRetention = policy.idempotencyRetention,
+    )
+
+    @Bean
+    fun inventoryCommandService(
+        transactionRunner: TransactionRunner,
+        copyStore: CopyStore,
+        inventoryIdempotencyStore: InventoryIdempotencyStore,
+        inventoryAuditStore: InventoryAuditStore,
+        inventoryOutboxEventStore: InventoryOutboxEventStore,
+        timeProvider: TimeProvider,
+        identifierGenerator: IdentifierGenerator,
+        policy: CirculationPolicyProperties,
+    ): InventoryCommandService = InventoryCommandService(
+        transactionRunner = transactionRunner,
+        copyStore = copyStore,
+        idempotencyStore = inventoryIdempotencyStore,
+        auditStore = inventoryAuditStore,
+        outboxEventStore = inventoryOutboxEventStore,
+        timeProvider = timeProvider,
+        identifierGenerator = identifierGenerator,
         idempotencyRetention = policy.idempotencyRetention,
     )
 
