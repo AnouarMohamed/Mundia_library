@@ -83,6 +83,15 @@ data class Loan private constructor(
         )
     }
 
+    fun cancel(): Loan {
+        require(status == LoanStatus.REQUESTED) { "Only requested loans can be cancelled" }
+
+        return copy(
+            status = LoanStatus.CANCELLED,
+            version = version + 1,
+        )
+    }
+
     private fun requireStateIsConsistent() {
         when (status) {
             LoanStatus.REQUESTED,

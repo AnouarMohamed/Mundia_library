@@ -19,6 +19,9 @@ class JwtCommandPrincipalResolver {
     fun forRenewal(authentication: JwtAuthenticationToken): CommandPrincipal =
         forMemberCommand(authentication, RENEW_ON_BEHALF_AUTHORITY)
 
+    fun forCancellation(authentication: JwtAuthenticationToken): CommandPrincipal =
+        forMemberCommand(authentication, CANCEL_ON_BEHALF_AUTHORITY)
+
     private fun forMemberCommand(
         authentication: JwtAuthenticationToken,
         onBehalfAuthority: String,
@@ -82,5 +85,6 @@ class JwtCommandPrincipalResolver {
         const val MEMBERSHIP_ID_CLAIM = "membership_id"
         const val REQUEST_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.request.on-behalf"
         const val RENEW_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.renew.on-behalf"
+        const val CANCEL_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.cancel.on-behalf"
     }
 }

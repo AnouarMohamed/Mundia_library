@@ -38,6 +38,32 @@ class LoanTest {
         }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
+    @Test
+    fun `rejection closes only a requested loan without allocating a copy`() {
+        val requested = requestedLoan()
+        val rejectedAt = requestedAt.plus(30, ChronoUnit.MINUTES)
+
+        val rejected = requested.reject(rejectedAt)
+
+        assertThat(rejected.status).isEqualTo(LoanStatus.REJECTED)
+        assertThat(rejected.rejectedAt).isEqualTo(rejectedAt)
+        assertThat(rejected.copyId).isNull()
+        assertThat(rejected.version).isEqualTo(1)
+        assertThatThrownBy { rejected.reject(rejectedAt.plusSeconds(1)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `cancellation closes only a requested loan without allocating a copy`() {
+        val cancelled = requestedLoan().cancel()
+
+        assertThat(cancelled.status).isEqualTo(LoanStatus.CANCELLED)
+        assertThat(cancelled.copyId).isNull()
+        assertThat(cancelled.version).isEqualTo(1)
+        assertThatThrownBy(cancelled::cancel)
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
     private fun requestedLoan(): Loan = Loan.request(
         id = LoanId(UUID.randomUUID()),
         memberId = MemberId(UUID.randomUUID()),

@@ -5,10 +5,14 @@ import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.domain.model.EditionId
@@ -34,6 +38,8 @@ import java.util.UUID
 class LoanCommandController(
     private val requestLoanUseCase: RequestLoanUseCase,
     private val approveLoanUseCase: ApproveLoanUseCase,
+    private val rejectLoanUseCase: RejectLoanUseCase,
+    private val cancelLoanUseCase: CancelLoanUseCase,
     private val renewLoanUseCase: RenewLoanUseCase,
     private val returnLoanUseCase: ReturnLoanUseCase,
     private val principalResolver: JwtCommandPrincipalResolver,
@@ -76,6 +82,44 @@ class LoanCommandController(
                 loanId = LoanId(loanId),
                 idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
                 principal = principalResolver.forAdministrativeCommand(authentication),
+            ),
+        )
+        return ok(execution)
+    }
+
+    @PostMapping("/{loanId}/reject")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.loan.reject')")
+    fun reject(
+        authentication: JwtAuthenticationToken,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+    ): ResponseEntity<LoanCommandResponse> {
+        val execution = rejectLoanUseCase.reject(
+            RejectLoanCommand(
+                loanId = LoanId(loanId),
+                idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
+                principal = principalResolver.forAdministrativeCommand(authentication),
+            ),
+        )
+        return ok(execution)
+    }
+
+    @PostMapping("/{loanId}/cancel")
+    @PreAuthorize(
+        "hasAnyAuthority(" +
+            "'SCOPE_circulation.loan.cancel'," +
+            "'SCOPE_circulation.loan.cancel.on-behalf')",
+    )
+    fun cancel(
+        authentication: JwtAuthenticationToken,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+    ): ResponseEntity<LoanCommandResponse> {
+        val execution = cancelLoanUseCase.cancel(
+            CancelLoanCommand(
+                loanId = LoanId(loanId),
+                idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
+                principal = principalResolver.forCancellation(authentication),
             ),
         )
         return ok(execution)

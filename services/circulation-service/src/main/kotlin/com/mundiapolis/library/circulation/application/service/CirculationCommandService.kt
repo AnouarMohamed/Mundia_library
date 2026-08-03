@@ -20,10 +20,14 @@ import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExis
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
@@ -57,6 +61,8 @@ class CirculationCommandService(
     private val idempotencyRetention: Duration,
 ) : RequestLoanUseCase,
     ApproveLoanUseCase,
+    RejectLoanUseCase,
+    CancelLoanUseCase,
     RenewLoanUseCase,
     ReturnLoanUseCase {
     override fun request(command: RequestLoanCommand): CommandExecution {
@@ -110,6 +116,57 @@ class CirculationCommandService(
                 throw ConcurrentCirculationUpdateException()
             }
             approved
+        }
+    }
+
+    override fun reject(command: RejectLoanCommand): CommandExecution {
+        val operation = CommandOperation.REJECT_LOAN
+        val fingerprint = fingerprint(operation, command.loanId.value.toString())
+
+        return executeIdempotently(
+            command.principal.idempotencyOwner,
+            command.idempotencyKey,
+            operation,
+            fingerprint,
+        ) { now ->
+            val requested = requireLoan(command.loanId)
+            if (requested.status != LoanStatus.REQUESTED) {
+                throw LoanStateConflictException(requested.id, requested.status)
+            }
+
+            val rejected = requested.reject(now)
+            if (!loanStore.update(rejected, requested.version, now)) {
+                throw ConcurrentCirculationUpdateException()
+            }
+            rejected
+        }
+    }
+
+    override fun cancel(command: CancelLoanCommand): CommandExecution {
+        val operation = CommandOperation.CANCEL_LOAN
+        val fingerprint = fingerprint(
+            operation,
+            command.loanId.value.toString(),
+            authorizationBinding(command.principal),
+        )
+
+        return executeIdempotently(
+            command.principal.idempotencyOwner,
+            command.idempotencyKey,
+            operation,
+            fingerprint,
+        ) { now ->
+            val requested = requireLoan(command.loanId)
+            authorizeLoanMember(requested, command.principal)
+            if (requested.status != LoanStatus.REQUESTED) {
+                throw LoanStateConflictException(requested.id, requested.status)
+            }
+
+            val cancelled = requested.cancel()
+            if (!loanStore.update(cancelled, requested.version, now)) {
+                throw ConcurrentCirculationUpdateException()
+            }
+            cancelled
         }
     }
 

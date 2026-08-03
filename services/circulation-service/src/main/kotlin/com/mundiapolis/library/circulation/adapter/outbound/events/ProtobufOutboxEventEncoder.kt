@@ -256,6 +256,8 @@ class ProtobufOutboxEventEncoder(
         val EVENT_TYPES = mapOf(
             "circulation.loan.requested" to LOAN_AGGREGATE,
             "circulation.loan.approved" to LOAN_AGGREGATE,
+            "circulation.loan.rejected" to LOAN_AGGREGATE,
+            "circulation.loan.cancelled" to LOAN_AGGREGATE,
             "circulation.loan.renewed" to LOAN_AGGREGATE,
             "circulation.loan.returned" to LOAN_AGGREGATE,
             "circulation.fine.assessed" to FINE_AGGREGATE,
@@ -265,6 +267,8 @@ class ProtobufOutboxEventEncoder(
         val LOAN_EVENT_STATUSES = mapOf(
             "circulation.loan.requested" to setOf(LoanStatus.LOAN_STATUS_REQUESTED),
             "circulation.loan.approved" to setOf(LoanStatus.LOAN_STATUS_ACTIVE),
+            "circulation.loan.rejected" to setOf(LoanStatus.LOAN_STATUS_REJECTED),
+            "circulation.loan.cancelled" to setOf(LoanStatus.LOAN_STATUS_CANCELLED),
             "circulation.loan.renewed" to setOf(LoanStatus.LOAN_STATUS_ACTIVE),
             "circulation.loan.returned" to setOf(LoanStatus.LOAN_STATUS_RETURNED),
         )

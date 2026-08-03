@@ -12,9 +12,13 @@ import com.mundiapolis.library.circulation.application.model.LoanStateConflictEx
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.CancelLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.GetCirculationStatusQuery
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.domain.model.EditionId
@@ -69,6 +73,12 @@ class CirculationServiceIntegrationTest {
 
     @Autowired
     private lateinit var approveLoan: ApproveLoanUseCase
+
+    @Autowired
+    private lateinit var rejectLoan: RejectLoanUseCase
+
+    @Autowired
+    private lateinit var cancelLoan: CancelLoanUseCase
 
     @Autowired
     private lateinit var returnLoan: ReturnLoanUseCase
@@ -290,6 +300,141 @@ class CirculationServiceIntegrationTest {
     }
 
     @Test
+    fun `rejection endpoint requires its exact staff scope and replays safely`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val requested = requestLoan.request(
+            RequestLoanCommand(
+                memberId = memberId,
+                editionId = EditionId(UUID.randomUUID()),
+                idempotencyKey = IdempotencyKey.parse("request-http-reject-${UUID.randomUUID()}"),
+                principal = selfPrincipal(memberId, "http-rejected-member"),
+            ),
+        )
+        val path = "$LOANS_PATH/${requested.result.loanId.value}/reject"
+        val key = "reject-http-${UUID.randomUUID()}"
+
+        mockMvc.post(path) {
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isUnauthorized() }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("wrong-scope-staff", APPROVE_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("rejecting-staff", REJECT_SCOPE))
+        }.andExpect {
+            status { isBadRequest() }
+        }
+
+        val firstResponse = mockMvc.post(path) {
+            with(jwtFor("rejecting-staff", REJECT_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.status") { value("REJECTED") }
+            jsonPath("$.copyId") { doesNotExist() }
+            jsonPath("$.version") { value(1) }
+        }.andReturn().response.contentAsString
+
+        val replayResponse = mockMvc.post(path) {
+            with(jwtFor("rejecting-staff", REJECT_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+        }.andReturn().response.contentAsString
+
+        assertThat(replayResponse).isEqualTo(firstResponse)
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN)).isOne()
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
+    }
+
+    @Test
+    fun `cancellation endpoint binds the member while staff delegation is explicit`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val requested = requestLoan.request(
+            RequestLoanCommand(
+                memberId = memberId,
+                editionId = EditionId(UUID.randomUUID()),
+                idempotencyKey = IdempotencyKey.parse("request-http-cancel-${UUID.randomUUID()}"),
+                principal = selfPrincipal(memberId, "http-cancel-member"),
+            ),
+        )
+        val path = "$LOANS_PATH/${requested.result.loanId.value}/cancel"
+        val key = "cancel-http-${UUID.randomUUID()}"
+
+        mockMvc.post(path) {
+            with(jwtFor("reader", "SCOPE_circulation.read", memberId.value))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("missing-member", CANCEL_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("missing_membership_claim") }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("different-member", CANCEL_SCOPE, UUID.randomUUID()))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("loan_not_found") }
+        }
+
+        val firstResponse = mockMvc.post(path) {
+            with(jwtFor("cancelling-member", CANCEL_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.status") { value("CANCELLED") }
+        }.andReturn().response.contentAsString
+
+        val replayResponse = mockMvc.post(path) {
+            with(jwtFor("cancelling-member", CANCEL_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+        }.andReturn().response.contentAsString
+        assertThat(replayResponse).isEqualTo(firstResponse)
+
+        val delegatedMember = MemberId(UUID.randomUUID())
+        val delegatedRequest = requestLoan.request(
+            RequestLoanCommand(
+                memberId = delegatedMember,
+                editionId = EditionId(UUID.randomUUID()),
+                idempotencyKey = IdempotencyKey.parse("request-staff-cancel-${UUID.randomUUID()}"),
+                principal = selfPrincipal(delegatedMember, "delegated-member"),
+            ),
+        )
+        mockMvc.post("$LOANS_PATH/${delegatedRequest.result.loanId.value}/cancel") {
+            with(jwtFor("delegated-staff", CANCEL_ON_BEHALF_SCOPE))
+            header(IDEMPOTENCY_HEADER, "cancel-staff-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("CANCELLED") }
+        }
+
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN)).isEqualTo(2)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(4)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(4)
+    }
+
+    @Test
     fun `identical idempotency keys are independent across authenticated principals`() {
         val sharedKey = "shared-principal-key-${UUID.randomUUID()}"
         val firstMemberId = UUID.randomUUID()
@@ -408,6 +553,114 @@ class CirculationServiceIntegrationTest {
 
         assertThat(approved.replayed).isFalse()
         assertThat(approved.result.copyId?.value).isEqualTo(copyId)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
+    }
+
+    @Test
+    fun `one hundred concurrent rejection retries close a request exactly once`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val requested = requestLoan.request(
+            RequestLoanCommand(
+                memberId = memberId,
+                editionId = EditionId(UUID.randomUUID()),
+                idempotencyKey = IdempotencyKey.parse("request-rejection-${UUID.randomUUID()}"),
+                principal = selfPrincipal(memberId, "rejected-member"),
+            ),
+        )
+        val rejectionKey = IdempotencyKey.parse("reject-concurrency-${UUID.randomUUID()}")
+        val command = RejectLoanCommand(
+            loanId = requested.result.loanId,
+            idempotencyKey = rejectionKey,
+            principal = administrativePrincipal("rejecting-staff"),
+        )
+
+        val rejections = runOneHundredConcurrently { rejectLoan.reject(command) }
+
+        assertThat(rejections.count { !it.replayed }).isOne()
+        assertThat(rejections.count { it.replayed }).isEqualTo(CONCURRENT_COMMANDS - 1)
+        assertThat(rejections.map { it.result }.distinct()).hasSize(1)
+        assertThat(rejections.first().result.status).isEqualTo(LoanStatus.REJECTED)
+        assertThat(rejections.first().result.copyId).isNull()
+        assertThat(rejections.first().result.version).isEqualTo(1)
+
+        val persisted = dsl.selectFrom(CIRCULATION_LOAN)
+            .where(CIRCULATION_LOAN.ID.eq(requested.result.loanId.value))
+            .fetchSingle()
+        assertThat(persisted.status).isEqualTo("REJECTED")
+        assertThat(persisted.rejectedAt).isNotNull()
+        assertThat(persisted.copyId).isNull()
+        assertOutbox(
+            expectedTypes = listOf(
+                "circulation.loan.requested",
+                "circulation.loan.rejected",
+            ),
+            expectedVersions = listOf(0L, 1L),
+        )
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
+
+        assertThatThrownBy {
+            approveLoan.approve(
+                ApproveLoanCommand(
+                    loanId = requested.result.loanId,
+                    idempotencyKey = IdempotencyKey.parse("approve-rejected-${UUID.randomUUID()}"),
+                    principal = administrativePrincipal("approving-staff"),
+                ),
+            )
+        }.isInstanceOf(LoanStateConflictException::class.java)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
+    }
+
+    @Test
+    fun `one hundred concurrent cancellation retries close a request exactly once`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val requested = requestLoan.request(
+            RequestLoanCommand(
+                memberId = memberId,
+                editionId = EditionId(UUID.randomUUID()),
+                idempotencyKey = IdempotencyKey.parse("request-cancellation-${UUID.randomUUID()}"),
+                principal = selfPrincipal(memberId, "cancelled-member"),
+            ),
+        )
+        val command = CancelLoanCommand(
+            loanId = requested.result.loanId,
+            idempotencyKey = IdempotencyKey.parse("cancel-concurrency-${UUID.randomUUID()}"),
+            principal = selfPrincipal(memberId, "cancelled-member"),
+        )
+
+        val cancellations = runOneHundredConcurrently { cancelLoan.cancel(command) }
+
+        assertThat(cancellations.count { !it.replayed }).isOne()
+        assertThat(cancellations.count { it.replayed }).isEqualTo(CONCURRENT_COMMANDS - 1)
+        assertThat(cancellations.map { it.result }.distinct()).hasSize(1)
+        assertThat(cancellations.first().result.status).isEqualTo(LoanStatus.CANCELLED)
+        assertThat(cancellations.first().result.copyId).isNull()
+        assertThat(cancellations.first().result.version).isEqualTo(1)
+
+        val persisted = dsl.selectFrom(CIRCULATION_LOAN)
+            .where(CIRCULATION_LOAN.ID.eq(requested.result.loanId.value))
+            .fetchSingle()
+        assertThat(persisted.status).isEqualTo("CANCELLED")
+        assertThat(persisted.copyId).isNull()
+        assertOutbox(
+            expectedTypes = listOf(
+                "circulation.loan.requested",
+                "circulation.loan.cancelled",
+            ),
+            expectedVersions = listOf(0L, 1L),
+        )
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
+
+        assertThatThrownBy {
+            rejectLoan.reject(
+                RejectLoanCommand(
+                    loanId = requested.result.loanId,
+                    idempotencyKey = IdempotencyKey.parse("reject-cancelled-${UUID.randomUUID()}"),
+                    principal = administrativePrincipal("rejecting-staff"),
+                ),
+            )
+        }.isInstanceOf(LoanStateConflictException::class.java)
         assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
     }
@@ -647,6 +900,9 @@ class CirculationServiceIntegrationTest {
         const val REQUEST_SCOPE = "SCOPE_circulation.loan.request"
         const val ON_BEHALF_SCOPE = "SCOPE_circulation.loan.request.on-behalf"
         const val APPROVE_SCOPE = "SCOPE_circulation.loan.approve"
+        const val REJECT_SCOPE = "SCOPE_circulation.loan.reject"
+        const val CANCEL_SCOPE = "SCOPE_circulation.loan.cancel"
+        const val CANCEL_ON_BEHALF_SCOPE = "SCOPE_circulation.loan.cancel.on-behalf"
         const val RETURN_SCOPE = "SCOPE_circulation.loan.return"
         const val CONCURRENT_COMMANDS = 100
         const val TEST_ISSUER = "https://issuer.example.test"

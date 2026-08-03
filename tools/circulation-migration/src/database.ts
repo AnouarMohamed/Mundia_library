@@ -444,6 +444,8 @@ const TARGET_FLYWAY_CHECKSUMS = [
   424_313_616,
   2_132_266_084,
   136_632_738,
+  -907_354_976,
+  -1_922_605_307,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -466,7 +468,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     ORDER BY installed_rank
   `);
   if (
-    history.rows.length !== 6 ||
+    history.rows.length !== TARGET_FLYWAY_CHECKSUMS.length ||
     history.rows.some(
       (row, index) =>
         row.version !== String(index + 1) ||
@@ -475,7 +477,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 6",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 8",
     );
   }
 

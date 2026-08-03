@@ -53,7 +53,8 @@ are implemented in the repository:
   production reject legacy credentials. Real tenant integration, privileged
   MFA, recovery, logout, and adversarial provider tests remain release gates.
 - `services/circulation-service` implements request, deterministic copy
-  allocation/approval, return, and renewal as caller-bound idempotent commands.
+  allocation/approval, rejection, member cancellation, return, and renewal as caller-bound
+  idempotent commands.
   State, exact replay results, and versioned outbox events commit atomically.
 - The service validates issuer, audience, and scopes, binds self-service
   requests to a UUID membership claim, isolates idempotency by authenticated
@@ -265,8 +266,8 @@ and rollback retention has elapsed with product approval.
 
 1. Fresh and production-shaped upgrade migrations pass with zero unmanaged drift.
 2. One hundred concurrent approvals of one request yield exactly one success.
-3. Concurrent request/approve/return/renew/inventory-edit tests never violate a
-   copy, loan, or ledger invariant.
+3. Concurrent request/approve/reject/cancel/return/renew/inventory-edit tests
+   never violate a copy, loan, or ledger invariant.
 4. Every mutating endpoint is idempotent or conditionally replay-safe.
 5. A process crash after commit but before publish is recovered from the outbox.
 6. Duplicate and out-of-order events create no duplicate external effect.

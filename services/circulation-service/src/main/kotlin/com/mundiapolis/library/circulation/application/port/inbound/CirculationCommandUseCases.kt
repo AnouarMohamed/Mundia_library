@@ -24,6 +24,18 @@ data class ApproveLoanCommand(
     val principal: CommandPrincipal,
 )
 
+data class RejectLoanCommand(
+    val loanId: LoanId,
+    val idempotencyKey: IdempotencyKey,
+    val principal: CommandPrincipal,
+)
+
+data class CancelLoanCommand(
+    val loanId: LoanId,
+    val idempotencyKey: IdempotencyKey,
+    val principal: CommandPrincipal,
+)
+
 data class ReturnLoanCommand(
     val loanId: LoanId,
     val idempotencyKey: IdempotencyKey,
@@ -66,6 +78,14 @@ fun interface RequestLoanUseCase {
 
 fun interface ApproveLoanUseCase {
     fun approve(command: ApproveLoanCommand): CommandExecution
+}
+
+fun interface RejectLoanUseCase {
+    fun reject(command: RejectLoanCommand): CommandExecution
+}
+
+fun interface CancelLoanUseCase {
+    fun cancel(command: CancelLoanCommand): CommandExecution
 }
 
 fun interface ReturnLoanUseCase {

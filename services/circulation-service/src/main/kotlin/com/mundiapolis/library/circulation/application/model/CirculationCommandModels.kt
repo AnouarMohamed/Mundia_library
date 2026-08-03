@@ -99,6 +99,8 @@ enum class CommandOperation(
 ) {
     REQUEST_LOAN(201, "circulation.loan.requested"),
     APPROVE_LOAN(200, "circulation.loan.approved"),
+    REJECT_LOAN(200, "circulation.loan.rejected"),
+    CANCEL_LOAN(200, "circulation.loan.cancelled"),
     RENEW_LOAN(200, "circulation.loan.renewed"),
     RETURN_LOAN(200, "circulation.loan.returned"),
     ASSESS_FINE(201, "circulation.fine.assessed"),
@@ -110,6 +112,8 @@ enum class CommandOperation(
         get() = when (this) {
             REQUEST_LOAN,
             APPROVE_LOAN,
+            REJECT_LOAN,
+            CANCEL_LOAN,
             RENEW_LOAN,
             RETURN_LOAN,
             -> true
