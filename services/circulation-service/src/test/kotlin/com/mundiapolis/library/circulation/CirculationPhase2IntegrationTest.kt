@@ -1,13 +1,16 @@
 package com.mundiapolis.library.circulation
 
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_COPY
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_CONSUMER_INBOX
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_FINE
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_FINE_LEDGER_ENTRY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_IDEMPOTENCY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_IDEMPOTENCY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_AUDIT_ENTRY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_MEMBER_ELIGIBILITY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.OUTBOX_EVENT
+import com.mundiapolis.library.circulation.application.model.EligibilityEventDisposition
 import com.mundiapolis.library.circulation.application.model.CommandPrincipal
 import com.mundiapolis.library.circulation.application.model.BrokerPublishAcknowledgement
 import com.mundiapolis.library.circulation.application.model.DuplicatePaymentReferenceException
@@ -16,10 +19,16 @@ import com.mundiapolis.library.circulation.application.model.FineNarrative
 import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
+import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
+import com.mundiapolis.library.circulation.application.model.MemberNotEligibleException
+import com.mundiapolis.library.circulation.application.model.MembershipEligibilityEvent
+import com.mundiapolis.library.circulation.application.model.MembershipEventConflictException
+import com.mundiapolis.library.circulation.application.model.MembershipEventGapException
 import com.mundiapolis.library.circulation.application.model.PaymentReference
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineCommand
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.ApplyMembershipEligibilityEventUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.AssessFineCommand
@@ -36,9 +45,12 @@ import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanCom
 import com.mundiapolis.library.circulation.application.port.inbound.RenewLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RequestLoanUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCommand
+import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
 import com.mundiapolis.library.circulation.domain.model.EditionId
+import com.mundiapolis.library.circulation.domain.model.EligibilityReasonCode
 import com.mundiapolis.library.circulation.domain.model.BranchId
 import com.mundiapolis.library.circulation.domain.model.CopyBarcode
 import com.mundiapolis.library.circulation.domain.model.CopyId
@@ -48,12 +60,14 @@ import com.mundiapolis.library.circulation.domain.model.FineStatus
 import com.mundiapolis.library.circulation.domain.model.LoanId
 import com.mundiapolis.library.circulation.domain.model.LoanStatus
 import com.mundiapolis.library.circulation.domain.model.MemberId
+import com.mundiapolis.library.circulation.domain.model.MemberEligibilityStatus
 import com.mundiapolis.library.circulation.domain.model.InventoryReason
 import com.mundiapolis.library.circulation.domain.model.ShelfLocation
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
+import org.hamcrest.Matchers.matchesPattern
 import org.jooq.DSLContext
 import org.jooq.exception.DataAccessException
 import org.junit.jupiter.api.BeforeEach
@@ -69,6 +83,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.RequestPostProcessor
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -108,6 +123,12 @@ class CirculationPhase2IntegrationTest {
     private lateinit var renewLoan: RenewLoanUseCase
 
     @Autowired
+    private lateinit var returnLoan: ReturnLoanUseCase
+
+    @Autowired
+    private lateinit var applyMembershipEligibility: ApplyMembershipEligibilityEventUseCase
+
+    @Autowired
     private lateinit var assessFine: AssessFineUseCase
 
     @Autowired
@@ -144,6 +165,8 @@ class CirculationPhase2IntegrationTest {
     fun cleanCommandData() {
         dsl.execute("ALTER TABLE circulation_fine_ledger_entry DISABLE TRIGGER USER")
         dsl.execute("ALTER TABLE circulation_inventory_audit_entry DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_consumer_inbox DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_member_eligibility DISABLE TRIGGER USER")
         try {
             dsl.execute(
                 """
@@ -151,6 +174,8 @@ class CirculationPhase2IntegrationTest {
                     circulation_fine_ledger_entry,
                     circulation_fine,
                     circulation_inventory_audit_entry,
+                    circulation_consumer_inbox,
+                    circulation_member_eligibility,
                     outbox_event,
                     circulation_idempotency,
                     circulation_inventory_idempotency,
@@ -161,6 +186,8 @@ class CirculationPhase2IntegrationTest {
         } finally {
             dsl.execute("ALTER TABLE circulation_fine_ledger_entry ENABLE TRIGGER USER")
             dsl.execute("ALTER TABLE circulation_inventory_audit_entry ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_consumer_inbox ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_member_eligibility ENABLE TRIGGER USER")
         }
     }
 
@@ -277,6 +304,7 @@ class CirculationPhase2IntegrationTest {
             ),
         )
         val memberId = MemberId(UUID.randomUUID())
+        seedEligible(memberId)
         val request = requestLoan.request(
             RequestLoanCommand(
                 memberId = memberId,
@@ -1168,9 +1196,270 @@ class CirculationPhase2IntegrationTest {
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isZero()
     }
 
+    @Test
+    fun `membership eligibility events are ordered replay safe and tamper evident`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val eligible = eligibilityEvent(
+            memberId = memberId,
+            aggregateVersion = 0,
+            status = MemberEligibilityStatus.ELIGIBLE,
+        )
+
+        val executions = runOneHundredConcurrently {
+            applyMembershipEligibility.apply(eligible)
+        }
+
+        assertThat(executions.count { !it.replayed }).isOne()
+        assertThat(executions.count { it.replayed }).isEqualTo(CONCURRENT_COMMANDS - 1)
+        assertThat(executions.map { it.eligibility }.distinct()).hasSize(1)
+        assertThat(dsl.fetchCount(CIRCULATION_MEMBER_ELIGIBILITY)).isOne()
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isOne()
+
+        assertThatThrownBy {
+            applyMembershipEligibility.apply(
+                eligibilityEvent(
+                    memberId = memberId,
+                    aggregateVersion = 2,
+                    status = MemberEligibilityStatus.SUSPENDED,
+                    reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
+                ),
+            )
+        }.isInstanceOf(MembershipEventGapException::class.java)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isOne()
+
+        val suspended = eligibilityEvent(
+            memberId = memberId,
+            aggregateVersion = 1,
+            status = MemberEligibilityStatus.SUSPENDED,
+            reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
+        )
+        val applied = applyMembershipEligibility.apply(suspended)
+        val replay = applyMembershipEligibility.apply(suspended)
+        assertThat(applied.disposition).isEqualTo(EligibilityEventDisposition.APPLIED)
+        assertThat(applied.replayed).isFalse()
+        assertThat(replay.replayed).isTrue()
+        assertThat(replay.eligibility.status).isEqualTo(MemberEligibilityStatus.SUSPENDED)
+
+        assertThatThrownBy {
+            applyMembershipEligibility.apply(suspended.copy(eventId = UUID.randomUUID()))
+        }.isInstanceOf(MembershipEventConflictException::class.java)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isEqualTo(2)
+
+        val backfilledMember = MemberId(UUID.randomUUID())
+        seedEligibility(
+            memberId = backfilledMember,
+            status = MemberEligibilityStatus.ELIGIBLE,
+            sourceVersion = 3,
+        )
+        val stale = applyMembershipEligibility.apply(
+            eligibilityEvent(
+                memberId = backfilledMember,
+                aggregateVersion = 2,
+                status = MemberEligibilityStatus.INELIGIBLE,
+                reasonCode = EligibilityReasonCode.parse("STALE_MEMBERSHIP_STATE"),
+            ),
+        )
+        assertThat(stale.disposition).isEqualTo(EligibilityEventDisposition.STALE)
+        assertThat(stale.eligibility.status).isEqualTo(MemberEligibilityStatus.ELIGIBLE)
+        assertThat(stale.eligibility.sourceVersion).isEqualTo(3)
+
+        assertThatThrownBy {
+            dsl.update(CIRCULATION_CONSUMER_INBOX)
+                .set(CIRCULATION_CONSUMER_INBOX.DISPOSITION, "STALE")
+                .where(CIRCULATION_CONSUMER_INBOX.EVENT_ID.eq(eligible.eventId))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+            .hasMessageContaining("immutable")
+        assertThatThrownBy {
+            dsl.deleteFrom(CIRCULATION_CONSUMER_INBOX)
+                .where(CIRCULATION_CONSUMER_INBOX.EVENT_ID.eq(eligible.eventId))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+            .hasMessageContaining("immutable")
+        assertThatThrownBy {
+            dsl.update(CIRCULATION_MEMBER_ELIGIBILITY)
+                .set(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION, 7L)
+                .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+            .hasMessageContaining("invalid circulation eligibility projection transition")
+        assertThatThrownBy {
+            dsl.deleteFrom(CIRCULATION_MEMBER_ELIGIBILITY)
+                .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+            .hasMessageContaining("cannot be deleted")
+    }
+
+    @Test
+    fun `loan decisions fail closed while suspended members can still return books`() {
+        val missingMember = MemberId(UUID.randomUUID())
+        val editionId = EditionId(UUID.randomUUID())
+        assertThatThrownBy {
+            requestLoan.request(
+                RequestLoanCommand(
+                    memberId = missingMember,
+                    editionId = editionId,
+                    idempotencyKey = IdempotencyKey.parse("missing-eligibility-${UUID.randomUUID()}"),
+                    principal = selfPrincipal(missingMember, "missing-eligibility-member"),
+                ),
+            )
+        }.isInstanceOf(MemberEligibilityUnavailableException::class.java)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isZero()
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isZero()
+
+        val ineligibleMember = MemberId(UUID.randomUUID())
+        seedEligibility(
+            memberId = ineligibleMember,
+            status = MemberEligibilityStatus.INELIGIBLE,
+            reasonCode = EligibilityReasonCode.parse("ACCOUNT_NOT_APPROVED"),
+        )
+        assertThatThrownBy {
+            requestLoan.request(
+                RequestLoanCommand(
+                    memberId = ineligibleMember,
+                    editionId = editionId,
+                    idempotencyKey = IdempotencyKey.parse("ineligible-request-${UUID.randomUUID()}"),
+                    principal = selfPrincipal(ineligibleMember, "ineligible-member"),
+                ),
+            )
+        }.isInstanceOf(MemberNotEligibleException::class.java)
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isZero()
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isZero()
+
+        val pendingMember = MemberId(UUID.randomUUID())
+        val pendingEdition = EditionId(UUID.randomUUID())
+        val pendingCopyId = UUID.randomUUID()
+        seedEligible(pendingMember)
+        seedCopy(
+            pendingCopyId,
+            pendingEdition.value,
+            UUID.randomUUID(),
+            "SUSPEND-${UUID.randomUUID()}",
+        )
+        val pendingLoan = requestLoan.request(
+            RequestLoanCommand(
+                memberId = pendingMember,
+                editionId = pendingEdition,
+                idempotencyKey = IdempotencyKey.parse("pre-suspension-request-${UUID.randomUUID()}"),
+                principal = selfPrincipal(pendingMember, "pre-suspension-member"),
+            ),
+        )
+        applyMembershipEligibility.apply(
+            eligibilityEvent(
+                memberId = pendingMember,
+                aggregateVersion = 1,
+                status = MemberEligibilityStatus.SUSPENDED,
+                reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
+            ),
+        )
+        assertThatThrownBy {
+            approveLoan.approve(
+                ApproveLoanCommand(
+                    loanId = pendingLoan.result.loanId,
+                    idempotencyKey = IdempotencyKey.parse("suspended-approve-${UUID.randomUUID()}"),
+                    principal = administrativePrincipal("suspended-approve-staff"),
+                ),
+            )
+        }.isInstanceOf(MemberNotEligibleException::class.java)
+        assertThat(
+            dsl.select(CIRCULATION_COPY.STATUS)
+                .from(CIRCULATION_COPY)
+                .where(CIRCULATION_COPY.ID.eq(pendingCopyId))
+                .fetchSingle(CIRCULATION_COPY.STATUS),
+        ).isEqualTo(CopyStatus.AVAILABLE.name)
+        assertThat(
+            dsl.select(CIRCULATION_LOAN.STATUS)
+                .from(CIRCULATION_LOAN)
+                .where(CIRCULATION_LOAN.ID.eq(pendingLoan.result.loanId.value))
+                .fetchSingle(CIRCULATION_LOAN.STATUS),
+        ).isEqualTo(LoanStatus.REQUESTED.name)
+
+        val activeMember = MemberId(UUID.randomUUID())
+        val activeLoanId = createActiveLoan(activeMember)
+        applyMembershipEligibility.apply(
+            eligibilityEvent(
+                memberId = activeMember,
+                aggregateVersion = 1,
+                status = MemberEligibilityStatus.SUSPENDED,
+                reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
+            ),
+        )
+
+        assertThatThrownBy {
+            renewLoan.renew(
+                RenewLoanCommand(
+                    loanId = activeLoanId,
+                    idempotencyKey = IdempotencyKey.parse("suspended-renew-${UUID.randomUUID()}"),
+                    principal = selfPrincipal(activeMember, "suspended-renew-member"),
+                ),
+            )
+        }.isInstanceOf(MemberNotEligibleException::class.java)
+
+        val returned = returnLoan.returnLoan(
+            ReturnLoanCommand(
+                loanId = activeLoanId,
+                idempotencyKey = IdempotencyKey.parse("suspended-return-${UUID.randomUUID()}"),
+                principal = administrativePrincipal("suspended-return-staff"),
+            ),
+        )
+        assertThat(returned.result.status).isEqualTo(LoanStatus.RETURNED)
+    }
+
+    @Test
+    fun `policy and eligibility reads enforce exact scopes and member privacy`() {
+        val memberId = MemberId(UUID.randomUUID())
+        seedEligible(memberId)
+
+        mockMvc.get(POLICY_PATH)
+            .andExpect { status { isUnauthorized() } }
+        mockMvc.get(POLICY_PATH) {
+            with(jwtFor("wrong-policy-scope", ELIGIBILITY_READ_SCOPE, memberId.value))
+        }.andExpect { status { isForbidden() } }
+        mockMvc.get(POLICY_PATH) {
+            with(jwtFor("policy-reader", POLICY_READ_SCOPE))
+        }.andExpect {
+            status { isOk() }
+            content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+            jsonPath("$.revision") { value(matchesPattern("[0-9a-f]{64}")) }
+            jsonPath("$.defaultLoanPeriod") { value("PT336H") }
+            jsonPath("$.renewalPeriod") { value("PT336H") }
+            jsonPath("$.maximumRenewals") { value(2) }
+            jsonPath("$.fineCurrency") { value("MAD") }
+        }
+
+        val eligibilityPath = "$MEMBERS_PATH/${memberId.value}/eligibility"
+        mockMvc.get(eligibilityPath) {
+            with(jwtFor("wrong-eligibility-scope", POLICY_READ_SCOPE))
+        }.andExpect { status { isForbidden() } }
+        mockMvc.get(eligibilityPath) {
+            with(jwtFor("self-eligibility-reader", ELIGIBILITY_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+            jsonPath("$.status") { value("ELIGIBLE") }
+            jsonPath("$.reasonCode") { doesNotExist() }
+            jsonPath("$.sourceVersion") { value(0) }
+            jsonPath("$.sourceOccurredAt") { exists() }
+        }
+        mockMvc.get("$MEMBERS_PATH/${UUID.randomUUID()}/eligibility") {
+            with(jwtFor("self-eligibility-reader", ELIGIBILITY_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("member_eligibility_not_found") }
+        }
+        mockMvc.get(eligibilityPath) {
+            with(jwtFor("staff-eligibility-reader", ELIGIBILITY_READ_ANY_SCOPE))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+        }
+    }
+
     private fun createActiveLoan(memberId: MemberId): LoanId {
         val editionId = EditionId(UUID.randomUUID())
         seedCopy(UUID.randomUUID(), editionId.value, UUID.randomUUID(), "C-${UUID.randomUUID()}")
+        seedEligible(memberId)
         val requested = requestLoan.request(
             RequestLoanCommand(
                 memberId = memberId,
@@ -1206,6 +1495,49 @@ class CirculationPhase2IntegrationTest {
             .set(CIRCULATION_COPY.UPDATED_AT, now)
             .execute()
     }
+
+    private fun seedEligible(memberId: MemberId) {
+        seedEligibility(
+            memberId = memberId,
+            status = MemberEligibilityStatus.ELIGIBLE,
+        )
+    }
+
+    private fun seedEligibility(
+        memberId: MemberId,
+        status: MemberEligibilityStatus,
+        reasonCode: EligibilityReasonCode? = null,
+        sourceVersion: Long = 0,
+    ) {
+        val now = Instant.now().atOffset(ZoneOffset.UTC)
+        dsl.insertInto(CIRCULATION_MEMBER_ELIGIBILITY)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID, memberId.value)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.STATUS, status.name)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.REASON_CODE, reasonCode?.value)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION, sourceVersion)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_OCCURRED_AT, now)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.CREATED_AT, now)
+            .set(CIRCULATION_MEMBER_ELIGIBILITY.UPDATED_AT, now)
+            .onConflictDoNothing()
+            .execute()
+    }
+
+    private fun eligibilityEvent(
+        memberId: MemberId,
+        aggregateVersion: Long,
+        status: MemberEligibilityStatus,
+        reasonCode: EligibilityReasonCode? = null,
+        eventId: UUID = UUID.randomUUID(),
+    ): MembershipEligibilityEvent = MembershipEligibilityEvent(
+        eventId = eventId,
+        eventType = MembershipEligibilityEvent.EVENT_TYPE,
+        eventVersion = MembershipEligibilityEvent.EVENT_VERSION,
+        memberId = memberId,
+        aggregateVersion = aggregateVersion,
+        status = status,
+        reasonCode = reasonCode,
+        occurredAt = Instant.now(),
+    )
 
     private fun jwtFor(
         subject: String,
@@ -1280,12 +1612,17 @@ class CirculationPhase2IntegrationTest {
         const val LOANS_PATH = "/api/v1/circulation/loans"
         const val FINES_PATH = "/api/v1/circulation/fines"
         const val COPIES_PATH = "/api/v1/circulation/copies"
+        const val POLICY_PATH = "/api/v1/circulation/policy"
+        const val MEMBERS_PATH = "/api/v1/circulation/members"
         const val IDEMPOTENCY_HEADER = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED_HEADER = "Idempotency-Replayed"
         const val RENEW_SCOPE = "SCOPE_circulation.loan.renew"
         const val RENEW_ON_BEHALF_SCOPE = "SCOPE_circulation.loan.renew.on-behalf"
         const val ASSESS_FINE_SCOPE = "SCOPE_circulation.fine.assess"
         const val RECORD_PAYMENT_SCOPE = "SCOPE_circulation.fine.payment.record"
+        const val POLICY_READ_SCOPE = "SCOPE_circulation.policy.read"
+        const val ELIGIBILITY_READ_SCOPE = "SCOPE_circulation.eligibility.read"
+        const val ELIGIBILITY_READ_ANY_SCOPE = "SCOPE_circulation.eligibility.read.any"
         const val REGISTER_INVENTORY_SCOPE = "SCOPE_circulation.inventory.register"
         const val CONDITION_INVENTORY_SCOPE =
             "SCOPE_circulation.inventory.condition.update"

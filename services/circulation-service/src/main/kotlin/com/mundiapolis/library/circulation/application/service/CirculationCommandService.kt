@@ -14,6 +14,8 @@ import com.mundiapolis.library.circulation.application.model.LoanNotFoundExcepti
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
 import com.mundiapolis.library.circulation.application.model.LoanStateConflictException
 import com.mundiapolis.library.circulation.application.model.MemberAccessDeniedException
+import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
+import com.mundiapolis.library.circulation.application.model.MemberNotEligibleException
 import com.mundiapolis.library.circulation.application.model.MissingMembershipClaimException
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExistsException
@@ -34,12 +36,14 @@ import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdempotencyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
 import com.mundiapolis.library.circulation.application.port.outbound.LoanStore
+import com.mundiapolis.library.circulation.application.port.outbound.MemberEligibilityStore
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.domain.model.Loan
 import com.mundiapolis.library.circulation.domain.model.LoanId
 import com.mundiapolis.library.circulation.domain.model.LoanStatus
+import com.mundiapolis.library.circulation.domain.model.MemberId
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Duration
@@ -51,6 +55,7 @@ class CirculationCommandService(
     private val transactionRunner: TransactionRunner,
     private val loanStore: LoanStore,
     private val copyStore: CopyStore,
+    private val eligibilityStore: MemberEligibilityStore,
     private val idempotencyStore: IdempotencyStore,
     private val outboxEventStore: OutboxEventStore,
     private val timeProvider: TimeProvider,
@@ -80,6 +85,7 @@ class CirculationCommandService(
             operation,
             fingerprint,
         ) { now ->
+            requireEligible(command.memberId)
             val loan = Loan.request(
                 id = LoanId(identifierGenerator.next()),
                 memberId = command.memberId,
@@ -107,6 +113,7 @@ class CirculationCommandService(
             if (requested.status != LoanStatus.REQUESTED) {
                 throw LoanStateConflictException(requested.id, requested.status)
             }
+            requireEligible(requested.memberId)
 
             val copyId = copyStore.allocateAvailable(requested.editionId, now)
                 ?: throw NoAvailableCopyException(requested.editionId)
@@ -215,6 +222,7 @@ class CirculationCommandService(
             if (active.status != LoanStatus.ACTIVE) {
                 throw LoanStateConflictException(active.id, active.status)
             }
+            requireEligible(active.memberId)
             if (now > requireNotNull(active.dueAt)) {
                 throw LoanOverdueException(active.id)
             }
@@ -232,6 +240,15 @@ class CirculationCommandService(
 
     private fun requireLoan(id: LoanId): Loan =
         loanStore.lockById(id) ?: throw LoanNotFoundException(id)
+
+    private fun requireEligible(memberId: MemberId) {
+        eligibilityStore.lockMember(memberId)
+        val eligibility = eligibilityStore.find(memberId)
+            ?: throw MemberEligibilityUnavailableException(memberId)
+        if (!eligibility.isEligible) {
+            throw MemberNotEligibleException(memberId, eligibility.status)
+        }
+    }
 
     private fun authorizeRequestedMember(command: RequestLoanCommand) {
         if (command.principal.canActOnBehalf) {

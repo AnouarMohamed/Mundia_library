@@ -4,12 +4,15 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.AdjustFineRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.AssessFineRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.ChangeCopyConditionRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationStatusController
+import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationPolicyResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationReadController
 import com.mundiapolis.library.circulation.adapter.`in`.web.FineCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.FineCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.MemberEligibilityResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.RecordFinePaymentRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RegisterCopyRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RelocateCopyRequest
@@ -78,6 +81,8 @@ class OpenApiContractTest {
     @Test
     fun `published JSON field sets match the transport models exactly`() {
         assertSchemaFields("CirculationStatus", CirculationStatus::class.java)
+        assertSchemaFields("CirculationPolicyResponse", CirculationPolicyResponse::class.java)
+        assertSchemaFields("MemberEligibilityResponse", MemberEligibilityResponse::class.java)
         assertSchemaFields("RequestLoanRequest", RequestLoanRequest::class.java)
         assertSchemaFields("LoanCommandResponse", LoanCommandResponse::class.java)
         assertSchemaFields("AssessFineRequest", AssessFineRequest::class.java)
@@ -162,6 +167,7 @@ class OpenApiContractTest {
         const val CONTRACT_RESOURCE = "/static/openapi/circulation-v1.json"
         val CONTROLLERS = listOf(
             CirculationStatusController::class.java,
+            CirculationReadController::class.java,
             LoanCommandController::class.java,
             FineCommandController::class.java,
             InventoryCommandController::class.java,
