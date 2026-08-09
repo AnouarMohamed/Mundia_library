@@ -17,7 +17,6 @@ import React from "react";
 import BorrowBook from "@/components/BorrowBook";
 import ReturnBookButton from "@/components/ReturnBookButton";
 import ReviewButton from "@/components/ReviewButton";
-import { useUserBorrows } from "@/hooks/useQueries";
 import type { BorrowRecord } from "@/lib/services/borrows";
 import type { ReviewEligibility } from "@/lib/services/reviews";
 
@@ -74,25 +73,7 @@ const BookBorrowButton: React.FC<BookBorrowButtonProps> = ({
   initialUserBorrows,
   initialReviewEligibility,
 }) => {
-  // Use React Query to check if user has an existing borrow for this book
-  // This will update immediately when borrow status changes
-  // Use SSR initial data to prevent duplicate fetch and ensure correct state on first load
-  const { data: userBorrows } = useUserBorrows(
-    userId,
-    undefined, // No status filter - get all
-    initialUserBorrows // Use SSR initial data (prevents duplicate fetch, ensures correct button state)
-  );
-
-  // CRITICAL: Handle case where userBorrows might be undefined or loading
-  // The API returns data WITH book field, but we only need bookId for this check
-  // Cast to handle both BorrowRecord[] and data with book field
-  const borrowsArray = (userBorrows || []) as Array<{
-    id: string;
-    bookId: string;
-    status: string;
-    dueDate?: string | null;
-    book?: unknown; // API includes book field, but we don't need it here
-  }>;
+  const borrowsArray = initialUserBorrows ?? [];
 
   // Find if user has an active or pending borrow for this book
   const existingBorrow = borrowsArray.find(

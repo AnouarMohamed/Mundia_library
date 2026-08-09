@@ -372,6 +372,7 @@ const AdminBookRequestsList: React.FC<AdminBookRequestsListProps> = ({
                     <BookCover
                       coverColor={request.bookCoverColor || ""}
                       coverImage={request.bookCoverUrl || ""}
+                      title={request.bookTitle}
                       className="h-16 w-12 sm:h-20 sm:w-16"
                     />
                   </div>

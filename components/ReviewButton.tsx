@@ -16,6 +16,7 @@ import ReviewFormDialog from "@/components/ReviewFormDialog";
 import { MessageCircle } from "lucide-react";
 import { useReviewEligibility } from "@/hooks/useQueries";
 import type { ReviewEligibility } from "@/lib/services/reviews";
+import { useRouter } from "next/navigation";
 
 /**
  * Props for ReviewButton
@@ -51,6 +52,7 @@ export default function ReviewButton({
   initialReviewEligibility,
 }: ReviewButtonProps) {
   const [showDialog, setShowDialog] = useState(false);
+  const router = useRouter();
 
   // Fetch live eligibility state using React Query, leveraging SSR data for hydration
   const { data: eligibility, isLoading } = useReviewEligibility(
@@ -69,6 +71,7 @@ export default function ReviewButton({
    */
   const handleReviewSubmitted = () => {
     setShowDialog(false);
+    router.refresh();
     /**
      * CRITICAL PERFORMANCE NOTE: 
      * Cache invalidation is handled centrally within the mutation success callback
@@ -81,7 +84,7 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="flex items-center gap-1.5 border-[var(--mundia-line)] bg-[var(--surface-0)] text-slate-500 sm:gap-2"
+        className="min-h-12 w-full border-[var(--mundia-line)] bg-[var(--surface-0)] text-slate-500 sm:w-fit"
       >
         <MessageCircle className="size-4 text-slate-500 sm:size-5" />
         <span className="text-sm font-semibold text-slate-500">Loading...</span>
@@ -94,10 +97,11 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
+        variant="outline"
+        className="mt-0 min-h-12 w-full border-[var(--mundia-line)] bg-transparent text-[var(--mundia-muted)] sm:w-fit"
       >
-        <MessageCircle className="size-4 text-white sm:size-5" />
-        <span className="text-sm font-semibold text-white">
+        <MessageCircle className="size-4 sm:size-5" aria-hidden="true" />
+        <span className="text-sm font-semibold">
           Review submitted
         </span>
       </Button>
@@ -109,13 +113,14 @@ export default function ReviewButton({
     return (
       <Button
         disabled
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
+        variant="outline"
+        className="mt-0 min-h-12 w-full border-[var(--mundia-line)] bg-transparent text-[var(--mundia-muted)] sm:w-fit"
       >
-        <MessageCircle className="size-4 text-white sm:size-5" />
-        <span className="text-sm font-semibold text-white">
+        <MessageCircle className="size-4 sm:size-5" aria-hidden="true" />
+        <span className="text-sm font-semibold">
           {isCurrentlyBorrowed
             ? "Return borrowed book to review"
-            : "Borrow Book to Review"}
+            : "Borrow and return to review"}
         </span>
       </Button>
     );
@@ -126,10 +131,11 @@ export default function ReviewButton({
     <>
       <Button
         onClick={() => setShowDialog(true)}
-        className="mt-3 min-h-12 w-full bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:mt-4 sm:w-fit"
+        variant="outline"
+        className="mt-0 min-h-12 w-full border-[var(--mundia-line)] bg-transparent text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:w-fit"
       >
-        <MessageCircle className="size-4 text-white sm:size-5" />
-        <span className="text-sm font-semibold text-white">
+        <MessageCircle className="size-4 sm:size-5" aria-hidden="true" />
+        <span className="text-sm font-semibold">
           Review this book
         </span>
       </Button>

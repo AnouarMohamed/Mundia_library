@@ -44,8 +44,8 @@ const Header = async ({ session }: HeaderProps) => {
   // Define primary navigation links for the application
   const navLinks = [
     { href: "/library", label: "Library" },
-    { href: "/all-books", label: "All Books" },
-    { href: "/my-profile", label: "My Profile" },
+    { href: "/all-books", label: "Catalog" },
+    { href: "/my-profile", label: "My account" },
   ];
 
   return (
@@ -56,7 +56,7 @@ const Header = async ({ session }: HeaderProps) => {
           {/* Logo Section */}
           <Link
             href="/"
-            className="group inline-flex min-w-0 items-center"
+            className="group inline-flex min-h-11 min-w-0 items-center"
           >
             <img
               src="/images/mundiapolis-logo-transparent.png"

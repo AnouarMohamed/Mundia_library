@@ -2,7 +2,7 @@
  * BookOverview Component
  *
  * Server Component that fetches initial book data and user data server-side.
- * Passes data to BookOverviewContent Client Component for React Query integration.
+ * Passes data to a server-rendered overview with small client action islands.
  *
  * This ensures:
  * - Fast initial load (SSR)
@@ -94,11 +94,8 @@ const BookOverview = async ({
     getCachedBorrowStats(id),
   ]);
 
-  // Pass all book data as initialBook to Client Component
-  // The Client Component will use React Query to fetch fresh data and update immediately
   return (
     <BookOverviewContent
-      bookId={id}
       userId={userId}
       userStatus={userStatus}
       isDetailPage={isDetailPage}

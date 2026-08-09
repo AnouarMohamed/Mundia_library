@@ -14,6 +14,7 @@ This directory is the operating manual for Mundiapolis Library. It is written fo
 | [API Reference](API_REFERENCE.md) | You are integrating with or debugging route handlers. |
 | [Data Model](DATA_MODEL.md) | You are changing schema, migrations, borrow lifecycle, or admin data. |
 | [Testing and CI](TESTING_AND_CI.md) | You are validating a branch, fixing checks, or tuning benchmarks. |
+| [Mobile Product Gate](MOBILE_PRODUCT_GATE.md) | You are changing student UI, navigation, hydration, images, or mobile performance. |
 | [Release Process](RELEASE_PROCESS.md) | You are cutting a tag, publishing artifacts, and deploying a version. |
 | [Production Readiness](PRODUCTION_READINESS.md) | You are deciding whether the product is ready to ship. |
 | [Security Policy](../SECURITY.md) | You are reporting or handling a vulnerability. |

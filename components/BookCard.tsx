@@ -25,6 +25,7 @@ interface BookCardProps extends Book {
    * (e.g., return countdown, receipt download).
    */
   isLoanedBook?: boolean;
+  imagePriority?: boolean;
 }
 
 /**
@@ -49,6 +50,7 @@ const BookCard = ({
   coverColor,
   coverUrl,
   isLoanedBook = false,
+  imagePriority = false,
 }: BookCardProps) => {
   // Safe formatting for the star rating, handles N/A cases
   const formattedRating =
@@ -69,7 +71,12 @@ const BookCard = ({
       >
         {/* Visual Cover Section - Uses the optimized BookCover component */}
         <div className="book-card-cover">
-          <BookCover coverColor={coverColor} coverImage={coverUrl} />
+          <BookCover
+            coverColor={coverColor}
+            coverImage={coverUrl}
+            title={title}
+            priority={imagePriority}
+          />
         </div>
 
         {/* Metadata Section: Title, Author, Rating, Genre */}

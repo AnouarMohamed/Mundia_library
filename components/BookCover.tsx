@@ -1,29 +1,9 @@
-/**
- * BookCover Component
- *
- * An optimized component for rendering book covers with a consistent look.
- * Includes a custom SVG spine and handles various image sources (External, ImageKit, Data-URI).
- *
- * @author Mundia Library Team
- * @version 1.2.0
- */
-
-"use client";
-
-import React from "react";
-import { Image as IKImage } from "@imagekit/next";
-import { cn } from "@/lib/utils";
+import Image from "next/image";
 import BookCoverSvg from "@/components/BookCoverSvg";
-import config from "@/lib/config";
+import { cn } from "@/lib/utils";
 
-/**
- * Available size variants for the book cover
- */
 type BookCoverVariant = "extraSmall" | "small" | "medium" | "regular" | "wide";
 
-/**
- * CSS classes mapping for different variants
- */
 const variantStyles: Record<BookCoverVariant, string> = {
   extraSmall: "book-cover_extra_small",
   small: "book-cover_small",
@@ -32,114 +12,108 @@ const variantStyles: Record<BookCoverVariant, string> = {
   wide: "book-cover_wide",
 };
 
-/**
- * Props for BookCover
- */
+const variantSizes: Record<BookCoverVariant, string> = {
+  extraSmall: "29px",
+  small: "55px",
+  medium: "144px",
+  regular: "(min-width: 480px) 174px, 114px",
+  wide: "(min-width: 480px) 296px, 256px",
+};
+
 interface Props {
-  /**
-   * Additional CSS classes for the container
-   */
   className?: string;
-  /**
-   * Size variant of the cover
-   * @default "regular"
-   */
   variant?: BookCoverVariant;
-  /**
-   * Background color for the book spine and fallback
-   */
   coverColor: string;
-  /**
-   * URL or path for the cover image
-   */
   coverImage: string;
+  title?: string;
+  priority?: boolean;
+  decorative?: boolean;
 }
 
-/**
- * BookCover
- *
- * Optimized component to prevent image flicker during React Query refetches.
- *
- * CRITICAL PERFORMANCE NOTE:
- * Uses React.memo with custom comparison to prevent unnecessary re-renders.
- * Only re-renders when coverImage or coverColor actually changes.
- * The image will only reload if the coverImage URL actually changes,
- * not when the component re-renders due to query refetch in parent components.
- */
-const BookCover = React.memo(
-  ({ className, variant = "regular", coverColor, coverImage }: Props) => {
-    return (
-      <div
-        className={cn(
-          "relative transition-all duration-300",
-          variantStyles[variant],
-          className,
-        )}
-      >
-        {/* Render the background SVG spine with the specified theme color */}
-        <BookCoverSvg coverColor={coverColor} />
+const normalizeCoverSource = (coverImage: string) => {
+  if (
+    /^(https?:|data:|blob:)/i.test(coverImage) ||
+    coverImage.startsWith("/")
+  ) {
+    return coverImage;
+  }
 
-        {/* Content container for the actual book cover image */}
-        <div
-          className="absolute z-10"
-          style={{ left: "12%", width: "87.5%", height: "88%" }}
-        >
-          {/* 
-            Strategy 1: Direct URL (External or Data-URI)
-            Optimized for fast loading and async decoding.
-          */}
-          {coverImage &&
-          (coverImage.startsWith("http") || coverImage.startsWith("data:")) ? (
-            <img
-              // CRITICAL: Removed key prop - it causes remounts and flickering
-              src={coverImage}
-              alt="Book cover"
-              className="size-full rounded-sm object-fill"
-              loading="eager"
-              decoding="async"
-              fetchPriority="high"
-            />
-          ) : /* 
-            Strategy 2: ImageKit Path
-            Uses specialized IKImage for responsive transformations and placeholders.
-          */
-          coverImage && config.env.imagekit.urlEndpoint ? (
-            <IKImage
-              // CRITICAL: Removed key prop - it causes remounts and flickering
-              src={coverImage}
-              urlEndpoint={config.env.imagekit.urlEndpoint}
-              alt="Book cover"
+  return `/${coverImage}`;
+};
+
+const canUseNextImage = (source: string) => {
+  if (source.startsWith("/")) return true;
+
+  try {
+    const url = new URL(source);
+    return (
+      url.protocol === "https:" &&
+      ["placehold.co", "m.media-amazon.com", "ik.imagekit.io"].includes(
+        url.hostname,
+      )
+    );
+  } catch {
+    return false;
+  }
+};
+
+const BookCover = ({
+  className,
+  variant = "regular",
+  coverColor,
+  coverImage,
+  title,
+  priority = false,
+  decorative = false,
+}: Props) => {
+  const source = normalizeCoverSource(coverImage);
+  const alt = decorative ? "" : title ? `Cover of ${title}` : "Book cover";
+
+  return (
+    <div
+      className={cn("relative", variantStyles[variant], className)}
+      data-book-cover
+    >
+      <BookCoverSvg coverColor={coverColor} />
+      <div
+        className="absolute z-10"
+        style={{ left: "12%", width: "87.5%", height: "88%" }}
+      >
+        {coverImage ? (
+          canUseNextImage(source) ? (
+            <Image
+              src={source}
+              alt={alt}
               fill
+              sizes={variantSizes[variant]}
               className="rounded-sm object-fill"
+              priority={priority}
+              loading={priority ? undefined : "lazy"}
+              referrerPolicy="no-referrer"
             />
           ) : (
-            /* 
-              Fallback Strategy: Rendered when no image is provided or loading fails.
-            */
-            <div className="flex size-full items-center justify-center rounded-sm bg-gray-200">
-              <span className="text-xs text-gray-500 sm:text-sm">No Cover</span>
-            </div>
-          )}
-        </div>
+            <img
+              src={source}
+              alt={alt}
+              width={360}
+              height={500}
+              className="size-full rounded-sm object-fill"
+              loading={priority ? "eager" : "lazy"}
+              decoding="async"
+              fetchPriority={priority ? "high" : "auto"}
+              referrerPolicy="no-referrer"
+            />
+          )
+        ) : (
+          <div className="flex size-full items-center justify-center rounded-sm bg-[var(--mundia-paper)]">
+            <span className="px-2 text-center text-xs text-[var(--mundia-muted)]">
+              Cover unavailable
+            </span>
+          </div>
+        )}
       </div>
-    );
-  },
-  (prevProps, nextProps) => {
-    /**
-     * Custom Comparison Logic:
-     * Only re-render if the core visual properties change.
-     * This prevents flicker when parent component re-renders but image data is identical.
-     */
-    return (
-      prevProps.coverImage === nextProps.coverImage &&
-      prevProps.coverColor === nextProps.coverColor &&
-      prevProps.variant === nextProps.variant &&
-      prevProps.className === nextProps.className
-    );
-  },
-);
-
-// Set display name for React DevTools debugging
-BookCover.displayName = "BookCover";
+    </div>
+  );
+};
 
 export default BookCover;

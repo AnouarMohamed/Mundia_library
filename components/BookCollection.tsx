@@ -1,622 +1,274 @@
-/**
- * BookCollection Component
- * 
- * A feature-rich client component that serves as the primary interface for browsing 
- * and searching the library's book catalog. It provides an integrated experience 
- * combining filtering, sorting, pagination, and ISBN scanning.
- * 
- * Features:
- * - Dynamic book grid with responsive layouts.
- * - Multi-criteria filtering: Search (text/ISBN), Genre, Availability, and Rating.
- * - Advanced sorting options (Title, Author, Rating, Date).
- * - ISBN Scanner integration using device camera for quick lookup.
- * - Synchronization with URL parameters for persistent and shareable search states.
- * - TanStack Query integration with SSR initial data for zero-flicker loading.
- * - Pre-emptive caching of user borrow records to speed up sub-navigation.
- * 
- * Type: Client Component
- */
-
-"use client";
-
-import React, { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import BookCard from "@/components/BookCard";
-import BookCardSkeleton from "@/components/skeletons/BookCardSkeleton";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { useAllBooks } from "@/hooks/useQueries";
-import { useQueryClient } from "@tanstack/react-query";
-import type { BooksListResponse } from "@/lib/services/books";
-import type { BorrowRecord } from "@/lib/services/borrows";
-import { Camera } from "lucide-react";
-import ISBNScanner from "@/components/ISBNScanner";
 
-/**
- * Props for the BookCollection component.
- */
 interface BookCollectionProps {
-  /** Initial array of books from SSR. */
-  initialBooks?: Book[];
-  /** List of available genres for the filter dropdown. */
-  initialGenres?: string[];
-  /** Pagination metadata from the initial server-side load. */
-  initialPagination?: {
+  initialBooks: Book[];
+  initialGenres: string[];
+  initialPagination: {
     currentPage: number;
     totalPages: number;
     totalBooks: number;
     booksPerPage: number;
   };
-  /** The search parameters used for the initial server-side fetch. */
-  initialSearchParams?: {
+  initialSearchParams: {
     search: string;
     genre: string;
     availability: string;
     rating: string;
     sort: string;
     page: number;
-  };
-  /** 
-   * Initial user borrow records. 
-   * Used to hydrate the React Query cache for immediate access in child components.
-   */
-  initialUserBorrows?: BorrowRecord[];
-  
-  // Legacy props for backward compatibility (Deprecated)
-  books?: Book[];
-  genres?: string[];
-  searchParams?: {
-    search: string;
-    genre: string;
-    availability: string;
-    rating: string;
-    sort: string;
-    page: number;
-  };
-  pagination?: {
-    currentPage: number;
-    totalPages: number;
-    totalBooks: number;
-    booksPerPage: number;
   };
 }
 
-const BookCollection: React.FC<BookCollectionProps> = ({
-  initialBooks,
-  initialGenres,
-  initialPagination,
-  initialSearchParams,
-  initialUserBorrows,
-  books: legacyBooks,
-  genres: legacyGenres,
-  searchParams: legacySearchParams,
-  pagination: legacyPagination,
-}) => {
-  const router = useRouter();
-  const searchParamsHook = useSearchParams();
-  const queryClient = useQueryClient();
-  const genreFilterId = React.useId();
-  const availabilityFilterId = React.useId();
-  const ratingFilterId = React.useId();
+const createCatalogHref = (
+  params: BookCollectionProps["initialSearchParams"],
+  updates: Partial<BookCollectionProps["initialSearchParams"]>,
+) => {
+  const next = { ...params, ...updates };
+  const query = new URLSearchParams();
 
-  /**
-   * Effect: Hydrate React Query Cache.
-   * On mount, if initial borrow data exists, we manually populate the cache.
-   * This eliminates the need for a network request when the user interacts with 
-   * borrow-related buttons on the detail pages.
-   */
-  useEffect(() => {
-    if (initialUserBorrows && initialUserBorrows.length > 0) {
-      const userId = initialUserBorrows[0].userId;
-      if (userId) {
-        const queryKey = ["user-borrows", userId, undefined];
-        queryClient.setQueryData(queryKey, initialUserBorrows);
-      }
-    }
-  }, [initialUserBorrows, queryClient]);
+  if (next.search) query.set("search", next.search);
+  if (next.genre) query.set("genre", next.genre);
+  if (next.availability) query.set("availability", next.availability);
+  if (next.rating) query.set("rating", next.rating);
+  if (next.sort && next.sort !== "title") query.set("sort", next.sort);
+  if (next.page > 1) query.set("page", String(next.page));
 
-  // Normalize initial data structure for useAllBooks
-  const initialData: BooksListResponse | undefined =
-    initialBooks || legacyBooks
-      ? {
-          books: initialBooks || legacyBooks || [],
-          total:
-            initialPagination?.totalBooks ||
-            legacyPagination?.totalBooks ||
-            (initialBooks || legacyBooks || []).length,
-          page:
-            initialPagination?.currentPage ||
-            legacyPagination?.currentPage ||
-            1,
-          totalPages:
-            initialPagination?.totalPages || legacyPagination?.totalPages || 1,
-          limit:
-            initialPagination?.booksPerPage ||
-            legacyPagination?.booksPerPage ||
-            (initialBooks || legacyBooks || []).length,
-        }
-      : undefined;
+  const serialized = query.toString();
+  return serialized ? `/all-books?${serialized}` : "/all-books";
+};
 
-  // Resolve active search parameters from URL or SSR defaults
-  const searchParamsToUse = initialSearchParams ||
-    legacySearchParams || {
-      search: searchParamsHook.get("search") || "",
-      genre: searchParamsHook.get("genre") || "",
-      availability: searchParamsHook.get("availability") || "",
-      rating: searchParamsHook.get("rating") || "",
-      sort: searchParamsHook.get("sort") || "title",
-      page: parseInt(searchParamsHook.get("page") || "1", 10),
-    };
-
-  /**
-   * Data Fetching: Primary query for the book catalog.
-   */
-  const {
-    data: booksData,
-    isLoading,
-    isError,
-    error,
-  } = useAllBooks(
-    searchParamsToUse
-      ? {
-          search: searchParamsToUse.search || undefined,
-          genre: searchParamsToUse.genre || undefined,
-          availability:
-            (searchParamsToUse.availability as
-              | "available"
-              | "unavailable"
-              | "all") || undefined,
-          rating: searchParamsToUse.rating
-            ? Number(searchParamsToUse.rating)
-            : undefined,
-          sort:
-            (searchParamsToUse.sort as
-              | "title"
-              | "author"
-              | "rating"
-              | "date") || undefined,
-          page: searchParamsToUse.page,
-          limit:
-            initialPagination?.booksPerPage ||
-            legacyPagination?.booksPerPage ||
-            12,
-        }
-      : undefined,
-    initialData,
+const BookCollection = ({
+  initialBooks: books,
+  initialGenres: genres,
+  initialPagination: pagination,
+  initialSearchParams: params,
+}: BookCollectionProps) => {
+  const hasActiveFilters = Boolean(
+    params.search || params.genre || params.availability || params.rating,
+  );
+  const firstResult =
+    pagination.totalBooks === 0
+      ? 0
+      : (pagination.currentPage - 1) * pagination.booksPerPage + 1;
+  const lastResult = Math.min(
+    pagination.currentPage * pagination.booksPerPage,
+    pagination.totalBooks,
+  );
+  const visiblePages = Array.from(
+    { length: Math.min(5, pagination.totalPages) },
+    (_, index) => {
+      const windowStart = Math.min(
+        Math.max(1, pagination.currentPage - 2),
+        Math.max(1, pagination.totalPages - 4),
+      );
+      return windowStart + index;
+    },
   );
 
-  // Derived Data: Prioritize fresh query data from TanStack Query
-  const books = (booksData?.books ?? legacyBooks ?? initialBooks) || [];
-  const genres = (legacyGenres ?? initialGenres) || [];
-  const pagination = (legacyPagination ??
-    initialPagination ??
-    (booksData
-      ? {
-          currentPage: booksData.page ?? 1,
-          totalPages: booksData.totalPages ?? 1,
-          totalBooks: booksData.total ?? 0,
-          booksPerPage: booksData.limit ?? 12,
-        }
-      : undefined)) || {
-    currentPage: 1,
-    totalPages: 1,
-    totalBooks: books.length,
-    booksPerPage: 12,
-  };
-
-  // UI Search Params: Current state derived from URL or fallbacks
-  const currentSearchParams = legacySearchParams ||
-    initialSearchParams || {
-      search: searchParamsHook.get("search") || "",
-      genre: searchParamsHook.get("genre") || "",
-      availability: searchParamsHook.get("availability") || "",
-      rating: searchParamsHook.get("rating") || "",
-      sort: searchParamsHook.get("sort") || "title",
-      page: parseInt(searchParamsHook.get("page") || "1", 10),
-    };
-
-  // Local UI state for search input and scanner modal
-  const [localSearch, setLocalSearch] = useState(currentSearchParams.search);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-
-  /**
-   * Updates the URL search parameters and triggers a navigation.
-   * Automatically resets pagination to page 1 for new filter combinations.
-   */
-  const updateSearchParams = (newParams: Record<string, string>) => {
-    const params = new URLSearchParams(searchParamsHook.toString());
-
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-    });
-
-    if (Object.keys(newParams).some((key) => key !== "page")) {
-      params.delete("page");
-    }
-
-    router.push(`/all-books?${params.toString()}`);
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateSearchParams({ search: localSearch });
-  };
-
-  /** Callback for successful ISBN detection via camera scanner. */
-  const handleScanSuccess = (isbn: string) => {
-    setLocalSearch(isbn);
-    updateSearchParams({ search: isbn });
-    setIsScannerOpen(false);
-  };
-
-  const handleFilterChange = (key: string, value: string) => {
-    updateSearchParams({ [key]: value });
-  };
-
-  const handleSortChange = (sort: string) => {
-    updateSearchParams({ sort });
-  };
-
-  const handlePageChange = (page: number) => {
-    updateSearchParams({ page: page.toString() });
-  };
-
-  const clearFilters = () => {
-    router.push("/all-books");
-  };
-
-  const hasActiveFilters =
-    currentSearchParams.search ||
-    currentSearchParams.genre ||
-    currentSearchParams.availability ||
-    currentSearchParams.rating;
-
-  // Show skeleton while loading (only if no initial data)
-  if (isLoading && (!initialBooks || initialBooks.length === 0)) {
-    return (
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-        <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
-            Book Collection
-          </h1>
-          <p className="text-sm text-slate-600 sm:text-base">
-            Loading books...
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[...Array(12)].map((_, index) => (
-            <BookCardSkeleton key={`skeleton-${index}`} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state
-  if (isError) {
-    return (
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-        <div className="catalog-header mb-5 p-4 sm:mb-6 sm:p-6">
-          <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
-            Book Collection
-          </h1>
-        </div>
-        <Card className="rounded-lg border-red-200 bg-red-50">
-          <CardContent className="p-4 text-center sm:p-8">
-            <p className="mb-2 text-base font-semibold text-red-700 sm:text-lg">
-              Failed to load books
-            </p>
-            <p className="text-xs text-red-600 sm:text-sm">
-              {error instanceof Error
-                ? error.message
-                : "An unknown error occurred"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-      {/* Header */}
-      <div className="catalog-header mb-4 p-5 sm:mb-6 sm:p-7">
-        <p className="text-sm text-[var(--mundia-muted)]">
-          Explore the catalog
-        </p>
-        <h1 className="mb-2 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
-          Book Collection
+    <div className="mx-auto w-full max-w-[1500px] py-1 sm:py-3">
+      <header className="mb-4 border-b border-[var(--mundia-line)] pb-5 sm:mb-6 sm:pb-7">
+        <p className="text-sm text-[var(--mundia-muted)]">Explore the catalog</p>
+        <h1 className="mt-1 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
+          Book collection
         </h1>
-        <p className="text-sm text-slate-600 sm:text-base">
-          Discover and explore our complete library of {pagination.totalBooks}{" "}
-          books
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--mundia-muted)] sm:text-base">
+          Search {pagination.totalBooks} titles and check live availability before
+          visiting the library.
         </p>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-6">
-        {/* Filters Sidebar */}
-        <div className="w-full">
-          <Card className="catalog-panel lg:sticky lg:top-28">
-            <CardHeader className="pb-2 sm:pb-3">
-              <CardTitle className="text-lg font-semibold tracking-tight text-[var(--mundia-ink)] sm:text-xl">
-                Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              {/* Search */}
-              <div className="space-y-2">
-                <form onSubmit={handleSearch} className="flex gap-2">
-                  <Input
-                    placeholder="Search books..."
-                    value={localSearch}
-                    onChange={(e) => setLocalSearch(e.target.value)}
-                    className="catalog-field"
-                  />
-
-                  {/* ISBN Scanner Dialog */}
-                  <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-11 shrink-0 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
-                        title="Scan ISBN"
-                      >
-                        <Camera className="size-5" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="p-0 border-none bg-transparent max-w-sm sm:max-w-md">
-                      <ISBNScanner
-                        onScanSuccess={handleScanSuccess}
-                        onClose={() => setIsScannerOpen(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                </form>
-
-                <Button
-                  onClick={() => updateSearchParams({ search: localSearch })}
-                  className="catalog-action w-full"
-                >
-                  Search
-                </Button>
-              </div>
-
-              {/* Genre Filter */}
-              <div className="space-y-1.5 sm:space-y-2">
-                <label
-                  htmlFor={genreFilterId}
-                  className="text-xs font-semibold text-slate-600 sm:text-sm"
-                >
-                  Genre
-                </label>
-                <select
-                  id={genreFilterId}
-                  value={currentSearchParams.genre}
-                  onChange={(e) => handleFilterChange("genre", e.target.value)}
-                  className="catalog-field"
-                >
-                  <option value="">All Genres</option>
-                  {genres.map((genre: string) => (
-                    <option key={genre} value={genre}>
-                      {genre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Availability Filter */}
-              <div className="space-y-1.5 sm:space-y-2">
-                <label
-                  htmlFor={availabilityFilterId}
-                  className="text-xs font-semibold text-slate-600 sm:text-sm"
-                >
-                  Availability
-                </label>
-                <select
-                  id={availabilityFilterId}
-                  value={currentSearchParams.availability}
-                  onChange={(e) =>
-                    handleFilterChange("availability", e.target.value)
-                  }
-                  className="catalog-field"
-                >
-                  <option value="">All Books</option>
-                  <option value="available">Available</option>
-                  <option value="unavailable">Unavailable</option>
-                </select>
-              </div>
-
-              {/* Rating Filter */}
-              <div className="space-y-1.5 sm:space-y-2">
-                <label
-                  htmlFor={ratingFilterId}
-                  className="text-xs font-semibold text-slate-600 sm:text-sm"
-                >
-                  Minimum Rating
-                </label>
-                <select
-                  id={ratingFilterId}
-                  value={currentSearchParams.rating}
-                  onChange={(e) => handleFilterChange("rating", e.target.value)}
-                  className="catalog-field"
-                >
-                  <option value="">All Ratings</option>
-                  <option value="5">5 Stars</option>
-                  <option value="4">4+ Stars</option>
-                  <option value="3">3+ Stars</option>
-                  <option value="2">2+ Stars</option>
-                  <option value="1">1+ Stars</option>
-                </select>
-              </div>
-
-              {/* Clear Filters */}
-              {hasActiveFilters && (
-                <Button
-                  variant="outline"
-                  onClick={clearFilters}
-                  className="h-11 w-full rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
-                >
-                  Clear All Filters
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+      <form
+        action="/all-books"
+        method="get"
+        className="catalog-search mb-4 sm:mb-6"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <label htmlFor="catalog-search" className="sr-only">
+            Search by title or author
+          </label>
+          <input
+            id="catalog-search"
+            name="search"
+            type="search"
+            defaultValue={params.search}
+            placeholder="Search by title or author"
+            enterKeyHint="search"
+            autoComplete="off"
+            className="catalog-field h-12 min-h-12 min-w-0 flex-1 px-4 py-3 text-base"
+          />
+          <button type="submit" className="catalog-action min-h-12 px-6">
+            Search catalog
+          </button>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1">
-          {/* Sort and Results Header */}
-          <div className="catalog-toolbar mb-3 p-3 sm:mb-4 sm:p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-xs text-slate-600 sm:text-sm">
-                  Showing {books.length} of {pagination.totalBooks} books
-                </span>
-                {hasActiveFilters && (
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    {currentSearchParams.search && (
-                      <Badge
-                        variant="secondary"
-                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
-                      >
-                        Search: &quot;{currentSearchParams.search}&quot;
-                      </Badge>
-                    )}
-                    {currentSearchParams.genre && (
-                      <Badge
-                        variant="secondary"
-                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
-                      >
-                        Genre: {currentSearchParams.genre}
-                      </Badge>
-                    )}
-                    {currentSearchParams.availability && (
-                      <Badge
-                        variant="secondary"
-                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
-                      >
-                        {currentSearchParams.availability === "available"
-                          ? "Available"
-                          : "Unavailable"}
-                      </Badge>
-                    )}
-                    {currentSearchParams.rating && (
-                      <Badge
-                        variant="secondary"
-                        className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] text-xs text-[var(--mundia-ink)] sm:text-sm"
-                      >
-                        {currentSearchParams.rating}+ Stars
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
+        <details
+          className="catalog-filter-disclosure mt-3"
+          open={hasActiveFilters || undefined}
+        >
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between rounded-lg border border-[var(--mundia-line)] px-4 text-sm font-semibold text-[var(--mundia-ink)] marker:hidden lg:hidden">
+            Filters and sorting
+            <span aria-hidden="true" className="text-lg leading-none">
+              +
+            </span>
+          </summary>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-600 sm:text-sm">
-                  Sort by
-                </span>
-                <select
-                  value={currentSearchParams.sort}
-                  onChange={(e) => handleSortChange(e.target.value)}
-                  className="catalog-field h-9 w-auto"
+          <div className="catalog-filter-options mt-3 grid gap-3 border-t border-[var(--mundia-line)] pt-4 sm:grid-cols-2 lg:mt-0 lg:grid-cols-4 lg:border-0 lg:pt-0">
+            <label className="space-y-1.5 text-sm font-medium text-[var(--mundia-ink)]">
+              <span>Genre</span>
+              <select
+                name="genre"
+                defaultValue={params.genre}
+                className="catalog-field"
+              >
+                <option value="">All genres</option>
+                {genres.map((genre) => (
+                  <option key={genre} value={genre}>
+                    {genre}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1.5 text-sm font-medium text-[var(--mundia-ink)]">
+              <span>Availability</span>
+              <select
+                name="availability"
+                defaultValue={params.availability}
+                className="catalog-field"
+              >
+                <option value="">All books</option>
+                <option value="available">Available now</option>
+                <option value="unavailable">Currently unavailable</option>
+              </select>
+            </label>
+
+            <label className="space-y-1.5 text-sm font-medium text-[var(--mundia-ink)]">
+              <span>Minimum rating</span>
+              <select
+                name="rating"
+                defaultValue={params.rating}
+                className="catalog-field"
+              >
+                <option value="">Any rating</option>
+                <option value="5">5 stars</option>
+                <option value="4">4+ stars</option>
+                <option value="3">3+ stars</option>
+                <option value="2">2+ stars</option>
+                <option value="1">1+ stars</option>
+              </select>
+            </label>
+
+            <label className="space-y-1.5 text-sm font-medium text-[var(--mundia-ink)]">
+              <span>Sort by</span>
+              <select name="sort" defaultValue={params.sort} className="catalog-field">
+                <option value="title">Title A–Z</option>
+                <option value="author">Author A–Z</option>
+                <option value="rating">Highest rated</option>
+                <option value="date">Newest first</option>
+              </select>
+            </label>
+
+            <div className="flex flex-col gap-2 sm:col-span-2 sm:flex-row lg:col-span-4 lg:justify-end">
+              {hasActiveFilters && (
+                <Link
+                  href="/all-books"
+                  className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[var(--mundia-line)] px-5 text-sm font-semibold text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)]"
                 >
-                  <option value="title">Title A-Z</option>
-                  <option value="author">Author A-Z</option>
-                  <option value="rating">Rating (High to Low)</option>
-                  <option value="date">Newest First</option>
-                </select>
-              </div>
+                  Clear filters
+                </Link>
+              )}
+              <button type="submit" className="catalog-action min-h-12 px-6">
+                Apply filters
+              </button>
             </div>
           </div>
+        </details>
+      </form>
 
-          {/* Books Grid */}
-          {books.length === 0 ? (
-            <Card className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-card)]">
-              <CardContent className="p-4 text-center sm:p-8">
-                <p className="text-sm text-slate-600 sm:text-base">
-                  No books found matching your criteria.
-                </p>
-                {hasActiveFilters && (
-                  <Button
-                    variant="outline"
-                    onClick={clearFilters}
-                    className="mt-3 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:mt-4"
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {books.map((book: Book) => (
-                <BookCard key={book.id} {...book} />
-              ))}
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5 sm:mt-8 sm:gap-2">
-              <Button
-                variant="outline"
-                onClick={() => handlePageChange(pagination.currentPage - 1)}
-                disabled={pagination.currentPage === 1}
-                className="min-h-11 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:text-sm"
-              >
-                Previous
-              </Button>
-
-              <div className="flex gap-1">
-                {Array.from(
-                  { length: Math.min(5, pagination.totalPages) },
-                  (_, i) => {
-                    const pageNum = Math.max(1, pagination.currentPage - 2) + i;
-                    if (pageNum > pagination.totalPages) return null;
-
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={
-                          pageNum === pagination.currentPage
-                            ? "default"
-                            : "outline"
-                        }
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`h-11 w-11 rounded-lg text-xs sm:text-sm ${
-                          pageNum === pagination.currentPage
-                            ? "border border-[var(--mundia-navy)] bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)]"
-                            : "border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)]"
-                        }`}
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  },
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                onClick={() => handlePageChange(pagination.currentPage + 1)}
-                disabled={pagination.currentPage === pagination.totalPages}
-                className="min-h-11 rounded-lg border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-xs text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:text-sm"
-              >
-                Next
-              </Button>
-            </div>
-          )}
-        </div>
+      <div className="mb-4 flex items-baseline justify-between gap-4 sm:mb-5">
+        <p className="text-sm text-[var(--mundia-muted)]" aria-live="polite">
+          {pagination.totalBooks === 0
+            ? "No matching books"
+            : `${firstResult}–${lastResult} of ${pagination.totalBooks} books`}
+        </p>
+        {hasActiveFilters && (
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--mundia-gold-strong)]">
+            Filtered
+          </span>
+        )}
       </div>
+
+      {books.length === 0 ? (
+        <section className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-surface)] px-5 py-10 text-center">
+          <h2 className="font-serif text-2xl text-[var(--mundia-ink)]">
+            No books found
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--mundia-muted)]">
+            Try a broader title, author, or filter combination.
+          </p>
+          <Link
+            href="/all-books"
+            className="mt-5 inline-flex min-h-12 items-center justify-center rounded-lg bg-[var(--mundia-navy)] px-6 text-sm font-semibold text-white"
+          >
+            Reset catalog
+          </Link>
+        </section>
+      ) : (
+        <ul className="book-list mt-0">
+          {books.map((book, index) => (
+            <BookCard key={book.id} {...book} imagePriority={index < 2} />
+          ))}
+        </ul>
+      )}
+
+      {pagination.totalPages > 1 && (
+        <nav
+          className="mt-7 flex flex-wrap items-center justify-center gap-2 sm:mt-9"
+          aria-label="Catalog pages"
+        >
+          {pagination.currentPage === 1 ? (
+            <span className="catalog-page-link px-4 opacity-45">Previous</span>
+          ) : (
+            <Link
+              href={createCatalogHref(params, {
+                page: pagination.currentPage - 1,
+              })}
+              className="catalog-page-link px-4"
+            >
+              Previous
+            </Link>
+          )}
+
+          {visiblePages.map((pageNumber) => (
+            <Link
+              key={pageNumber}
+              href={createCatalogHref(params, { page: pageNumber })}
+              aria-current={
+                pageNumber === pagination.currentPage ? "page" : undefined
+              }
+              className="catalog-page-link min-w-12 px-3 aria-[current=page]:border-[var(--mundia-navy)] aria-[current=page]:bg-[var(--mundia-navy)] aria-[current=page]:text-white"
+            >
+              <span className="sr-only">Page </span>
+              {pageNumber}
+            </Link>
+          ))}
+
+          {pagination.currentPage === pagination.totalPages ? (
+            <span className="catalog-page-link px-4 opacity-45">Next</span>
+          ) : (
+            <Link
+              href={createCatalogHref(params, {
+                page: pagination.currentPage + 1,
+              })}
+              className="catalog-page-link px-4"
+            >
+              Next
+            </Link>
+          )}
+        </nav>
+      )}
     </div>
   );
 };

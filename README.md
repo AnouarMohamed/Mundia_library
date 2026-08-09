@@ -310,6 +310,7 @@ Mundiapolis Library enforces strict automated quality gates prior to any code me
 - **Type Safety**: TypeScript strictly validates type signatures across the entire App Router codebase.
 - **Unit & Integration Tests**: Vitest runs colocated `*.test.ts` files testing server actions, caches, API error handling, and authorization rules.
 - **End-to-End E2E Testing**: Playwright runs full browser automation tests verifying login, catalog search, borrowing, and admin workflows.
+- **Mobile Product Gate**: 360–430 px student flows, touch ergonomics, navigation safety, and route JavaScript budgets are enforced by Playwright and the production build. See [the mobile gate](docs/MOBILE_PRODUCT_GATE.md).
 - **Security Audits**: Automated `npm audit` checks dependencies against known CVE databases.
 
 To run the complete quality suite locally:
