@@ -33,7 +33,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* Left side: Authentication form container */}
-      <section className="flex items-center justify-center bg-white px-6 py-12">
+      <section className="flex items-start justify-center bg-[var(--mundia-paper)] px-6 pb-12 pt-[max(3rem,env(safe-area-inset-top))] sm:items-center sm:py-12">
         <div className="mx-auto w-full max-w-sm">
           {/* Brand Logo */}
           <img
@@ -41,7 +41,7 @@ const Layout = async ({ children }: { children: ReactNode }) => {
             alt="Mundiapolis"
             width={200}
             height={67}
-            className="mb-10 h-auto w-[180px] sm:w-[200px]"
+            className="mb-9 h-auto w-[160px] sm:mb-10 sm:w-[200px]"
           />
           {/* Auth form (children) */}
           {children}
@@ -53,11 +53,11 @@ const Layout = async ({ children }: { children: ReactNode }) => {
         <img
           src="/images/mundiapolis-campus-optimized.jpg"
           alt="Université Mundiapolis campus"
+          loading="lazy"
           className="size-full object-cover"
           style={{ objectPosition: "74% center" }}
         />
-        {/* Overlay gradient for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-slate-950/45" />
         {/* Brand slogan */}
         <div className="absolute bottom-8 left-8 right-8 z-10">
           <p className="text-lg font-serif text-white sm:text-2xl">Mundiatheque</p>

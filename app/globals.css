@@ -355,6 +355,7 @@
 
   .catalog-field {
     @apply h-11 w-full rounded-lg border px-3 text-xs outline-none transition focus:ring-2 sm:text-sm;
+    min-height: 3rem;
     border-color: var(--mundia-line);
     background: var(--mundia-surface);
     color: var(--mundia-ink);
@@ -371,6 +372,24 @@
     border-color: var(--mundia-navy);
     background: var(--mundia-navy);
     color: var(--mundia-paper);
+  }
+
+  .catalog-page-link {
+    @apply inline-flex min-h-12 items-center justify-center rounded-lg border text-sm font-semibold transition-colors;
+    border-color: var(--mundia-line);
+    background: var(--mundia-paper);
+    color: var(--mundia-ink);
+  }
+
+  .catalog-page-link:hover {
+    border-color: oklch(32% 0.065 255 / 0.38);
+    background: var(--mundia-panel);
+  }
+
+  @media (min-width: 64rem) {
+    .catalog-filter-disclosure > .catalog-filter-options {
+      display: grid !important;
+    }
   }
 
   /* Book Overview */
@@ -556,8 +575,15 @@
 
   /* Root */
   .root-container {
-    @apply relative flex min-h-screen flex-1 flex-col px-4 pb-16 pt-4 xs:px-7 md:px-10 lg:px-14;
+    @apply relative flex min-h-screen flex-1 flex-col px-4 pt-4 xs:px-7 md:px-10 lg:px-14;
     @apply w-full max-w-full overflow-x-hidden;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 48rem) {
+    .root-container {
+      padding-bottom: 4rem;
+    }
   }
 
   /* Book Details */

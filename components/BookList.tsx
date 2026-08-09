@@ -35,6 +35,7 @@ interface Props {
    * @default false
    */
   showViewAllButton?: boolean;
+  imagePriorityCount?: number;
 }
 
 /**
@@ -50,6 +51,7 @@ const BookList = ({
   books,
   containerClassName,
   showViewAllButton = false,
+  imagePriorityCount = 0,
 }: Props) => {
   return (
     <section className={cn("fade-in-up", containerClassName)}>
@@ -71,8 +73,13 @@ const BookList = ({
       {/* Book Grid/List - Conditional rendering for empty state */}
       {books.length > 0 ? (
         <ul className="book-list">
-          {books.map((book) => (
-            <BookCard key={book.title} {...book} isLoanedBook={false} />
+          {books.map((book, index) => (
+            <BookCard
+              key={book.id}
+              {...book}
+              isLoanedBook={false}
+              imagePriority={index < imagePriorityCount}
+            />
           ))}
         </ul>
       ) : (

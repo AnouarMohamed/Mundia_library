@@ -19,6 +19,14 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "mobile-chromium",
+      use: {
+        ...devices["iPhone 13"],
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+      },
+    },
   ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
@@ -42,6 +50,12 @@ export default defineConfig({
             "https://example.com",
           IMAGEKIT_PRIVATE_KEY:
             process.env.IMAGEKIT_PRIVATE_KEY || "private-key",
+          // Browser tests must not inherit deployment credentials or contact
+          // external Redis/QStash services from a maintainer's shell.
+          UPSTASH_REDIS_URL: process.env.E2E_UPSTASH_REDIS_URL || "",
+          UPSTASH_REDIS_TOKEN: process.env.E2E_UPSTASH_REDIS_TOKEN || "",
+          QSTASH_URL: "",
+          QSTASH_TOKEN: "",
           ENABLE_WORKFLOWS: "false",
         },
       },

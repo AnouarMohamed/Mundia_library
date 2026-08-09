@@ -10,7 +10,7 @@
 
 "use client";
 
-import React from "react";
+import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { BookOpen } from "lucide-react";
@@ -58,9 +58,10 @@ interface Props {
 const BorrowBook = ({
   userId,
   bookId,
-  borrowingEligibility: { isEligible },
+  borrowingEligibility: { isEligible, message },
 }: Props) => {
   const router = useRouter();
+  const eligibilityMessageId = useId();
 
   // Initialize the borrow book mutation hook
   const borrowBookMutation = useBorrowBook();
@@ -91,26 +92,32 @@ const BorrowBook = ({
            */
           router.push("/my-profile");
         },
-        onError: (error) => {
-          console.error("[BorrowBook] Mutation error:", error);
-          // Fallback alert for critical errors if toast fails or is not present
-          alert(`Failed to borrow book: ${error.message}`);
-        },
       },
     );
   };
 
   return (
-    <Button
-      className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
-      onClick={handleBorrowBook}
-      disabled={borrowBookMutation.isPending || !isEligible}
-    >
-      <BookOpen className="size-4 text-white sm:size-5" />
-      <span className="text-sm font-semibold text-white">
-        {borrowBookMutation.isPending ? "Borrowing ..." : "Borrow Book"}
-      </span>
-    </Button>
+    <div className="w-full sm:w-auto">
+      <Button
+        className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
+        onClick={handleBorrowBook}
+        disabled={borrowBookMutation.isPending || !isEligible}
+        aria-describedby={!isEligible ? eligibilityMessageId : undefined}
+      >
+        <BookOpen className="size-4 text-white sm:size-5" aria-hidden="true" />
+        <span className="text-sm font-semibold text-white">
+          {borrowBookMutation.isPending ? "Requesting…" : "Request this book"}
+        </span>
+      </Button>
+      {!isEligible && (
+        <p
+          id={eligibilityMessageId}
+          className="mt-2 max-w-sm text-xs leading-5 text-[var(--mundia-muted)]"
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 };
 

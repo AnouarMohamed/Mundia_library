@@ -1,115 +1,35 @@
-/**
- * BookOverviewContent Component
- * 
- * A high-fidelity client component that provides a detailed visual and informational 
- * overview of a specific book. This component serves as the central hub for book-specific 
- * actions like borrowing, viewing statistics, and reading descriptions.
- * 
- * Features:
- * - Real-time synchronization of book metadata using TanStack Query.
- * - Dynamic availability tracking (Available vs. Total copies).
- * - Comprehensive technical details display (ISBN, Publisher, Language, etc.).
- * - Integration with BookBorrowButton for contextual borrow/return actions.
- * - Performance-optimized with SSR initial data to prevent hydration shifts.
- * - Elegant 3D-style book cover presentation with CSS-based depth effects.
- * 
- * Type: Client Component
- */
-
-"use client";
-
-import React from "react";
-import BookCover from "@/components/BookCover";
-import BookBorrowStats from "@/components/BookBorrowStats";
-import BookBorrowButton from "@/components/BookBorrowButton";
-import { Button } from "@/components/ui/button";
-import { BookOpen, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { useBook } from "@/hooks/useQueries";
-import BookSkeleton from "@/components/skeletons/BookSkeleton";
+import { AlertCircle, BookOpen, Star } from "lucide-react";
+import BookBorrowButton from "@/components/BookBorrowButton";
+import BookBorrowStats from "@/components/BookBorrowStats";
+import BookCover from "@/components/BookCover";
+import { Button } from "@/components/ui/button";
 import type { BorrowRecord } from "@/lib/services/borrows";
 import type { ReviewEligibility } from "@/lib/services/reviews";
 
-/**
- * Props for the BookOverviewContent component.
- */
 interface BookOverviewContentProps {
-  /** The unique identifier of the book. */
-  bookId: string;
-  /** The unique identifier of the currently logged-in user. */
   userId: string;
-  /** Current verification status of the user (e.g., "APPROVED"). */
   userStatus?: string | null;
-  /** Flag to adjust the layout and available actions for the full detail page. */
   isDetailPage?: boolean;
-  /** Initial book metadata from SSR to ensure immediate visual rendering. */
   initialBook: Book;
-  /** Initial high-level borrow statistics (total, active, returned). */
   initialStats?: {
     totalBorrows: number;
     activeBorrows: number;
     returnedBorrows: number;
   };
-  /** 
-   * Initial list of borrow records for the current user.
-   * Crucial for determining the immediate state of the borrow button.
-   */
   initialUserBorrows?: BorrowRecord[];
-  /** Initial eligibility status for the user to leave a review. */
   initialReviewEligibility?: ReviewEligibility;
 }
 
-const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
-  bookId,
+const BookOverviewContent = ({
   userId,
   userStatus,
   isDetailPage = false,
-  initialBook,
+  initialBook: book,
   initialStats,
   initialUserBorrows,
   initialReviewEligibility,
-}) => {
-  /**
-   * Data Fetching: Primary query for book metadata.
-   * Leverages TanStack Query for caching and background synchronization.
-   */
-  const {
-    data: book,
-    isLoading,
-    isError,
-    error,
-  } = useBook(bookId, initialBook);
-
-  // Loading state: Render skeleton if no initial data is available
-  if (isLoading && !initialBook) {
-    return <BookSkeleton showDetails={false} />;
-  }
-
-  // Error state: Display localized error feedback
-  if (isError && !initialBook) {
-    return (
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
-        <div className="rounded-lg border border-red-500 bg-red-50 p-4 text-center sm:p-8">
-          <p className="mb-2 text-base font-semibold text-red-500 sm:text-lg">
-            Failed to load book
-          </p>
-          <p className="text-xs text-gray-500 sm:text-sm">
-            {error instanceof Error
-              ? error.message
-              : "An unknown error occurred"}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Data Source Selection: Prefer fresh query data over SSR snapshot
-  const bookData = book ?? initialBook;
-
-  if (!bookData) {
-    return null;
-  }
-
+}: BookOverviewContentProps) => {
   const {
     title,
     author,
@@ -128,11 +48,10 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     pageCount,
     edition,
     isActive,
-    createdAt,
-    updatedAt,
-  } = bookData;
-
-  // Technical metadata definition for the summary list
+  } = book;
+  const isAvailable = isActive && availableCopies > 0;
+  const formattedRating =
+    typeof rating === "number" ? rating.toFixed(1) : String(rating ?? "N/A");
   const detailFields = [
     { label: "Published", value: publicationYear ?? "Not listed" },
     { label: "Publisher", value: publisher || "Not listed" },
@@ -142,159 +61,139 @@ const BookOverviewContent: React.FC<BookOverviewContentProps> = ({
     { label: "ISBN", value: isbn || "Not listed" },
   ];
 
-  const formattedRating =
-    typeof rating === "number" ? rating.toFixed(1) : String(rating ?? "N/A");
-
-  const formattedCreatedAt = createdAt
-    ? new Date(createdAt).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "N/A";
-
-  const formattedUpdatedAt = updatedAt
-    ? new Date(updatedAt).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : "N/A";
-
   return (
-    <section className="book-overview motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4 motion-safe:duration-500">
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col gap-5 sm:gap-6">
+    <section className="book-overview">
+      <div className="relative z-10 min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-[var(--mundia-line)] bg-[var(--mundia-paper)] px-3 py-1 text-sm text-[var(--mundia-muted)]">
+          <span className="text-sm font-medium text-[var(--mundia-muted)]">
             {genre}
           </span>
           {!isActive && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm text-red-700">
-              <AlertCircle className="size-3.5" />
-              Currently unavailable
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-700">
+              <AlertCircle className="size-4" aria-hidden="true" />
+              Catalog listing inactive
             </span>
           )}
         </div>
 
-        <h1 className="break-words">{title}</h1>
-
-        <p className="text-sm text-slate-600 sm:text-base">
-          By{" "}
-          <span className="font-semibold text-[var(--mundia-ink)]">
-            {author}
-          </span>
+        <h1 className="mt-2 break-words">{title}</h1>
+        <p className="mt-2 text-sm text-[var(--mundia-muted)] sm:text-base">
+          By <span className="font-semibold text-[var(--mundia-ink)]">{author}</span>
         </p>
 
-        <div className="flex flex-wrap gap-2 sm:gap-3">
-          <span className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] px-3 py-1.5 text-xs text-slate-700 sm:text-sm">
-            <img
-              src="/icons/star.svg"
-              alt="star"
-              width={18}
-              height={18}
-              className="size-4"
+        <div className="mt-5 grid grid-cols-[6rem_minmax(0,1fr)] gap-4 sm:grid-cols-[8rem_minmax(0,1fr)] xl:block">
+          <div className="flex items-start justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-2 xl:hidden">
+            <BookCover
+              variant="medium"
+              className="h-[8.3rem] w-24 sm:h-[11rem] sm:w-32"
+              coverColor={coverColor}
+              coverImage={coverUrl}
+              title={title}
+              priority
             />
-            {formattedRating}
-          </span>
-          <span className="rounded-full border border-[var(--mundia-line)] bg-[var(--surface-0)] px-3 py-1.5 text-xs text-slate-700 sm:text-sm">
-            {availableCopies} available of {totalCopies}
-          </span>
-        </div>
-
-        <dl className="grid gap-x-8 gap-y-3 border-y border-[var(--mundia-line)] py-4 text-sm sm:grid-cols-2">
-          {detailFields.map((item) => (
-            <div key={item.label} className="flex justify-between gap-4">
-              <dt className="text-[var(--mundia-muted)]">{item.label}</dt>
-              <dd className="max-w-[14rem] truncate text-right font-medium text-[var(--mundia-ink)]">
-                {item.value}
-              </dd>
-            </div>
-          ))}
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--mundia-muted)]">Catalog record</dt>
-            <dd className="text-right font-medium text-[var(--mundia-ink)]">
-              Added {formattedCreatedAt}
-            </dd>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-[var(--mundia-muted)]">Last update</dt>
-            <dd className="text-right font-medium text-[var(--mundia-ink)]">
-              {formattedUpdatedAt}
-            </dd>
+
+          <div className="min-w-0">
+            <p
+              className={`text-lg font-semibold ${
+                isAvailable
+                  ? "text-[var(--mundia-success-strong)]"
+                  : "text-[var(--mundia-danger)]"
+              }`}
+            >
+              {isAvailable ? "Available now" : "Currently unavailable"}
+            </p>
+            <p className="mt-1 text-sm leading-5 text-[var(--mundia-muted)]">
+              {availableCopies} of {totalCopies} copies ready to borrow
+            </p>
+            <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--mundia-ink)]">
+              <Star
+                className="size-4 fill-[var(--mundia-gold)] text-[var(--mundia-gold)]"
+                aria-hidden="true"
+              />
+              {formattedRating} reader rating
+            </p>
           </div>
-        </dl>
-
-        <BookBorrowStats
-          bookId={id}
-          initialBook={bookData}
-          initialStats={initialStats}
-        />
-
-        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)] px-4 py-4 sm:px-5">
-          <p className="book-description">{description}</p>
         </div>
 
         {userId && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            {isDetailPage ? (
-              <BookBorrowButton
-                bookId={id}
-                userId={userId}
-                bookTitle={title}
-                availableCopies={availableCopies}
-                isActive={isActive}
-                userStatus={userStatus}
-                isDetailPage={true}
-                initialUserBorrows={initialUserBorrows}
-                initialReviewEligibility={initialReviewEligibility}
-              />
-            ) : (
-              <>
-                <BookBorrowButton
-                  bookId={id}
-                  userId={userId}
-                  bookTitle={title}
-                  availableCopies={availableCopies}
-                  isActive={isActive}
-                  userStatus={userStatus}
-                  isDetailPage={false}
-                  initialUserBorrows={initialUserBorrows}
-                  initialReviewEligibility={initialReviewEligibility}
-                />
-                <Button
-                  asChild
-                  className="mt-0 min-h-12 w-full rounded-lg bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
-                >
-                  <Link href={`/books/${id}`}>
-                    <BookOpen className="size-4 text-white sm:size-5" />
-                    <span className="text-sm font-semibold">Book Details</span>
-                  </Link>
-                </Button>
-              </>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <BookBorrowButton
+              bookId={id}
+              userId={userId}
+              bookTitle={title}
+              availableCopies={availableCopies}
+              isActive={isActive}
+              userStatus={userStatus}
+              isDetailPage={isDetailPage}
+              initialUserBorrows={initialUserBorrows}
+              initialReviewEligibility={initialReviewEligibility}
+            />
+            {!isDetailPage && (
+              <Button
+                asChild
+                variant="outline"
+                className="min-h-12 w-full rounded-lg border-[var(--mundia-line)] bg-transparent text-[var(--mundia-ink)] hover:bg-[var(--mundia-panel)] sm:w-fit"
+              >
+                <Link href={`/books/${id}`}>
+                  <BookOpen className="size-4" aria-hidden="true" />
+                  Book details
+                </Link>
+              </Button>
             )}
           </div>
         )}
+
+        <div className="mt-6 border-t border-[var(--mundia-line)] pt-5">
+          <h2 className="font-serif text-xl text-[var(--mundia-ink)]">About this book</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--mundia-muted)] sm:text-base sm:leading-7">
+            {description}
+          </p>
+        </div>
+
+        <details className="mt-5 border-t border-[var(--mundia-line)] pt-1">
+          <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between text-sm font-semibold text-[var(--mundia-ink)] marker:hidden">
+            Publication details
+            <span aria-hidden="true">+</span>
+          </summary>
+          <dl className="grid gap-x-8 gap-y-3 pb-4 text-sm sm:grid-cols-2">
+            {detailFields.map((item) => (
+              <div key={item.label} className="flex justify-between gap-4">
+                <dt className="text-[var(--mundia-muted)]">{item.label}</dt>
+                <dd className="max-w-[14rem] truncate text-right font-medium text-[var(--mundia-ink)]">
+                  {item.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+
+        {initialStats && (
+          <details className="border-t border-[var(--mundia-line)] pt-1">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between text-sm font-semibold text-[var(--mundia-ink)] marker:hidden">
+              Borrowing activity
+              <span aria-hidden="true">+</span>
+            </summary>
+            <BookBorrowStats
+              availableCopies={availableCopies}
+              initialStats={initialStats}
+            />
+          </details>
+        )}
       </div>
 
-      <div className="relative z-10 flex flex-1 items-center justify-center">
-        <div className="relative">
-          <div className="pointer-events-none absolute -left-5 -top-5 h-[calc(100%+2.5rem)] w-[calc(100%+2.5rem)] rounded-lg border border-[var(--mundia-line)] bg-[var(--surface-0)]" />
+      <aside className="relative z-10 hidden flex-1 items-start justify-center xl:flex" aria-label="Book cover">
+        <div className="rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] p-6">
           <BookCover
             variant="wide"
             className="z-10"
             coverColor={coverColor}
             coverImage={coverUrl}
+            title={title}
+            priority
           />
-
-          <div className="absolute left-14 top-8 -z-10 rotate-12 opacity-45 max-sm:hidden">
-            <BookCover
-              variant="wide"
-              coverColor={coverColor}
-              coverImage={coverUrl}
-            />
-          </div>
         </div>
-      </div>
+      </aside>
     </section>
   );
 };

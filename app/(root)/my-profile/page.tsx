@@ -13,7 +13,11 @@ export const runtime = "nodejs";
 /**
  * Profile page with borrow history and review stats.
  */
-const Page = async () => {
+const Page = async ({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) => {
   const session = await getSession();
 
   if (!session?.user?.id) {
@@ -121,6 +125,9 @@ const Page = async () => {
     (record) => record.status === "RETURNED",
   );
   const totalReviews = Number(reviewCountResult[0]?.count || 0);
+  const { tab } = await searchParams;
+  const selectedTab =
+    tab === "pending" || tab === "history" ? tab : "active";
 
   return (
     <section className="space-y-6">
@@ -137,7 +144,7 @@ const Page = async () => {
       </div>
 
       <MyProfileTabs
-        userId={session.user.id}
+        selectedTab={selectedTab}
         initialActiveBorrows={initialActiveBorrows}
         initialPendingRequests={initialPendingRequests}
         initialBorrowHistory={initialBorrowHistory}

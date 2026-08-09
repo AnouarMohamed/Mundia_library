@@ -365,6 +365,7 @@ const AdminBooksList: React.FC<AdminBooksListProps> = ({ initialBooks }) => {
                       <BookCover
                         coverColor={book.coverColor}
                         coverImage={book.coverUrl}
+                        title={book.title}
                         className="h-20 w-14 shrink-0"
                       />
                       <div className="min-w-0">

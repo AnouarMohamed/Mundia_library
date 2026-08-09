@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useRouter } from "next/navigation";
 
 /**
  * Represents a single book review record.
@@ -252,18 +253,19 @@ export default function ReviewsSection({
 }: ReviewsSectionProps) {
   // Track which review is currently being edited in-line
   const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const router = useRouter();
 
   const handleReviewEdit = (review: Review) => {
     setEditingReview(review);
   };
 
   const handleReviewDelete = () => {
-    // Note: Cache invalidation is handled globally by useDeleteReview mutation
+    router.refresh();
   };
 
   const handleReviewUpdate = () => {
     setEditingReview(null);
-    // Note: Cache invalidation is handled globally by useUpdateReview mutation
+    router.refresh();
   };
 
   // If in edit mode, swap the list for the specialized form

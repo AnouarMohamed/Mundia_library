@@ -73,6 +73,10 @@ vi.mock("@/lib/security/logger", () => ({
   logWarn: vi.fn(),
 }));
 
+vi.mock("@/lib/security/auth-rate-limit", () => ({
+  allowCredentialAttempt: vi.fn().mockResolvedValue(true),
+}));
+
 describe("NextAuth credential authorization", () => {
   beforeEach(async () => {
     vi.clearAllMocks();

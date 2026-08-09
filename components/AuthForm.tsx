@@ -211,7 +211,7 @@ const AuthForm = <T extends FieldValues>({
           {/* Submit Button */}
           <Button
             type="submit"
-            className="!mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--mundia-navy)] px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-[var(--mundia-navy-strong)]"
+            className="!mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--mundia-navy)] px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-[var(--mundia-navy-strong)]"
             disabled={isSubmitting}
           >
             {isSubmitting

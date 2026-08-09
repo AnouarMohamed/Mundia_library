@@ -11,9 +11,9 @@
 
 "use client";
 
-import React from "react";
 import { Button } from "@/components/ui/button";
 import { useReturnBook } from "@/hooks/useMutations";
+import { useRouter } from "next/navigation";
 
 /**
  * Props for ReturnBookButton
@@ -40,6 +40,7 @@ interface Props {
  * Integrates with useReturnBook mutation for proper cache invalidation.
  */
 const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
+  const router = useRouter();
   // Initialize the return book mutation hook
   const returnBookMutation = useReturnBook();
 
@@ -54,6 +55,7 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
         bookTitle,
       },
       {
+        onSuccess: () => router.refresh(),
         onError: (error) => {
           console.error("[ReturnBookButton] Mutation error:", error);
         },
@@ -75,17 +77,14 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
 
   return (
     <Button
-      className={`mt-0 min-h-12 w-full rounded-lg border text-white sm:w-fit ${
-        isOverdue
-          ? "border-red-300/40 bg-red-500 hover:bg-red-500/90"
-          : "border-orange-300/40 bg-orange-500 hover:bg-orange-500/90"
-      }`}
+      className="mt-0 min-h-12 w-full rounded-lg border border-[var(--mundia-navy)] bg-[var(--mundia-navy)] text-white hover:bg-[var(--mundia-navy-strong)] sm:w-fit"
       onClick={handleReturnBook}
       disabled={returnBookMutation.isPending}
     >
       <img
         src="/icons/book.svg"
-        alt="return book"
+        alt=""
+        aria-hidden="true"
         width={20}
         height={20}
         className="size-4 sm:size-5"
@@ -96,8 +95,8 @@ const ReturnBookButton = ({ recordId, bookTitle, dueDate }: Props) => {
         {returnBookMutation.isPending
           ? "Returning..."
           : isOverdue
-            ? `Return Book (${daysOverdue} days overdue)`
-            : "Return Book"}
+            ? `Return book · ${daysOverdue} days overdue`
+            : "Return book"}
       </span>
     </Button>
   );

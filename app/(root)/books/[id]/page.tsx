@@ -143,7 +143,6 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
       <BookDetailContent
         bookId={id}
-        userId={userId}
         initialBook={book as Book}
         initialReviews={reviewRows}
       />

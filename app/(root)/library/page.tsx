@@ -229,8 +229,6 @@ const Page = async () => {
 
       <HomeRecommendations
         initialRecommendations={recommendations as Book[]}
-        userId={userId}
-        limit={6}
       />
     </section>
   );
