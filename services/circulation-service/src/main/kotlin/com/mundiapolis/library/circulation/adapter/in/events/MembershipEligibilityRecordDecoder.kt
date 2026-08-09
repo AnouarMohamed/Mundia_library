@@ -84,6 +84,8 @@ class MembershipEligibilityRecordDecoder(
             Instant.ofEpochSecond(timestamp.seconds, timestamp.nanos.toLong())
         } catch (_: DateTimeException) {
             throw MembershipEventContractException("Membership event occurrence time is invalid")
+        } catch (_: ArithmeticException) {
+            throw MembershipEventContractException("Membership event occurrence time is invalid")
         }
         val status = when (message.status) {
             ContractStatus.MEMBER_ELIGIBILITY_STATUS_ELIGIBLE ->

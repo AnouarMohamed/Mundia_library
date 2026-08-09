@@ -16,6 +16,7 @@ data class MembershipEligibilityConsumerProperties(
     val schemaVersion: Int,
     val pollTimeout: Duration,
     val commitTimeout: Duration,
+    val retryBackoff: Duration,
     val startupGracePeriod: Duration,
     val maximumPollSilence: Duration,
     val maximumPollRecords: Int,
@@ -33,6 +34,7 @@ data class MembershipEligibilityConsumerProperties(
                     schemaVersion == SUPPORTED_SCHEMA_VERSION &&
                     pollTimeout in MIN_POLL_TIMEOUT..MAX_POLL_TIMEOUT &&
                     commitTimeout in MIN_COMMIT_TIMEOUT..MAX_COMMIT_TIMEOUT &&
+                    retryBackoff in MIN_RETRY_BACKOFF..MAX_RETRY_BACKOFF &&
                     startupGracePeriod in MIN_STARTUP_GRACE..MAX_STARTUP_GRACE &&
                     maximumPollSilence in pollTimeout.multipliedBy(2)..MAX_POLL_SILENCE &&
                     maximumPollRecords in 1..MAX_POLL_RECORDS &&
@@ -96,6 +98,8 @@ data class MembershipEligibilityConsumerProperties(
         private val MAX_POLL_TIMEOUT: Duration = Duration.ofSeconds(10)
         private val MIN_COMMIT_TIMEOUT: Duration = Duration.ofMillis(100)
         private val MAX_COMMIT_TIMEOUT: Duration = Duration.ofSeconds(30)
+        private val MIN_RETRY_BACKOFF: Duration = Duration.ofMillis(10)
+        private val MAX_RETRY_BACKOFF: Duration = Duration.ofSeconds(5)
         private val MIN_STARTUP_GRACE: Duration = Duration.ofSeconds(1)
         private val MAX_STARTUP_GRACE: Duration = Duration.ofMinutes(5)
         private val MAX_POLL_SILENCE: Duration = Duration.ofMinutes(2)

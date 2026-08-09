@@ -70,6 +70,15 @@ are implemented in the repository:
   poison-event blocking, Protobuf v1 encoding, synchronous Kafka acknowledgement,
   lag/blocked health and metrics, retention cleanup, and a lease-expiry recovery
   integration test. Delivery remains correctly classified as at least once.
+- Circulation now consumes Membership's minimal versioned eligibility event
+  into a local projection with an atomic immutable inbox, strict transport and
+  Protobuf validation, per-member ordering, manual offsets after database
+  commit, duplicate replay, gap/conflict detection, readiness failure, and
+  transport-level tests. Request, approval, and renewal fail closed while
+  returns remain available to suspended members.
+- The service exposes a revisioned effective-policy read and privacy-preserving
+  eligibility read with separate self-service and staff scopes. Both routes
+  are enforced by the machine-checked OpenAPI contract.
 - GitOps now isolates runtime, platform, and migration layers. Schema-owner
   credentials and Jobs live in protected `*-migrations` namespaces; the
   workload Argo project cannot manage Jobs, RBAC, secret stores, or those
@@ -77,7 +86,7 @@ are implemented in the repository:
   and target Secret names.
 
 This checkpoint is not general availability. The platform/IdP, remaining
-circulation reservation/policy/eligibility reads, consumer inboxes, remaining domain
+circulation reservations and dynamic policy administration, remaining domain
 extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.

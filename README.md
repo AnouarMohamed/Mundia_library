@@ -1,16 +1,18 @@
 # Mundiapolis Library
 
-> Production-grade, secure, and full-featured university library platform built for students, faculty, and library staff at Mundiapolis University.
+> Production-focused university library platform for students, faculty, and library staff at Mundiapolis University.
 
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D24.17.0-brightgreen.svg)](https://nodejs.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5-black.svg)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle%20ORM-0.45-green.svg)](https://orm.drizzle.team/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Mundiapolis Library provides an end-to-end digital library experience. It supports authenticated catalog discovery, borrow request lifecycle management, renewal workflows, book reviews, administrative approvals, circulation operations, automated fine calculations, overdue reminders, real-time analytics, secure data exports, and production-ready packaging.
+Mundiapolis Library provides an end-to-end digital library experience. It supports authenticated catalog discovery, borrow request lifecycle management, renewal workflows, book reviews, administrative approvals, circulation operations, fine calculations, overdue reminders, analytics, secure data exports, and reproducible deployment packaging.
+
+The Next.js product is live while a measured strangler migration moves domain ownership into a small set of Kotlin/Spring services. The repository has strong automated quality and security gates, but the full overhaul is not general availability until the platform, institutional OIDC, cutover, load, disaster-recovery, and independent security gates in [the production overhaul plan](docs/PRODUCTION_OVERHAUL.md) are complete.
 
 ---
 
@@ -71,12 +73,15 @@ Mundiapolis Library provides an end-to-end digital library experience. It suppor
 | **Framework** | [Next.js 15](https://nextjs.org/) (App Router) | React server components, server actions, route handlers, standalone output |
 | **Frontend UI** | [React 19](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/) | Radix UI primitives, Lucide React icons, customized Mundiapolis theme |
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) | Strict type checking without emit (`tsc --noEmit`) |
-| **Authentication** | [NextAuth.js v5](https://authjs.dev/) | Credentials provider, salted password hashes, JWT sessions, Edge-safe lazy DB import |
-| **Database** | [PostgreSQL 16](https://www.postgresql.org/) | Production relational engine with constraint checks and foreign key enforcement |
+| **Web/BFF authentication** | [NextAuth.js v5](https://authjs.dev/) | Current credentials path plus fail-closed managed OIDC foundation during migration |
+| **Domain services** | Kotlin 2.3, Spring Boot 4.1, JDK 25 | Bounded-context services introduced behind strangler cutover gates |
+| **Database** | [PostgreSQL 18](https://www.postgresql.org/) | Transactional authority with service-owned schemas, constraints, and reviewed migrations |
 | **ORM** | [Drizzle ORM](https://orm.drizzle.team/) & `drizzle-kit` | Type-safe query builder, declarative schema, canonical SQL migration runner |
+| **Service persistence** | jOOQ and Flyway | Generated SQL types and forward-only migrations for Kotlin services |
 | **DB Driver** | `pg` Pool | Bounded, transaction-capable PostgreSQL pool across all environments |
 | **Cache & Rate Limit** | [Upstash Redis](https://upstash.com/) | Distributed caching, rate limiting with PostgreSQL bucket fallback |
 | **Background Workflows** | [Upstash QStash & Workflow](https://upstash.com/) | Asynchronous background tasks, scheduled reminders, and workflow state engines |
+| **Domain events** | Kafka-compatible broker and Protobuf | Transactional outbox, durable inbox, replay-safe at-least-once delivery |
 | **Media Delivery** | [ImageKit](https://imagekit.io/) | Optimized book cover images and university ID card uploads |
 | **Email Service** | [Brevo](https://www.brevo.com/) & [Resend](https://resend.com/) | Primary transactional email delivery with Resend fallback |
 | **Testing** | [Vitest](https://vitest.dev/) & [Playwright](https://playwright.dev/) | Unit/integration testing and end-to-end browser automation |
@@ -98,8 +103,16 @@ flowchart TD
     API["API Route Handlers (app/api)"]
   end
 
+  subgraph Services ["Strangler Service Layer"]
+    Circulation["Circulation Service\nKotlin / Spring"]
+    Membership["Membership Service\nplanned extraction"]
+    Catalog["Catalog Service\nplanned extraction"]
+    Broker["Kafka-compatible Broker"]
+  end
+
   subgraph Storage ["Persistence & Cache Layer"]
-    DB[("PostgreSQL Database\n(Drizzle ORM + pg Pool)")]
+    DB[("Legacy PostgreSQL 18\n(Drizzle ORM + pg Pool)")]
+    CirculationDB[("Circulation PostgreSQL 18\n(jOOQ + Flyway)")]
     Redis[("Upstash Redis\n(Cache & Rate Limiting)")]
     DBRateLimit[("Rate Limit Buckets\n(Fallback Rate Limiter)")]
   end
@@ -121,13 +134,18 @@ flowchart TD
   ServerActions -->|"Schedule Reminder Jobs"| QStash
   QStash -->|"Send Due / Overdue Alerts"| Email
   API -->|"Send Transactional Emails"| Email
+  API -.->|"single-writer cutover only"| Circulation
+  Circulation --> CirculationDB
+  Membership --> Broker
+  Broker --> Circulation
+  Catalog --> Broker
 ```
 
 ---
 
 ## Data Model & Domain Invariants
 
-The database schema ([database/schema.ts](file:///home/anouar/Mundia_library/database/schema.ts)) is managed via Drizzle ORM and PostgreSQL. Key entities include:
+The database schema ([database/schema.ts](database/schema.ts)) is managed via Drizzle ORM and PostgreSQL. Key entities include:
 
 - **`users`**: Stores student and admin credentials, status (`PENDING`, `APPROVED`, `REJECTED`), role (`USER`, `ADMIN`), and university ID card references.
 - **`federated_identities`**: Provisioned institutional identities for OIDC provider session bindings.
@@ -155,7 +173,7 @@ The database schema ([database/schema.ts](file:///home/anouar/Mundia_library/dat
 
 - **Node.js**: `24.17.0` or newer (LTS 24 line)
 - **Package Manager**: `npm`
-- **Database**: PostgreSQL 16 (local or Docker)
+- **Database**: PostgreSQL 18 (local or Docker)
 - **Docker & Docker Compose**: Optional, for running local PostgreSQL and Adminer
 
 ### Installation & Local Setup
@@ -306,7 +324,7 @@ npm run ci:quality
 The application supports three production deployment targets:
 
 1. **Vercel** *(Recommended)*: Zero-config deployment with native App Router support and automated preview deployments.
-2. **Docker Container**: Build and launch using the production multi-stage [Dockerfile](file:///home/anouar/Mundia_library/Dockerfile):
+2. **Docker Container**: Build and launch using the production multi-stage [Dockerfile](Dockerfile):
    ```bash
    docker build -t mundia-library:latest .
    docker run -p 3000:3000 -e DATABASE_URL="..." -e NEXTAUTH_SECRET="..." mundia-library:latest
@@ -352,4 +370,3 @@ Complete architectural, operational, and development documentation is located in
 ## License & Repository Status
 
 This repository contains private application code for Mundiapolis University Library (`"private": true` in `package.json`). Licensed under the [MIT License](LICENSE).
-

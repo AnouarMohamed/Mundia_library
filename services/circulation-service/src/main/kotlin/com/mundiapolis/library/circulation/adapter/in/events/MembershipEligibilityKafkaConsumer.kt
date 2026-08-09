@@ -8,11 +8,13 @@ import com.mundiapolis.library.circulation.application.port.inbound.ApplyMembers
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.config.MembershipEligibilityConsumerProperties
 import io.micrometer.core.instrument.MeterRegistry
+import org.apache.kafka.clients.consumer.CloseOptions
 import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.AuthenticationException
 import org.apache.kafka.common.errors.AuthorizationException
+import org.apache.kafka.common.errors.RetriableException
 import org.apache.kafka.common.errors.WakeupException
 import org.slf4j.LoggerFactory
 import org.springframework.context.SmartLifecycle
@@ -47,6 +49,7 @@ class MembershipEligibilityKafkaConsumer(
     private val replayCounter = meterRegistry.counter("mundia.membership.consumer.replayed")
     private val staleCounter = meterRegistry.counter("mundia.membership.consumer.stale")
     private val failureCounter = meterRegistry.counter("mundia.membership.consumer.failures")
+    private val retryCounter = meterRegistry.counter("mundia.membership.consumer.retries")
     private var worker: Future<*>? = null
 
     init {
@@ -97,13 +100,18 @@ class MembershipEligibilityKafkaConsumer(
         try {
             consumer.subscribe(listOf(properties.topic))
             while (running.get()) {
-                val records = consumer.poll(properties.pollTimeout)
+                val records = try {
+                    consumer.poll(properties.pollTimeout)
+                } catch (failure: RetriableException) {
+                    retryAfterBrokerFailure(failure)
+                    continue
+                }
                 assignmentCount.set(consumer.assignment().size)
                 lastSuccessfulPoll.set(timeProvider.now())
                 for (record in records) {
                     if (!running.get()) break
                     val execution = applyEligibilityEvent.apply(decoder.decode(record))
-                    commit(record.topic(), record.partition(), record.offset() + 1)
+                    if (!commit(record.topic(), record.partition(), record.offset() + 1)) break
                     processedCounter.increment()
                     if (execution.replayed) replayCounter.increment()
                     if (execution.disposition == EligibilityEventDisposition.STALE) {
@@ -130,15 +138,38 @@ class MembershipEligibilityKafkaConsumer(
             fail(MembershipConsumerFailure.INTERNAL)
         } finally {
             running.set(false)
-            runCatching { consumer.close(CLOSE_TIMEOUT) }
+            runCatching { consumer.close(CloseOptions.timeout(CLOSE_TIMEOUT)) }
         }
     }
 
-    private fun commit(topic: String, partition: Int, nextOffset: Long) {
-        consumer.commitSync(
-            mapOf(TopicPartition(topic, partition) to OffsetAndMetadata(nextOffset)),
-            properties.commitTimeout,
+    private fun commit(topic: String, partition: Int, nextOffset: Long): Boolean {
+        while (running.get()) {
+            try {
+                consumer.commitSync(
+                    mapOf(TopicPartition(topic, partition) to OffsetAndMetadata(nextOffset)),
+                    properties.commitTimeout,
+                )
+                return true
+            } catch (failure: RetriableException) {
+                retryAfterBrokerFailure(failure)
+            }
+        }
+        return false
+    }
+
+    private fun retryAfterBrokerFailure(failure: RetriableException) {
+        retryCounter.increment()
+        logger.warn(
+            "Transient membership eligibility broker failure; retrying after {}",
+            properties.retryBackoff,
+            failure,
         )
+        try {
+            Thread.sleep(properties.retryBackoff)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            running.set(false)
+        }
     }
 
     private fun fail(failure: MembershipConsumerFailure) {

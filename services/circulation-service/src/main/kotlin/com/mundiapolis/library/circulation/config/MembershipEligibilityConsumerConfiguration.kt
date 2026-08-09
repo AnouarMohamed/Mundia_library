@@ -109,7 +109,7 @@ class MembershipEligibilityConsumerConfiguration {
             ?: return@HealthIndicator Health.down().withDetail("enabled", true).build()
         val builder = when {
             snapshot.ready -> Health.up()
-            snapshot.starting -> Health.status("STARTING")
+            snapshot.starting -> Health.outOfService()
             else -> Health.down()
         }
         builder
