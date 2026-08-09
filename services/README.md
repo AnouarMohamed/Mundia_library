@@ -72,6 +72,12 @@ The immutable OpenAPI document is public at
 `GET /openapi/circulation-v1.json`. All other non-health HTTP endpoints require
 a valid bearer token, and domain endpoints enforce explicit OAuth scopes.
 
+Authenticated operational reads also expose the effective policy revision at
+`GET /api/v1/circulation/policy` and the privacy-preserving eligibility
+projection at `GET /api/v1/circulation/members/{memberId}/eligibility`.
+Self-service eligibility reads are bound to the token's `membership_id`; the
+separate `circulation.eligibility.read.any` scope is required for staff reads.
+
 ## Circulation command API
 
 The first authoritative slice exposes:
@@ -118,6 +124,44 @@ fine-ledger entry
 when applicable, and one versioned outbox event commit in the same PostgreSQL
 transaction.
 
+Loan requests, approvals, and renewals consult the local Membership-owned
+eligibility projection while holding the same per-member transaction lock used
+by the event consumer. Missing projection state fails closed with HTTP 503;
+ineligible or suspended state returns HTTP 422. Rejection, cancellation, fine
+settlement, and returns remain available. In particular, suspension never
+prevents a member from returning a book.
+
+## Membership eligibility consumer
+
+When `MEMBERSHIP_CONSUMER_ENABLED=true`, Circulation consumes the minimal
+`mundia.membership.v1.MemberEligibilityChanged` Protobuf contract from the
+configured Membership topic. The consumer requires exactly one matching set of
+content type, event, and schema headers; a canonical UUID key equal to the
+member ID; a supported schema version; bounded payload size; and a valid state
+and reason combination. Profile and identity-document data are not part of the
+contract.
+
+The projection update and immutable inbox row commit in one PostgreSQL
+transaction. Kafka offsets are committed manually only after that transaction
+succeeds. A crash between those operations is safe because redelivery resolves
+through the inbox. Exact duplicates replay safely, approved older backfill
+events are recorded as stale, and aggregate versions must otherwise be
+contiguous from version zero. Transient broker poll and commit failures retry
+with bounded backoff; a prolonged outage makes readiness unhealthy when the
+last successful poll exceeds the configured silence limit.
+
+Malformed, conflicting, future-skewed, or gapped events are never skipped or
+sent through a best-effort path. The consumer stops, leaves the offset
+uncommitted, increments a failure metric, and makes readiness unhealthy for
+operator repair and controlled replay. Its group, topic, TLS/SASL credential,
+and ACL are independent from the Circulation outbox producer.
+
+The source topic must retain uncompacted, ordered aggregate history long enough
+to rebuild the projection from version zero. Circulation deliberately cannot
+skip an eligibility version gap because doing so could authorize borrowing from
+an incomplete state. Production enablement therefore requires a tested
+Membership snapshot/full-replay procedure and broker-retention evidence.
+
 ## Outbox delivery
 
 When `OUTBOX_DELIVERY_ENABLED=true`, the service leases unpublished rows with
@@ -130,11 +174,11 @@ idempotence is enabled, but the database-to-broker boundary is intentionally
 documented as **at least once**: every consumer must use `event_id` as its inbox
 deduplication key.
 
-The broker topic and ACL must already exist; the producer is not authorized to
-administer topics. The platform supplies private TLS/SASL connectivity and the
-approved schema subject. Broker selection, schema-registry deployment, consumer
-inboxes, replay drills, and production retention/partition sizing remain
-release evidence—not application defaults.
+The broker topics and ACLs must already exist; neither producer nor consumer is
+authorized to administer topics. The platform supplies private TLS/SASL
+connectivity and approved schema subjects. Broker selection, schema-registry
+deployment, replay drills, and production retention/partition sizing remain
+release evidence, not application defaults.
 
 ## Container build
 

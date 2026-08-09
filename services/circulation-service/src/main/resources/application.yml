@@ -84,6 +84,34 @@ app:
       delivery-timeout: ${OUTBOX_KAFKA_DELIVERY_TIMEOUT:PT5S}
       request-timeout: ${OUTBOX_KAFKA_REQUEST_TIMEOUT:PT3S}
       maximum-block: ${OUTBOX_KAFKA_MAXIMUM_BLOCK:PT1S}
+  membership-consumer:
+    enabled: ${MEMBERSHIP_CONSUMER_ENABLED:false}
+    instance-id: ${MEMBERSHIP_CONSUMER_INSTANCE_ID:${HOSTNAME:local}}
+    group-id: ${MEMBERSHIP_CONSUMER_GROUP_ID:mundia-circulation-membership-v1}
+    topic: ${MEMBERSHIP_CONSUMER_TOPIC:mundia.membership.events.v1}
+    schema-subject: ${MEMBERSHIP_CONSUMER_SCHEMA_SUBJECT:mundia.membership.v1.MemberEligibilityChanged}
+    schema-version: ${MEMBERSHIP_CONSUMER_SCHEMA_VERSION:1}
+    poll-timeout: ${MEMBERSHIP_CONSUMER_POLL_TIMEOUT:PT0.5S}
+    commit-timeout: ${MEMBERSHIP_CONSUMER_COMMIT_TIMEOUT:PT5S}
+    retry-backoff: ${MEMBERSHIP_CONSUMER_RETRY_BACKOFF:PT0.25S}
+    startup-grace-period: ${MEMBERSHIP_CONSUMER_STARTUP_GRACE_PERIOD:PT30S}
+    maximum-poll-silence: ${MEMBERSHIP_CONSUMER_MAXIMUM_POLL_SILENCE:PT15S}
+    maximum-poll-records: ${MEMBERSHIP_CONSUMER_MAXIMUM_POLL_RECORDS:25}
+    maximum-event-bytes: ${MEMBERSHIP_CONSUMER_MAXIMUM_EVENT_BYTES:65536}
+    kafka:
+      bootstrap-servers: ${MEMBERSHIP_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      security-protocol: ${MEMBERSHIP_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+      allow-insecure-transport: ${MEMBERSHIP_KAFKA_ALLOW_INSECURE_TRANSPORT:false}
+      sasl-mechanism: ${MEMBERSHIP_KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      sasl-jaas-config: ${MEMBERSHIP_KAFKA_SASL_JAAS_CONFIG:}
+      truststore-location: ${MEMBERSHIP_KAFKA_TRUSTSTORE_LOCATION:}
+      truststore-password: ${MEMBERSHIP_KAFKA_TRUSTSTORE_PASSWORD:}
+      keystore-location: ${MEMBERSHIP_KAFKA_KEYSTORE_LOCATION:}
+      keystore-password: ${MEMBERSHIP_KAFKA_KEYSTORE_PASSWORD:}
+      key-password: ${MEMBERSHIP_KAFKA_KEY_PASSWORD:}
+      request-timeout: ${MEMBERSHIP_KAFKA_REQUEST_TIMEOUT:PT10S}
+      session-timeout: ${MEMBERSHIP_KAFKA_SESSION_TIMEOUT:PT30S}
+      heartbeat-interval: ${MEMBERSHIP_KAFKA_HEARTBEAT_INTERVAL:PT3S}
   security:
     jwt:
       issuer: ${AUTH_ISSUER_URI}
@@ -102,7 +130,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,membershipEligibilityConsumer
   health:
     livenessstate:
       enabled: true

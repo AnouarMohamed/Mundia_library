@@ -13,6 +13,8 @@
     { "name": "Loans", "description": "Idempotent loan lifecycle commands" },
     { "name": "Inventory", "description": "Audited physical-copy inventory commands" },
     { "name": "Fines", "description": "Idempotent fine and immutable-ledger commands" },
+    { "name": "Membership", "description": "Privacy-preserving membership projections" },
+    { "name": "Policy", "description": "Versioned effective circulation policy" },
     { "name": "Operations", "description": "Authenticated operational read models" }
   ],
   "paths": {
@@ -33,6 +35,43 @@
         }
       }
     },
+    "/api/v1/circulation/policy": {
+      "get": {
+        "operationId": "getCirculationPolicy",
+        "tags": ["Policy"],
+        "summary": "Read the effective circulation policy and revision",
+        "x-required-scopes": ["circulation.policy.read"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Effective policy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationPolicyResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/circulation/members/{memberId}/eligibility": {
+      "get": {
+        "operationId": "getMemberEligibility",
+        "tags": ["Membership"],
+        "summary": "Read a member eligibility projection",
+        "description": "Self-service callers may read only the membership_id bound to their token. The read-any scope is required for staff access.",
+        "x-required-scopes": ["circulation.eligibility.read", "circulation.eligibility.read.any"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
+        "responses": {
+          "200": {
+            "description": "Current projected membership eligibility",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberEligibilityResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/circulation/loans": {
       "post": {
         "operationId": "requestLoan",
@@ -50,7 +89,9 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
-          "409": { "$ref": "#/components/responses/Conflict" }
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -71,7 +112,9 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "409": { "$ref": "#/components/responses/Conflict" }
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -155,7 +198,9 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "409": { "$ref": "#/components/responses/Conflict" }
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -337,6 +382,12 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      "MemberId": {
+        "name": "memberId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
       }
     },
     "headers": {
@@ -404,11 +455,19 @@
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       },
       "NotFound": {
-        "description": "Loan or fine does not exist",
+        "description": "Requested resource does not exist or is hidden from this caller",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       },
       "Conflict": {
         "description": "Lifecycle, invariant, concurrency, or idempotency conflict",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "UnprocessableEntity": {
+        "description": "The projected membership state makes this loan decision ineligible",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "ServiceUnavailable": {
+        "description": "Required membership eligibility is unavailable and the command fails closed",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     },
@@ -420,6 +479,30 @@
         "properties": {
           "service": { "type": "string", "const": "circulation-service" },
           "activeLoans": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "CirculationPolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["revision", "defaultLoanPeriod", "renewalPeriod", "maximumRenewals", "fineCurrency"],
+        "properties": {
+          "revision": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "defaultLoanPeriod": { "type": "string", "format": "duration", "example": "PT336H" },
+          "renewalPeriod": { "type": "string", "format": "duration", "example": "PT336H" },
+          "maximumRenewals": { "type": "integer", "format": "int32", "minimum": 0, "maximum": 100 },
+          "fineCurrency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+        }
+      },
+      "MemberEligibilityResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "status", "reasonCode", "sourceVersion", "sourceOccurredAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["ELIGIBLE", "INELIGIBLE", "SUSPENDED"] },
+          "reasonCode": { "type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "sourceVersion": { "type": "integer", "format": "int64", "minimum": 0 },
+          "sourceOccurredAt": { "type": "string", "format": "date-time" }
         }
       },
       "RequestLoanRequest": {

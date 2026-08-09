@@ -24,6 +24,9 @@ import com.mundiapolis.library.circulation.application.model.LoanNotFoundExcepti
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
 import com.mundiapolis.library.circulation.application.model.LoanStateConflictException
 import com.mundiapolis.library.circulation.application.model.MemberAccessDeniedException
+import com.mundiapolis.library.circulation.application.model.MemberEligibilityNotFoundException
+import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
+import com.mundiapolis.library.circulation.application.model.MemberNotEligibleException
 import com.mundiapolis.library.circulation.application.model.MissingMembershipClaimException
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExistsException
@@ -68,6 +71,20 @@ class CirculationExceptionHandler {
     @ExceptionHandler(MemberAccessDeniedException::class)
     fun memberAccessDenied(exception: MemberAccessDeniedException): ProblemDetail =
         problem(HttpStatus.FORBIDDEN, "member_access_denied", exception.message)
+
+    @ExceptionHandler(MemberEligibilityNotFoundException::class)
+    fun memberEligibilityNotFound(exception: MemberEligibilityNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "member_eligibility_not_found", exception.message)
+
+    @ExceptionHandler(MemberEligibilityUnavailableException::class)
+    fun memberEligibilityUnavailable(
+        exception: MemberEligibilityUnavailableException,
+    ): ProblemDetail =
+        problem(HttpStatus.SERVICE_UNAVAILABLE, "member_eligibility_unavailable", exception.message)
+
+    @ExceptionHandler(MemberNotEligibleException::class)
+    fun memberNotEligible(exception: MemberNotEligibleException): ProblemDetail =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, "member_not_eligible", exception.message)
 
     @ExceptionHandler(LoanNotFoundException::class)
     fun loanNotFound(exception: LoanNotFoundException): ProblemDetail =
