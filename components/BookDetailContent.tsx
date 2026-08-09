@@ -25,9 +25,10 @@ const BookDetailContent = ({
       <section>
         <h2 className="font-serif text-2xl text-[var(--mundia-ink)]">Summary</h2>
         <div className="mt-3 space-y-3 break-words text-sm leading-7 text-[var(--mundia-muted)] sm:text-base">
-          {initialBook.summary?.split("\n").map((line) => (
-            <p key={line}>{line}</p>
-          ))}
+          {initialBook.summary
+            ?.split("\n")
+            .filter((line) => line.trim().length > 0)
+            .map((line, index) => <p key={index}>{line}</p>)}
         </div>
       </section>
 

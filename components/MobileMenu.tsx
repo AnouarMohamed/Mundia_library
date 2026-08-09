@@ -36,42 +36,21 @@ const MobileMenu = ({
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    const dialog = panelRef.current;
+    if (!dialog) return;
+
+    if (!isOpen) {
+      if (dialog.open) dialog.close();
+      return;
+    }
+
+    if (!dialog.open) dialog.showModal();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeButtonRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeMenu();
-        return;
-      }
-
-      if (event.key !== "Tab" || !panelRef.current) return;
-
-      const focusable = [
-        ...panelRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      ];
-      const first = focusable[0];
-      const last = focusable.at(-1);
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
@@ -80,8 +59,9 @@ const MobileMenu = ({
 
     try {
       setIsLoggingOut(true);
-      document.cookie =
-        "logout-in-progress=true; path=/; max-age=10; SameSite=Lax";
+      document.cookie = `logout-in-progress=true; path=/; max-age=10; SameSite=Lax${
+        window.location.protocol === "https:" ? "; Secure" : ""
+      }`;
       await signOut({ redirect: true, callbackUrl: "/sign-in" });
     } catch (error) {
       console.error("Logout error:", error);
@@ -111,27 +91,24 @@ const MobileMenu = ({
         <UserRound className="size-5" aria-hidden="true" />
       </button>
 
-      {isOpen && (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 cursor-default bg-slate-950/35 md:hidden"
-          onClick={closeMenu}
-          aria-label="Close account menu"
-          tabIndex={-1}
-        />
-      )}
-
       <dialog
         ref={panelRef}
         id="mobile-account-menu"
-        open={isOpen}
-        aria-modal="true"
         aria-labelledby="mobile-account-menu-title"
-        className={`fixed right-0 top-0 z-50 m-0 ml-auto h-dvh w-[min(88vw,22rem)] max-w-none border-0 border-l border-[var(--mundia-line)] bg-[var(--surface-card-strong)] p-0 transition-transform duration-200 ease-out md:hidden ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        onCancel={(event) => {
+          event.preventDefault();
+          closeMenu();
+        }}
+        className="mobile-account-dialog fixed inset-0 z-50 m-0 h-dvh w-screen max-w-none border-0 bg-transparent p-0 md:hidden"
       >
-        <div className="flex h-full flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+        <button
+          type="button"
+          className="fixed inset-0 cursor-default"
+          onClick={closeMenu}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
+        <div className="relative z-10 ml-auto flex h-full w-[min(88vw,22rem)] flex-col overflow-y-auto border-l border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
           <div className="flex min-h-16 items-center justify-between border-b border-[var(--mundia-line)] px-4">
             <h2
               id="mobile-account-menu-title"

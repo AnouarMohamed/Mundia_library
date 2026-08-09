@@ -228,16 +228,18 @@ const BookCollection = ({
           className="mt-7 flex flex-wrap items-center justify-center gap-2 sm:mt-9"
           aria-label="Catalog pages"
         >
-          <Link
-            href={createCatalogHref(params, {
-              page: Math.max(1, pagination.currentPage - 1),
-            })}
-            aria-disabled={pagination.currentPage === 1}
-            tabIndex={pagination.currentPage === 1 ? -1 : undefined}
-            className="catalog-page-link px-4 aria-disabled:pointer-events-none aria-disabled:opacity-45"
-          >
-            Previous
-          </Link>
+          {pagination.currentPage === 1 ? (
+            <span className="catalog-page-link px-4 opacity-45">Previous</span>
+          ) : (
+            <Link
+              href={createCatalogHref(params, {
+                page: pagination.currentPage - 1,
+              })}
+              className="catalog-page-link px-4"
+            >
+              Previous
+            </Link>
+          )}
 
           {visiblePages.map((pageNumber) => (
             <Link
@@ -253,21 +255,18 @@ const BookCollection = ({
             </Link>
           ))}
 
-          <Link
-            href={createCatalogHref(params, {
-              page: Math.min(
-                pagination.totalPages,
-                pagination.currentPage + 1,
-              ),
-            })}
-            aria-disabled={pagination.currentPage === pagination.totalPages}
-            tabIndex={
-              pagination.currentPage === pagination.totalPages ? -1 : undefined
-            }
-            className="catalog-page-link px-4 aria-disabled:pointer-events-none aria-disabled:opacity-45"
-          >
-            Next
-          </Link>
+          {pagination.currentPage === pagination.totalPages ? (
+            <span className="catalog-page-link px-4 opacity-45">Next</span>
+          ) : (
+            <Link
+              href={createCatalogHref(params, {
+                page: pagination.currentPage + 1,
+              })}
+              className="catalog-page-link px-4"
+            >
+              Next
+            </Link>
+          )}
         </nav>
       )}
     </div>

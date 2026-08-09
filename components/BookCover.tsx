@@ -105,7 +105,7 @@ const BookCover = ({
             />
           )
         ) : (
-          <div className="flex size-full items-center justify-center rounded-sm bg-slate-100">
+          <div className="flex size-full items-center justify-center rounded-sm bg-[var(--mundia-paper)]">
             <span className="px-2 text-center text-xs text-[var(--mundia-muted)]">
               Cover unavailable
             </span>

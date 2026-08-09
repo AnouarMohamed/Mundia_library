@@ -43,12 +43,16 @@ const formatDate = (date: Date | null | undefined) =>
       }).format(date)
     : "Not set";
 
+const toUtcDayStart = (date: Date) =>
+  Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+
 const getDueState = (dueDate: Date | null) => {
   if (!dueDate) return { label: "Due date not set", isOverdue: false };
 
-  const today = new Date();
   const millisecondsPerDay = 86_400_000;
-  const days = Math.ceil((dueDate.getTime() - today.getTime()) / millisecondsPerDay);
+  const days = Math.round(
+    (toUtcDayStart(dueDate) - toUtcDayStart(new Date())) / millisecondsPerDay,
+  );
 
   if (days < 0) {
     const overdueDays = Math.abs(days);
@@ -145,7 +149,6 @@ const BorrowRecordCard = ({ record }: { record: BorrowRecordWithBook }) => {
                     ? "text-[var(--mundia-danger)]"
                     : "text-[var(--mundia-ink)]"
                 }`}
-                role={dueState.isOverdue ? "alert" : undefined}
               >
                 {dueState.label}
               </p>

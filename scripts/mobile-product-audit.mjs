@@ -122,14 +122,15 @@ for (const [name, pathname] of routeDefinitions) {
 
 await page.goto(`${baseURL}/all-books`, { waitUntil: "networkidle" });
 const firstBookLink = page.locator('a[href^="/books/"]').first();
-if (await firstBookLink.count()) {
-  const bookHref = await firstBookLink.getAttribute("href");
-  await page.goto(`${baseURL}${bookHref}`, { waitUntil: "networkidle" });
-  await page.screenshot({
-    path: `${outputDirectory}/${auditLabel}-book-detail.png`,
-    fullPage: true,
-  });
+const bookHref = await firstBookLink.getAttribute("href");
+if (!bookHref) {
+  throw new Error("Mobile audit could not find a book-detail link");
 }
+await page.goto(`${baseURL}${bookHref}`, { waitUntil: "networkidle" });
+await page.screenshot({
+  path: `${outputDirectory}/${auditLabel}-book-detail.png`,
+  fullPage: true,
+});
 
 await page.goto(`${baseURL}/library`, { waitUntil: "networkidle" });
 await page.getByRole("button", { name: /open account menu/i }).click();

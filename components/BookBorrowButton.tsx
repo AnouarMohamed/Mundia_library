@@ -73,13 +73,7 @@ const BookBorrowButton: React.FC<BookBorrowButtonProps> = ({
   initialUserBorrows,
   initialReviewEligibility,
 }) => {
-  const borrowsArray = (initialUserBorrows || []) as Array<{
-    id: string;
-    bookId: string;
-    status: string;
-    dueDate?: string | null;
-    book?: unknown; // API includes book field, but we don't need it here
-  }>;
+  const borrowsArray = initialUserBorrows ?? [];
 
   // Find if user has an active or pending borrow for this book
   const existingBorrow = borrowsArray.find(

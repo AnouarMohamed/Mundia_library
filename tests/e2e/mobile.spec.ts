@@ -40,6 +40,7 @@ test("sign-in is usable at the primary phone viewport", async ({ page }) => {
     page.getByRole("button", { name: /^sign in$/i }),
   ]) {
     const bounds = await control.boundingBox();
+    expect(bounds?.width ?? 0).toBeGreaterThanOrEqual(44);
     expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
   }
 });
@@ -105,7 +106,11 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   });
   await expect(accountMenuTrigger).toBeEnabled();
   await accountMenuTrigger.click();
-  await expect(page.getByRole("dialog", { name: "Account" })).toBeVisible();
+  const accountDialog = page.getByRole("dialog", { name: "Account" });
+  await expect(accountDialog).toBeVisible();
+  expect(
+    await accountDialog.evaluate((element) => element.matches(":modal")),
+  ).toBe(true);
   await expect(page.getByText("Request Admin Access")).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Account" })).not.toBeVisible();

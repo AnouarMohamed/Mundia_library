@@ -69,7 +69,7 @@ const BookOverviewContent = ({
             {genre}
           </span>
           {!isActive && (
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-red-700">
+            <span className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--mundia-danger)]">
               <AlertCircle className="size-4" aria-hidden="true" />
               Catalog listing inactive
             </span>
@@ -190,7 +190,7 @@ const BookOverviewContent = ({
             coverColor={coverColor}
             coverImage={coverUrl}
             title={title}
-            priority
+            decorative
           />
         </div>
       </aside>

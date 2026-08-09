@@ -15,13 +15,14 @@ const MobileBottomNav = () => {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Primary navigation"
     >
       <ul className="mx-auto grid max-w-lg grid-cols-3">
         {items.map(({ href, label, icon: Icon }) => {
           const isCurrent =
             pathname === href ||
+            (href === "/library" && pathname.startsWith("/library/")) ||
             (href === "/all-books" && pathname.startsWith("/books/"));
 
           return (
