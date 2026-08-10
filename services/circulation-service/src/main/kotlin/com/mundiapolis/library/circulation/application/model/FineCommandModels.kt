@@ -100,7 +100,9 @@ class InvalidFineAdjustmentException :
     CirculationCommandException("Fine adjustment must be a supported non-zero minor-unit amount")
 
 class InvalidFineCurrencyException :
-    CirculationCommandException("Fine currency must be a three-letter uppercase ISO 4217 code")
+    CirculationCommandException(
+        "Fine currency must be a supported uppercase ISO 4217 code with minor units",
+    )
 
 class InvalidFineNarrativeException :
     CirculationCommandException(

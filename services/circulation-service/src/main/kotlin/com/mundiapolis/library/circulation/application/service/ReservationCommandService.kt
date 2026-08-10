@@ -131,10 +131,11 @@ class ReservationCommandService(
                 authorizationBinding(command.principal),
             ),
         ) { now ->
-            val open = lockReservationAfterEdition(command.reservationId) { observed ->
-                authorizeReservationMember(observed.memberId, observed.id, command.principal)
-            }
-            authorizeReservationMember(open.memberId, open.id, command.principal)
+            val open = lockReservationInCanonicalOrder(
+                command.reservationId,
+                command.principal,
+                requireEligibility = false,
+            )
             if (open.status !in setOf(ReservationStatus.WAITING, ReservationStatus.READY)) {
                 throw ReservationStateConflictException(open.id, open.status)
             }
@@ -164,11 +165,11 @@ class ReservationCommandService(
                 authorizationBinding(command.principal),
             ),
         ) { now ->
-            val ready = lockReservationAfterEdition(command.reservationId) { observed ->
-                authorizeReservationMember(observed.memberId, observed.id, command.principal)
-                requireEligible(observed.memberId)
-            }
-            authorizeReservationMember(ready.memberId, ready.id, command.principal)
+            val ready = lockReservationInCanonicalOrder(
+                command.reservationId,
+                command.principal,
+                requireEligibility = true,
+            )
             if (ready.status != ReservationStatus.READY) {
                 throw ReservationStateConflictException(ready.id, ready.status)
             }
@@ -219,10 +220,11 @@ class ReservationCommandService(
                 authorizationBinding(command.principal),
             ),
         ) { now ->
-            val ready = lockReservationAfterEdition(command.reservationId) { observed ->
-                authorizeReservationMember(observed.memberId, observed.id, command.principal)
-            }
-            authorizeReservationMember(ready.memberId, ready.id, command.principal)
+            val ready = lockReservationInCanonicalOrder(
+                command.reservationId,
+                command.principal,
+                requireEligibility = false,
+            )
             if (ready.status != ReservationStatus.READY) {
                 throw ReservationStateConflictException(ready.id, ready.status)
             }
@@ -288,12 +290,16 @@ class ReservationCommandService(
     private fun requireReservation(id: ReservationId): Reservation =
         reservationStore.lockById(id) ?: throw ReservationNotFoundException(id)
 
-    private fun lockReservationAfterEdition(
+    private fun lockReservationInCanonicalOrder(
         id: ReservationId,
-        beforeEditionLock: (Reservation) -> Unit,
+        principal: CommandPrincipal,
+        requireEligibility: Boolean,
     ): Reservation {
         val observed = reservationStore.findById(id) ?: throw ReservationNotFoundException(id)
-        beforeEditionLock(observed)
+        authorizeReservationMember(observed.memberId, observed.id, principal)
+        // Canonical order for shared circulation resources: member (when
+        // required) -> edition -> reservation row -> copy row.
+        if (requireEligibility) requireEligible(observed.memberId)
         reservationStore.lockEdition(observed.editionId)
         val locked = requireReservation(id)
         if (
@@ -302,6 +308,7 @@ class ReservationCommandService(
         ) {
             throw ConcurrentCirculationUpdateException()
         }
+        authorizeReservationMember(locked.memberId, locked.id, principal)
         return locked
     }
 

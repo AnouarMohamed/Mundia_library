@@ -12,11 +12,11 @@ data class CirculationIdempotencyProperties(
 ) {
     @get:AssertTrue(message = "idempotency retention must be between one second and 365 days")
     val isIdempotencyRetentionValid: Boolean
-        get() = !idempotencyRetention.isZero &&
-            !idempotencyRetention.isNegative &&
+        get() = idempotencyRetention >= MINIMUM_RETENTION &&
             idempotencyRetention <= MAXIMUM_RETENTION
 
     private companion object {
+        val MINIMUM_RETENTION: Duration = Duration.ofSeconds(1)
         val MAXIMUM_RETENTION: Duration = Duration.ofDays(365)
     }
 }

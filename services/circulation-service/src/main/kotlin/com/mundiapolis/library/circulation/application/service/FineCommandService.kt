@@ -271,7 +271,7 @@ class FineCommandService(
     }
 
     private fun requireCurrency(currency: String) {
-        if (!Regex("[A-Z]{3}").matches(currency)) throw InvalidFineCurrencyException()
+        if (!Fine.isSupportedCurrency(currency)) throw InvalidFineCurrencyException()
     }
 
     private fun fingerprint(operation: CommandOperation, vararg values: String): String {

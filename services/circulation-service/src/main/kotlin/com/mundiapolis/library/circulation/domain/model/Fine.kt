@@ -69,7 +69,7 @@ data class Fine private constructor(
         const val MAX_AMOUNT_MINOR = 1_000_000_000_000L
         private val CURRENCY_PATTERN = Regex("[A-Z]{3}")
 
-        private fun isSupportedCurrency(code: String): Boolean =
+        internal fun isSupportedCurrency(code: String): Boolean =
             CURRENCY_PATTERN.matches(code) &&
                 (
                     runCatching { Currency.getInstance(code) }

@@ -34,7 +34,7 @@ describe("distributed rate limiting", () => {
   });
 
   it("passes the raw identity to the PostgreSQL backend for one stable hash", async () => {
-    const { applyDistributedRateLimit } = await import("./ratelimit");
+    const { applyDistributedRateLimit } = await import("@/lib/ratelimit");
 
     await applyDistributedRateLimit({
       scope: "request:sensitive",
@@ -54,7 +54,7 @@ describe("distributed rate limiting", () => {
     configEnv.appEnvironment = "test";
     configEnv.upstash.redisUrl = "";
     configEnv.upstash.redisToken = "";
-    const { applyDistributedRateLimit } = await import("./ratelimit");
+    const { applyDistributedRateLimit } = await import("@/lib/ratelimit");
 
     await applyDistributedRateLimit({
       scope: "request:command",

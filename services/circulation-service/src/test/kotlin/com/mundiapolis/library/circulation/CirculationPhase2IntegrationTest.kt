@@ -1090,6 +1090,19 @@ class CirculationPhase2IntegrationTest {
             )
         }.isInstanceOf(InvalidFineCurrencyException::class.java)
 
+        assertThatThrownBy {
+            recordFinePayment.recordPayment(
+                RecordFinePaymentCommand(
+                    fineId = assessed.result.fineId,
+                    currency = "ZZZ",
+                    amountMinor = 100,
+                    externalReference = PaymentReference.parse("PAY-${UUID.randomUUID()}"),
+                    idempotencyKey = IdempotencyKey.parse("unsupported-currency-${UUID.randomUUID()}"),
+                    principal = staff,
+                ),
+            )
+        }.isInstanceOf(InvalidFineCurrencyException::class.java)
+
         val adjusted = adjustFine.adjust(
             AdjustFineCommand(
                 fineId = assessed.result.fineId,
