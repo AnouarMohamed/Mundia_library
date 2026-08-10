@@ -78,9 +78,7 @@
           "403": { "$ref": "#/components/responses/Forbidden" },
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
-          "409": { "$ref": "#/components/responses/Conflict" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
     },
@@ -126,8 +124,7 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "409": { "$ref": "#/components/responses/Conflict" },
-          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
         }
       }
     },
@@ -151,8 +148,7 @@
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
-          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
         }
       }
     },
@@ -245,8 +241,7 @@
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
-          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
         }
       }
     },
@@ -270,9 +265,7 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "409": { "$ref": "#/components/responses/Conflict" },
-          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
         }
       }
     },
@@ -295,9 +288,7 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "409": { "$ref": "#/components/responses/Conflict" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
     },
@@ -321,9 +312,7 @@
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
-          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
         }
       }
     },
@@ -346,9 +335,7 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
-          "409": { "$ref": "#/components/responses/Conflict" },
-          "429": { "$ref": "#/components/responses/TooManyRequests" },
-          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+          "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
     },
@@ -622,10 +609,7 @@
       },
       "ReservationCreated": {
         "description": "Reservation placed or its exact original result replayed",
-        "headers": {
-          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
-          "Location": { "$ref": "#/components/headers/Location" }
-        },
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommandResponse" } } }
       },
       "ReservationCommandSucceeded": {
@@ -675,7 +659,10 @@
           "Retry-After": { "schema": { "type": "integer", "minimum": 1 } },
           "RateLimit-Limit": { "schema": { "type": "integer", "minimum": 1 } },
           "RateLimit-Remaining": { "schema": { "type": "integer", "minimum": 0 } },
-          "RateLimit-Reset": { "schema": { "type": "integer", "format": "int64" } }
+          "RateLimit-Reset": {
+            "description": "Whole seconds until the current rate-limit window resets",
+            "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+          }
         },
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
@@ -833,8 +820,9 @@
       "RecordFinePaymentRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["amountMinor", "externalReference"],
+        "required": ["currency", "amountMinor", "externalReference"],
         "properties": {
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
           "amountMinor": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1000000000000 },
           "externalReference": { "type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[!-~]+$" }
         }
@@ -842,8 +830,9 @@
       "AdjustFineRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["deltaMinor", "reason"],
+        "required": ["currency", "deltaMinor", "reason"],
         "properties": {
+          "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
           "deltaMinor": { "type": "integer", "format": "int64", "minimum": -1000000000000, "maximum": 1000000000000, "not": { "const": 0 } },
           "reason": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001F\\u007F]+$" }
         }

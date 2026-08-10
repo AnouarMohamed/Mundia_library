@@ -59,6 +59,8 @@ interface LoanStore {
 interface CopyStore {
     fun create(copy: Copy, now: Instant): Boolean
 
+    fun findById(id: CopyId): Copy?
+
     fun lockById(id: CopyId): Copy?
 
     fun update(copy: Copy, expectedVersion: Long, now: Instant): Boolean
@@ -82,6 +84,8 @@ interface ReservationStore {
     fun lockEdition(editionId: EditionId)
 
     fun create(reservation: Reservation, now: Instant): Boolean
+
+    fun findById(id: ReservationId): Reservation?
 
     fun lockById(id: ReservationId): Reservation?
 

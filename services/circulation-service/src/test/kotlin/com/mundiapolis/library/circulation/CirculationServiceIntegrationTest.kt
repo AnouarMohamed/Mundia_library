@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit
         "app.security.jwt.issuer=https://issuer.example.test",
         "app.security.jwt.jwk-set-uri=https://issuer.example.test/.well-known/jwks.json",
         "app.security.jwt.audience=circulation-api",
-        "app.circulation.default-loan-period=P14D",
         "app.circulation.idempotency-retention=P1D",
         "spring.datasource.hikari.maximum-pool-size=24",
         "spring.datasource.hikari.connection-timeout=10000",

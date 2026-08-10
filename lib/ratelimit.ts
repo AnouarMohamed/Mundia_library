@@ -9,6 +9,7 @@ import {
 } from "@/lib/security/postgres-rate-limit";
 
 const isRateLimitDisabled = process.env.DISABLE_RATE_LIMIT === "true";
+const isDevelopmentEnvironment = config.env.appEnvironment === "development";
 const isLocalEnvironment = ["development", "test"].includes(
   config.env.appEnvironment,
 );
@@ -77,7 +78,10 @@ export async function applyDistributedRateLimit({
     .update(identifier.slice(0, 1024))
     .digest("hex");
 
-  if (isLocalEnvironment && (isRateLimitDisabled || !hasRedisConfig)) {
+  if (
+    (isLocalEnvironment && isRateLimitDisabled) ||
+    (isDevelopmentEnvironment && !hasRedisConfig)
+  ) {
     return localBypassResult(limit);
   }
 
@@ -85,7 +89,7 @@ export async function applyDistributedRateLimit({
     try {
       return await applyPostgresRateLimit({
         scope,
-        identifier: privacySafeIdentifier,
+        identifier,
         limit,
         windowSeconds: 60,
       });

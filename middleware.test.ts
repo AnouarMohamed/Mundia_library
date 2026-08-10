@@ -102,6 +102,8 @@ describe("document security middleware", () => {
     expect(admitRequest).toHaveBeenCalledOnce();
     expect(response.headers.get("RateLimit-Limit")).toBe("300");
     expect(response.headers.get("RateLimit-Remaining")).toBe("299");
+    expect(Number(response.headers.get("RateLimit-Reset"))).toBeGreaterThan(0);
+    expect(Number(response.headers.get("RateLimit-Reset"))).toBeLessThanOrEqual(60);
   });
 
   it("returns a bounded problem response when a request exceeds its budget", async () => {
@@ -128,6 +130,9 @@ describe("document security middleware", () => {
     );
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(Number(response.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(response.headers.get("RateLimit-Reset")).toBe(
+      response.headers.get("retry-after"),
+    );
     await expect(response.json()).resolves.toMatchObject({
       code: "rate_limit_exceeded",
       status: 429,

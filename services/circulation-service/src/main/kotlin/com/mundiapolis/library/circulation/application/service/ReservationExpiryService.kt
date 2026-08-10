@@ -28,14 +28,21 @@ class ReservationExpiryService(
 
     fun expireIfDue(id: ReservationId): Boolean = transactionRunner.required {
         val now = timeProvider.now().truncatedTo(ChronoUnit.MICROS)
+        val observed = reservationStore.findById(id) ?: return@required false
+        reservationStore.lockEdition(observed.editionId)
         val ready = reservationStore.lockById(id) ?: return@required false
+        if (
+            ready.memberId != observed.memberId ||
+            ready.editionId != observed.editionId
+        ) {
+            throw ConcurrentCirculationUpdateException()
+        }
         if (
             ready.status != ReservationStatus.READY ||
             now < requireNotNull(ready.expiresAt)
         ) {
             return@required false
         }
-        reservationStore.lockEdition(ready.editionId)
         val expired = ready.expire(now)
         if (!reservationStore.update(expired, ready.version, now)) {
             throw ConcurrentCirculationUpdateException()

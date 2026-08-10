@@ -63,7 +63,7 @@ class ApplicationConfiguration {
         outboxEventStore: OutboxEventStore,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
-        policy: CirculationPolicyProperties,
+        idempotency: CirculationIdempotencyProperties,
         policyStore: CirculationPolicyStore,
         reservationStore: ReservationStore,
         reservationQueueService: ReservationQueueService,
@@ -79,7 +79,7 @@ class ApplicationConfiguration {
         policyStore = policyStore,
         reservationStore = reservationStore,
         reservationQueueService = reservationQueueService,
-        idempotencyRetention = policy.idempotencyRetention,
+        idempotencyRetention = idempotency.idempotencyRetention,
     )
 
     @Bean
@@ -92,7 +92,7 @@ class ApplicationConfiguration {
         fineOutboxEventStore: FineOutboxEventStore,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
-        policy: CirculationPolicyProperties,
+        idempotency: CirculationIdempotencyProperties,
         policyStore: CirculationPolicyStore,
     ): FineCommandService = FineCommandService(
         transactionRunner = transactionRunner,
@@ -104,7 +104,7 @@ class ApplicationConfiguration {
         timeProvider = timeProvider,
         identifierGenerator = identifierGenerator,
         policyStore = policyStore,
-        idempotencyRetention = policy.idempotencyRetention,
+        idempotencyRetention = idempotency.idempotencyRetention,
     )
 
     @Bean
@@ -116,7 +116,7 @@ class ApplicationConfiguration {
         inventoryOutboxEventStore: InventoryOutboxEventStore,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
-        policy: CirculationPolicyProperties,
+        idempotency: CirculationIdempotencyProperties,
         reservationQueueService: ReservationQueueService,
     ): InventoryCommandService = InventoryCommandService(
         transactionRunner = transactionRunner,
@@ -127,7 +127,7 @@ class ApplicationConfiguration {
         timeProvider = timeProvider,
         identifierGenerator = identifierGenerator,
         reservationQueueService = reservationQueueService,
-        idempotencyRetention = policy.idempotencyRetention,
+        idempotencyRetention = idempotency.idempotencyRetention,
     )
 
     @Bean
@@ -173,7 +173,7 @@ class ApplicationConfiguration {
         reservationQueueService: ReservationQueueService,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
-        policy: CirculationPolicyProperties,
+        idempotency: CirculationIdempotencyProperties,
     ): ReservationCommandService = ReservationCommandService(
         transactionRunner,
         reservationStore,
@@ -187,7 +187,7 @@ class ApplicationConfiguration {
         reservationQueueService,
         timeProvider,
         identifierGenerator,
-        policy.idempotencyRetention,
+        idempotency.idempotencyRetention,
     )
 
     @Bean
@@ -215,7 +215,7 @@ class ApplicationConfiguration {
         policyOutboxEventStore: PolicyOutboxEventStore,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
-        policy: CirculationPolicyProperties,
+        idempotency: CirculationIdempotencyProperties,
     ): PolicyCommandService = PolicyCommandService(
         transactionRunner,
         circulationPolicyStore,
@@ -223,7 +223,7 @@ class ApplicationConfiguration {
         policyOutboxEventStore,
         timeProvider,
         identifierGenerator,
-        policy.idempotencyRetention,
+        idempotency.idempotencyRetention,
     )
 
     @Bean

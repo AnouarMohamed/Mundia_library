@@ -60,11 +60,17 @@ const applyContentSecurityPolicy = (
 
 type Admission = Awaited<ReturnType<typeof admitRequest>>;
 
+const secondsUntilReset = (reset: number, now = Date.now()) =>
+  Math.max(1, Math.ceil((reset - now) / 1000));
+
 const applyRateLimitHeaders = <T extends NextResponse>(
   response: T,
   admission: Admission | undefined,
+  resetAfterSeconds?: number,
 ) => {
   if (!admission) return response;
+  const resetAfter =
+    resetAfterSeconds ?? secondsUntilReset(admission.decision.reset);
   response.headers.set(
     "RateLimit-Limit",
     admission.decision.limit.toString(),
@@ -75,7 +81,7 @@ const applyRateLimitHeaders = <T extends NextResponse>(
   );
   response.headers.set(
     "RateLimit-Reset",
-    Math.ceil(admission.decision.reset / 1000).toString(),
+    resetAfter.toString(),
   );
   return response;
 };
@@ -83,10 +89,7 @@ const applyRateLimitHeaders = <T extends NextResponse>(
 const rejectedAdmissionResponse = (admission: Admission) => {
   const unavailable = admission.decision.unavailable === true;
   const status = unavailable ? 503 : 429;
-  const retryAfter = Math.max(
-    1,
-    Math.ceil((admission.decision.reset - Date.now()) / 1000),
-  );
+  const retryAfter = secondsUntilReset(admission.decision.reset);
   const response = NextResponse.json(
     {
       type: unavailable
@@ -108,7 +111,7 @@ const rejectedAdmissionResponse = (admission: Admission) => {
       },
     },
   );
-  return applyRateLimitHeaders(response, admission);
+  return applyRateLimitHeaders(response, admission, retryAfter);
 };
 
 /**

@@ -235,7 +235,7 @@ jobs:
         working-directory: services
         run: ./gradlew :circulation-service:bootJar --no-daemon
 
-      - name: Apply circulation Flyway migrations 1 through 11
+      - name: Apply circulation Flyway migrations 1 through 12
         working-directory: services
         env:
           APP_MIGRATION_ONLY: "true"

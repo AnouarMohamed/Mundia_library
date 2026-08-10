@@ -8,6 +8,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationStore
+import com.mundiapolis.library.circulation.domain.model.Copy
 import com.mundiapolis.library.circulation.domain.model.CopyId
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import java.time.Instant
@@ -19,18 +20,23 @@ class ReservationQueueService(
     private val outboxEventStore: ReservationOutboxEventStore,
     private val identifierGenerator: IdentifierGenerator,
 ) {
+    fun lockEdition(editionId: EditionId) = reservationStore.lockEdition(editionId)
+
     fun claimNewlyAvailableCopy(
         editionId: EditionId,
         copyId: CopyId,
         now: Instant,
         actorFingerprint: String,
-    ) {
+    ): Copy {
         reservationStore.lockEdition(editionId)
-        val waiting = reservationStore.lockOldestWaiting(editionId) ?: return
-        if (!copyStore.reserve(copyId, now)) {
-            throw ConcurrentCirculationUpdateException()
+        val waiting = reservationStore.lockOldestWaiting(editionId)
+        if (waiting != null) {
+            if (!copyStore.reserve(copyId, now)) {
+                throw ConcurrentCirculationUpdateException()
+            }
+            makeReady(waiting, copyId, now, actorFingerprint)
         }
-        makeReady(waiting, copyId, now, actorFingerprint)
+        return copyStore.lockById(copyId) ?: throw ConcurrentCirculationUpdateException()
     }
 
     fun releaseReturnedCopy(

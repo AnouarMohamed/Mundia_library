@@ -51,6 +51,12 @@ class JooqReservationStore(
             .fetchOne()
             ?.toDomain()
 
+    override fun findById(id: ReservationId): Reservation? =
+        dsl.selectFrom(CIRCULATION_RESERVATION)
+            .where(CIRCULATION_RESERVATION.ID.eq(id.value))
+            .fetchOne()
+            ?.toDomain()
+
     override fun update(
         reservation: Reservation,
         expectedVersion: Long,

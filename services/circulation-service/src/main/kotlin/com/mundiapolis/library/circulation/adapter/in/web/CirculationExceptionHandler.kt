@@ -7,6 +7,7 @@ import com.mundiapolis.library.circulation.application.model.CopyNotFoundExcepti
 import com.mundiapolis.library.circulation.application.model.CopyStateConflictException
 import com.mundiapolis.library.circulation.application.model.DuplicatePaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.FineBalanceConflictException
+import com.mundiapolis.library.circulation.application.model.FineCurrencyMismatchException
 import com.mundiapolis.library.circulation.application.model.FineNotFoundException
 import com.mundiapolis.library.circulation.application.model.FinePersistenceConflictException
 import com.mundiapolis.library.circulation.application.model.IdempotencyKeyConflictException
@@ -15,6 +16,7 @@ import com.mundiapolis.library.circulation.application.model.InvalidActorIdentit
 import com.mundiapolis.library.circulation.application.model.InvalidAuthenticationClaimException
 import com.mundiapolis.library.circulation.application.model.InvalidFineAdjustmentException
 import com.mundiapolis.library.circulation.application.model.InvalidFineAmountException
+import com.mundiapolis.library.circulation.application.model.InvalidFineCurrencyException
 import com.mundiapolis.library.circulation.application.model.InvalidFineNarrativeException
 import com.mundiapolis.library.circulation.application.model.InvalidIdempotencyKeyException
 import com.mundiapolis.library.circulation.application.model.InvalidInventoryInputException
@@ -65,6 +67,7 @@ class CirculationExceptionHandler {
     @ExceptionHandler(
         InvalidFineAmountException::class,
         InvalidFineAdjustmentException::class,
+        InvalidFineCurrencyException::class,
         InvalidFineNarrativeException::class,
         InvalidPaymentReferenceException::class,
     )
@@ -165,6 +168,10 @@ class CirculationExceptionHandler {
     @ExceptionHandler(FineBalanceConflictException::class)
     fun fineBalanceConflict(exception: FineBalanceConflictException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "fine_balance_conflict", exception.message)
+
+    @ExceptionHandler(FineCurrencyMismatchException::class)
+    fun fineCurrencyMismatch(exception: FineCurrencyMismatchException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "fine_currency_mismatch", exception.message)
 
     @ExceptionHandler(DuplicatePaymentReferenceException::class)
     fun duplicatePaymentReference(exception: DuplicatePaymentReferenceException): ProblemDetail =

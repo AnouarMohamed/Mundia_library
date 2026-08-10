@@ -58,6 +58,7 @@ data class AssessFineCommand(
 
 data class RecordFinePaymentCommand(
     val fineId: FineId,
+    val currency: String,
     val amountMinor: Long,
     val externalReference: PaymentReference,
     val idempotencyKey: IdempotencyKey,
@@ -66,6 +67,7 @@ data class RecordFinePaymentCommand(
 
 data class AdjustFineCommand(
     val fineId: FineId,
+    val currency: String,
     val deltaMinor: Long,
     val reason: FineNarrative,
     val idempotencyKey: IdempotencyKey,

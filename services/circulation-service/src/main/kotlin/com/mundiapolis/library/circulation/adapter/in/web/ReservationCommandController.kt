@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.net.URI
 import java.time.Instant
 import java.util.UUID
 
@@ -58,11 +57,6 @@ class ReservationCommandController(
             ),
         )
         return ResponseEntity.status(HttpStatus.CREATED)
-            .location(
-                URI.create(
-                    "/api/v1/circulation/reservations/${execution.result.reservationId.value}",
-                ),
-            )
             .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
             .body(execution.toResponse())
     }

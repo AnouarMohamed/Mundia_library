@@ -131,12 +131,13 @@ class ReservationCommandService(
                 authorizationBinding(command.principal),
             ),
         ) { now ->
-            val open = requireReservation(command.reservationId)
+            val open = lockReservationAfterEdition(command.reservationId) { observed ->
+                authorizeReservationMember(observed.memberId, observed.id, command.principal)
+            }
             authorizeReservationMember(open.memberId, open.id, command.principal)
             if (open.status !in setOf(ReservationStatus.WAITING, ReservationStatus.READY)) {
                 throw ReservationStateConflictException(open.id, open.status)
             }
-            reservationStore.lockEdition(open.editionId)
             val cancelled = open.cancel(now)
             if (!reservationStore.update(cancelled, open.version, now)) {
                 throw ConcurrentCirculationUpdateException()
@@ -157,17 +158,23 @@ class ReservationCommandService(
             command.principal,
             command.idempotencyKey,
             ReservationOperation.FULFILL,
-            fingerprint("FULFILL", command.reservationId.value.toString()),
+            fingerprint(
+                "FULFILL",
+                command.reservationId.value.toString(),
+                authorizationBinding(command.principal),
+            ),
         ) { now ->
-            val ready = requireReservation(command.reservationId)
+            val ready = lockReservationAfterEdition(command.reservationId) { observed ->
+                authorizeReservationMember(observed.memberId, observed.id, command.principal)
+                requireEligible(observed.memberId)
+            }
+            authorizeReservationMember(ready.memberId, ready.id, command.principal)
             if (ready.status != ReservationStatus.READY) {
                 throw ReservationStateConflictException(ready.id, ready.status)
             }
             if (now > requireNotNull(ready.expiresAt)) {
                 throw ReservationHoldExpiredException(ready.id)
             }
-            reservationStore.lockEdition(ready.editionId)
-            requireEligible(ready.memberId)
             val policy = policyStore.current()
             val copyId = requireNotNull(ready.copyId)
             if (!copyStore.reservedToLoan(copyId, now)) {
@@ -206,16 +213,22 @@ class ReservationCommandService(
             command.principal,
             command.idempotencyKey,
             ReservationOperation.EXPIRE,
-            fingerprint("EXPIRE", command.reservationId.value.toString()),
+            fingerprint(
+                "EXPIRE",
+                command.reservationId.value.toString(),
+                authorizationBinding(command.principal),
+            ),
         ) { now ->
-            val ready = requireReservation(command.reservationId)
+            val ready = lockReservationAfterEdition(command.reservationId) { observed ->
+                authorizeReservationMember(observed.memberId, observed.id, command.principal)
+            }
+            authorizeReservationMember(ready.memberId, ready.id, command.principal)
             if (ready.status != ReservationStatus.READY) {
                 throw ReservationStateConflictException(ready.id, ready.status)
             }
             if (now < requireNotNull(ready.expiresAt)) {
                 throw ReservationHoldNotExpiredException(ready.id)
             }
-            reservationStore.lockEdition(ready.editionId)
             val expired = ready.expire(now)
             if (!reservationStore.update(expired, ready.version, now)) {
                 throw ConcurrentCirculationUpdateException()
@@ -274,6 +287,23 @@ class ReservationCommandService(
 
     private fun requireReservation(id: ReservationId): Reservation =
         reservationStore.lockById(id) ?: throw ReservationNotFoundException(id)
+
+    private fun lockReservationAfterEdition(
+        id: ReservationId,
+        beforeEditionLock: (Reservation) -> Unit,
+    ): Reservation {
+        val observed = reservationStore.findById(id) ?: throw ReservationNotFoundException(id)
+        beforeEditionLock(observed)
+        reservationStore.lockEdition(observed.editionId)
+        val locked = requireReservation(id)
+        if (
+            locked.memberId != observed.memberId ||
+            locked.editionId != observed.editionId
+        ) {
+            throw ConcurrentCirculationUpdateException()
+        }
+        return locked
+    }
 
     private fun requireEligible(memberId: MemberId) {
         eligibilityStore.lockMember(memberId)

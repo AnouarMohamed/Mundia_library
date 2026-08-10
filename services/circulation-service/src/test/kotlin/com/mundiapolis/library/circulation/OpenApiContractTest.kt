@@ -24,6 +24,7 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.RequestLoanRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.UpdateCirculationPolicyRequest
 import com.mundiapolis.library.circulation.application.port.inbound.CirculationStatus
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -32,11 +33,28 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.PutMapping
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.core.StreamReadFeature
+import tools.jackson.core.json.JsonFactory
 
 class OpenApiContractTest {
     private val contract: JsonNode = requireNotNull(
         OpenApiContractTest::class.java.getResourceAsStream(CONTRACT_RESOURCE),
     ).use(ObjectMapper()::readTree)
+
+    @Test
+    fun `published contract contains no duplicate JSON object keys`() {
+        val strictMapper = ObjectMapper(
+            JsonFactory.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .build(),
+        )
+
+        assertThatCode {
+            requireNotNull(
+                OpenApiContractTest::class.java.getResourceAsStream(CONTRACT_RESOURCE),
+            ).use(strictMapper::readTree)
+        }.doesNotThrowAnyException()
+    }
 
     @Test
     fun `published contract routes and scopes match controller annotations exactly`() {

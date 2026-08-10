@@ -70,6 +70,7 @@ class FineCommandController(
         val execution = recordFinePaymentUseCase.recordPayment(
             RecordFinePaymentCommand(
                 fineId = FineId(fineId),
+                currency = request.currency,
                 amountMinor = request.amountMinor,
                 externalReference = PaymentReference.parse(request.externalReference),
                 idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
@@ -90,6 +91,7 @@ class FineCommandController(
         val execution = adjustFineUseCase.adjust(
             AdjustFineCommand(
                 fineId = FineId(fineId),
+                currency = request.currency,
                 deltaMinor = request.deltaMinor,
                 reason = FineNarrative.parse(request.reason),
                 idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
@@ -120,11 +122,13 @@ data class AssessFineRequest(
 )
 
 data class RecordFinePaymentRequest(
+    val currency: String,
     val amountMinor: Long,
     val externalReference: String,
 )
 
 data class AdjustFineRequest(
+    val currency: String,
     val deltaMinor: Long,
     val reason: String,
 )

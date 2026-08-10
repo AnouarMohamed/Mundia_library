@@ -30,7 +30,7 @@ operator acknowledgements.
 - The apply process receives a plan and a target URL only. It has no source
   connection and cannot write the legacy database.
 - Apply requires PostgreSQL 18 and exactly successful circulation Flyway
-  versions 1 through 11. It validates the target column signature, validated
+  versions 1 through 12. It validates the target column signature, validated
   constraints, and enabled immutable/consistency triggers before touching data.
 - Apply uses one serializable transaction, a PostgreSQL advisory lock, bounded
   timeouts, insert-only statements, and exact post-insert reconciliation across
@@ -79,7 +79,7 @@ CIRCULATION_MIGRATION_TEST_DATABASE=FRESH_DB \
 npm run test:integration
 ```
 
-CI must provision that fresh database, run circulation Flyway 1 through 11, and
+CI must provision that fresh database, run circulation Flyway 1 through 12, and
 set both test-only variables; it must not point this test at a shared database.
 `test:integration` fails rather than skips when either variable is absent.
 The ordinary `npm test` reports the database scenario as skipped when the
@@ -219,7 +219,7 @@ npm run cli -- plan \
 
 ### 2. Prepare the target
 
-Apply the circulation service's reviewed Flyway migrations 1 through 11 to a
+Apply the circulation service's reviewed Flyway migrations 1 through 12 to a
 fresh local PostgreSQL 18 target. Stop the circulation service writer. The
 target database role should have only:
 
@@ -229,6 +229,12 @@ target database role should have only:
 - catalog visibility needed for the schema/constraint/trigger checks;
 - `SELECT` and `INSERT` on `circulation_copy`, `circulation_loan`,
   `circulation_fine`, and `circulation_fine_ledger_entry`;
+- `SELECT` on `circulation_consumer_inbox`,
+  `circulation_member_eligibility`, `circulation_policy_current`,
+  `circulation_policy_idempotency`, `circulation_policy_revision`,
+  `circulation_rate_limit_bucket`, `circulation_reservation`,
+  `circulation_reservation_idempotency`, and `outbox_event`; these tables are
+  locked in `ACCESS SHARE` mode while the target schema is verified;
 - permission to call `pg_advisory_lock` and `pg_advisory_unlock`.
 
 Do not grant `UPDATE`, `DELETE`, DDL, or access to legacy tables.

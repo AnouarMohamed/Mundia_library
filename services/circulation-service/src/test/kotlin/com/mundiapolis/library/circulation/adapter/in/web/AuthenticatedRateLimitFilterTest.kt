@@ -43,6 +43,7 @@ class AuthenticatedRateLimitFilterTest {
 
         assertThat(response.status).isEqualTo(429)
         assertThat(response.getHeader("Retry-After")?.toLong()).isBetween(1, 45)
+        assertThat(response.getHeader("RateLimit-Reset")).isEqualTo(response.getHeader("Retry-After"))
         assertThat(response.getHeader("RateLimit-Limit")).isEqualTo("30")
         assertThat(response.contentAsString).contains("rate_limit_exceeded")
         assertThat(chain.request).isNull()

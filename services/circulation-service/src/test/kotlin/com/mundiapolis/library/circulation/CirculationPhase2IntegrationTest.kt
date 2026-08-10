@@ -16,8 +16,10 @@ import com.mundiapolis.library.circulation.application.model.CommandPrincipal
 import com.mundiapolis.library.circulation.application.model.BrokerPublishAcknowledgement
 import com.mundiapolis.library.circulation.application.model.DuplicatePaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.FineBalanceConflictException
+import com.mundiapolis.library.circulation.application.model.FineCurrencyMismatchException
 import com.mundiapolis.library.circulation.application.model.FineNarrative
 import com.mundiapolis.library.circulation.application.model.IdempotencyKey
+import com.mundiapolis.library.circulation.application.model.InvalidFineCurrencyException
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
 import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
@@ -27,6 +29,7 @@ import com.mundiapolis.library.circulation.application.model.MembershipEventConf
 import com.mundiapolis.library.circulation.application.model.MembershipEventGapException
 import com.mundiapolis.library.circulation.application.model.PaymentReference
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
+import com.mundiapolis.library.circulation.application.model.ReservationNotFoundException
 import com.mundiapolis.library.circulation.application.model.PolicyRevisionConflictException
 import com.mundiapolis.library.circulation.application.model.UpdateCirculationPolicyValues
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineCommand
@@ -52,6 +55,8 @@ import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCo
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.FulfillReservationCommand
 import com.mundiapolis.library.circulation.application.port.inbound.FulfillReservationUseCase
+import com.mundiapolis.library.circulation.application.port.inbound.ExpireReservationCommand
+import com.mundiapolis.library.circulation.application.port.inbound.ExpireReservationUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.GetCirculationPolicyQuery
 import com.mundiapolis.library.circulation.application.port.inbound.PlaceReservationCommand
 import com.mundiapolis.library.circulation.application.port.inbound.PlaceReservationUseCase
@@ -117,10 +122,6 @@ import javax.sql.DataSource
         "app.security.jwt.issuer=https://issuer.example.test",
         "app.security.jwt.jwk-set-uri=https://issuer.example.test/.well-known/jwks.json",
         "app.security.jwt.audience=circulation-api",
-        "app.circulation.default-loan-period=P14D",
-        "app.circulation.renewal-period=P14D",
-        "app.circulation.maximum-renewals=2",
-        "app.circulation.fine-currency=MAD",
         "app.circulation.idempotency-retention=P1D",
         "spring.datasource.hikari.maximum-pool-size=24",
         "spring.datasource.hikari.connection-timeout=10000",
@@ -144,6 +145,9 @@ class CirculationPhase2IntegrationTest {
 
     @Autowired
     private lateinit var fulfillReservation: FulfillReservationUseCase
+
+    @Autowired
+    private lateinit var expireReservation: ExpireReservationUseCase
 
     @Autowired
     private lateinit var getCirculationPolicy: GetCirculationPolicyQuery
@@ -228,6 +232,16 @@ class CirculationPhase2IntegrationTest {
             dsl.execute("ALTER TABLE circulation_inventory_audit_entry ENABLE TRIGGER USER")
             dsl.execute("ALTER TABLE circulation_consumer_inbox ENABLE TRIGGER USER")
             dsl.execute("ALTER TABLE circulation_member_eligibility ENABLE TRIGGER USER")
+        }
+        dsl.execute("ALTER TABLE circulation_policy_revision DISABLE TRIGGER USER")
+        try {
+            dsl.execute(
+                "DELETE FROM circulation_policy_revision " +
+                    "WHERE revision_id <> CAST(? AS uuid)",
+                POLICY_SEED_REVISION.toString(),
+            )
+        } finally {
+            dsl.execute("ALTER TABLE circulation_policy_revision ENABLE TRIGGER USER")
         }
     }
 
@@ -894,7 +908,7 @@ class CirculationPhase2IntegrationTest {
             with(jwtFor("fine-assessor", ASSESS_FINE_SCOPE))
             contentType = MediaType.APPLICATION_JSON
             content =
-                """{"amountMinor":100,"externalReference":"PAY-${UUID.randomUUID()}"}"""
+                """{"currency":"MAD","amountMinor":100,"externalReference":"PAY-${UUID.randomUUID()}"}"""
             header(IDEMPOTENCY_HEADER, "payment-wrong-scope-${UUID.randomUUID()}")
         }.andExpect {
             status { isForbidden() }
@@ -903,7 +917,7 @@ class CirculationPhase2IntegrationTest {
         mockMvc.post("$FINES_PATH/$fineId/adjustments") {
             with(jwtFor("payment-recorder", RECORD_PAYMENT_SCOPE))
             contentType = MediaType.APPLICATION_JSON
-            content = """{"deltaMinor":-100,"reason":"Approved waiver"}"""
+            content = """{"currency":"MAD","deltaMinor":-100,"reason":"Approved waiver"}"""
             header(IDEMPOTENCY_HEADER, "adjust-wrong-scope-${UUID.randomUUID()}")
         }.andExpect {
             status { isForbidden() }
@@ -951,6 +965,7 @@ class CirculationPhase2IntegrationTest {
             recordFinePayment.recordPayment(
                 RecordFinePaymentCommand(
                     fineId = assessed.result.fineId,
+                    currency = "MAD",
                     amountMinor = 1,
                     externalReference = PaymentReference.parse("PAY-$index-${UUID.randomUUID()}"),
                     idempotencyKey =
@@ -1007,6 +1022,7 @@ class CirculationPhase2IntegrationTest {
             recordFinePayment.recordPayment(
                 RecordFinePaymentCommand(
                     fineId = assessed.result.fineId,
+                    currency = "MAD",
                     amountMinor = 2_000,
                     externalReference = paymentReference,
                     idempotencyKey = paymentKey,
@@ -1025,6 +1041,7 @@ class CirculationPhase2IntegrationTest {
             recordFinePayment.recordPayment(
                 RecordFinePaymentCommand(
                     fineId = assessed.result.fineId,
+                    currency = "MAD",
                     amountMinor = 100,
                     externalReference = paymentReference,
                     idempotencyKey =
@@ -1038,6 +1055,7 @@ class CirculationPhase2IntegrationTest {
             recordFinePayment.recordPayment(
                 RecordFinePaymentCommand(
                     fineId = assessed.result.fineId,
+                    currency = "MAD",
                     amountMinor = 3_001,
                     externalReference = PaymentReference.parse("PAY-${UUID.randomUUID()}"),
                     idempotencyKey = IdempotencyKey.parse("overpayment-${UUID.randomUUID()}"),
@@ -1046,9 +1064,36 @@ class CirculationPhase2IntegrationTest {
             )
         }.isInstanceOf(FineBalanceConflictException::class.java)
 
+        assertThatThrownBy {
+            recordFinePayment.recordPayment(
+                RecordFinePaymentCommand(
+                    fineId = assessed.result.fineId,
+                    currency = "USD",
+                    amountMinor = 100,
+                    externalReference = PaymentReference.parse("PAY-${UUID.randomUUID()}"),
+                    idempotencyKey = IdempotencyKey.parse("wrong-currency-${UUID.randomUUID()}"),
+                    principal = staff,
+                ),
+            )
+        }.isInstanceOf(FineCurrencyMismatchException::class.java)
+
+        assertThatThrownBy {
+            recordFinePayment.recordPayment(
+                RecordFinePaymentCommand(
+                    fineId = assessed.result.fineId,
+                    currency = "mad",
+                    amountMinor = 100,
+                    externalReference = PaymentReference.parse("PAY-${UUID.randomUUID()}"),
+                    idempotencyKey = IdempotencyKey.parse("invalid-currency-${UUID.randomUUID()}"),
+                    principal = staff,
+                ),
+            )
+        }.isInstanceOf(InvalidFineCurrencyException::class.java)
+
         val adjusted = adjustFine.adjust(
             AdjustFineCommand(
                 fineId = assessed.result.fineId,
+                currency = "MAD",
                 deltaMinor = -500,
                 reason = FineNarrative.parse("Approved partial waiver"),
                 idempotencyKey = IdempotencyKey.parse("adjust-fine-${UUID.randomUUID()}"),
@@ -1592,6 +1637,52 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `reservation fulfillment and expiry reject unrelated member principals`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val unrelatedMemberId = MemberId(UUID.randomUUID())
+        val editionId = EditionId(UUID.randomUUID())
+        val copyId = UUID.randomUUID()
+        seedEligible(memberId)
+        seedCopy(copyId, editionId.value, UUID.randomUUID(), "AUTH-${UUID.randomUUID()}")
+        val reservation = placeReservation.place(
+            PlaceReservationCommand(
+                memberId,
+                editionId,
+                IdempotencyKey.parse("place-auth-${UUID.randomUUID()}"),
+                selfPrincipal(memberId, "reservation-owner"),
+            ),
+        )
+        val unrelated = selfPrincipal(unrelatedMemberId, "unrelated-member")
+
+        assertThatThrownBy {
+            fulfillReservation.fulfill(
+                FulfillReservationCommand(
+                    reservation.result.reservationId,
+                    IdempotencyKey.parse("fulfill-auth-${UUID.randomUUID()}"),
+                    unrelated,
+                ),
+            )
+        }.isInstanceOf(ReservationNotFoundException::class.java)
+        assertThatThrownBy {
+            expireReservation.expire(
+                ExpireReservationCommand(
+                    reservation.result.reservationId,
+                    IdempotencyKey.parse("expire-auth-${UUID.randomUUID()}"),
+                    unrelated,
+                ),
+            )
+        }.isInstanceOf(ReservationNotFoundException::class.java)
+
+        assertThat(
+            dsl.select(CIRCULATION_RESERVATION.STATUS)
+                .from(CIRCULATION_RESERVATION)
+                .where(CIRCULATION_RESERVATION.ID.eq(reservation.result.reservationId.value))
+                .fetchSingle(CIRCULATION_RESERVATION.STATUS),
+        ).isEqualTo(ReservationStatus.READY.name)
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN)).isZero()
+    }
+
+    @Test
     fun `policy updates are immutable compare and set and replay safe`() {
         val current = getCirculationPolicy.get()
         val key = IdempotencyKey.parse("policy-update-${UUID.randomUUID()}")
@@ -1673,18 +1764,23 @@ class CirculationPhase2IntegrationTest {
         assertThat(waiting.result.status).isEqualTo(ReservationStatus.WAITING)
 
         val copyId = CopyId(UUID.randomUUID())
-        registerCopy.register(
-            RegisterCopyCommand(
-                copyId,
-                editionId,
-                BranchId(UUID.randomUUID()),
-                CopyBarcode.parse("RP-${UUID.randomUUID()}"),
-                ShelfLocation.parse("HOLD-DESK"),
-                InventoryReason.parse("New copy available for queued hold"),
-                IdempotencyKey.parse("register-for-hold-${UUID.randomUUID()}"),
-                administrativePrincipal("inventory-for-hold"),
-            ),
+        val registerCommand = RegisterCopyCommand(
+            copyId,
+            editionId,
+            BranchId(UUID.randomUUID()),
+            CopyBarcode.parse("RP-${UUID.randomUUID()}"),
+            ShelfLocation.parse("HOLD-DESK"),
+            InventoryReason.parse("New copy available for queued hold"),
+            IdempotencyKey.parse("register-for-hold-${UUID.randomUUID()}"),
+            administrativePrincipal("inventory-for-hold"),
         )
+        val registered = registerCopy.register(registerCommand)
+        val replay = registerCopy.register(registerCommand)
+
+        assertThat(registered.result.status).isEqualTo(CopyStatus.RESERVED)
+        assertThat(registered.result.version).isOne()
+        assertThat(replay.replayed).isTrue()
+        assertThat(replay.result).isEqualTo(registered.result)
 
         assertThat(
             dsl.select(CIRCULATION_RESERVATION.STATUS)
@@ -1698,6 +1794,19 @@ class CirculationPhase2IntegrationTest {
                 .where(CIRCULATION_COPY.ID.eq(copyId.value))
                 .fetchOne(CIRCULATION_COPY.STATUS),
         ).isEqualTo("RESERVED")
+        val audit = dsl.selectFrom(CIRCULATION_INVENTORY_AUDIT_ENTRY)
+            .where(CIRCULATION_INVENTORY_AUDIT_ENTRY.COPY_ID.eq(copyId.value))
+            .fetchSingle()
+        assertThat(audit.copyStatus).isEqualTo(CopyStatus.RESERVED.name)
+        assertThat(audit.copyVersion).isOne()
+        val copyEvent = dsl.selectFrom(OUTBOX_EVENT)
+            .where(
+                OUTBOX_EVENT.AGGREGATE_TYPE.eq("copy")
+                    .and(OUTBOX_EVENT.AGGREGATE_ID.eq(copyId.value)),
+            )
+            .fetchSingle()
+        assertThat(copyEvent.aggregateVersion).isOne()
+        assertThat(copyEvent.payload?.data()).contains("\"status\": \"RESERVED\"")
     }
 
     @Test
@@ -1864,7 +1973,7 @@ class CirculationPhase2IntegrationTest {
         CommandPrincipal(
             idempotencyOwner = idempotencyOwner(subject),
             membershipId = null,
-            canActOnBehalf = false,
+            canActOnBehalf = true,
         )
 
     private fun idempotencyOwner(subject: String): IdempotencyOwner =
@@ -1904,6 +2013,9 @@ class CirculationPhase2IntegrationTest {
     }
 
     private companion object {
+        val POLICY_SEED_REVISION: UUID = UUID.fromString(
+            "00000000-0000-0000-0000-000000000001",
+        )
         const val LOANS_PATH = "/api/v1/circulation/loans"
         const val FINES_PATH = "/api/v1/circulation/fines"
         const val COPIES_PATH = "/api/v1/circulation/copies"

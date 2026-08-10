@@ -47,7 +47,7 @@ class JwtCommandPrincipalResolver {
     }
 
     fun forAdministrativeCommand(authentication: JwtAuthenticationToken): CommandPrincipal =
-        resolve(authentication.token, membershipId = null, canActOnBehalf = false)
+        resolve(authentication.token, membershipId = null, canActOnBehalf = true)
 
     private fun resolve(
         jwt: Jwt,

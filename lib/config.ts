@@ -344,6 +344,11 @@ if (parsedEnv.success && isServer) {
       "ALLOW_PUBLIC_SIGNUP is forbidden when APP_ENV is staging or production",
     );
   }
+  if (protectedIdentityTier && process.env.DISABLE_RATE_LIMIT === "true") {
+    throw new Error(
+      "DISABLE_RATE_LIMIT is forbidden when APP_ENV is staging or production",
+    );
+  }
 }
 
 if (
@@ -373,9 +378,6 @@ if (
     }
   }
 
-  if (process.env.DISABLE_RATE_LIMIT === "true") {
-    throw new Error("DISABLE_RATE_LIMIT is forbidden when APP_ENV=production");
-  }
   if (parsedEnv.data.allowPublicSignup) {
     throw new Error("ALLOW_PUBLIC_SIGNUP is forbidden when APP_ENV=production");
   }

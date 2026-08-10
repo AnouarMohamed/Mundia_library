@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -39,8 +40,23 @@ async function snapshot(): Promise<LegacySnapshot> {
   ) as LegacySnapshot;
 }
 
+function quoteIdentifier(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`;
+}
+
+function quoteLiteral(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function withRole(connectionString: string, role: string, password: string): string {
+  const parsed = new URL(connectionString);
+  parsed.username = role;
+  parsed.password = password;
+  return parsed.toString();
+}
+
 test(
-  "PostgreSQL 18 apply is exact, replayable, conflict-rollback safe, and trigger guarded",
+  "PostgreSQL 18 apply is exact, replayable, least-privilege, conflict-rollback safe, and trigger guarded",
   { skip: !integrationEnabled },
   async () => {
     const url = targetUrl!;
@@ -159,7 +175,69 @@ test(
       ssl: false,
     });
     await client.connect();
+    let leastPrivilegeRole: string | undefined;
     try {
+      leastPrivilegeRole = `circulation_target_${randomUUID().replaceAll("-", "")}`;
+      const leastPrivilegePassword = `test-${randomUUID()}`;
+      const quotedRole = quoteIdentifier(leastPrivilegeRole);
+      await client.query(
+        `CREATE ROLE ${quotedRole} LOGIN PASSWORD ${quoteLiteral(leastPrivilegePassword)}`,
+      );
+      await client.query(
+        `GRANT CONNECT ON DATABASE ${quoteIdentifier(database)} TO ${quotedRole}`,
+      );
+      await client.query(`GRANT USAGE ON SCHEMA public TO ${quotedRole}`);
+      await client.query(`
+        GRANT SELECT ON
+          flyway_schema_history,
+          circulation_copy,
+          circulation_loan,
+          circulation_fine,
+          circulation_fine_ledger_entry,
+          circulation_consumer_inbox,
+          circulation_member_eligibility,
+          circulation_policy_current,
+          circulation_policy_idempotency,
+          circulation_policy_revision,
+          circulation_rate_limit_bucket,
+          circulation_reservation,
+          circulation_reservation_idempotency,
+          outbox_event
+        TO ${quotedRole}
+      `);
+      await client.query(`
+        GRANT INSERT ON
+          circulation_copy,
+          circulation_loan,
+          circulation_fine,
+          circulation_fine_ledger_entry
+        TO ${quotedRole}
+      `);
+      await client.query(
+        `GRANT EXECUTE ON FUNCTION pg_catalog.pg_advisory_lock(integer, integer), ` +
+          `pg_catalog.pg_advisory_unlock(integer, integer) TO ${quotedRole}`,
+      );
+
+      const leastPrivilegeUrl = withRole(
+        url,
+        leastPrivilegeRole,
+        leastPrivilegePassword,
+      );
+      const leastPrivilegeApply = await applyPlan({
+        plan,
+        targetUrl: leastPrivilegeUrl,
+        expectedDatabase: database,
+        writeAcknowledgement: "TARGET_ONLY_NO_DUAL_WRITE",
+      });
+      assert.equal(leastPrivilegeApply.status, "MATCH");
+      assert.equal(leastPrivilegeApply.application?.transactionOutcome, "COMMITTED");
+      const leastPrivilegeReconciliation = await reconcileTarget({
+        plan,
+        targetUrl: leastPrivilegeUrl,
+        expectedDatabase: database,
+      });
+      assert.equal(leastPrivilegeReconciliation.status, "MATCH");
+
       await assert.rejects(
         () =>
           client.query(
@@ -186,6 +264,11 @@ test(
           "ALTER TABLE circulation_fine_ledger_entry ENABLE TRIGGER trg_circulation_fine_ledger_no_update_delete",
         )
         .catch(() => undefined);
+      if (leastPrivilegeRole !== undefined) {
+        const quotedRole = quoteIdentifier(leastPrivilegeRole);
+        await client.query(`DROP OWNED BY ${quotedRole}`).catch(() => undefined);
+        await client.query(`DROP ROLE ${quotedRole}`).catch(() => undefined);
+      }
       await client.end();
     }
   },

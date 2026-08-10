@@ -69,9 +69,13 @@ class AuthenticatedRateLimitFilter(
 
         response.setHeader("RateLimit-Limit", decision.limit.toString())
         response.setHeader("RateLimit-Remaining", decision.remaining.toString())
+        val resetAfterSeconds = Duration.between(now, decision.resetsAt)
+            .toMillis()
+            .coerceAtLeast(1)
+            .let { (it + 999) / 1000 }
         response.setHeader(
             "RateLimit-Reset",
-            decision.resetsAt.epochSecond.toString(),
+            resetAfterSeconds.toString(),
         )
         if (!decision.allowed) {
             meterRegistry.counter(
@@ -81,11 +85,7 @@ class AuthenticatedRateLimitFilter(
                 "outcome",
                 "rejected",
             ).increment()
-            val retryAfter = Duration.between(now, decision.resetsAt)
-                .toMillis()
-                .coerceAtLeast(1)
-                .let { (it + 999) / 1000 }
-            response.setHeader("Retry-After", retryAfter.toString())
+            response.setHeader("Retry-After", resetAfterSeconds.toString())
             writeProblem(
                 response,
                 status = 429,

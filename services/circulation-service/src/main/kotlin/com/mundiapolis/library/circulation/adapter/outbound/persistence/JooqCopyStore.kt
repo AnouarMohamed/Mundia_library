@@ -1,6 +1,7 @@
 package com.mundiapolis.library.circulation.adapter.outbound.persistence
 
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_COPY
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.tables.records.CirculationCopyRecord
 import com.mundiapolis.library.circulation.application.model.ConcurrentCirculationUpdateException
 import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
 import com.mundiapolis.library.circulation.domain.model.BranchId
@@ -34,22 +35,18 @@ class JooqCopyStore(
             .onConflictDoNothing()
             .execute() == 1
 
+    override fun findById(id: CopyId): Copy? =
+        dsl.selectFrom(CIRCULATION_COPY)
+            .where(CIRCULATION_COPY.ID.eq(id.value))
+            .fetchOne()
+            ?.toDomain()
+
     override fun lockById(id: CopyId): Copy? =
         dsl.selectFrom(CIRCULATION_COPY)
             .where(CIRCULATION_COPY.ID.eq(id.value))
             .forUpdate()
             .fetchOne()
-            ?.let { record ->
-                Copy.restore(
-                    id = CopyId(requireNotNull(record.id)),
-                    editionId = EditionId(requireNotNull(record.editionId)),
-                    branchId = BranchId(requireNotNull(record.branchId)),
-                    barcode = CopyBarcode.parse(requireNotNull(record.barcode)),
-                    status = CopyStatus.valueOf(requireNotNull(record.status)),
-                    shelfLocation = record.shelfLocation?.let(ShelfLocation::parse),
-                    version = requireNotNull(record.version),
-                )
-            }
+            ?.toDomain()
 
     override fun update(copy: Copy, expectedVersion: Long, now: Instant): Boolean =
         dsl.update(CIRCULATION_COPY)
@@ -176,6 +173,16 @@ class JooqCopyStore(
         .execute() == 1
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = atOffset(ZoneOffset.UTC)
+
+    private fun CirculationCopyRecord.toDomain(): Copy = Copy.restore(
+        id = CopyId(requireNotNull(id)),
+        editionId = EditionId(requireNotNull(editionId)),
+        branchId = BranchId(requireNotNull(branchId)),
+        barcode = CopyBarcode.parse(requireNotNull(barcode)),
+        status = CopyStatus.valueOf(requireNotNull(status)),
+        shelfLocation = shelfLocation?.let(ShelfLocation::parse),
+        version = requireNotNull(version),
+    )
 
     private companion object {
         const val AVAILABLE = "AVAILABLE"

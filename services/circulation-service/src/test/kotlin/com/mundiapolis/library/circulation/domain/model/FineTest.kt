@@ -11,12 +11,12 @@ class FineTest {
     fun `money arithmetic settles exactly without floating point`() {
         val assessed = fine(amountMinor = 501)
 
-        val partiallyPaid = assessed.recordPayment(500)
+        val partiallyPaid = assessed.recordPayment(500, "MAD")
         assertThat(partiallyPaid.balanceMinor).isOne()
         assertThat(partiallyPaid.status).isEqualTo(FineStatus.OPEN)
         assertThat(partiallyPaid.version).isOne()
 
-        val settled = partiallyPaid.recordPayment(1)
+        val settled = partiallyPaid.recordPayment(1, "MAD")
         assertThat(settled.balanceMinor).isZero()
         assertThat(settled.status).isEqualTo(FineStatus.SETTLED)
         assertThat(settled.version).isEqualTo(2)
@@ -27,9 +27,11 @@ class FineTest {
         val assessed = fine(amountMinor = Fine.MAX_AMOUNT_MINOR)
 
         assertThatIllegalArgumentException()
-            .isThrownBy { assessed.adjust(1) }
+            .isThrownBy { assessed.adjust(1, "MAD") }
         assertThatIllegalArgumentException()
-            .isThrownBy { assessed.recordPayment(Fine.MAX_AMOUNT_MINOR + 1) }
+            .isThrownBy { assessed.recordPayment(Fine.MAX_AMOUNT_MINOR + 1, "MAD") }
+        assertThatIllegalArgumentException()
+            .isThrownBy { assessed.recordPayment(1, "USD") }
         assertThatIllegalArgumentException()
             .isThrownBy { fine(amountMinor = 100, currency = "XXX") }
     }

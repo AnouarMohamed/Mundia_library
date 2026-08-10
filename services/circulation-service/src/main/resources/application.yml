@@ -61,10 +61,6 @@ app:
     poll-interval: ${RESERVATION_EXPIRY_POLL_INTERVAL:PT30S}
     batch-size: ${RESERVATION_EXPIRY_BATCH_SIZE:100}
   circulation:
-    default-loan-period: ${DEFAULT_LOAN_PERIOD:P14D}
-    renewal-period: ${RENEWAL_PERIOD:P14D}
-    maximum-renewals: ${MAXIMUM_RENEWALS:2}
-    fine-currency: ${FINE_CURRENCY:MAD}
     idempotency-retention: ${IDEMPOTENCY_RETENTION:P1D}
   outbox:
     enabled: ${OUTBOX_DELIVERY_ENABLED:false}
