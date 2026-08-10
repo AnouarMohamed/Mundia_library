@@ -105,6 +105,10 @@ class CirculationServiceIntegrationTest {
                     circulation_inventory_audit_entry,
                     circulation_consumer_inbox,
                     circulation_member_eligibility,
+                    circulation_reservation_idempotency,
+                    circulation_reservation,
+                    circulation_policy_idempotency,
+                    circulation_rate_limit_bucket,
                     outbox_event,
                     circulation_idempotency,
                     circulation_inventory_idempotency,
@@ -976,6 +980,8 @@ class CirculationServiceIntegrationTest {
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
+            registry.add("app.rate-limit.enabled") { "false" }
+            registry.add("app.reservation-expiry.enabled") { "false" }
         }
     }
 }

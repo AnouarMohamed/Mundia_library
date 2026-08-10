@@ -43,6 +43,7 @@ class InventoryCommandService(
     private val outboxEventStore: InventoryOutboxEventStore,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
+    private val reservationQueueService: ReservationQueueService,
     private val idempotencyRetention: Duration,
 ) : RegisterCopyUseCase,
     ChangeCopyConditionUseCase,
@@ -75,6 +76,12 @@ class InventoryCommandService(
             if (!copyStore.create(copy, now)) {
                 throw CopyAlreadyExistsException()
             }
+            reservationQueueService.claimNewlyAvailableCopy(
+                copy.editionId,
+                copy.id,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+            )
             InventoryMutation(previous = null, current = copy)
         }
     }
@@ -104,6 +111,14 @@ class InventoryCommandService(
             }
             if (!copyStore.update(changed, current.version, now)) {
                 throw ConcurrentInventoryUpdateException()
+            }
+            if (changed.status == com.mundiapolis.library.circulation.domain.model.CopyStatus.AVAILABLE) {
+                reservationQueueService.claimNewlyAvailableCopy(
+                    changed.editionId,
+                    changed.id,
+                    now,
+                    command.principal.idempotencyOwner.fingerprint,
+                )
             }
             InventoryMutation(previous = current, current = changed)
         }

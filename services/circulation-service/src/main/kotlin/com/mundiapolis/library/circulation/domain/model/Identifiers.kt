@@ -22,3 +22,6 @@ value class FineId(val value: UUID)
 
 @JvmInline
 value class FineLedgerEntryId(val value: UUID)
+
+@JvmInline
+value class ReservationId(val value: UUID)

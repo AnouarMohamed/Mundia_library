@@ -35,7 +35,10 @@ const expectNoHorizontalOverflow = async (page: Page) => {
 
 test.beforeEach(({ browserName }, testInfo) => {
   void browserName;
-  testInfo.setTimeout(60_000);
+  // These gates intentionally exercise several authenticated routes across
+  // multiple phone widths. Allow enough time for cold dev-server compilation
+  // while keeping every individual Playwright assertion on its strict timeout.
+  testInfo.setTimeout(120_000);
   test.skip(testInfo.project.name !== "mobile-chromium", "Mobile product gate");
 });
 
@@ -83,6 +86,7 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/all-books");
   const search = page.getByLabel("Search by title or author");
+  await expect(search).toBeVisible();
   expect((await search.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
   await expect(page.getByText("Filters and sorting")).toBeVisible();
   const catalogCovers = page.locator("[data-book-cover] img");

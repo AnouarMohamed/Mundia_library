@@ -129,13 +129,18 @@ Current cache-sensitive areas:
 
 ## Rate Limiting
 
-`lib/ratelimit.ts` defines a shared fixed-window limiter:
+The Node.js request-boundary middleware admits every API request and every
+mutating page request, including Server Actions, before application code runs.
+Health probes and CORS preflight are dependency-free exceptions. Fixed-window
+budgets are separated by risk: 300 reads, 120 commands, and 30 sensitive
+operations per trusted ingress identity per minute. Authentication then adds
+stricter account and IP budgets around credential verification.
 
-- Default: 200 requests per minute per identifier.
-- Backend: Upstash Redis.
-- Development behavior: bypassed outside production, when `DISABLE_RATE_LIMIT=true`, or when Redis config is missing.
-
-Production should have valid `UPSTASH_REDIS_URL` and `UPSTASH_REDIS_TOKEN`.
+`lib/ratelimit.ts` selects Upstash Redis or the atomic PostgreSQL fallback.
+Identifiers are SHA-256 pseudonyms, counters are capped at `limit + 1`, and
+protected tiers fail closed with 503 when admission state is unavailable.
+Limit exhaustion returns 429 with `RateLimit-*` and `Retry-After` metadata.
+Only development and test may bypass missing local limiter infrastructure.
 
 ## Background Workflow And Email
 

@@ -31,6 +31,18 @@ import com.mundiapolis.library.circulation.application.model.MissingMembershipCl
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExistsException
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
+import com.mundiapolis.library.circulation.application.model.InvalidCirculationPolicyException
+import com.mundiapolis.library.circulation.application.model.OpenLoanBlocksReservationException
+import com.mundiapolis.library.circulation.application.model.OpenReservationAlreadyExistsException
+import com.mundiapolis.library.circulation.application.model.OpenReservationBlocksLoanException
+import com.mundiapolis.library.circulation.application.model.PendingReservationBlocksRenewalException
+import com.mundiapolis.library.circulation.application.model.PolicyRevisionConflictException
+import com.mundiapolis.library.circulation.application.model.PolicyRevisionNotFoundException
+import com.mundiapolis.library.circulation.application.model.ReservationHoldExpiredException
+import com.mundiapolis.library.circulation.application.model.ReservationHoldNotExpiredException
+import com.mundiapolis.library.circulation.application.model.ReservationLimitReachedException
+import com.mundiapolis.library.circulation.application.model.ReservationNotFoundException
+import com.mundiapolis.library.circulation.application.model.ReservationStateConflictException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -39,6 +51,9 @@ import java.net.URI
 
 @RestControllerAdvice
 class CirculationExceptionHandler {
+    @ExceptionHandler(InvalidCirculationPolicyException::class)
+    fun invalidPolicy(exception: InvalidCirculationPolicyException): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, "invalid_circulation_policy", exception.message)
     @ExceptionHandler(InvalidIdempotencyKeyException::class)
     fun invalidIdempotencyKey(exception: InvalidIdempotencyKeyException): ProblemDetail =
         problem(HttpStatus.BAD_REQUEST, "invalid_idempotency_key", exception.message)
@@ -90,6 +105,10 @@ class CirculationExceptionHandler {
     fun loanNotFound(exception: LoanNotFoundException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "loan_not_found", exception.message)
 
+    @ExceptionHandler(ReservationNotFoundException::class)
+    fun reservationNotFound(exception: ReservationNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "reservation_not_found", exception.message)
+
     @ExceptionHandler(FineNotFoundException::class)
     fun fineNotFound(exception: FineNotFoundException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "fine_not_found", exception.message)
@@ -105,6 +124,27 @@ class CirculationExceptionHandler {
     @ExceptionHandler(OpenLoanAlreadyExistsException::class)
     fun openLoanConflict(exception: OpenLoanAlreadyExistsException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "open_loan_already_exists", exception.message)
+
+    @ExceptionHandler(
+        OpenReservationAlreadyExistsException::class,
+        OpenLoanBlocksReservationException::class,
+        OpenReservationBlocksLoanException::class,
+        PendingReservationBlocksRenewalException::class,
+        ReservationStateConflictException::class,
+        ReservationHoldNotExpiredException::class,
+        ReservationHoldExpiredException::class,
+        PolicyRevisionConflictException::class,
+    )
+    fun reservationOrPolicyConflict(exception: RuntimeException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "circulation_state_conflict", exception.message)
+
+    @ExceptionHandler(ReservationLimitReachedException::class)
+    fun reservationLimit(exception: ReservationLimitReachedException): ProblemDetail =
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, "reservation_limit_reached", exception.message)
+
+    @ExceptionHandler(PolicyRevisionNotFoundException::class)
+    fun policyRevisionUnavailable(exception: PolicyRevisionNotFoundException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "policy_revision_unavailable", exception.message)
 
     @ExceptionHandler(LoanStateConflictException::class)
     fun loanStateConflict(exception: LoanStateConflictException): ProblemDetail =

@@ -13,6 +13,7 @@
     { "name": "Loans", "description": "Idempotent loan lifecycle commands" },
     { "name": "Inventory", "description": "Audited physical-copy inventory commands" },
     { "name": "Fines", "description": "Idempotent fine and immutable-ledger commands" },
+    { "name": "Reservations", "description": "Fair, copy-backed reservation queue commands" },
     { "name": "Membership", "description": "Privacy-preserving membership projections" },
     { "name": "Policy", "description": "Versioned effective circulation policy" },
     { "name": "Operations", "description": "Authenticated operational read models" }
@@ -31,7 +32,9 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationStatus" } } }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/Forbidden" }
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -45,10 +48,39 @@
         "responses": {
           "200": {
             "description": "Effective policy",
+            "headers": { "ETag": { "$ref": "#/components/headers/PolicyRevision" } },
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationPolicyResponse" } } }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/Forbidden" }
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
+      "put": {
+        "operationId": "updateCirculationPolicy",
+        "tags": ["Policy"],
+        "summary": "Install a new immutable circulation policy revision",
+        "x-required-scopes": ["circulation.policy.manage"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/IdempotencyKey" },
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCirculationPolicyRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/PolicyUpdated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -68,6 +100,8 @@
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -89,6 +123,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "422": { "$ref": "#/components/responses/UnprocessableEntity" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
@@ -111,6 +147,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "422": { "$ref": "#/components/responses/UnprocessableEntity" },
@@ -134,6 +172,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -155,6 +195,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -176,6 +218,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -197,9 +241,113 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations": {
+      "post": {
+        "operationId": "placeReservation",
+        "tags": ["Reservations"],
+        "summary": "Join the fair reservation queue for an edition",
+        "x-required-scopes": ["circulation.reservation.place", "circulation.reservation.place.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlaceReservationRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/ReservationCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations/{reservationId}/cancel": {
+      "post": {
+        "operationId": "cancelReservation",
+        "tags": ["Reservations"],
+        "summary": "Cancel an open reservation and promote the next member",
+        "x-required-scopes": ["circulation.reservation.cancel", "circulation.reservation.cancel.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReservationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations/{reservationId}/fulfill": {
+      "post": {
+        "operationId": "fulfillReservation",
+        "tags": ["Reservations"],
+        "summary": "Fulfil a ready hold and atomically create its active loan",
+        "x-required-scopes": ["circulation.reservation.fulfill"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReservationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations/{reservationId}/expire": {
+      "post": {
+        "operationId": "expireReservation",
+        "tags": ["Reservations"],
+        "summary": "Expire a due hold and promote the next member",
+        "x-required-scopes": ["circulation.reservation.expire"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReservationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
@@ -221,6 +369,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
@@ -245,6 +395,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -270,6 +422,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -292,6 +446,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -317,6 +473,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -342,6 +500,8 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" }
         }
@@ -388,6 +548,19 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      "ReservationId": {
+        "name": "reservationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "description": "The exact effective policy revision returned by the latest read.",
+        "schema": { "type": "string", "pattern": "^\"?[0-9a-fA-F-]{36}\"?$" }
       }
     },
     "headers": {
@@ -400,6 +573,11 @@
         "description": "Canonical path of the created resource.",
         "required": true,
         "schema": { "type": "string", "format": "uri-reference" }
+      },
+      "PolicyRevision": {
+        "description": "Quoted immutable policy revision for the next If-Match update.",
+        "required": true,
+        "schema": { "type": "string" }
       }
     },
     "responses": {
@@ -442,6 +620,27 @@
         "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InventoryCommandResponse" } } }
       },
+      "ReservationCreated": {
+        "description": "Reservation placed or its exact original result replayed",
+        "headers": {
+          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
+          "Location": { "$ref": "#/components/headers/Location" }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommandResponse" } } }
+      },
+      "ReservationCommandSucceeded": {
+        "description": "Reservation command committed or its exact original result replayed",
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommandResponse" } } }
+      },
+      "PolicyUpdated": {
+        "description": "New immutable policy revision installed or its original result replayed",
+        "headers": {
+          "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" },
+          "ETag": { "$ref": "#/components/headers/PolicyRevision" }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationPolicyResponse" } } }
+      },
       "BadRequest": {
         "description": "Malformed request or invalid command input",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
@@ -467,7 +666,17 @@
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       },
       "ServiceUnavailable": {
-        "description": "Required membership eligibility is unavailable and the command fails closed",
+        "description": "A required admission or membership dependency is unavailable and the request fails closed",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "TooManyRequests": {
+        "description": "The authenticated principal exhausted the applicable distributed request budget",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer", "minimum": 1 } },
+          "RateLimit-Limit": { "schema": { "type": "integer", "minimum": 1 } },
+          "RateLimit-Remaining": { "schema": { "type": "integer", "minimum": 0 } },
+          "RateLimit-Reset": { "schema": { "type": "integer", "format": "int64" } }
+        },
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     },
@@ -484,13 +693,30 @@
       "CirculationPolicyResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["revision", "defaultLoanPeriod", "renewalPeriod", "maximumRenewals", "fineCurrency"],
+        "required": ["revision", "sequence", "defaultLoanPeriod", "renewalPeriod", "maximumRenewals", "fineCurrency", "reservationHoldPeriod", "maximumActiveReservations", "effectiveAt"],
         "properties": {
-          "revision": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "revision": { "type": "string", "format": "uuid" },
+          "sequence": { "type": "integer", "format": "int64", "minimum": 0 },
           "defaultLoanPeriod": { "type": "string", "format": "duration", "example": "PT336H" },
           "renewalPeriod": { "type": "string", "format": "duration", "example": "PT336H" },
-          "maximumRenewals": { "type": "integer", "format": "int32", "minimum": 0, "maximum": 100 },
-          "fineCurrency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+          "maximumRenewals": { "type": "integer", "format": "int32", "minimum": 1, "maximum": 100 },
+          "fineCurrency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+          "reservationHoldPeriod": { "type": "string", "format": "duration", "example": "PT48H" },
+          "maximumActiveReservations": { "type": "integer", "format": "int32", "minimum": 1, "maximum": 100 },
+          "effectiveAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "UpdateCirculationPolicyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["defaultLoanPeriod", "renewalPeriod", "maximumRenewals", "fineCurrency", "reservationHoldPeriod", "maximumActiveReservations"],
+        "properties": {
+          "defaultLoanPeriod": { "type": "string", "format": "duration", "example": "P14D" },
+          "renewalPeriod": { "type": "string", "format": "duration", "example": "P14D" },
+          "maximumRenewals": { "type": "integer", "format": "int32", "minimum": 1, "maximum": 100 },
+          "fineCurrency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+          "reservationHoldPeriod": { "type": "string", "format": "duration", "example": "PT48H" },
+          "maximumActiveReservations": { "type": "integer", "format": "int32", "minimum": 1, "maximum": 100 }
         }
       },
       "MemberEligibilityResponse": {
@@ -512,6 +738,33 @@
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
           "editionId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "PlaceReservationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "editionId"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "ReservationCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reservationId", "memberId", "editionId", "copyId", "status", "placedAt", "readyAt", "expiresAt", "fulfilledAt", "cancelledAt", "version"],
+        "properties": {
+          "reservationId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "copyId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string", "enum": ["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"] },
+          "placedAt": { "type": "string", "format": "date-time" },
+          "readyAt": { "type": ["string", "null"], "format": "date-time" },
+          "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+          "fulfilledAt": { "type": ["string", "null"], "format": "date-time" },
+          "cancelledAt": { "type": ["string", "null"], "format": "date-time" },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 }
         }
       },
       "RegisterCopyRequest": {

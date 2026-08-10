@@ -10,6 +10,7 @@ export type DistributedRateLimitResult = {
   remaining: number;
   reset: number;
   pending: Promise<void>;
+  unavailable?: boolean;
 };
 
 type RateLimitOptions = {
@@ -98,7 +99,10 @@ export async function applyPostgresRateLimit({
       "request_count" = CASE
         WHEN "rate_limit_buckets"."expires_at" <= EXCLUDED."window_started_at"
           THEN 1
-        ELSE "rate_limit_buckets"."request_count" + 1
+        ELSE LEAST(
+          "rate_limit_buckets"."request_count" + 1,
+          ${admittedLimit + 1}
+        )
       END,
       "window_started_at" = CASE
         WHEN "rate_limit_buckets"."expires_at" <= EXCLUDED."window_started_at"

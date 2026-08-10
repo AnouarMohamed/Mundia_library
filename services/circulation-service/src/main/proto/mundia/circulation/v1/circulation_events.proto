@@ -24,6 +24,8 @@ message CirculationEvent {
     LoanEvent loan = 20;
     FineEvent fine = 21;
     CopyEvent copy = 22;
+    ReservationEvent reservation = 23;
+    PolicyEvent policy = 24;
   }
 
   reserved 9 to 19;
@@ -92,6 +94,41 @@ enum CopyStatus {
   COPY_STATUS_LOST = 4;
   COPY_STATUS_DAMAGED = 5;
   COPY_STATUS_WITHDRAWN = 6;
+}
+
+message ReservationEvent {
+  string reservation_id = 1;
+  string member_id = 2;
+  string edition_id = 3;
+  optional string copy_id = 4;
+  ReservationStatus status = 5;
+  google.protobuf.Timestamp placed_at = 6;
+  optional google.protobuf.Timestamp ready_at = 7;
+  optional google.protobuf.Timestamp expires_at = 8;
+  optional google.protobuf.Timestamp fulfilled_at = 9;
+  optional google.protobuf.Timestamp cancelled_at = 10;
+  uint64 reservation_version = 11;
+}
+
+enum ReservationStatus {
+  RESERVATION_STATUS_UNSPECIFIED = 0;
+  RESERVATION_STATUS_WAITING = 1;
+  RESERVATION_STATUS_READY = 2;
+  RESERVATION_STATUS_FULFILLED = 3;
+  RESERVATION_STATUS_CANCELLED = 4;
+  RESERVATION_STATUS_EXPIRED = 5;
+}
+
+message PolicyEvent {
+  string revision = 1;
+  uint64 sequence = 2;
+  uint64 default_loan_period_seconds = 3;
+  uint64 renewal_period_seconds = 4;
+  uint32 maximum_renewals = 5;
+  string fine_currency = 6;
+  uint64 reservation_hold_period_seconds = 7;
+  uint32 maximum_active_reservations = 8;
+  google.protobuf.Timestamp effective_at = 9;
 }
 
 enum FineLedgerEntryType {

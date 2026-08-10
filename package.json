@@ -31,6 +31,7 @@
     "db:baseline-existing": "node scripts/baseline-existing-production.mjs",
     "db:verify-schema": "node scripts/verify-production-schema.mjs",
     "db:verify-concurrency": "node scripts/verify-concurrency-invariants.mjs",
+    "db:verify-rate-limits": "tsx scripts/verify-postgres-rate-limits.ts",
     "db:push": "drizzle-kit push",
     "db:perf-indexes": "tsx scripts/add-performance-indexes.ts",
     "db:studio": "drizzle-kit studio",

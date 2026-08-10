@@ -13,6 +13,9 @@ import com.mundiapolis.library.circulation.contract.v1.FineLedgerEntryType
 import com.mundiapolis.library.circulation.contract.v1.FineStatus
 import com.mundiapolis.library.circulation.contract.v1.LoanEvent
 import com.mundiapolis.library.circulation.contract.v1.LoanStatus
+import com.mundiapolis.library.circulation.contract.v1.PolicyEvent
+import com.mundiapolis.library.circulation.contract.v1.ReservationEvent
+import com.mundiapolis.library.circulation.contract.v1.ReservationStatus
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.time.DateTimeException
@@ -46,6 +49,8 @@ class ProtobufOutboxEventEncoder(
                     LOAN_AGGREGATE -> setLoan(encodeLoan(event, payload))
                     FINE_AGGREGATE -> setFine(encodeFine(event, payload))
                     COPY_AGGREGATE -> setCopy(encodeCopy(event, payload))
+                    RESERVATION_AGGREGATE -> setReservation(encodeReservation(event, payload))
+                    POLICY_AGGREGATE -> setPolicy(encodePolicy(event, payload))
                     else -> throw OutboxContractException()
                 }
             }
@@ -164,6 +169,64 @@ class ProtobufOutboxEventEncoder(
             .build()
     }
 
+    private fun encodeReservation(
+        event: ClaimedOutboxEvent,
+        payload: JsonNode,
+    ): ReservationEvent {
+        requireContract(payload.isObject)
+        requireContract(payload.propertyNames().all(RESERVATION_PAYLOAD_FIELDS::contains))
+        val reservationId = payload.requiredUuid("reservationId")
+        val status = payload.requiredText("status").toReservationStatus()
+        val version = payload.requiredNonNegativeLong("reservationVersion")
+        requireContract(reservationId == event.aggregateId)
+        requireContract(version == event.aggregateVersion)
+        requireContract(status in RESERVATION_EVENT_STATUSES.getValue(event.eventType))
+        payload.validateActorFingerprint()
+
+        return ReservationEvent.newBuilder()
+            .setReservationId(reservationId.toString())
+            .setMemberId(payload.requiredUuid("memberId").toString())
+            .setEditionId(payload.requiredUuid("editionId").toString())
+            .setStatus(status)
+            .setPlacedAt(payload.requiredInstant("placedAt").toTimestamp())
+            .setReservationVersion(version)
+            .apply {
+                payload.optionalUuid("copyId")?.let { setCopyId(it.toString()) }
+                payload.optionalInstant("readyAt")?.let { setReadyAt(it.toTimestamp()) }
+                payload.optionalInstant("expiresAt")?.let { setExpiresAt(it.toTimestamp()) }
+                payload.optionalInstant("fulfilledAt")?.let { setFulfilledAt(it.toTimestamp()) }
+                payload.optionalInstant("cancelledAt")?.let { setCancelledAt(it.toTimestamp()) }
+            }
+            .build()
+    }
+
+    private fun encodePolicy(event: ClaimedOutboxEvent, payload: JsonNode): PolicyEvent {
+        requireContract(payload.isObject)
+        requireContract(payload.propertyNames().all(POLICY_PAYLOAD_FIELDS::contains))
+        val revision = payload.requiredUuid("revision")
+        val sequence = payload.requiredNonNegativeLong("sequence")
+        requireContract(event.aggregateId == POLICY_AGGREGATE_ID)
+        requireContract(sequence == event.aggregateVersion)
+        requireContract(payload.requiredText("fineCurrency").matches(CURRENCY))
+        payload.validateActorFingerprint()
+
+        return PolicyEvent.newBuilder()
+            .setRevision(revision.toString())
+            .setSequence(sequence)
+            .setDefaultLoanPeriodSeconds(payload.requiredNonNegativeLong("defaultLoanPeriodSeconds"))
+            .setRenewalPeriodSeconds(payload.requiredNonNegativeLong("renewalPeriodSeconds"))
+            .setMaximumRenewals(payload.requiredNonNegativeInt("maximumRenewals"))
+            .setFineCurrency(payload.requiredText("fineCurrency"))
+            .setReservationHoldPeriodSeconds(
+                payload.requiredNonNegativeLong("reservationHoldPeriodSeconds"),
+            )
+            .setMaximumActiveReservations(
+                payload.requiredNonNegativeInt("maximumActiveReservations"),
+            )
+            .setEffectiveAt(payload.requiredInstant("effectiveAt").toTimestamp())
+            .build()
+    }
+
     private fun parsePayload(raw: String): JsonNode =
         try {
             objectMapper.readTree(raw) ?: throw OutboxContractException()
@@ -278,6 +341,15 @@ class ProtobufOutboxEventEncoder(
         else -> throw OutboxContractException()
     }
 
+    private fun String.toReservationStatus(): ReservationStatus = when (this) {
+        "WAITING" -> ReservationStatus.RESERVATION_STATUS_WAITING
+        "READY" -> ReservationStatus.RESERVATION_STATUS_READY
+        "FULFILLED" -> ReservationStatus.RESERVATION_STATUS_FULFILLED
+        "CANCELLED" -> ReservationStatus.RESERVATION_STATUS_CANCELLED
+        "EXPIRED" -> ReservationStatus.RESERVATION_STATUS_EXPIRED
+        else -> throw OutboxContractException()
+    }
+
     private fun Instant.toTimestamp(): Timestamp =
         try {
             Timestamp.newBuilder()
@@ -299,11 +371,15 @@ class ProtobufOutboxEventEncoder(
         const val LOAN_AGGREGATE = "loan"
         const val FINE_AGGREGATE = "fine"
         const val COPY_AGGREGATE = "copy"
+        const val RESERVATION_AGGREGATE = "reservation"
+        const val POLICY_AGGREGATE = "policy"
         const val MAX_TEXT_LENGTH = 512
         val TRACE_ID = Regex("[0-9a-f]{32}")
         val ACTOR_FINGERPRINT = Regex("[0-9a-f]{64}")
         val CURRENCY = Regex("[A-Z]{3}")
         val BARCODE = Regex("[A-Za-z0-9][A-Za-z0-9._/-]{2,63}")
+        val POLICY_AGGREGATE_ID: UUID =
+            UUID.fromString("00000000-0000-0000-0000-000000000001")
         val EVENT_TYPES = mapOf(
             "circulation.loan.requested" to LOAN_AGGREGATE,
             "circulation.loan.approved" to LOAN_AGGREGATE,
@@ -317,6 +393,12 @@ class ProtobufOutboxEventEncoder(
             "circulation.copy.registered" to COPY_AGGREGATE,
             "circulation.copy.condition-changed" to COPY_AGGREGATE,
             "circulation.copy.relocated" to COPY_AGGREGATE,
+            "circulation.reservation.placed" to RESERVATION_AGGREGATE,
+            "circulation.reservation.ready" to RESERVATION_AGGREGATE,
+            "circulation.reservation.cancelled" to RESERVATION_AGGREGATE,
+            "circulation.reservation.fulfilled" to RESERVATION_AGGREGATE,
+            "circulation.reservation.expired" to RESERVATION_AGGREGATE,
+            "circulation.policy.updated" to POLICY_AGGREGATE,
         )
         val LOAN_EVENT_STATUSES = mapOf(
             "circulation.loan.requested" to setOf(LoanStatus.LOAN_STATUS_REQUESTED),
@@ -340,6 +422,24 @@ class ProtobufOutboxEventEncoder(
                 CopyStatus.COPY_STATUS_WITHDRAWN,
             ),
             "circulation.copy.relocated" to setOf(CopyStatus.COPY_STATUS_AVAILABLE),
+        )
+        val RESERVATION_EVENT_STATUSES = mapOf(
+            "circulation.reservation.placed" to setOf(
+                ReservationStatus.RESERVATION_STATUS_WAITING,
+                ReservationStatus.RESERVATION_STATUS_READY,
+            ),
+            "circulation.reservation.ready" to setOf(
+                ReservationStatus.RESERVATION_STATUS_READY,
+            ),
+            "circulation.reservation.cancelled" to setOf(
+                ReservationStatus.RESERVATION_STATUS_CANCELLED,
+            ),
+            "circulation.reservation.fulfilled" to setOf(
+                ReservationStatus.RESERVATION_STATUS_FULFILLED,
+            ),
+            "circulation.reservation.expired" to setOf(
+                ReservationStatus.RESERVATION_STATUS_EXPIRED,
+            ),
         )
         val LOAN_PAYLOAD_FIELDS = setOf(
             "loanId",
@@ -380,6 +480,32 @@ class ProtobufOutboxEventEncoder(
             "copyVersion",
             "actorFingerprint",
             "reason",
+        )
+        val RESERVATION_PAYLOAD_FIELDS = setOf(
+            "reservationId",
+            "memberId",
+            "editionId",
+            "copyId",
+            "status",
+            "placedAt",
+            "readyAt",
+            "expiresAt",
+            "fulfilledAt",
+            "cancelledAt",
+            "reservationVersion",
+            "actorFingerprint",
+        )
+        val POLICY_PAYLOAD_FIELDS = setOf(
+            "revision",
+            "sequence",
+            "defaultLoanPeriodSeconds",
+            "renewalPeriodSeconds",
+            "maximumRenewals",
+            "fineCurrency",
+            "reservationHoldPeriodSeconds",
+            "maximumActiveReservations",
+            "effectiveAt",
+            "actorFingerprint",
         )
     }
 }

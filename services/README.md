@@ -77,6 +77,17 @@ Authenticated operational reads also expose the effective policy revision at
 projection at `GET /api/v1/circulation/members/{memberId}/eligibility`.
 Self-service eligibility reads are bound to the token's `membership_id`; the
 separate `circulation.eligibility.read.any` scope is required for staff reads.
+Policy reads return an ETag. Administrators install immutable revisions with
+`PUT /api/v1/circulation/policy`, an exact `If-Match` revision, an
+`Idempotency-Key`, and `circulation.policy.manage`.
+
+Every authenticated endpoint is also protected by a distributed,
+principal-scoped fixed-window admission layer. Read, command, and sensitive
+operations have independent budgets. Rejections return 429 with
+`RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`, and `Retry-After`;
+database admission failures return 503 and never fail open. Expired buckets are
+removed in bounded scheduled batches. This service control complements, but
+does not replace, the mandatory ingress WAF and network-level DDoS controls.
 
 ## Circulation command API
 
@@ -93,6 +104,13 @@ The first authoritative slice exposes:
 | Renew an eligible own loan | `POST /api/v1/circulation/loans/{loanId}/renew` | `circulation.loan.renew` |
 | Renew for another member | `POST /api/v1/circulation/loans/{loanId}/renew` | `circulation.loan.renew.on-behalf` |
 | Return a loan and release its copy | `POST /api/v1/circulation/loans/{loanId}/return` | `circulation.loan.return` |
+| Place an own reservation | `POST /api/v1/circulation/reservations` | `circulation.reservation.place` |
+| Place for another member | `POST /api/v1/circulation/reservations` | `circulation.reservation.place.on-behalf` |
+| Cancel an own reservation | `POST /api/v1/circulation/reservations/{reservationId}/cancel` | `circulation.reservation.cancel` |
+| Cancel for another member | `POST /api/v1/circulation/reservations/{reservationId}/cancel` | `circulation.reservation.cancel.on-behalf` |
+| Fulfil a ready reservation | `POST /api/v1/circulation/reservations/{reservationId}/fulfill` | `circulation.reservation.fulfill` |
+| Expire a due reservation | `POST /api/v1/circulation/reservations/{reservationId}/expire` | `circulation.reservation.expire` |
+| Update circulation policy | `PUT /api/v1/circulation/policy` | `circulation.policy.manage` |
 | Register a physical copy | `POST /api/v1/circulation/copies` | `circulation.inventory.register` |
 | Change an eligible copy condition | `POST /api/v1/circulation/copies/{copyId}/condition` | `circulation.inventory.condition.update` |
 | Relocate an available copy | `POST /api/v1/circulation/copies/{copyId}/relocations` | `circulation.inventory.relocate` |
@@ -123,6 +141,14 @@ fingerprint and before/after state. Loan/copy/fine state, exact replay result, i
 fine-ledger entry
 when applicable, and one versioned outbox event commit in the same PostgreSQL
 transaction.
+
+Reservation placement is serialized per edition with a PostgreSQL advisory
+transaction lock. Available copies become time-bounded holds immediately;
+otherwise members join a deterministic FIFO queue. Returns, newly available
+inventory, cancellations, and expiries promote the oldest waiter atomically.
+Renewal is denied when another member is waiting. Fulfilment converts the held
+copy and new active loan in one transaction. A bounded scheduler expires due
+holds, and every transition emits the versioned Protobuf/outbox contract.
 
 Loan requests, approvals, and renewals consult the local Membership-owned
 eligibility projection while holding the same per-member transaction lock used

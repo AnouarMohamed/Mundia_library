@@ -21,14 +21,12 @@ export const normalizeTextParam = (value: string | null, maxLength: number) =>
  * Use the first forwarded IP when proxies append a chain of addresses.
  * Prioritizes standard headers from trusted environments like Vercel.
  */
-export const getClientIp = async () => {
+export const getClientIpFromHeaders = (headerList: Headers) => {
   if (!config.env.trustProxyHeaders) {
     // A shared identifier deliberately fails safe. Deployments should enable
     // trusted forwarding only behind an ingress that overwrites client headers.
     return "untrusted-proxy";
   }
-
-  const headerList = await headers();
 
   // Vercel and many proxies provide a reliable IP in x-real-ip
   const realIp = headerList.get("x-real-ip");
@@ -43,6 +41,9 @@ export const getClientIp = async () => {
 
   return "unknown";
 };
+
+export const getClientIp = async () =>
+  getClientIpFromHeaders(await headers());
 
 /**
  * Apply the shared public API rate limiter for the current request.

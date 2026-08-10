@@ -17,6 +17,13 @@ import com.mundiapolis.library.circulation.application.model.LoanCommandResult
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
+import com.mundiapolis.library.circulation.application.model.PolicyOutboxEvent
+import com.mundiapolis.library.circulation.application.model.ReservationOperation
+import com.mundiapolis.library.circulation.application.model.ReservationCommandResult
+import com.mundiapolis.library.circulation.application.model.ReservationOutboxEvent
+import com.mundiapolis.library.circulation.application.model.RateLimitDecision
+import com.mundiapolis.library.circulation.application.model.StoredPolicyIdempotencyResult
+import com.mundiapolis.library.circulation.application.model.StoredReservationIdempotencyResult
 import com.mundiapolis.library.circulation.application.model.StoredFineIdempotencyResult
 import com.mundiapolis.library.circulation.application.model.StoredIdempotencyResult
 import com.mundiapolis.library.circulation.application.model.StoredInventoryIdempotencyResult
@@ -28,6 +35,10 @@ import com.mundiapolis.library.circulation.domain.model.FineId
 import com.mundiapolis.library.circulation.domain.model.FineLedgerEntry
 import com.mundiapolis.library.circulation.domain.model.Loan
 import com.mundiapolis.library.circulation.domain.model.LoanId
+import com.mundiapolis.library.circulation.domain.model.MemberId
+import com.mundiapolis.library.circulation.domain.model.CirculationPolicy
+import com.mundiapolis.library.circulation.domain.model.Reservation
+import com.mundiapolis.library.circulation.domain.model.ReservationId
 import java.time.Instant
 import java.util.UUID
 
@@ -41,6 +52,8 @@ interface LoanStore {
     fun lockById(id: LoanId): Loan?
 
     fun update(loan: Loan, expectedVersion: Long, now: Instant): Boolean
+
+    fun hasOpenForMemberEdition(memberId: MemberId, editionId: EditionId): Boolean
 }
 
 interface CopyStore {
@@ -53,6 +66,100 @@ interface CopyStore {
     fun allocateAvailable(editionId: EditionId, now: Instant): CopyId?
 
     fun release(copyId: CopyId, now: Instant): Boolean
+
+    fun reserveAvailable(editionId: EditionId, now: Instant): CopyId?
+
+    fun reservedToLoan(copyId: CopyId, now: Instant): Boolean
+
+    fun releaseReserved(copyId: CopyId, now: Instant): Boolean
+
+    fun returnToReservation(copyId: CopyId, now: Instant): Boolean
+
+    fun reserve(copyId: CopyId, now: Instant): Boolean
+}
+
+interface ReservationStore {
+    fun lockEdition(editionId: EditionId)
+
+    fun create(reservation: Reservation, now: Instant): Boolean
+
+    fun lockById(id: ReservationId): Reservation?
+
+    fun update(reservation: Reservation, expectedVersion: Long, now: Instant): Boolean
+
+    fun lockOldestWaiting(editionId: EditionId): Reservation?
+
+    fun hasOpenForMemberEdition(memberId: MemberId, editionId: EditionId): Boolean
+
+    fun countOpenForMember(memberId: MemberId): Int
+
+    fun hasWaitingForEditionExcluding(editionId: EditionId, memberId: MemberId): Boolean
+
+    fun findExpiredIds(now: Instant, batchSize: Int): List<ReservationId>
+}
+
+interface ReservationIdempotencyStore {
+    fun claim(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        operation: ReservationOperation,
+        requestFingerprint: String,
+        createdAt: Instant,
+        expiresAt: Instant,
+    ): Boolean
+
+    fun find(owner: IdempotencyOwner, key: IdempotencyKey): StoredReservationIdempotencyResult?
+
+    fun complete(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        operation: ReservationOperation,
+        result: ReservationCommandResult,
+        completedAt: Instant,
+    )
+}
+
+interface CirculationPolicyStore {
+    fun current(): CirculationPolicy
+
+    fun lockCurrent(): CirculationPolicy
+
+    fun findRevision(revisionId: UUID): CirculationPolicy?
+
+    fun install(policy: CirculationPolicy, expectedRevisionId: UUID): Boolean
+}
+
+interface PolicyIdempotencyStore {
+    fun claim(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        requestFingerprint: String,
+        createdAt: Instant,
+        expiresAt: Instant,
+    ): Boolean
+
+    fun find(owner: IdempotencyOwner, key: IdempotencyKey): StoredPolicyIdempotencyResult?
+
+    fun complete(
+        owner: IdempotencyOwner,
+        key: IdempotencyKey,
+        revisionId: UUID,
+        completedAt: Instant,
+    )
+}
+
+fun interface RateLimitStore {
+    fun consume(
+        principalFingerprint: String,
+        bucketKey: String,
+        limit: Int,
+        window: java.time.Duration,
+        now: Instant,
+    ): RateLimitDecision
+}
+
+fun interface RateLimitMaintenanceStore {
+    fun deleteExpired(cutoff: Instant, batchSize: Int): Int
 }
 
 interface InventoryIdempotencyStore {
@@ -146,6 +253,14 @@ fun interface FineOutboxEventStore {
 
 fun interface InventoryOutboxEventStore {
     fun append(event: InventoryOutboxEvent)
+}
+
+fun interface ReservationOutboxEventStore {
+    fun append(event: ReservationOutboxEvent)
+}
+
+fun interface PolicyOutboxEventStore {
+    fun append(event: PolicyOutboxEvent)
 }
 
 fun interface InventoryAuditStore {

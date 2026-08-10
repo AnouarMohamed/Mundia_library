@@ -76,6 +76,10 @@ Production rate limiting is always distributed. `RATE_LIMIT_BACKEND=redis`
 uses Upstash for rate limits and cache. `RATE_LIMIT_BACKEND=postgres` stores
 only SHA-256 identifier digests and atomic security budgets in PostgreSQL; the
 Redis cache then becomes optional and safely degrades to direct database reads.
+The request-boundary middleware covers all API routes and mutating page
+requests with read, command, and sensitive budgets. Health probes remain
+independent of the limiter so orchestration can diagnose an unavailable store.
+Unavailable admission fails closed in staging and production.
 
 OIDC identities are never auto-linked by email. Before a user can sign in, an
 administrator must bind the exact issuer/subject tuple to an existing local

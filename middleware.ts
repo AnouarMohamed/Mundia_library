@@ -1,15 +1,21 @@
 /**
- * Next.js Edge Middleware
+ * Next.js request-boundary middleware
  *
  * This middleware provides a per-request Content Security Policy nonce for
- * rendered documents and a fast session-cookie presence prefilter for
- * sensitive routes. Authorization remains authoritative in the server layout,
- * which validates the session and current database state.
+ * rendered documents, distributed admission control for API and mutation
+ * requests, and a fast session-cookie presence prefilter for sensitive routes.
+ * Authorization remains authoritative in the server layout, which validates
+ * the session and current database state.
  *
  * @module middleware
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+import {
+  admitRequest,
+  requiresRequestAdmission,
+} from "@/lib/security/request-admission";
 
 const sessionCookieNames = [
   "__Secure-authjs.session-token",
@@ -52,6 +58,59 @@ const applyContentSecurityPolicy = (
   return response;
 };
 
+type Admission = Awaited<ReturnType<typeof admitRequest>>;
+
+const applyRateLimitHeaders = <T extends NextResponse>(
+  response: T,
+  admission: Admission | undefined,
+) => {
+  if (!admission) return response;
+  response.headers.set(
+    "RateLimit-Limit",
+    admission.decision.limit.toString(),
+  );
+  response.headers.set(
+    "RateLimit-Remaining",
+    admission.decision.remaining.toString(),
+  );
+  response.headers.set(
+    "RateLimit-Reset",
+    Math.ceil(admission.decision.reset / 1000).toString(),
+  );
+  return response;
+};
+
+const rejectedAdmissionResponse = (admission: Admission) => {
+  const unavailable = admission.decision.unavailable === true;
+  const status = unavailable ? 503 : 429;
+  const retryAfter = Math.max(
+    1,
+    Math.ceil((admission.decision.reset - Date.now()) / 1000),
+  );
+  const response = NextResponse.json(
+    {
+      type: unavailable
+        ? "urn:mundia:error:rate_limit_unavailable"
+        : "urn:mundia:error:rate_limit_exceeded",
+      title: unavailable ? "Service Unavailable" : "Too Many Requests",
+      status,
+      detail: unavailable
+        ? "Request admission is temporarily unavailable"
+        : "Too many requests; retry after the current window resets",
+      code: unavailable ? "rate_limit_unavailable" : "rate_limit_exceeded",
+    },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/problem+json",
+        "Retry-After": retryAfter.toString(),
+      },
+    },
+  );
+  return applyRateLimitHeaders(response, admission);
+};
+
 /**
  * Middleware function that handles request filtering and redirection.
  *
@@ -62,7 +121,18 @@ const applyContentSecurityPolicy = (
  * @param {NextRequest} request - The incoming Next.js request object
  * @returns {NextResponse} The response (either a redirect or a continuation)
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const admission = requiresRequestAdmission(request)
+    ? await admitRequest(request)
+    : undefined;
+  if (admission && !admission.decision.success) {
+    return rejectedAdmissionResponse(admission);
+  }
+
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    return applyRateLimitHeaders(NextResponse.next(), admission);
+  }
+
   const nonce = createNonce();
   const contentSecurityPolicy = buildContentSecurityPolicy(nonce);
   const requestHeaders = new Headers(request.headers);
@@ -79,31 +149,40 @@ export function middleware(request: NextRequest) {
       "callbackUrl",
       `${request.nextUrl.pathname}${request.nextUrl.search}`,
     );
-    return applyContentSecurityPolicy(
-      NextResponse.redirect(signInUrl),
-      contentSecurityPolicy,
+    return applyRateLimitHeaders(
+      applyContentSecurityPolicy(
+        NextResponse.redirect(signInUrl),
+        contentSecurityPolicy,
+      ),
+      admission,
     );
   }
 
-  return applyContentSecurityPolicy(
-    NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    }),
-    contentSecurityPolicy,
+  return applyRateLimitHeaders(
+    applyContentSecurityPolicy(
+      NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      }),
+      contentSecurityPolicy,
+    ),
+    admission,
   );
 }
 
 /**
  * Middleware Configuration
  *
- * Generates nonces only for document requests. API routes and immutable assets
- * do not render executable HTML and keep the static security headers configured
- * by Next.js.
+ * Runs in the stable Node.js middleware runtime so the deployment may use its
+ * configured PostgreSQL fallback when Redis is not selected. Nonces are still
+ * generated only for documents; API responses retain the static headers from
+ * Next.js and receive rate-limit metadata here.
  */
 export const config = {
+  runtime: "nodejs",
   matcher: [
+    "/api/:path*",
     {
       source:
         "/((?!api|_next/static|_next/image|favicon.ico|fonts/|icons/|images/).*)",

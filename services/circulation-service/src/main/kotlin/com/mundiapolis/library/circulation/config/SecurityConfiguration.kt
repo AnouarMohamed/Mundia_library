@@ -1,5 +1,6 @@
 package com.mundiapolis.library.circulation.config
 
+import com.mundiapolis.library.circulation.adapter.`in`.web.AuthenticatedRateLimitFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
@@ -15,12 +16,16 @@ import org.springframework.security.oauth2.jwt.JwtValidators
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter
 
 @Configuration(proxyBeanMethods = false)
 @EnableMethodSecurity
 class SecurityConfiguration {
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(
+        http: HttpSecurity,
+        rateLimitFilter: AuthenticatedRateLimitFilter,
+    ): SecurityFilterChain {
         http
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
@@ -32,6 +37,7 @@ class SecurityConfiguration {
                 it.anyRequest().authenticated()
             }
             .oauth2ResourceServer { it.jwt {} }
+            .addFilterAfter(rateLimitFilter, BearerTokenAuthenticationFilter::class.java)
 
         return http.build()
     }

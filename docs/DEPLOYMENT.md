@@ -74,7 +74,10 @@ ENABLE_WORKFLOWS=true
 Keep `ENABLE_WORKFLOWS=false` until QStash signing keys and email are verified.
 When an owned Redis service is unavailable, set
 `RATE_LIMIT_BACKEND=postgres`; migration `0013` provides the distributed
-security-budget table and Redis becomes an optional cache.
+security-budget table and Redis becomes an optional cache. The middleware uses
+the stable Node.js runtime so this PostgreSQL fallback protects API routes and
+Server Actions at the same request boundary. Place a managed WAF and volumetric
+DDoS service in front of the deployment as a separate infrastructure control.
 
 ## Option 1: Vercel
 

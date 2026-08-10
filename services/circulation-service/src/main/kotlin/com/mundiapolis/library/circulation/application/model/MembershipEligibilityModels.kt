@@ -97,10 +97,14 @@ data class MemberEligibilityView(
 
 data class CirculationPolicyView(
     val revision: String,
+    val sequence: Long,
     val defaultLoanPeriod: Duration,
     val renewalPeriod: Duration,
     val maximumRenewals: Int,
     val fineCurrency: String,
+    val reservationHoldPeriod: Duration,
+    val maximumActiveReservations: Int,
+    val effectiveAt: Instant,
 )
 
 sealed class MembershipEligibilityException(message: String) : RuntimeException(message)

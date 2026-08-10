@@ -235,7 +235,7 @@ jobs:
         working-directory: services
         run: ./gradlew :circulation-service:bootJar --no-daemon
 
-      - name: Apply circulation Flyway migrations 1 through 10
+      - name: Apply circulation Flyway migrations 1 through 11
         working-directory: services
         env:
           APP_MIGRATION_ONLY: "true"
@@ -303,6 +303,9 @@ jobs:
 
       - name: Verify circulation concurrency invariants
         run: npm run db:verify-concurrency
+
+      - name: Verify distributed rate-limit concurrency invariants
+        run: npm run db:verify-rate-limits
 
   circulation-service:
     name: Circulation Service (JDK 25)

@@ -23,6 +23,7 @@ import com.mundiapolis.library.circulation.application.port.inbound.AssessFineUs
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.FineIdempotencyStore
+import com.mundiapolis.library.circulation.application.port.outbound.CirculationPolicyStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineLedgerStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineStore
@@ -52,7 +53,7 @@ class FineCommandService(
     private val outboxEventStore: FineOutboxEventStore,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
-    private val currency: String,
+    private val policyStore: CirculationPolicyStore,
     private val idempotencyRetention: Duration,
 ) : AssessFineUseCase,
     RecordFinePaymentUseCase,
@@ -82,7 +83,7 @@ class FineCommandService(
                 id = FineId(identifierGenerator.next()),
                 loanId = loan.id,
                 memberId = loan.memberId,
-                currency = currency,
+                currency = policyStore.current().fineCurrency,
                 amountMinor = command.amountMinor,
                 assessedAt = now,
             )
