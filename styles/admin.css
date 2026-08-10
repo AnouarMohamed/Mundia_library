@@ -212,7 +212,7 @@
 
   /* Header */
   .admin-header {
-    @apply flex lg:items-end items-start justify-between lg:flex-row flex-col gap-5 sm:mb-10 mb-5 rounded-lg border px-4 py-4 sm:px-6 sm:py-5;
+    @apply mb-5 flex items-center justify-between gap-4 rounded-lg border px-4 py-4 sm:mb-10 sm:px-6 sm:py-5;
     border-color: var(--mundia-line);
     background: var(--mundia-surface);
     box-shadow: none;
@@ -231,14 +231,19 @@
 
   /* Sidebar */
   .admin-sidebar {
-    @apply sticky top-0 z-40 flex h-screen w-[82px] shrink-0 flex-col justify-between overflow-y-auto border-r px-2 pb-5 pt-8 sm:w-[248px] sm:px-5 sm:pt-10 lg:w-[264px];
+    @apply sticky top-0 z-40 hidden w-[248px] shrink-0 flex-col border-r px-5 pt-8 md:flex lg:w-[264px] lg:pt-10;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 100svh;
+    align-self: flex-start;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
     border-color: var(--mundia-line);
     background: var(--mundia-surface);
     box-shadow: none;
   }
 
   .admin-sidebar .logo {
-    @apply flex cursor-pointer flex-row items-center justify-center gap-2 border-b pb-8 transition-all duration-200 hover:opacity-80 sm:justify-start sm:pb-10;
+    @apply flex shrink-0 cursor-pointer items-center border-b pb-8 transition-opacity duration-200 hover:opacity-80 lg:pb-10;
     border-color: var(--mundia-line);
   }
 
@@ -247,23 +252,14 @@
     font-family: var(--font-heading);
   }
 
-  .admin-sidebar .link {
-    @apply flex w-full flex-row items-center justify-center gap-2 rounded-none border-l border-transparent px-2 py-3.5 transition-colors hover:bg-transparent sm:justify-start sm:px-4;
-  }
-
-  .admin-sidebar .link.is-active {
-    border-left-color: var(--mundia-navy);
-    color: var(--mundia-navy);
-  }
-
-  .admin-sidebar .link p {
-    @apply text-base font-medium max-md:hidden;
-  }
-
   .admin-sidebar .user {
-    @apply my-6 flex w-full flex-row items-center justify-center gap-2 rounded-lg border px-2 py-2 sm:my-8 sm:justify-start sm:px-4;
+    @apply mt-4 flex w-full shrink-0 items-center gap-3 rounded-lg border px-3 py-3;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
+  }
+
+  .admin-mobile-navigation-dialog::backdrop {
+    background: oklch(15% 0.025 255 / 0.42);
   }
 
   /* User Card */
