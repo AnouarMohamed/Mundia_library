@@ -1,9 +1,9 @@
 /**
  * Application Constants
- * 
- * This module serves as the single source of truth for static UI text, 
+ *
+ * This module serves as the single source of truth for static UI text,
  * navigation configurations, and development-only sample data.
- * 
+ *
  * Using constants ensures:
  * - Consistency across forms and navigation menus.
  * - Easier localization and global UI updates.
@@ -56,6 +56,11 @@ export const adminSideBarLinks = [
     img: "/icons/admin/bookmark.svg",
     route: "/admin/book-requests",
     text: "Borrow Requests",
+  },
+  {
+    img: "/icons/admin/renewal.svg",
+    route: "/admin/renewal-requests",
+    text: "Renewal Requests",
   },
   {
     img: "/icons/admin/user.svg",

@@ -1,9 +1,9 @@
 /**
  * Admin Dashboard Layout
- * 
+ *
  * This layout is the shell for all administrative pages (/admin/*).
  * It enforces strict admin-only access and provides the admin-specific sidebar and header.
- * 
+ *
  * @module app/admin/layout
  */
 
@@ -23,10 +23,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * Admin layout component.
- * 
+ *
  * Uses the `requireAdmin` guard to ensure the user is authenticated and has the 'ADMIN' role.
  * Redirects unauthorized users to sign-in (if unauthenticated) or the home page (if not an admin).
- * 
+ *
  * @param {Object} props - Component properties
  * @param {ReactNode} props.children - Admin sub-page content
  */
@@ -45,14 +45,14 @@ const Layout = async ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <main className="admin-theme flex min-h-screen w-full flex-row">
+    <main className="admin-theme flex min-h-[100dvh] w-full flex-row">
       {/* Admin-specific sidebar for navigation */}
       <Sidebar session={guard.session} />
 
       <div className="admin-container">
         {/* Admin-specific header with search and user profile */}
         <Header session={guard.session} />
-        
+
         {/* Admin page content */}
         {children}
       </div>

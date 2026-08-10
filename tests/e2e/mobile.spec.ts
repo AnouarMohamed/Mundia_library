@@ -5,12 +5,22 @@ const user = {
   password: process.env.E2E_USER_PASSWORD,
 };
 
-const signIn = async (page: Page) => {
-  if (!user.email || !user.password) throw new Error("Missing E2E credentials");
+const admin = {
+  email: process.env.E2E_ADMIN_EMAIL,
+  password: process.env.E2E_ADMIN_PASSWORD,
+};
+
+const signIn = async (
+  page: Page,
+  credentials: { email?: string; password?: string } = user,
+) => {
+  if (!credentials.email || !credentials.password) {
+    throw new Error("Missing E2E credentials");
+  }
 
   await page.goto("/sign-in");
-  await page.getByLabel(/email/i).fill(user.email);
-  await page.getByLabel(/password/i).fill(user.password);
+  await page.getByLabel(/email/i).fill(credentials.email);
+  await page.getByLabel(/password/i).fill(credentials.password);
   await page.getByRole("button", { name: /^sign in$/i }).click();
   await expect(page).not.toHaveURL(/\/sign-in/);
 };
@@ -83,7 +93,9 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   await search.fill("Algorithms");
   await search.press("Enter");
   await expect(page).toHaveURL(/search=Algorithms/);
-  await expect(page.getByText("Algorithms", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("Algorithms", { exact: true }).first(),
+  ).toBeVisible();
 
   const bottomSpacing = await page.evaluate(() => {
     const main = document.querySelector("main");
@@ -115,4 +127,79 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Account" })).not.toBeVisible();
   await expect(accountMenuTrigger).toBeFocused();
+});
+
+test("admin workspace uses a viewport-safe responsive navigation", async ({
+  page,
+}) => {
+  test.skip(
+    !admin.email || !admin.password,
+    "Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD to run mobile admin checks",
+  );
+
+  await page.setViewportSize({ width: 360, height: 800 });
+  await signIn(page, admin);
+  await page.goto("/admin");
+  await expectNoHorizontalOverflow(page);
+
+  await expect(page.locator(".admin-sidebar")).toBeHidden();
+  const navigationTrigger = page.getByRole("button", {
+    name: "Open admin navigation",
+  });
+  const triggerBounds = await navigationTrigger.boundingBox();
+  expect(triggerBounds?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(triggerBounds?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  await navigationTrigger.click();
+  const navigationDialog = page.getByRole("dialog", {
+    name: "Admin navigation",
+  });
+  const navigationDialogElement = page.locator("#admin-mobile-navigation");
+  await expect(navigationDialog).toBeVisible();
+  expect(
+    await navigationDialog.evaluate((element) => element.matches(":modal")),
+  ).toBe(true);
+  await expect(
+    navigationDialog.getByRole("link", { name: "Account Requests" }),
+  ).toBeVisible();
+  await expect(
+    navigationDialog.getByRole("link", { name: "Renewal Requests" }),
+  ).toBeVisible();
+
+  await navigationDialog
+    .getByRole("link", { name: "Account Requests" })
+    .click();
+  await expect(page).toHaveURL(/\/admin\/account-requests/);
+  await expect(navigationDialog).not.toBeVisible();
+
+  await navigationTrigger.click();
+  await expect(navigationDialog).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .toBe("hidden");
+
+  await page.setViewportSize({ width: 1024, height: 700 });
+  await expect(navigationDialog).not.toBeVisible();
+  await expect
+    .poll(() =>
+      navigationDialogElement.evaluate((element) => element.matches(":modal")),
+    )
+    .toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .not.toBe("hidden");
+  await expect(page.locator(".admin-sidebar")).toBeVisible();
+  await expect(navigationTrigger).toBeHidden();
+
+  const sidebarGeometry = await page
+    .locator(".admin-sidebar")
+    .evaluate((element) => ({
+      top: element.getBoundingClientRect().top,
+      height: element.getBoundingClientRect().height,
+      viewportHeight: window.innerHeight,
+    }));
+  expect(Math.abs(sidebarGeometry.top)).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(sidebarGeometry.height - sidebarGeometry.viewportHeight),
+  ).toBeLessThanOrEqual(1);
 });
