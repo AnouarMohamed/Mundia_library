@@ -129,6 +129,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const requestContentType = request.headers
+      .get("content-type")
+      ?.toLowerCase();
+    if (!requestContentType?.startsWith("multipart/form-data;")) {
+      return NextResponse.json(
+        { error: "Upload requests must use multipart form data" },
+        { status: 415 },
+      );
+    }
+
     const formData = await request.formData();
     const intentValue = formData.get("intent");
     const fileValue = formData.get("file");

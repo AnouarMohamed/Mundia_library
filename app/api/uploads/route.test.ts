@@ -109,6 +109,26 @@ describe("POST /api/uploads", () => {
     expect(upload).not.toHaveBeenCalled();
   });
 
+  it("rejects malformed upload media types without raising a server error", async () => {
+    const response = await POST(
+      new NextRequest("http://localhost/api/uploads", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost",
+        },
+        body: "{}",
+      }),
+    );
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toEqual({
+      error: "Upload requests must use multipart form data",
+    });
+    expect(requireAdmin).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
   it("rejects non-admin book media uploads before storage", async () => {
     requireAdmin.mockResolvedValue({ ok: false });
 
