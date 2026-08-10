@@ -4,9 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import type { Session } from "next-auth";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getInitials } from "@/lib/utils";
 import AdminNavLinks from "@/components/admin/AdminNavLinks";
+import AdminUserCard from "@/components/admin/AdminUserCard";
 
 interface MobileNavigationProps {
   session: Session;
@@ -14,7 +13,6 @@ interface MobileNavigationProps {
 
 const MobileNavigation = ({ session }: MobileNavigationProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -25,7 +23,14 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
   };
 
   useEffect(() => {
-    setIsHydrated(true);
+    const desktopViewport = window.matchMedia("(min-width: 768px)");
+    const closeAtDesktop = (event: MediaQueryListEvent | MediaQueryList) => {
+      if (event.matches) setIsOpen(false);
+    };
+
+    closeAtDesktop(desktopViewport);
+    desktopViewport.addEventListener("change", closeAtDesktop);
+    return () => desktopViewport.removeEventListener("change", closeAtDesktop);
   }, []);
 
   useEffect(() => {
@@ -54,8 +59,7 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
         ref={triggerRef}
         type="button"
         onClick={() => setIsOpen(true)}
-        disabled={!isHydrated}
-        className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] transition-colors hover:border-[var(--mundia-navy)] hover:text-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] disabled:opacity-60 md:hidden"
+        className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] transition-colors hover:border-[var(--mundia-navy)] hover:text-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] md:hidden"
         aria-label="Open admin navigation"
         aria-expanded={isOpen}
         aria-controls="admin-mobile-navigation"
@@ -113,21 +117,7 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
           </nav>
 
           <div className="shrink-0 border-t border-[var(--mundia-line)] p-4">
-            <div className="flex min-w-0 items-center gap-3 rounded-lg bg-[var(--mundia-paper)] p-3">
-              <Avatar className="size-11">
-                <AvatarFallback className="bg-amber-100 text-sm text-[var(--mundia-ink)]">
-                  {getInitials(session.user?.name || "Administrator")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--mundia-ink)]">
-                  {session.user?.name || "Administrator"}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-[var(--mundia-muted)]">
-                  {session.user?.email}
-                </p>
-              </div>
-            </div>
+            <AdminUserCard session={session} variant="mobile" />
           </div>
         </div>
       </dialog>

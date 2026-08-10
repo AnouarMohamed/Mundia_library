@@ -8,13 +8,10 @@
  * @version 1.0.0
  */
 
-"use client";
-
 import Link from "next/link";
-import { getInitials } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Session } from "next-auth";
+import type { Session } from "next-auth";
 import AdminNavLinks from "@/components/admin/AdminNavLinks";
+import AdminUserCard from "@/components/admin/AdminUserCard";
 
 /**
  * Props for Admin Sidebar
@@ -29,8 +26,8 @@ interface AdminSidebarProps {
 /**
  * Sidebar
  *
- * Client-side component that manages the administrative navigation state.
- * Automatically highlights the active route based on the current pathname.
+ * Server-rendered navigation shell. AdminNavLinks owns client-side active-route
+ * highlighting so the rest of the sidebar does not need to hydrate.
  *
  * @param {AdminSidebarProps} props - Component properties
  * @returns {JSX.Element} The rendered admin sidebar
@@ -61,22 +58,7 @@ const Sidebar = ({ session }: AdminSidebarProps) => {
       </div>
 
       {/* User Profile Footer Section */}
-      <div className="user">
-        <Avatar className="size-10">
-          <AvatarFallback className="bg-amber-100 text-sm text-[var(--mundia-ink)]">
-            {getInitials(session.user?.name || "Administrator")}
-          </AvatarFallback>
-        </Avatar>
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-slate-900">
-            {session.user?.name || "Administrator"}
-          </p>
-          <p className="truncate text-xs text-slate-600">
-            {session.user?.email}
-          </p>
-        </div>
-      </div>
+      <AdminUserCard session={session} variant="sidebar" />
     </aside>
   );
 };

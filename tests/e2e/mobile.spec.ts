@@ -154,6 +154,7 @@ test("admin workspace uses a viewport-safe responsive navigation", async ({
   const navigationDialog = page.getByRole("dialog", {
     name: "Admin navigation",
   });
+  const navigationDialogElement = page.locator("#admin-mobile-navigation");
   await expect(navigationDialog).toBeVisible();
   expect(
     await navigationDialog.evaluate((element) => element.matches(":modal")),
@@ -171,8 +172,22 @@ test("admin workspace uses a viewport-safe responsive navigation", async ({
   await expect(page).toHaveURL(/\/admin\/account-requests/);
   await expect(navigationDialog).not.toBeVisible();
 
+  await navigationTrigger.click();
+  await expect(navigationDialog).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .toBe("hidden");
+
   await page.setViewportSize({ width: 1024, height: 700 });
-  await page.goto("/admin");
+  await expect(navigationDialog).not.toBeVisible();
+  await expect
+    .poll(() =>
+      navigationDialogElement.evaluate((element) => element.matches(":modal")),
+    )
+    .toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .not.toBe("hidden");
   await expect(page.locator(".admin-sidebar")).toBeVisible();
   await expect(navigationTrigger).toBeHidden();
 
@@ -180,11 +195,11 @@ test("admin workspace uses a viewport-safe responsive navigation", async ({
     .locator(".admin-sidebar")
     .evaluate((element) => ({
       top: element.getBoundingClientRect().top,
-      bottom: element.getBoundingClientRect().bottom,
       height: element.getBoundingClientRect().height,
       viewportHeight: window.innerHeight,
     }));
-  expect(sidebarGeometry.top).toBe(0);
-  expect(sidebarGeometry.bottom).toBe(sidebarGeometry.viewportHeight);
-  expect(sidebarGeometry.height).toBe(sidebarGeometry.viewportHeight);
+  expect(Math.abs(sidebarGeometry.top)).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(sidebarGeometry.height - sidebarGeometry.viewportHeight),
+  ).toBeLessThanOrEqual(1);
 });

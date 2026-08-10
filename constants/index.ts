@@ -58,7 +58,7 @@ export const adminSideBarLinks = [
     text: "Borrow Requests",
   },
   {
-    img: "/icons/admin/bookmark.svg",
+    img: "/icons/admin/renewal.svg",
     route: "/admin/renewal-requests",
     text: "Renewal Requests",
   },

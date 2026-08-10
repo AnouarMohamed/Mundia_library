@@ -232,9 +232,9 @@
   /* Sidebar */
   .admin-sidebar {
     @apply sticky top-0 z-40 hidden w-[248px] shrink-0 flex-col border-r px-5 pt-8 md:flex lg:w-[264px] lg:pt-10;
+
     height: 100vh;
     height: 100dvh;
-    min-height: 100svh;
     align-self: flex-start;
     padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
     border-color: var(--mundia-line);
@@ -247,13 +247,9 @@
     border-color: var(--mundia-line);
   }
 
-  .admin-sidebar .logo h1 {
-    @apply text-xl font-normal text-[var(--mundia-ink)] max-md:hidden;
-    font-family: var(--font-heading);
-  }
-
   .admin-sidebar .user {
     @apply mt-4 flex w-full shrink-0 items-center gap-3 rounded-lg border px-3 py-3;
+
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
   }
