@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit
         "app.security.jwt.issuer=https://issuer.example.test",
         "app.security.jwt.jwk-set-uri=https://issuer.example.test/.well-known/jwks.json",
         "app.security.jwt.audience=circulation-api",
-        "app.circulation.default-loan-period=P14D",
         "app.circulation.idempotency-retention=P1D",
         "spring.datasource.hikari.maximum-pool-size=24",
         "spring.datasource.hikari.connection-timeout=10000",
@@ -105,6 +104,10 @@ class CirculationServiceIntegrationTest {
                     circulation_inventory_audit_entry,
                     circulation_consumer_inbox,
                     circulation_member_eligibility,
+                    circulation_reservation_idempotency,
+                    circulation_reservation,
+                    circulation_policy_idempotency,
+                    circulation_rate_limit_bucket,
                     outbox_event,
                     circulation_idempotency,
                     circulation_inventory_idempotency,
@@ -976,6 +979,8 @@ class CirculationServiceIntegrationTest {
             registry.add("spring.datasource.url", postgres::getJdbcUrl)
             registry.add("spring.datasource.username", postgres::getUsername)
             registry.add("spring.datasource.password", postgres::getPassword)
+            registry.add("app.rate-limit.enabled") { "false" }
+            registry.add("app.reservation-expiry.enabled") { "false" }
         }
     }
 }

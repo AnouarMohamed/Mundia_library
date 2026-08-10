@@ -42,9 +42,13 @@ are implemented in the repository:
 
 - The legacy application uses transaction-capable PostgreSQL everywhere,
   canonical forward migrations, database constraints, atomic circulation and
-  privilege transitions, fail-closed production configuration/rate limits,
-  same-origin mutation checks, bounded server-mediated uploads, safe response
-  projections, append-only audit storage, and expanded CI security gates.
+  privilege transitions, fail-closed production configuration, centralized
+  request admission for every API and mutating page request, stricter
+  credential budgets, same-origin mutation checks, bounded server-mediated
+  uploads, safe response projections, append-only audit storage, and expanded
+  CI security gates. Redis and PostgreSQL admission backends share
+  privacy-preserving keys; the PostgreSQL path is concurrency-verified and caps
+  rejected traffic at one sentinel count above the configured budget.
 - A fresh PostgreSQL 18 database is migrated, inspected, seeded, and exercised
   by synchronized approval/return races in CI.
 - The BFF contains a fail-closed generic OIDC client foundation with
@@ -54,7 +58,8 @@ are implemented in the repository:
   MFA, recovery, logout, and adversarial provider tests remain release gates.
 - `services/circulation-service` implements request, deterministic copy
   allocation/approval, rejection, member cancellation, return, renewal,
-  copy registration/condition/relocation, and immutable-ledger fine commands
+  fair edition reservation queues, automatic hold expiry, copy registration/
+  condition/relocation, and immutable-ledger fine commands
   as caller-bound idempotent commands.
   State, exact replay results, append-only inventory/fine audit entries, and
   versioned outbox events commit atomically.
@@ -76,18 +81,28 @@ are implemented in the repository:
   commit, duplicate replay, gap/conflict detection, readiness failure, and
   transport-level tests. Request, approval, and renewal fail closed while
   returns remain available to suspended members.
-- The service exposes a revisioned effective-policy read and privacy-preserving
-  eligibility read with separate self-service and staff scopes. Both routes
-  are enforced by the machine-checked OpenAPI contract.
+- Circulation policy is now an immutable, actor-audited revision history with
+  compare-and-set administration, exact idempotent replay, ETags, and outbox
+  events. Loan, renewal, fine, reservation, and expiry decisions read the
+  current persisted policy inside their command transaction.
+- The service enforces distributed authenticated-principal rate limits before
+  controllers run, with separate read, command, and sensitive-operation
+  budgets, atomic capped PostgreSQL counters, bounded cleanup, observable
+  outcomes, standard 429 metadata, and fail-closed admission when its store is
+  unavailable. Public-edge DDoS/WAF controls remain a platform gate.
+- The service exposes revisioned policy and privacy-preserving eligibility
+  reads with separate self-service and staff scopes. Routes and admission
+  outcomes are enforced by the machine-checked OpenAPI contract.
 - GitOps now isolates runtime, platform, and migration layers. Schema-owner
   credentials and Jobs live in protected `*-migrations` namespaces; the
   workload Argo project cannot manage Jobs, RBAC, secret stores, or those
   namespaces. Admission policy fixes approved secret names, remote keys, stores,
   and target Secret names.
 
-This checkpoint is not general availability. The platform/IdP, remaining
-circulation reservations and dynamic policy administration, remaining domain
-extractions, data
+This checkpoint is not general availability. Reservation and dynamic-policy
+capabilities are implemented and their invariant/replay suites pass, but the
+Phase 2 backfill/reconciliation exit evidence is not yet signed off. The
+platform/IdP, remaining domain extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.
 

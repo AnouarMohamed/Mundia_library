@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.http.ResponseEntity
 import java.time.Instant
 import java.util.UUID
 
@@ -24,7 +25,12 @@ class CirculationReadController(
 ) {
     @GetMapping("/policy")
     @PreAuthorize("hasAuthority('SCOPE_circulation.policy.read')")
-    fun policy(): CirculationPolicyResponse = CirculationPolicyResponse.from(getPolicy.get())
+    fun policy(): ResponseEntity<CirculationPolicyResponse> {
+        val policy = getPolicy.get()
+        return ResponseEntity.ok()
+            .eTag(policy.revision)
+            .body(CirculationPolicyResponse.from(policy))
+    }
 
     @GetMapping("/members/{memberId}/eligibility")
     @PreAuthorize(
@@ -45,19 +51,27 @@ class CirculationReadController(
 
 data class CirculationPolicyResponse(
     val revision: String,
+    val sequence: Long,
     val defaultLoanPeriod: String,
     val renewalPeriod: String,
     val maximumRenewals: Int,
     val fineCurrency: String,
+    val reservationHoldPeriod: String,
+    val maximumActiveReservations: Int,
+    val effectiveAt: Instant,
 ) {
     companion object {
         fun from(view: CirculationPolicyView): CirculationPolicyResponse =
             CirculationPolicyResponse(
                 revision = view.revision,
+                sequence = view.sequence,
                 defaultLoanPeriod = view.defaultLoanPeriod.toString(),
                 renewalPeriod = view.renewalPeriod.toString(),
                 maximumRenewals = view.maximumRenewals,
                 fineCurrency = view.fineCurrency,
+                reservationHoldPeriod = view.reservationHoldPeriod.toString(),
+                maximumActiveReservations = view.maximumActiveReservations,
+                effectiveAt = view.effectiveAt,
             )
     }
 }

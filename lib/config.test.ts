@@ -120,6 +120,15 @@ describe.sequential("production configuration", () => {
     );
   });
 
+  it("rejects rate-limit bypasses in staging", async () => {
+    process.env.APP_ENV = "staging";
+    process.env.DISABLE_RATE_LIMIT = "true";
+
+    await expect(import("@/lib/config")).rejects.toThrow(
+      /DISABLE_RATE_LIMIT is forbidden/,
+    );
+  });
+
   it("rejects production without complete institutional OIDC settings", async () => {
     delete process.env.OIDC_CLIENT_SECRET;
 

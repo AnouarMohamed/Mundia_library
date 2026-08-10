@@ -43,13 +43,13 @@ export async function allowCredentialAttempt(email: string) {
       const [account, source] = await Promise.all([
         applyPostgresRateLimit({
           scope: "auth-account",
-          identifier: pseudonymize(email),
+          identifier: email,
           limit: 5,
           windowSeconds: 15 * 60,
         }),
         applyPostgresRateLimit({
           scope: "auth-ip",
-          identifier: pseudonymize(ip),
+          identifier: ip,
           limit: 20,
           windowSeconds: 15 * 60,
         }),

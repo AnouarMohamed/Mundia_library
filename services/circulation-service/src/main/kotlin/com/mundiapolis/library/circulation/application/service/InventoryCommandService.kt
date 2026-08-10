@@ -43,6 +43,7 @@ class InventoryCommandService(
     private val outboxEventStore: InventoryOutboxEventStore,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
+    private val reservationQueueService: ReservationQueueService,
     private val idempotencyRetention: Duration,
 ) : RegisterCopyUseCase,
     ChangeCopyConditionUseCase,
@@ -65,6 +66,7 @@ class InventoryCommandService(
             requestFingerprint = fingerprint,
             reason = command.reason.value,
         ) { now ->
+            reservationQueueService.lockEdition(command.editionId)
             val copy = Copy.register(
                 id = command.copyId,
                 editionId = command.editionId,
@@ -75,7 +77,13 @@ class InventoryCommandService(
             if (!copyStore.create(copy, now)) {
                 throw CopyAlreadyExistsException()
             }
-            InventoryMutation(previous = null, current = copy)
+            val persisted = reservationQueueService.claimNewlyAvailableCopy(
+                copy.editionId,
+                copy.id,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+            )
+            InventoryMutation(previous = null, current = persisted)
         }
     }
 
@@ -94,7 +102,20 @@ class InventoryCommandService(
             requestFingerprint = fingerprint,
             reason = command.reason.value,
         ) { now ->
-            val current = requireCopy(command.copyId)
+            val current = if (
+                command.target == com.mundiapolis.library.circulation.domain.model.CopyStatus.AVAILABLE
+            ) {
+                val observed = copyStore.findById(command.copyId)
+                    ?: throw CopyNotFoundException(command.copyId)
+                reservationQueueService.lockEdition(observed.editionId)
+                requireCopy(command.copyId).also { locked ->
+                    if (locked.editionId != observed.editionId) {
+                        throw ConcurrentInventoryUpdateException()
+                    }
+                }
+            } else {
+                requireCopy(command.copyId)
+            }
             val changed = try {
                 current.changeCondition(command.target)
             } catch (exception: IllegalArgumentException) {
@@ -105,7 +126,19 @@ class InventoryCommandService(
             if (!copyStore.update(changed, current.version, now)) {
                 throw ConcurrentInventoryUpdateException()
             }
-            InventoryMutation(previous = current, current = changed)
+            val persisted = if (
+                changed.status == com.mundiapolis.library.circulation.domain.model.CopyStatus.AVAILABLE
+            ) {
+                reservationQueueService.claimNewlyAvailableCopy(
+                    changed.editionId,
+                    changed.id,
+                    now,
+                    command.principal.idempotencyOwner.fingerprint,
+                )
+            } else {
+                changed
+            }
+            InventoryMutation(previous = current, current = persisted)
         }
     }
 

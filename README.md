@@ -340,7 +340,7 @@ Refer to [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructio
 
 - **Authentication & Password Protection**: Passwords are saved with salted bcrypt hashes. NextAuth v5 JWT sessions govern authenticated routes.
 - **Authoritative Authorization**: `/admin` routes and actions undergo strict multi-tier server-side validation evaluating authentication status, account approval state (`APPROVED`), role (`ADMIN`), and required granular capabilities (`AdminCapability`).
-- **Distributed Rate Limiting**: Upstash Redis rate limiting protects public and sensitive API endpoints. Deployments without Redis automatically fall back to PostgreSQL `rate_limit_buckets`.
+- **Distributed Rate Limiting**: Request-boundary admission protects every API route and mutating page request with separate read, command, and sensitive budgets. Credential verification adds stricter account/IP limits. Deployments without Redis use atomic, capped PostgreSQL `rate_limit_buckets`; protected tiers fail closed if admission is unavailable.
 - **Audit Logging**: Sensitive administrative actions are appended to `audit_logs` with actor details, timestamps, and target identifiers.
 - **Security Automation**: CI workflows run GitHub CodeQL analysis, secret scanning, dependency review, and OpenSSF Scorecard evaluations.
 

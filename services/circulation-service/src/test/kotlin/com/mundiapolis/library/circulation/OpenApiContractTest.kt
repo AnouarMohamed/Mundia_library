@@ -13,24 +13,48 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandResp
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.MemberEligibilityResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.PlaceReservationRequest
+import com.mundiapolis.library.circulation.adapter.`in`.web.PolicyCommandController
+import com.mundiapolis.library.circulation.adapter.`in`.web.ReservationCommandController
+import com.mundiapolis.library.circulation.adapter.`in`.web.ReservationCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.RecordFinePaymentRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RegisterCopyRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RelocateCopyRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RequestLoanRequest
+import com.mundiapolis.library.circulation.adapter.`in`.web.UpdateCirculationPolicyRequest
 import com.mundiapolis.library.circulation.application.port.inbound.CirculationStatus
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.PutMapping
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.core.StreamReadFeature
+import tools.jackson.core.json.JsonFactory
 
 class OpenApiContractTest {
     private val contract: JsonNode = requireNotNull(
         OpenApiContractTest::class.java.getResourceAsStream(CONTRACT_RESOURCE),
     ).use(ObjectMapper()::readTree)
+
+    @Test
+    fun `published contract contains no duplicate JSON object keys`() {
+        val strictMapper = ObjectMapper(
+            JsonFactory.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .build(),
+        )
+
+        assertThatCode {
+            requireNotNull(
+                OpenApiContractTest::class.java.getResourceAsStream(CONTRACT_RESOURCE),
+            ).use(strictMapper::readTree)
+        }.doesNotThrowAnyException()
+    }
 
     @Test
     fun `published contract routes and scopes match controller annotations exactly`() {
@@ -42,7 +66,7 @@ class OpenApiContractTest {
 
     @Test
     fun `every command publishes the actor scoped idempotency contract`() {
-        val commandOperations = contractOperations().keys.filter { it.method == "post" }
+        val commandOperations = contractOperations().keys.filter { it.method in setOf("post", "put") }
 
         assertThat(commandOperations).isNotEmpty()
         commandOperations.forEach { route ->
@@ -66,7 +90,10 @@ class OpenApiContractTest {
                         reference == "#/components/responses/FineCreated" ||
                         reference == "#/components/responses/FineCommandSucceeded" ||
                         reference == "#/components/responses/InventoryCreated" ||
-                        reference == "#/components/responses/InventoryCommandSucceeded"
+                        reference == "#/components/responses/InventoryCommandSucceeded" ||
+                        reference == "#/components/responses/ReservationCreated" ||
+                        reference == "#/components/responses/ReservationCommandSucceeded" ||
+                        reference == "#/components/responses/PolicyUpdated"
                 }
         }
 
@@ -85,6 +112,12 @@ class OpenApiContractTest {
         assertSchemaFields("MemberEligibilityResponse", MemberEligibilityResponse::class.java)
         assertSchemaFields("RequestLoanRequest", RequestLoanRequest::class.java)
         assertSchemaFields("LoanCommandResponse", LoanCommandResponse::class.java)
+        assertSchemaFields("PlaceReservationRequest", PlaceReservationRequest::class.java)
+        assertSchemaFields("ReservationCommandResponse", ReservationCommandResponse::class.java)
+        assertSchemaFields(
+            "UpdateCirculationPolicyRequest",
+            UpdateCirculationPolicyRequest::class.java,
+        )
         assertSchemaFields("AssessFineRequest", AssessFineRequest::class.java)
         assertSchemaFields("RecordFinePaymentRequest", RecordFinePaymentRequest::class.java)
         assertSchemaFields("AdjustFineRequest", AdjustFineRequest::class.java)
@@ -93,6 +126,19 @@ class OpenApiContractTest {
         assertSchemaFields("ChangeCopyConditionRequest", ChangeCopyConditionRequest::class.java)
         assertSchemaFields("RelocateCopyRequest", RelocateCopyRequest::class.java)
         assertSchemaFields("InventoryCommandResponse", InventoryCommandResponse::class.java)
+    }
+
+    @Test
+    fun `every authenticated operation documents admission control outcomes`() {
+        contractOperations().keys.forEach { route ->
+            val responses = contract["paths"][route.path][route.method]["responses"]
+            assertThat(responses.has("429"))
+                .describedAs("%s %s must document rate limiting", route.method, route.path)
+                .isTrue()
+            assertThat(responses.has("503"))
+                .describedAs("%s %s must document fail-closed admission", route.method, route.path)
+                .isTrue()
+        }
     }
 
     private fun assertSchemaFields(schemaName: String, model: Class<*>) {
@@ -146,6 +192,10 @@ class OpenApiContractTest {
                     "post",
                     basePath + method.getAnnotation(PostMapping::class.java).value.singleOrNull().orEmpty(),
                 )
+                method.isAnnotationPresent(PutMapping::class.java) -> Route(
+                    "put",
+                    basePath + method.getAnnotation(PutMapping::class.java).value.singleOrNull().orEmpty(),
+                )
                 else -> null
             } ?: return@mapNotNull null
             val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java)) {
@@ -171,6 +221,8 @@ class OpenApiContractTest {
             LoanCommandController::class.java,
             FineCommandController::class.java,
             InventoryCommandController::class.java,
+            ReservationCommandController::class.java,
+            PolicyCommandController::class.java,
         )
         val SUPPORTED_HTTP_METHODS = setOf("get", "post", "put", "patch", "delete")
         val SCOPE_PATTERN = Regex("SCOPE_([a-z0-9.-]+)")

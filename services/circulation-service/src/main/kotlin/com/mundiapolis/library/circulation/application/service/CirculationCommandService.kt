@@ -19,6 +19,8 @@ import com.mundiapolis.library.circulation.application.model.MemberNotEligibleEx
 import com.mundiapolis.library.circulation.application.model.MissingMembershipClaimException
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExistsException
+import com.mundiapolis.library.circulation.application.model.OpenReservationBlocksLoanException
+import com.mundiapolis.library.circulation.application.model.PendingReservationBlocksRenewalException
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ApproveLoanUseCase
@@ -33,11 +35,13 @@ import com.mundiapolis.library.circulation.application.port.inbound.RejectLoanUs
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ReturnLoanUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
+import com.mundiapolis.library.circulation.application.port.outbound.CirculationPolicyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdempotencyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
 import com.mundiapolis.library.circulation.application.port.outbound.LoanStore
 import com.mundiapolis.library.circulation.application.port.outbound.MemberEligibilityStore
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxEventStore
+import com.mundiapolis.library.circulation.application.port.outbound.ReservationStore
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.domain.model.Loan
@@ -60,9 +64,9 @@ class CirculationCommandService(
     private val outboxEventStore: OutboxEventStore,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
-    private val defaultLoanPeriod: Duration,
-    private val renewalPeriod: Duration,
-    private val maximumRenewals: Int,
+    private val policyStore: CirculationPolicyStore,
+    private val reservationStore: ReservationStore,
+    private val reservationQueueService: ReservationQueueService,
     private val idempotencyRetention: Duration,
 ) : RequestLoanUseCase,
     ApproveLoanUseCase,
@@ -86,6 +90,10 @@ class CirculationCommandService(
             fingerprint,
         ) { now ->
             requireEligible(command.memberId)
+            reservationStore.lockEdition(command.editionId)
+            if (reservationStore.hasOpenForMemberEdition(command.memberId, command.editionId)) {
+                throw OpenReservationBlocksLoanException()
+            }
             val loan = Loan.request(
                 id = LoanId(identifierGenerator.next()),
                 memberId = command.memberId,
@@ -115,9 +123,12 @@ class CirculationCommandService(
             }
             requireEligible(requested.memberId)
 
+            reservationStore.lockEdition(requested.editionId)
+            val policy = policyStore.current()
+
             val copyId = copyStore.allocateAvailable(requested.editionId, now)
                 ?: throw NoAvailableCopyException(requested.editionId)
-            val approved = requested.approve(copyId, now, now.plus(defaultLoanPeriod))
+            val approved = requested.approve(copyId, now, now.plus(policy.defaultLoanPeriod))
 
             if (!loanStore.update(approved, requested.version, now)) {
                 throw ConcurrentCirculationUpdateException()
@@ -196,9 +207,12 @@ class CirculationCommandService(
             if (!loanStore.update(returned, active.version, now)) {
                 throw ConcurrentCirculationUpdateException()
             }
-            if (!copyStore.release(requireNotNull(active.copyId), now)) {
-                throw ConcurrentCirculationUpdateException()
-            }
+            reservationQueueService.releaseReturnedCopy(
+                active.editionId,
+                requireNotNull(active.copyId),
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+            )
             returned
         }
     }
@@ -223,14 +237,19 @@ class CirculationCommandService(
                 throw LoanStateConflictException(active.id, active.status)
             }
             requireEligible(active.memberId)
+            reservationStore.lockEdition(active.editionId)
+            if (reservationStore.hasWaitingForEditionExcluding(active.editionId, active.memberId)) {
+                throw PendingReservationBlocksRenewalException()
+            }
+            val policy = policyStore.current()
             if (now > requireNotNull(active.dueAt)) {
                 throw LoanOverdueException(active.id)
             }
-            if (active.renewalCount >= maximumRenewals) {
+            if (active.renewalCount >= policy.maximumRenewals) {
                 throw RenewalLimitReachedException(active.id)
             }
 
-            val renewed = active.renew(now, renewalPeriod, maximumRenewals)
+            val renewed = active.renew(now, policy.renewalPeriod, policy.maximumRenewals)
             if (!loanStore.update(renewed, active.version, now)) {
                 throw ConcurrentCirculationUpdateException()
             }

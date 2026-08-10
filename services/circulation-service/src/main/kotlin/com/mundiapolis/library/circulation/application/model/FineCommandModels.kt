@@ -99,6 +99,11 @@ class InvalidFineAmountException :
 class InvalidFineAdjustmentException :
     CirculationCommandException("Fine adjustment must be a supported non-zero minor-unit amount")
 
+class InvalidFineCurrencyException :
+    CirculationCommandException(
+        "Fine currency must be a supported uppercase ISO 4217 code with minor units",
+    )
+
 class InvalidFineNarrativeException :
     CirculationCommandException(
         "Fine reason must be trimmed, contain 1 to 500 characters, and have no controls",
@@ -114,6 +119,9 @@ class FineNotFoundException(id: FineId) :
 
 class FineBalanceConflictException :
     CirculationCommandException("The command would make the fine balance invalid")
+
+class FineCurrencyMismatchException :
+    CirculationCommandException("The command currency does not match the fine currency")
 
 class DuplicatePaymentReferenceException :
     CirculationCommandException("The payment reference has already been recorded")

@@ -48,11 +48,19 @@ spring:
     sql-dialect: postgres
 
 app:
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    window: ${RATE_LIMIT_WINDOW:PT1M}
+    read-requests: ${RATE_LIMIT_READ_REQUESTS:600}
+    command-requests: ${RATE_LIMIT_COMMAND_REQUESTS:120}
+    sensitive-requests: ${RATE_LIMIT_SENSITIVE_REQUESTS:30}
+    cleanup-interval: ${RATE_LIMIT_CLEANUP_INTERVAL:PT1H}
+    cleanup-batch-size: ${RATE_LIMIT_CLEANUP_BATCH_SIZE:5000}
+  reservation-expiry:
+    enabled: ${RESERVATION_EXPIRY_ENABLED:true}
+    poll-interval: ${RESERVATION_EXPIRY_POLL_INTERVAL:PT30S}
+    batch-size: ${RESERVATION_EXPIRY_BATCH_SIZE:100}
   circulation:
-    default-loan-period: ${DEFAULT_LOAN_PERIOD:P14D}
-    renewal-period: ${RENEWAL_PERIOD:P14D}
-    maximum-renewals: ${MAXIMUM_RENEWALS:2}
-    fine-currency: ${FINE_CURRENCY:MAD}
     idempotency-retention: ${IDEMPOTENCY_RETENTION:P1D}
   outbox:
     enabled: ${OUTBOX_DELIVERY_ENABLED:false}

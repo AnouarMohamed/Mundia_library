@@ -36,13 +36,15 @@ data class Fine private constructor(
         ) { "Fine status does not match its balance" }
     }
 
-    fun recordPayment(amountMinor: Long): Fine {
+    fun recordPayment(amountMinor: Long, currency: String): Fine {
+        require(currency == this.currency) { "Payment currency does not match the fine currency" }
         require(amountMinor in 1..MAX_AMOUNT_MINOR) { "Payment amount is outside the supported range" }
         require(amountMinor <= balanceMinor) { "Payment exceeds the outstanding fine balance" }
         return withBalance(balanceMinor - amountMinor)
     }
 
-    fun adjust(deltaMinor: Long): Fine {
+    fun adjust(deltaMinor: Long, currency: String): Fine {
+        require(currency == this.currency) { "Adjustment currency does not match the fine currency" }
         require(deltaMinor != 0L && deltaMinor in -MAX_AMOUNT_MINOR..MAX_AMOUNT_MINOR) {
             "Adjustment amount is outside the supported range"
         }
@@ -67,7 +69,7 @@ data class Fine private constructor(
         const val MAX_AMOUNT_MINOR = 1_000_000_000_000L
         private val CURRENCY_PATTERN = Regex("[A-Z]{3}")
 
-        private fun isSupportedCurrency(code: String): Boolean =
+        internal fun isSupportedCurrency(code: String): Boolean =
             CURRENCY_PATTERN.matches(code) &&
                 (
                     runCatching { Currency.getInstance(code) }

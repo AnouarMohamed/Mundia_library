@@ -22,6 +22,12 @@ class JwtCommandPrincipalResolver {
     fun forCancellation(authentication: JwtAuthenticationToken): CommandPrincipal =
         forMemberCommand(authentication, CANCEL_ON_BEHALF_AUTHORITY)
 
+    fun forReservationRequest(authentication: JwtAuthenticationToken): CommandPrincipal =
+        forMemberCommand(authentication, RESERVATION_REQUEST_ON_BEHALF_AUTHORITY)
+
+    fun forReservationCancellation(authentication: JwtAuthenticationToken): CommandPrincipal =
+        forMemberCommand(authentication, RESERVATION_CANCEL_ON_BEHALF_AUTHORITY)
+
     fun forEligibilityRead(authentication: JwtAuthenticationToken): CommandPrincipal =
         forMemberCommand(authentication, ELIGIBILITY_READ_ANY_AUTHORITY)
 
@@ -41,7 +47,7 @@ class JwtCommandPrincipalResolver {
     }
 
     fun forAdministrativeCommand(authentication: JwtAuthenticationToken): CommandPrincipal =
-        resolve(authentication.token, membershipId = null, canActOnBehalf = false)
+        resolve(authentication.token, membershipId = null, canActOnBehalf = true)
 
     private fun resolve(
         jwt: Jwt,
@@ -89,6 +95,10 @@ class JwtCommandPrincipalResolver {
         const val REQUEST_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.request.on-behalf"
         const val RENEW_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.renew.on-behalf"
         const val CANCEL_ON_BEHALF_AUTHORITY = "SCOPE_circulation.loan.cancel.on-behalf"
+        const val RESERVATION_REQUEST_ON_BEHALF_AUTHORITY =
+            "SCOPE_circulation.reservation.place.on-behalf"
+        const val RESERVATION_CANCEL_ON_BEHALF_AUTHORITY =
+            "SCOPE_circulation.reservation.cancel.on-behalf"
         const val ELIGIBILITY_READ_ANY_AUTHORITY =
             "SCOPE_circulation.eligibility.read.any"
     }

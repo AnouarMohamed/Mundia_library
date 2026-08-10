@@ -62,6 +62,17 @@ class JooqLoanStore(
             )
             .execute() == 1
 
+    override fun hasOpenForMemberEdition(memberId: MemberId, editionId: EditionId): Boolean =
+        dsl.fetchExists(
+            dsl.selectOne()
+                .from(CIRCULATION_LOAN)
+                .where(
+                    CIRCULATION_LOAN.MEMBER_ID.eq(memberId.value)
+                        .and(CIRCULATION_LOAN.EDITION_ID.eq(editionId.value))
+                        .and(CIRCULATION_LOAN.STATUS.`in`("REQUESTED", "ACTIVE")),
+                ),
+        )
+
     private fun CirculationLoanRecord.toDomain(): Loan = Loan.restore(
         id = LoanId(requireNotNull(id)),
         memberId = MemberId(requireNotNull(memberId)),

@@ -5,6 +5,7 @@ import com.mundiapolis.library.circulation.application.model.DuplicatePaymentRef
 import com.mundiapolis.library.circulation.application.model.FineBalanceConflictException
 import com.mundiapolis.library.circulation.application.model.FineCommandExecution
 import com.mundiapolis.library.circulation.application.model.FineCommandResult
+import com.mundiapolis.library.circulation.application.model.FineCurrencyMismatchException
 import com.mundiapolis.library.circulation.application.model.FineNotFoundException
 import com.mundiapolis.library.circulation.application.model.FineOutboxEvent
 import com.mundiapolis.library.circulation.application.model.FinePersistenceConflictException
@@ -14,6 +15,7 @@ import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.IncompleteIdempotencyRecordException
 import com.mundiapolis.library.circulation.application.model.InvalidFineAdjustmentException
 import com.mundiapolis.library.circulation.application.model.InvalidFineAmountException
+import com.mundiapolis.library.circulation.application.model.InvalidFineCurrencyException
 import com.mundiapolis.library.circulation.application.model.LoanNotEligibleForFineException
 import com.mundiapolis.library.circulation.application.model.LoanNotFoundException
 import com.mundiapolis.library.circulation.application.port.inbound.AdjustFineCommand
@@ -23,6 +25,7 @@ import com.mundiapolis.library.circulation.application.port.inbound.AssessFineUs
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentCommand
 import com.mundiapolis.library.circulation.application.port.inbound.RecordFinePaymentUseCase
 import com.mundiapolis.library.circulation.application.port.outbound.FineIdempotencyStore
+import com.mundiapolis.library.circulation.application.port.outbound.CirculationPolicyStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineLedgerStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.FineStore
@@ -52,7 +55,7 @@ class FineCommandService(
     private val outboxEventStore: FineOutboxEventStore,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
-    private val currency: String,
+    private val policyStore: CirculationPolicyStore,
     private val idempotencyRetention: Duration,
 ) : AssessFineUseCase,
     RecordFinePaymentUseCase,
@@ -82,7 +85,7 @@ class FineCommandService(
                 id = FineId(identifierGenerator.next()),
                 loanId = loan.id,
                 memberId = loan.memberId,
-                currency = currency,
+                currency = policyStore.current().fineCurrency,
                 amountMinor = command.amountMinor,
                 assessedAt = now,
             )
@@ -108,11 +111,13 @@ class FineCommandService(
     }
 
     override fun recordPayment(command: RecordFinePaymentCommand): FineCommandExecution {
+        requireCurrency(command.currency)
         requireFineAmount(command.amountMinor)
         val operation = CommandOperation.RECORD_FINE_PAYMENT
         val fingerprint = fingerprint(
             operation,
             command.fineId.value.toString(),
+            command.currency,
             command.amountMinor.toString(),
             command.externalReference.value,
         )
@@ -124,10 +129,11 @@ class FineCommandService(
             fingerprint,
         ) { now ->
             val current = requireFine(command.fineId)
+            requireMatchingCurrency(command.currency, current.currency)
             if (command.amountMinor > current.balanceMinor) {
                 throw FineBalanceConflictException()
             }
-            val paid = current.recordPayment(command.amountMinor)
+            val paid = current.recordPayment(command.amountMinor, command.currency)
             if (!fineStore.update(paid, current.version, now)) {
                 throw FinePersistenceConflictException()
             }
@@ -150,6 +156,7 @@ class FineCommandService(
     }
 
     override fun adjust(command: AdjustFineCommand): FineCommandExecution {
+        requireCurrency(command.currency)
         if (
             command.deltaMinor == 0L ||
             command.deltaMinor !in -Fine.MAX_AMOUNT_MINOR..Fine.MAX_AMOUNT_MINOR
@@ -160,6 +167,7 @@ class FineCommandService(
         val fingerprint = fingerprint(
             operation,
             command.fineId.value.toString(),
+            command.currency,
             command.deltaMinor.toString(),
             command.reason.value,
         )
@@ -171,6 +179,7 @@ class FineCommandService(
             fingerprint,
         ) { now ->
             val current = requireFine(command.fineId)
+            requireMatchingCurrency(command.currency, current.currency)
             val adjustedBalance = try {
                 Math.addExact(current.balanceMinor, command.deltaMinor)
             } catch (_: ArithmeticException) {
@@ -179,7 +188,7 @@ class FineCommandService(
             if (adjustedBalance !in 0..Fine.MAX_AMOUNT_MINOR) {
                 throw FineBalanceConflictException()
             }
-            val adjusted = current.adjust(command.deltaMinor)
+            val adjusted = current.adjust(command.deltaMinor, command.currency)
             if (!fineStore.update(adjusted, current.version, now)) {
                 throw FinePersistenceConflictException()
             }
@@ -255,6 +264,14 @@ class FineCommandService(
         if (amountMinor !in 1..Fine.MAX_AMOUNT_MINOR) {
             throw InvalidFineAmountException()
         }
+    }
+
+    private fun requireMatchingCurrency(requested: String, actual: String) {
+        if (requested != actual) throw FineCurrencyMismatchException()
+    }
+
+    private fun requireCurrency(currency: String) {
+        if (!Fine.isSupportedCurrency(currency)) throw InvalidFineCurrencyException()
     }
 
     private fun fingerprint(operation: CommandOperation, vararg values: String): String {
