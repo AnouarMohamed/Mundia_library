@@ -45,7 +45,7 @@ dependencies {
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     // Spring Boot 4.1.0 manages 42.7.11, which is affected by
     // CVE-2026-54291. Keep this explicit until the managed BOM is updated.
-    runtimeOnly("org.postgresql:postgresql:42.7.12")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     jooqCodegen("org.jooq:jooq-meta-extensions:${libs.versions.jooq.get()}")
     jooqCodegen("com.h2database:h2:2.4.240")

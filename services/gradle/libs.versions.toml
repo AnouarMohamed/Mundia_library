@@ -1,9 +1,9 @@
 [versions]
 spring-boot = "4.1.0"
-kotlin = "2.3.21"
-jooq = "3.21.5"
+kotlin = "2.4.10"
+jooq = "3.21.7"
 protobuf-java = "4.35.1"
-protobuf-gradle-plugin = "0.9.6"
+protobuf-gradle-plugin = "0.10.0"
 grpc-java = "1.80.0"
 
 [plugins]
