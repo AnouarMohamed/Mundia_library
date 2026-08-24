@@ -39,7 +39,7 @@ COPY --from=builder /app/.next/static ./.next/static
 RUN rm -rf ./node_modules/next/node_modules/postcss
 COPY --from=builder /app/node_modules/postcss ./node_modules/next/node_modules/postcss
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:fbbdda866ea71aef98c4abece17e3d61fbf820cc2ef3961522caa2478716171a AS runner
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:ffab599740d4aaa66029d02b9e6d3de4f622fefb7410081c5ef69c86430f364d AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV APP_ENV=production
