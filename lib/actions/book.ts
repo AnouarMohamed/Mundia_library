@@ -131,12 +131,28 @@ export const borrowBook = async (
     // 3. Cache maintenance
     await revalidateCatalogTags();
 
+    // 4. Phase 3 Shadow Evaluation (Non-blocking)
+    const { shadowEvaluateBorrowRequest } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateBorrowRequest({
+      userId,
+      bookId,
+      legacySuccess: true,
+    });
+
     return {
       success: true,
       data: [record],
     };
   } catch (error: unknown) {
     logError("borrow.request_failed", error, { userId, bookId });
+
+    const { shadowEvaluateBorrowRequest } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateBorrowRequest({
+      userId,
+      bookId,
+      legacySuccess: false,
+      legacyError: error instanceof Error ? error.message : String(error),
+    });
 
     return {
       success: false,

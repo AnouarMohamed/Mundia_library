@@ -204,9 +204,22 @@ export const approveBorrowRequest = async (recordId: string) => {
 
     await revalidateCatalogTags();
 
+    const { shadowEvaluateApproveLoan } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateApproveLoan({
+      recordId,
+      legacySuccess: true,
+    });
+
     return { success: true };
   } catch (error) {
     logError("admin.borrow_approve_failed", error, { recordId });
+    const { shadowEvaluateApproveLoan } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateApproveLoan({
+      recordId,
+      legacySuccess: false,
+      legacyError: error instanceof Error ? error.message : String(error),
+    });
+
     return {
       success: false,
       error: safeBorrowOperationError(
@@ -541,6 +554,12 @@ export const returnBook = async (recordId: string) => {
 
     await revalidateCatalogTags();
 
+    const { shadowEvaluateReturnLoan } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateReturnLoan({
+      recordId,
+      legacySuccess: true,
+    });
+
     return {
       success: true,
       data: {
@@ -551,6 +570,13 @@ export const returnBook = async (recordId: string) => {
     };
   } catch (error) {
     logError("admin.borrow_return_failed", error, { recordId });
+    const { shadowEvaluateReturnLoan } = await import("@/lib/services/circulation-shadow");
+    void shadowEvaluateReturnLoan({
+      recordId,
+      legacySuccess: false,
+      legacyError: error instanceof Error ? error.message : String(error),
+    });
+
     return {
       success: false,
       error: safeBorrowOperationError(
