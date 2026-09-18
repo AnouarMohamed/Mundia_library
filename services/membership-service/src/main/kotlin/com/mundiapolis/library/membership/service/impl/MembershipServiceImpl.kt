@@ -18,7 +18,7 @@ class MembershipServiceImpl : MembershipService {
     // In-memory storage for demonstration - to be replaced with actual database implementation
     private val memberProfiles = ConcurrentHashMap<String, MemberProfile>()
     private val memberEligibilities = ConcurrentHashMap<String, MemberEligibility>()
-    private val identityEvidenceRefs = ConcurrentHashMap<String, IdentityEvidenceRef?>
+    private val identityEvidenceRefs = ConcurrentHashMap<String, IdentityEvidenceRef?>()
 
     init {
         // Initialize with some test data

@@ -33,6 +33,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
@@ -42,7 +43,7 @@ dependencies {
 }
 
 tasks.withType<KotlinCompile>().configureEach {
-    dependsOn(tasks.named("jar"))
+    // No special dependencies needed for basic service
 }
 
 tasks.withType<Test>().configureEach {
