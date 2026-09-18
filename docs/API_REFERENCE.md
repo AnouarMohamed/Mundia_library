@@ -236,7 +236,7 @@ Auth: required.
 
 ### `POST /api/notifications`
 
-Creates a notification.
+Handles bulk actions for notifications (e.g., mark all as read).
 
 File: `app/api/notifications/route.ts`
 

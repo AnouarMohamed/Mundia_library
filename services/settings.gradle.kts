@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 rootProject.name = "mundia-library-services"
 
 include("circulation-service")
+include("membership-service")
+include("catalog-service")

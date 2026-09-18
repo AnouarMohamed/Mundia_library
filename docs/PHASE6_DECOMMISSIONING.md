@@ -11,11 +11,11 @@ This document specifies the authoritative rules, safety checks, and step-by-step
 | Component | Current State | Phase 6 Target State | Verification Method |
 |---|---|---|---|
 | **Circulation Writes** | Next.js Drizzle ORM writes to `borrow_records` & `books.availableCopies` | All circulation mutations routed exclusively to `services/circulation-service` | Code & AST dependency scan for `borrowRecords` mutations |
-| **Catalog Metadata** | Next.js Drizzle ORM reads/writes to `books` | Serviced by `Catalog Service` via [contracts/catalog.ts](../lib/services/contracts/catalog.ts) | Grep scan for direct `books` table queries |
-| **Membership & Identity** | Next.js Drizzle ORM reads/writes to `users` | Serviced by `Membership Service` via [contracts/membership.ts](../lib/services/contracts/membership.ts) | AST scan for direct `users` table queries |
+| **Catalog Metadata** | Next.js Drizzle ORM reads/writes to `books` | Serviced by `Catalog Service` (implementation in progress) via [contracts/catalog.ts](../lib/services/contracts/catalog.ts) | Grep scan for direct `books` table queries |
+| **Membership & Identity** | Next.js Drizzle ORM reads/writes to `users` | Serviced by `Membership Service` (implementation in progress) via [contracts/membership.ts](../lib/services/contracts/membership.ts) | AST scan for direct `users` table queries |
 | **Authentication** | Dual NextAuth Credentials + OIDC PKCE | Managed OIDC PKCE exclusively; legacy SHA-256 / bcrypt password verification retired | NextAuth config audit (`auth.ts`) |
-| **Notification Delivery** | Direct Brevo / QStash email sending from Next.js | Outbox-driven `Notification Service` via [contracts/notification.ts](../lib/services/contracts/notification.ts) | Outbox event delivery audit |
-| **Search & Recommendations** | PostgreSQL ILIKE queries & local DB joins | OpenSearch `Discovery Service` via [contracts/discovery.ts](../lib/services/contracts/discovery.ts) | Read latency SLO monitoring |
+| **Notification Delivery** | Direct Brevo / QStash email sending from Next.js | Outbox-driven `Notification Service` (implementation in progress) via [contracts/notification.ts](../lib/services/contracts/notification.ts) | Outbox event delivery audit |
+| **Search & Recommendations** | PostgreSQL ILIKE queries & local DB joins | OpenSearch `Discovery Service` (implementation in progress) via [contracts/discovery.ts](../lib/services/contracts/discovery.ts) | Read latency SLO monitoring |
 
 ---
 
