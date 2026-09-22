@@ -45,7 +45,7 @@ const setValidProductionEnvironment = () => {
   process.env.ENABLE_LOCAL_CREDENTIALS = "false";
 };
 
-describe.sequential("production configuration", () => {
+describe("production configuration", { concurrent: false }, () => {
   beforeEach(() => {
     vi.resetModules();
     setValidProductionEnvironment();

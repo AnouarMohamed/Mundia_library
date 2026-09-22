@@ -4,6 +4,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: process.cwd(),
+  allowedDevOrigins: ["127.0.0.1"],
   eslint: {
     // `npm run lint` is the enforced Oxlint gate. Avoid running a second,
     // framework-coupled legacy lint pass during the production build.

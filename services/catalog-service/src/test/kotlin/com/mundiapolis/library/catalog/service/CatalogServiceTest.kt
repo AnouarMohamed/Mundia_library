@@ -9,6 +9,7 @@ import com.mundiapolis.library.catalog.service.impl.CatalogServiceImpl
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -90,5 +91,26 @@ class CatalogServiceTest {
         assertNotNull(result)
         assertTrue(result.editions.isNotEmpty())
         assertEquals(1, result.total)
+    }
+
+    @Test
+    fun `test search catalog reports filtered totals and handles pages beyond the result set`() = runBlocking {
+        val result = service.searchCatalog(
+            CatalogSearchFilters(query = "nonexistent", page = 5, limit = 1)
+        )
+
+        assertTrue(result.editions.isEmpty())
+        assertEquals(0, result.total)
+        assertEquals(5, result.page)
+        assertEquals(0, result.totalPages)
+    }
+
+    @Test
+    fun `test search catalog filters by author id`() = runBlocking {
+        val matching = service.searchCatalog(CatalogSearchFilters(authorId = "author-001"))
+        val missing = service.searchCatalog(CatalogSearchFilters(authorId = "author-999"))
+
+        assertEquals(1, matching.total)
+        assertEquals(0, missing.total)
     }
 }

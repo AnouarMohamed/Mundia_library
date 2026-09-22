@@ -6,10 +6,7 @@ import com.mundiapolis.library.catalog.dto.CatalogSearchResult
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import com.mundiapolis.library.catalog.service.CatalogService
-import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Service
-import java.time.Instant
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 @Service
@@ -65,15 +62,16 @@ class CatalogServiceImpl : CatalogService {
 
     override suspend fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult {
         // Simple implementation for demonstration
-        val filteredEditions = editions.values.filter { it.isActive }
+        val activeEditions = editions.values.filter { it.isActive }
         
         // Apply filters
         val query = filters.query?.lowercase() ?: ""
         val genreFilter = filters.genre?.lowercase() ?: ""
+        val authorId = filters.authorId
         val availableOnly = filters.availableOnly ?: false
         val minRating = filters.minRating ?: 0.0
 
-        val filtered = filteredEditions.filter { edition ->
+        val filtered = activeEditions.filter { edition ->
             val work = works[edition.workId] ?: return@filter false
             val matchesQuery = query.isEmpty() || 
                 edition.title.lowercase().contains(query) || 
@@ -83,10 +81,11 @@ class CatalogServiceImpl : CatalogService {
                 work.authors.any { it.name.lowercase().contains(query) }
             
             val matchesGenre = genreFilter.isEmpty() || work.genre.lowercase().contains(genreFilter)
+            val matchesAuthor = authorId == null || work.authors.any { it.id == authorId }
             val matchesAvailability = !availableOnly || edition.availableCopies > 0
             val matchesRating = work.rating >= minRating
             
-            matchesQuery && matchesGenre && matchesAvailability && matchesRating
+            matchesQuery && matchesGenre && matchesAuthor && matchesAvailability && matchesRating
         }
 
         // Sort results
@@ -98,17 +97,16 @@ class CatalogServiceImpl : CatalogService {
         }
 
         // Apply pagination
-        val page = filters.page ?: 0
-        val limit = filters.limit ?: 20
+        val page = (filters.page ?: 0).coerceAtLeast(0)
+        val limit = (filters.limit ?: 20).coerceIn(1, 100)
         val fromIndex = page * limit
-        val toIndex = min(fromIndex + limit, sortedEditions.size)
-        val pagedEditions = sortedEditions.subList(fromIndex, toIndex)
+        val pagedEditions = sortedEditions.drop(fromIndex).take(limit)
 
         return CatalogSearchResult(
             editions = pagedEditions,
-            total = filteredEditions.size,
+            total = filtered.size,
             page = page,
-            totalPages = (filteredEditions.size + limit - 1) / limit
+            totalPages = (filtered.size + limit - 1) / limit
         )
     }
 

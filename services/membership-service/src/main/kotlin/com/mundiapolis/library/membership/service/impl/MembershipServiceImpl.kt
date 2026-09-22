@@ -6,10 +6,8 @@ import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
 import com.mundiapolis.library.membership.dto.MembershipRole
 import com.mundiapolis.library.membership.service.MembershipService
-import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Service
 import java.time.Instant
-import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 @Service

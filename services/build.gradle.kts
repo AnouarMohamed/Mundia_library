@@ -15,4 +15,13 @@ subprojects {
     dependencyLocking {
         lockAllConfigurations()
     }
+
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.apache.tomcat.embed") {
+                useVersion("11.0.25")
+                because("Tomcat 11.0.24 and earlier contain critical authentication and access-control vulnerabilities")
+            }
+        }
+    }
 }
