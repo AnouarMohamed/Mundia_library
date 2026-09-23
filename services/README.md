@@ -16,9 +16,10 @@ cd services
 ./gradlew clean check
 ```
 
-`circulation-service` generates jOOQ sources from its Flyway migrations before
-compilation. Integration tests start an isolated PostgreSQL container and verify
-that Flyway and the persistence adapter work together.
+`circulation-service` and `membership-service` generate jOOQ sources from their
+Flyway migrations before compilation. Integration tests start isolated
+PostgreSQL containers and verify that Flyway, the persistence adapters, HTTP
+authorization, and published contracts work together.
 
 The packaged application defaults `spring.flyway.enabled` to `false`.
 `bootRun` explicitly opts into Flyway for the single-role local database; this
@@ -29,7 +30,7 @@ local convenience is not part of the container runtime contract.
 Start PostgreSQL:
 
 ```bash
-docker compose up -d circulation-db
+docker compose up -d circulation-db membership-db
 ```
 
 Run the service with a real development OIDC issuer and JWK set:
@@ -39,6 +40,16 @@ export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
 export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
 export AUTH_AUDIENCE=circulation-api
 ./gradlew :circulation-service:bootRun
+```
+
+Run Membership against its local database (Flyway is enabled only for
+`bootRun`):
+
+```bash
+export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
+export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
+export AUTH_AUDIENCE=membership-api
+./gradlew :membership-service:bootRun
 ```
 
 The local database defaults are defined in `compose.yaml`. Production must
@@ -88,6 +99,35 @@ operations have independent budgets. Rejections return 429 with
 database admission failures return 503 and never fail open. Expired buckets are
 removed in bounded scheduled batches. This service control complements, but
 does not replace, the mandatory ingress WAF and network-level DDoS controls.
+
+## Membership read API
+
+The first authoritative Membership slice owns member profile, eligibility, and
+identity-evidence metadata in its own PostgreSQL schema. Its immutable OpenAPI
+document is public at `GET /openapi/membership-v1.json`; health probes use the
+same public actuator paths as Circulation.
+
+| Read | Endpoint | Required scope |
+|---|---|---|
+| Own profile | `GET /api/v1/members/{memberId}/profile` | `membership.profile.read` |
+| Delegated profile | `GET /api/v1/members/{memberId}/profile` | `membership.profile.read.any` |
+| Own eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read` |
+| Delegated eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read.any` |
+| Identity-evidence metadata | `GET /api/v1/members/{memberId}/identity-evidence` | `membership.identity-evidence.read` |
+
+Self-service profile and eligibility reads require a canonical UUID
+`membership_id` token claim equal to the path member. Eligibility is derived
+from authoritative account status, active-loan limits, and overdue-fine state;
+unknown or incomplete member state fails closed. Identity-evidence responses
+contain only MIME type, size, checksum, and timestamps. The private object key
+is database-only, and this API publishes neither durable nor signed URLs.
+
+The schema is installed from
+`membership-service/src/main/resources/db/migration`. Runtime Flyway remains
+disabled by default, so production deployment must apply the reviewed migration
+with its dedicated migration role before starting this service. Membership
+writes, outbox publication, legacy backfill, and BFF cutover remain later Phase
+4 gates; the Next.js application is still authoritative for those paths.
 
 ## Circulation command API
 
@@ -212,4 +252,5 @@ Use `services` as the build context:
 
 ```bash
 docker build -f circulation-service/Dockerfile -t mundia/circulation-service:dev .
+docker build -f membership-service/Dockerfile -t mundia/membership-service:dev .
 ```

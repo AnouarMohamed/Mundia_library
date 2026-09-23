@@ -1,0 +1,126 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mundiapolis Membership API",
+    "version": "1.0.0",
+    "description": "Authoritative version 1 read contract for member profiles, borrowing eligibility, and privacy-safe identity-evidence metadata.",
+    "license": { "name": "MIT", "identifier": "MIT" }
+  },
+  "servers": [
+    { "url": "/", "description": "The same origin as the published contract" }
+  ],
+  "paths": {
+    "/api/v1/members/{memberId}/profile": {
+      "get": {
+        "operationId": "getMemberProfile",
+        "summary": "Read an authoritative member profile",
+        "description": "Self-service callers must request the membership_id bound to their token. The read-any scope permits delegated access.",
+        "x-required-scopes": ["membership.profile.read", "membership.profile.read.any"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
+        "responses": {
+          "200": { "description": "Member profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberProfile" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/members/{memberId}/eligibility": {
+      "get": {
+        "operationId": "getMemberEligibility",
+        "summary": "Evaluate borrowing eligibility from authoritative membership state",
+        "description": "Unknown members and incomplete state fail closed. Self-service callers must request the membership_id bound to their token.",
+        "x-required-scopes": ["membership.eligibility.read", "membership.eligibility.read.any"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
+        "responses": {
+          "200": { "description": "Current eligibility decision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberEligibility" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/members/{memberId}/identity-evidence": {
+      "get": {
+        "operationId": "getMemberIdentityEvidence",
+        "summary": "Read privacy-safe identity-evidence metadata",
+        "description": "Returns integrity metadata only. Private object keys and durable or signed URLs are never exposed by this operation.",
+        "x-required-scopes": ["membership.identity-evidence.read"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
+        "responses": {
+          "200": { "description": "Identity-evidence metadata", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdentityEvidenceRef" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "MemberId": {
+        "name": "memberId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    },
+    "schemas": {
+      "MemberProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "email", "fullName", "universityId", "status", "role", "createdAt", "updatedAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email", "maxLength": 320 },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "universityId": { "type": "integer", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "role": { "$ref": "#/components/schemas/MembershipRole" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MemberEligibility": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "eligible", "status", "maxActiveLoans", "currentActiveLoans", "hasUnpaidOverdueFines", "evaluatedAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "eligible": { "type": "boolean" },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "maxActiveLoans": { "type": "integer", "minimum": 0 },
+          "currentActiveLoans": { "type": "integer", "minimum": 0 },
+          "hasUnpaidOverdueFines": { "type": "boolean" },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "evaluatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "IdentityEvidenceRef": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidenceId", "memberId", "mimeType", "fileSize", "checksumSha256", "uploadedAt"],
+        "properties": {
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "mimeType": { "type": "string", "enum": ["application/pdf", "image/jpeg", "image/png"] },
+          "fileSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+          "checksumSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "uploadedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "AccountStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+      "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN"] }
+    },
+    "responses": {
+      "Unauthorized": { "description": "A valid bearer token is required" },
+      "Forbidden": { "description": "The token lacks the required scope or member binding" },
+      "NotFound": { "description": "The requested membership resource does not exist" }
+    }
+  }
+}

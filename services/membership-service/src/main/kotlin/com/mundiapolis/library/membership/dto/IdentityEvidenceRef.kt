@@ -9,5 +9,4 @@ data class IdentityEvidenceRef(
     val fileSize: Int,
     val checksumSha256: String,
     val uploadedAt: Instant,
-    val signedReadUrl: String? = null
 )

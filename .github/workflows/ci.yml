@@ -307,8 +307,8 @@ jobs:
       - name: Verify distributed rate-limit concurrency invariants
         run: npm run db:verify-rate-limits
 
-  circulation-service:
-    name: Circulation Service (JDK 25)
+  backend-services:
+    name: Backend Services (JDK 25)
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -370,3 +370,14 @@ jobs:
           tags: mundia-circulation-service:ci
           cache-from: type=gha,scope=circulation
           cache-to: type=gha,mode=max,scope=circulation
+
+      - name: Build membership service image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./services
+          file: ./services/membership-service/Dockerfile
+          pull: true
+          push: false
+          tags: mundia-membership-service:ci
+          cache-from: type=gha,scope=membership
+          cache-to: type=gha,mode=max,scope=membership

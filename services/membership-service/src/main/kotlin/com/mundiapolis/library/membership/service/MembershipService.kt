@@ -5,7 +5,7 @@ import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
 
 interface MembershipService {
-    suspend fun getMemberProfile(memberId: String): MemberProfile?
-    suspend fun checkEligibility(memberId: String): MemberEligibility
-    suspend fun getIdentityEvidenceRef(memberId: String): IdentityEvidenceRef?
+    fun getMemberProfile(memberId: String): MemberProfile?
+    fun checkEligibility(memberId: String): MemberEligibility
+    fun getIdentityEvidenceRef(memberId: String): IdentityEvidenceRef?
 }

@@ -1,56 +1,25 @@
 package com.mundiapolis.library.membership.service.impl
 
+import com.mundiapolis.library.membership.adapter.outbound.persistence.JooqMembershipRepository
 import com.mundiapolis.library.membership.dto.AccountStatus
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
-import com.mundiapolis.library.membership.dto.MembershipRole
 import com.mundiapolis.library.membership.service.MembershipService
 import org.springframework.stereotype.Service
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
+import java.time.Clock
+import java.util.UUID
 
 @Service
-class MembershipServiceImpl : MembershipService {
+class MembershipServiceImpl(
+    private val repository: JooqMembershipRepository,
+    private val clock: Clock,
+) : MembershipService {
+    override fun getMemberProfile(memberId: String): MemberProfile? =
+        repository.findProfile(memberId.toMemberId())
 
-    // In-memory storage for demonstration - to be replaced with actual database implementation
-    private val memberProfiles = ConcurrentHashMap<String, MemberProfile>()
-    private val memberEligibilities = ConcurrentHashMap<String, MemberEligibility>()
-    private val identityEvidenceRefs = ConcurrentHashMap<String, IdentityEvidenceRef?>()
-
-    init {
-        // Initialize with some test data
-        val testMemberId = "test-member-001"
-        val testProfile = MemberProfile(
-            memberId = testMemberId,
-            email = "test@user.com",
-            fullName = "Test User",
-            universityId = 12345,
-            status = AccountStatus.APPROVED,
-            role = MembershipRole.USER,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now()
-        )
-        memberProfiles[testMemberId] = testProfile
-
-        val testEligibility = MemberEligibility(
-            memberId = testMemberId,
-            eligible = true,
-            status = AccountStatus.APPROVED,
-            maxActiveLoans = 5,
-            currentActiveLoans = 0,
-            hasUnpaidOverdueFines = false,
-            evaluatedAt = Instant.now()
-        )
-        memberEligibilities[testMemberId] = testEligibility
-    }
-
-    override suspend fun getMemberProfile(memberId: String): MemberProfile? {
-        return memberProfiles[memberId]
-    }
-
-    override suspend fun checkEligibility(memberId: String): MemberEligibility {
-        return memberEligibilities[memberId] ?: MemberEligibility(
+    override fun checkEligibility(memberId: String): MemberEligibility =
+        repository.findEligibility(memberId.toMemberId()) ?: MemberEligibility(
             memberId = memberId,
             eligible = false,
             status = AccountStatus.REJECTED,
@@ -58,11 +27,13 @@ class MembershipServiceImpl : MembershipService {
             currentActiveLoans = 0,
             hasUnpaidOverdueFines = false,
             reason = "Member not found",
-            evaluatedAt = Instant.now()
+            evaluatedAt = clock.instant(),
         )
-    }
 
-    override suspend fun getIdentityEvidenceRef(memberId: String): IdentityEvidenceRef? {
-        return identityEvidenceRefs[memberId]
-    }
+    override fun getIdentityEvidenceRef(memberId: String): IdentityEvidenceRef? =
+        repository.findIdentityEvidence(memberId.toMemberId())
+
+    private fun String.toMemberId(): UUID =
+        runCatching { UUID.fromString(this) }
+            .getOrElse { throw IllegalArgumentException("memberId must be a canonical UUID") }
 }
