@@ -279,7 +279,11 @@ Circulation; Catalog stores only a disposable, versioned availability
 projection. Membership and Catalog writes, outbox events, availability event
 consumption, backfill/reconciliation, retention/deletion automation, BFF
 routing, and production cutover are not complete, so the Phase 4 exit gate
-remains open.
+remains open. Catalog's first create-work and create-edition commands now add an
+actor-bound idempotency foundation: aggregate state, exact replay response,
+append-only audit, and a versioned outbox event commit in one transaction.
+Update/deactivation and review commands, outbox delivery, and all cutover gates
+remain open; these create APIs are not production-routed yet.
 
 Exit gate: there are no cross-service database reads or writes and all privacy
 retention/deletion workflows pass.

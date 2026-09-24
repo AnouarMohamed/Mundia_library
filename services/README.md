@@ -153,13 +153,19 @@ known state. The immutable contract is public at
 | Edition metadata and projected availability | `GET /api/v1/catalog/editions/{editionId}` | `catalog.read` |
 | Filtered, sorted catalog page | `GET /api/v1/catalog/search` | `catalog.search` |
 | Active-edition genres | `GET /api/v1/catalog/genres` | `catalog.search` |
+| Create a work and ordered authors | `POST /api/v1/catalog/works` | `catalog.manage` |
+| Create an edition under a work | `POST /api/v1/catalog/works/{workId}/editions` | `catalog.manage` |
 
 Search filtering, totals, and pagination execute in PostgreSQL and use a stable
-edition-ID tie breaker. The schema is installed from
+edition-ID tie breaker. Create commands require an actor-bound
+`Idempotency-Key`; the aggregate, exact replay snapshot, append-only audit, and
+versioned outbox event commit atomically. Catalog commands never accept copy
+counts or copy state. The schema is installed from
 `catalog-service/src/main/resources/db/migration`; runtime Flyway remains
-disabled by default. Catalog writes, availability event consumption, outbox
-publication, legacy backfill/reconciliation, and BFF cutover remain later Phase
-4 gates, so Next.js is still the production authority.
+disabled by default. Catalog update/deactivation and review commands,
+availability event consumption, outbox delivery, legacy
+backfill/reconciliation, and BFF cutover remain later Phase 4 gates, so Next.js
+is still the production authority.
 
 ## Circulation command API
 

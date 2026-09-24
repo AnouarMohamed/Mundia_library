@@ -1,14 +1,21 @@
 package com.mundiapolis.library.catalog
 
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_CONTRIBUTOR
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_AUDIT_ENTRY
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_COMMAND_IDEMPOTENCY
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION_AVAILABILITY_PROJECTION
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_OUTBOX_EVENT
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_REVIEW
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK_CONTRIBUTOR
+import com.mundiapolis.library.catalog.dto.CatalogAuthorInput
+import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.service.CatalogCommandService
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -18,8 +25,11 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.http.MediaType
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
@@ -27,6 +37,8 @@ import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import java.util.concurrent.Callable
+import java.util.concurrent.Executors
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -38,8 +50,14 @@ class CatalogServiceIntegrationTest {
     @Autowired
     private lateinit var dsl: DSLContext
 
+    @Autowired
+    private lateinit var commandService: CatalogCommandService
+
     @BeforeEach
     fun seedCatalog() {
+        dsl.deleteFrom(CATALOG_OUTBOX_EVENT).execute()
+        dsl.deleteFrom(CATALOG_AUDIT_ENTRY).execute()
+        dsl.deleteFrom(CATALOG_COMMAND_IDEMPOTENCY).execute()
         dsl.deleteFrom(CATALOG_REVIEW).execute()
         dsl.deleteFrom(CATALOG_EDITION_AVAILABILITY_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_EDITION).execute()
@@ -198,6 +216,220 @@ class CatalogServiceIntegrationTest {
             .andExpect(status().isOk)
     }
 
+    @Test
+    fun `work creation commits metadata audit outbox and exact idempotent response atomically`() {
+        val workId = UUID.fromString("40000000-0000-0000-0000-000000000001")
+        val contributorId = UUID.fromString("41000000-0000-0000-0000-000000000001")
+        val body = createWorkBody(workId, contributorId, "Created Through Command")
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-work-key-0001")
+                .content(body)
+                .with(commandScope()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(header().string("Location", "/api/v1/catalog/works/$workId"))
+            .andExpect(jsonPath("$.aggregateType").value("work"))
+            .andExpect(jsonPath("$.aggregateVersion").value(0))
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-work-key-0001")
+                .content(body)
+                .with(commandScope()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+            .andExpect(jsonPath("$.aggregateId").value(workId.toString()))
+
+        assertEquals(1, dsl.fetchCount(CATALOG_WORK, CATALOG_WORK.WORK_ID.eq(workId)))
+        assertEquals(
+            1,
+            dsl.fetchCount(CATALOG_WORK_CONTRIBUTOR, CATALOG_WORK_CONTRIBUTOR.WORK_ID.eq(workId)),
+        )
+        assertEquals(1, dsl.fetchCount(CATALOG_AUDIT_ENTRY, CATALOG_AUDIT_ENTRY.AGGREGATE_ID.eq(workId)))
+        assertEquals(1, dsl.fetchCount(CATALOG_OUTBOX_EVENT, CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(workId)))
+        assertEquals(
+            "catalog.work.created",
+            dsl.select(CATALOG_OUTBOX_EVENT.EVENT_TYPE)
+                .from(CATALOG_OUTBOX_EVENT)
+                .where(CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(workId))
+                .fetchOne(CATALOG_OUTBOX_EVENT.EVENT_TYPE),
+        )
+    }
+
+    @Test
+    fun `edition creation never accepts or fabricates physical inventory`() {
+        val editionId = UUID.fromString("42000000-0000-0000-0000-000000000001")
+        val body = """
+            {
+              "editionId": "$editionId",
+              "title": "Command Edition",
+              "isbn": "9780000000042",
+              "publisher": "Mundiapolis Press",
+              "publicationYear": 2026,
+              "language": "English",
+              "pageCount": 320,
+              "coverUrl": "https://images.example.test/command.jpg",
+              "coverColor": "#abcdef",
+              "videoUrl": null,
+              "isActive": true,
+              "reason": "Initial reviewed catalog import"
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/editions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-edition-key-01")
+                .content(body)
+                .with(commandScope()),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.aggregateType").value("edition"))
+
+        assertEquals(1, dsl.fetchCount(CATALOG_EDITION, CATALOG_EDITION.EDITION_ID.eq(editionId)))
+        assertEquals(
+            0,
+            dsl.fetchCount(
+                CATALOG_EDITION_AVAILABILITY_PROJECTION,
+                CATALOG_EDITION_AVAILABILITY_PROJECTION.EDITION_ID.eq(editionId),
+            ),
+        )
+        assertEquals(
+            "#ABCDEF",
+            dsl.select(CATALOG_EDITION.COVER_COLOR)
+                .from(CATALOG_EDITION)
+                .where(CATALOG_EDITION.EDITION_ID.eq(editionId))
+                .fetchOne(CATALOG_EDITION.COVER_COLOR)
+                ?.trim(),
+        )
+
+        val forbiddenInventory = body
+            .replace(editionId.toString(), UUID.randomUUID().toString())
+            .replace("\"reason\":", "\"totalCopies\": 5, \"reason\":")
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/editions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-edition-key-02")
+                .content(forbiddenInventory)
+                .with(commandScope()),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `catalog commands reject key reuse changed input invalid actor and wrong scope`() {
+        val workId = UUID.fromString("43000000-0000-0000-0000-000000000001")
+        val contributorId = UUID.fromString("44000000-0000-0000-0000-000000000001")
+        val original = createWorkBody(workId, contributorId, "Original Title")
+        val changed = createWorkBody(workId, contributorId, "Changed Title")
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-conflict-key")
+                .content(original)
+                .with(commandScope()),
+        ).andExpect(status().isCreated)
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-conflict-key")
+                .content(changed)
+                .with(commandScope()),
+        ).andExpect(status().isConflict)
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-invalid-actor")
+                .content(createWorkBody(UUID.randomUUID(), UUID.randomUUID(), "Missing Actor"))
+                .with(jwt().authorities(SimpleGrantedAuthority(MANAGE_SCOPE))),
+        ).andExpect(status().isForbidden)
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-wrong-scope1")
+                .content(createWorkBody(UUID.randomUUID(), UUID.randomUUID(), "Wrong Scope"))
+                .with(scope(READ_SCOPE)),
+        ).andExpect(status().isForbidden)
+
+        val rolledBackWorkId = UUID.fromString("47000000-0000-0000-0000-000000000001")
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-atomic-rollback")
+                .content(createWorkBody(rolledBackWorkId, PRIMARY_AUTHOR_ID, "Conflicting Contributor"))
+                .with(commandScope()),
+        ).andExpect(status().isConflict)
+        assertEquals(0, dsl.fetchCount(CATALOG_WORK, CATALOG_WORK.WORK_ID.eq(rolledBackWorkId)))
+        assertEquals(
+            0,
+            dsl.fetchCount(
+                CATALOG_COMMAND_IDEMPOTENCY,
+                CATALOG_COMMAND_IDEMPOTENCY.IDEMPOTENCY_KEY.eq("catalog-atomic-rollback"),
+            ),
+        )
+        assertEquals(
+            0,
+            dsl.fetchCount(CATALOG_OUTBOX_EVENT, CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(rolledBackWorkId)),
+        )
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-oversized-key")
+                .content("x".repeat(128 * 1024 + 1))
+                .with(commandScope()),
+        ).andExpect(status().isContentTooLarge)
+    }
+
+    @Test
+    fun `concurrent exact retries create one aggregate audit and outbox event`() {
+        val workId = UUID.fromString("45000000-0000-0000-0000-000000000001")
+        val command = CreateWorkCommand(
+            workId = workId,
+            title = "Concurrent Catalog Work",
+            summary = "A concurrency test",
+            description = "A reviewed concurrency test description",
+            genre = "Systems",
+            authors = listOf(
+                CatalogAuthorInput(
+                    contributorId = UUID.fromString("46000000-0000-0000-0000-000000000001"),
+                    name = "Concurrent Author",
+                    bio = null,
+                ),
+            ),
+            reason = "Verify exact concurrent command replay",
+            idempotencyKey = "catalog-concurrent-key",
+            ownerFingerprint = "a".repeat(64),
+        )
+        val executor = Executors.newFixedThreadPool(10)
+        val results = try {
+            executor.invokeAll(
+                (1..20).map {
+                    Callable { commandService.createWork(command) }
+                },
+            ).map { future -> future.get() }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        assertEquals(1, results.count { !it.replayed })
+        assertEquals(19, results.count { it.replayed })
+        assertEquals(1, results.map { it.result }.toSet().size)
+        assertEquals(1, dsl.fetchCount(CATALOG_WORK, CATALOG_WORK.WORK_ID.eq(workId)))
+        assertEquals(1, dsl.fetchCount(CATALOG_AUDIT_ENTRY, CATALOG_AUDIT_ENTRY.AGGREGATE_ID.eq(workId)))
+        assertEquals(1, dsl.fetchCount(CATALOG_OUTBOX_EVENT, CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(workId)))
+    }
+
     private fun insertContributor(id: UUID, name: String, biography: String?) {
         dsl.insertInto(CATALOG_CONTRIBUTOR)
             .set(CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID, id)
@@ -271,6 +503,32 @@ class CatalogServiceIntegrationTest {
 
     private fun scope(authority: String) = jwt().authorities(SimpleGrantedAuthority(authority))
 
+    private fun commandScope() = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject("catalog-admin")
+                .claim("azp", "catalog-bff")
+        }
+        .authorities(SimpleGrantedAuthority(MANAGE_SCOPE))
+
+    private fun createWorkBody(workId: UUID, contributorId: UUID, title: String): String = """
+        {
+          "workId": "$workId",
+          "title": "$title",
+          "summary": "A reviewed summary",
+          "description": "A reviewed catalog description",
+          "genre": "History",
+          "authors": [
+            {
+              "contributorId": "$contributorId",
+              "name": "Command Author",
+              "bio": "A bounded biography"
+            }
+          ],
+          "reason": "Initial reviewed catalog import"
+        }
+    """.trimIndent()
+
     private companion object {
         val PRIMARY_AUTHOR_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
         val SECONDARY_AUTHOR_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000002")
@@ -283,6 +541,7 @@ class CatalogServiceIntegrationTest {
 
         const val READ_SCOPE = "SCOPE_catalog.read"
         const val SEARCH_SCOPE = "SCOPE_catalog.search"
+        const val MANAGE_SCOPE = "SCOPE_catalog.manage"
 
         @Container
         @JvmStatic

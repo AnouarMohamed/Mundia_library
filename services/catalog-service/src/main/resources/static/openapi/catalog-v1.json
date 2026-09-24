@@ -2,10 +2,45 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Authoritative catalog metadata reads. Copy counts are a versioned projection owned by Circulation."
   },
   "paths": {
+    "/api/v1/catalog/works": {
+      "post": {
+        "operationId": "createWork",
+        "x-required-scopes": ["catalog.manage"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateWorkRequest" } } } },
+        "responses": {
+          "201": { "description": "Work created or exact command replayed", "headers": { "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommandResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
+    },
+    "/api/v1/catalog/works/{workId}/editions": {
+      "post": {
+        "operationId": "createEdition",
+        "x-required-scopes": ["catalog.manage"],
+        "parameters": [
+          { "$ref": "#/components/parameters/WorkId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateEditionRequest" } } } },
+        "responses": {
+          "201": { "description": "Edition created or exact command replayed", "headers": { "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommandResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
+    },
     "/api/v1/catalog/works/{workId}": {
       "get": {
         "operationId": "getWork",
@@ -72,13 +107,16 @@
     },
     "parameters": {
       "WorkId": { "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-      "EditionId": { "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+      "EditionId": { "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 16, "maxLength": 128, "pattern": "^[ -~]+$" } }
     },
     "responses": {
       "BadRequest": { "description": "Invalid request" },
       "Unauthorized": { "description": "Missing or invalid bearer token" },
       "Forbidden": { "description": "Required scope is missing" },
-      "NotFound": { "description": "Resource not found" }
+      "NotFound": { "description": "Resource not found" },
+      "Conflict": { "description": "Aggregate, contributor metadata, or idempotency conflict" },
+      "PayloadTooLarge": { "description": "Command body exceeds 128 KiB" }
     },
     "schemas": {
       "Author": {
@@ -135,6 +173,60 @@
           "total": { "type": "integer", "minimum": 0 },
           "page": { "type": "integer", "minimum": 0 },
           "totalPages": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "CreateAuthorRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contributorId", "name"],
+        "properties": {
+          "contributorId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "maxLength": 300 },
+          "bio": { "type": ["string", "null"], "maxLength": 5000 }
+        }
+      },
+      "CreateWorkRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workId", "title", "summary", "description", "genre", "authors", "reason"],
+        "properties": {
+          "workId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 500 },
+          "summary": { "type": "string", "maxLength": 1000 },
+          "description": { "type": "string", "maxLength": 10000 },
+          "genre": { "type": "string", "maxLength": 120 },
+          "authors": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/components/schemas/CreateAuthorRequest" } },
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        }
+      },
+      "CreateEditionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editionId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "isActive", "reason"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "maxLength": 500 },
+          "isbn": { "type": "string", "maxLength": 32 },
+          "publisher": { "type": "string", "maxLength": 300 },
+          "publicationYear": { "type": "integer", "minimum": 1000, "maximum": 3000 },
+          "language": { "type": "string", "maxLength": 80 },
+          "pageCount": { "type": "integer", "minimum": 1, "maximum": 100000 },
+          "coverUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+          "coverColor": { "type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "videoUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+          "isActive": { "type": "boolean", "default": true },
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        }
+      },
+      "CatalogCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["aggregateType", "aggregateId", "aggregateVersion", "occurredAt"],
+        "properties": {
+          "aggregateType": { "type": "string", "enum": ["work", "edition"] },
+          "aggregateId": { "type": "string", "format": "uuid" },
+          "aggregateVersion": { "type": "integer", "minimum": 0 },
+          "occurredAt": { "type": "string", "format": "date-time" }
         }
       }
     }
