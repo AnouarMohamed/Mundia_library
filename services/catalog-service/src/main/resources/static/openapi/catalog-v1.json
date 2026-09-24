@@ -1,0 +1,143 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mundiapolis Catalog API",
+    "version": "1.0.0",
+    "description": "Authoritative catalog metadata reads. Copy counts are a versioned projection owned by Circulation."
+  },
+  "paths": {
+    "/api/v1/catalog/works/{workId}": {
+      "get": {
+        "operationId": "getWork",
+        "x-required-scopes": ["catalog.read"],
+        "parameters": [{ "$ref": "#/components/parameters/WorkId" }],
+        "responses": {
+          "200": { "description": "Work found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Work" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/catalog/editions/{editionId}": {
+      "get": {
+        "operationId": "getEdition",
+        "x-required-scopes": ["catalog.read"],
+        "parameters": [{ "$ref": "#/components/parameters/EditionId" }],
+        "responses": {
+          "200": { "description": "Edition found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Edition" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/catalog/search": {
+      "get": {
+        "operationId": "searchCatalog",
+        "x-required-scopes": ["catalog.search"],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "genre", "in": "query", "schema": { "type": "string", "maxLength": 120 } },
+          { "name": "authorId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "availableOnly", "in": "query", "schema": { "type": "boolean", "default": false } },
+          { "name": "minRating", "in": "query", "schema": { "type": "number", "minimum": 0, "maximum": 5, "default": 0 } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["title", "rating", "publicationYear"], "default": "title" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Filtered catalog page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogSearchResult" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/catalog/genres": {
+      "get": {
+        "operationId": "getCatalogGenres",
+        "x-required-scopes": ["catalog.search"],
+        "responses": {
+          "200": { "description": "Sorted active catalog genres", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "string" } } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "WorkId": { "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "EditionId": { "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "BadRequest": { "description": "Invalid request" },
+      "Unauthorized": { "description": "Missing or invalid bearer token" },
+      "Forbidden": { "description": "Required scope is missing" },
+      "NotFound": { "description": "Resource not found" }
+    },
+    "schemas": {
+      "Author": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "bio": { "type": ["string", "null"] }
+        }
+      },
+      "Work": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workId", "title", "summary", "description", "genre", "rating", "authors"],
+        "properties": {
+          "workId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "description": { "type": "string" },
+          "genre": { "type": "string" },
+          "rating": { "type": "number", "minimum": 0, "maximum": 5 },
+          "authors": { "type": "array", "items": { "$ref": "#/components/schemas/Author" } }
+        }
+      },
+      "Edition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "workId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "isbn": { "type": "string" },
+          "publisher": { "type": "string" },
+          "publicationYear": { "type": "integer" },
+          "language": { "type": "string" },
+          "pageCount": { "type": "integer", "minimum": 1 },
+          "coverUrl": { "type": ["string", "null"], "format": "uri" },
+          "coverColor": { "type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "videoUrl": { "type": ["string", "null"], "format": "uri" },
+          "totalCopies": { "type": "integer", "minimum": 0, "description": "Disposable projection from Circulation." },
+          "availableCopies": { "type": "integer", "minimum": 0, "description": "Disposable projection from Circulation." },
+          "isActive": { "type": "boolean" }
+        }
+      },
+      "CatalogSearchResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editions", "total", "page", "totalPages"],
+        "properties": {
+          "editions": { "type": "array", "items": { "$ref": "#/components/schemas/Edition" } },
+          "total": { "type": "integer", "minimum": 0 },
+          "page": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }]
+}

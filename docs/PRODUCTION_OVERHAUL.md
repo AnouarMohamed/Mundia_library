@@ -268,15 +268,18 @@ operators demonstrate rollback. Dual-writing inventory is forbidden.
 - Replace BFF database imports with service contracts.
 - Migrate identity documents to private object storage and apply retention.
 
-Implementation checkpoint (2026-09-23): Membership now has a PostgreSQL-backed
-read slice for authoritative profiles, fail-closed eligibility, and
-privacy-safe identity-evidence metadata. Exact OIDC issuer/audience/type and
-scope enforcement, self-member claim binding, Flyway/jOOQ schema generation,
-a versioned OpenAPI contract, and real-PostgreSQL integration coverage are in
-place. The private object key never crosses the HTTP contract. Membership
-writes, outbox events, backfill/reconciliation, retention/deletion automation,
-BFF routing, and the production cutover are not complete, so the Phase 4 exit
-gate remains open.
+Implementation checkpoint (2026-09-24): Membership has a PostgreSQL-backed read
+slice for authoritative profiles, fail-closed eligibility, and privacy-safe
+identity-evidence metadata. Catalog now has a separate PostgreSQL-backed read
+slice for works, editions, contributors, media references, reviews, and SQL
+search/pagination. Exact OIDC issuer/audience/type and scope enforcement,
+Flyway/jOOQ schema generation, versioned OpenAPI contracts, and real PostgreSQL
+integration coverage protect both boundaries. Physical copies remain owned by
+Circulation; Catalog stores only a disposable, versioned availability
+projection. Membership and Catalog writes, outbox events, availability event
+consumption, backfill/reconciliation, retention/deletion automation, BFF
+routing, and production cutover are not complete, so the Phase 4 exit gate
+remains open.
 
 Exit gate: there are no cross-service database reads or writes and all privacy
 retention/deletion workflows pass.

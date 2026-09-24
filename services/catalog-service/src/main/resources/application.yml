@@ -1,0 +1,69 @@
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: none
+  max-http-request-header-size: 16KB
+  tomcat:
+    connection-timeout: 5s
+    keep-alive-timeout: 15s
+    max-keep-alive-requests: 100
+    max-http-form-post-size: 16KB
+    max-swallow-size: 16KB
+    max-parameter-count: 32
+
+spring:
+  application:
+    name: catalog-service
+  jackson:
+    default-property-inclusion: non_null
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:55434/catalog}
+    username: ${DATABASE_USERNAME:catalog}
+    password: ${DATABASE_PASSWORD:catalog-local-only}
+    hikari:
+      pool-name: catalog-pool
+      maximum-pool-size: ${DATABASE_POOL_MAX_SIZE:10}
+      minimum-idle: ${DATABASE_POOL_MIN_IDLE:1}
+      connection-timeout: 3000
+      validation-timeout: 1000
+      max-lifetime: 1500000
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:false}
+    clean-disabled: true
+    validate-on-migrate: true
+  jooq:
+    sql-dialect: postgres
+
+app:
+  security:
+    jwt:
+      issuer: ${AUTH_ISSUER_URI}
+      jwk-set-uri: ${AUTH_JWK_SET_URI}
+      audience: ${AUTH_AUDIENCE:catalog-api}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState,db
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: false

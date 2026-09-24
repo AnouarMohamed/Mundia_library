@@ -2,8 +2,9 @@
  * Phase 4 Catalog Service Contract Definitions
  *
  * Defines canonical data contracts and client interfaces for the Catalog Service,
- * decoupling works, editions, authors, contributors, and physical inventory availability
- * from the monolithic Next.js database schema.
+ * decoupling works, editions, authors, and contributors from the monolithic
+ * Next.js database schema. Copy counts are a disposable Catalog projection;
+ * Circulation remains authoritative for physical inventory.
  */
 
 export interface Author {
@@ -58,6 +59,7 @@ export interface CatalogSearchResult {
 }
 
 export interface CatalogService {
+  getWork(workId: string): Promise<Work | null>;
   getEdition(editionId: string): Promise<Edition | null>;
   searchCatalog(filters: CatalogSearchFilters): Promise<CatalogSearchResult>;
   getDistinctGenres(): Promise<string[]>;

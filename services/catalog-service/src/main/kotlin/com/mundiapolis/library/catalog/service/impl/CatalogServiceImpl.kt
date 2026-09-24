@@ -1,116 +1,71 @@
 package com.mundiapolis.library.catalog.service.impl
 
-import com.mundiapolis.library.catalog.dto.Author
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.JooqCatalogRepository
 import com.mundiapolis.library.catalog.dto.CatalogSearchFilters
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import com.mundiapolis.library.catalog.service.CatalogService
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
+import java.util.UUID
 
 @Service
-class CatalogServiceImpl : CatalogService {
+class CatalogServiceImpl(
+    private val repository: JooqCatalogRepository,
+) : CatalogService {
+    override fun getWork(workId: String): Work? = repository.findWork(workId.toIdentifier("workId"))
 
-    // In-memory storage for demonstration - to be replaced with actual database implementation
-    private val works = ConcurrentHashMap<String, Work>()
-    private val editions = ConcurrentHashMap<String, Edition>()
-    private val authors = ConcurrentHashMap<String, Author>()
+    override fun getEdition(editionId: String): Edition? =
+        repository.findEdition(editionId.toIdentifier("editionId"))
 
-    init {
-        // Initialize with some test data
-        val testAuthor = Author(
-            id = "author-001",
-            name = "Test Author",
-            bio = "A test author for demonstration"
-        )
-        authors[testAuthor.id] = testAuthor
+    override fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult =
+        repository.search(filters.normalized())
 
-        val testWork = Work(
-            workId = "work-001",
-            title = "Test Work",
-            summary = "A test work for demonstration",
-            description = "This is a test work used for demonstration purposes",
-            genre = "Fiction",
-            rating = 4.5,
-            authors = listOf(testAuthor)
-        )
-        works[testWork.workId] = testWork
+    override fun getDistinctGenres(): List<String> = repository.findDistinctGenres()
 
-        val testEdition = Edition(
-            editionId = "edition-001",
-            workId = testWork.workId,
-            title = "Test Edition",
-            isbn = "978-1234567890",
-            publisher = "Test Publisher",
-            publicationYear = 2023,
-            language = "English",
-            pageCount = 300,
-            coverUrl = "https://example.com/cover.jpg",
-            coverColor = "#FF0000",
-            videoUrl = "https://example.com/video.mp4",
-            totalCopies = 5,
-            availableCopies = 5,
-            isActive = true
-        )
-        editions[testEdition.editionId] = testEdition
-    }
-
-    override suspend fun getEdition(editionId: String): Edition? {
-        return editions[editionId]
-    }
-
-    override suspend fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult {
-        // Simple implementation for demonstration
-        val activeEditions = editions.values.filter { it.isActive }
-        
-        // Apply filters
-        val query = filters.query?.lowercase() ?: ""
-        val genreFilter = filters.genre?.lowercase() ?: ""
-        val authorId = filters.authorId
-        val availableOnly = filters.availableOnly ?: false
-        val minRating = filters.minRating ?: 0.0
-
-        val filtered = activeEditions.filter { edition ->
-            val work = works[edition.workId] ?: return@filter false
-            val matchesQuery = query.isEmpty() || 
-                edition.title.lowercase().contains(query) || 
-                work.title.lowercase().contains(query) || 
-                work.summary.lowercase().contains(query) || 
-                work.description.lowercase().contains(query) ||
-                work.authors.any { it.name.lowercase().contains(query) }
-            
-            val matchesGenre = genreFilter.isEmpty() || work.genre.lowercase().contains(genreFilter)
-            val matchesAuthor = authorId == null || work.authors.any { it.id == authorId }
-            val matchesAvailability = !availableOnly || edition.availableCopies > 0
-            val matchesRating = work.rating >= minRating
-            
-            matchesQuery && matchesGenre && matchesAuthor && matchesAvailability && matchesRating
+    private fun CatalogSearchFilters.normalized(): CatalogSearchFilters {
+        val normalizedQuery = query?.trim()?.takeIf(String::isNotEmpty)
+        val normalizedGenre = genre?.trim()?.takeIf(String::isNotEmpty)
+        require(normalizedQuery == null || normalizedQuery.length <= MAX_QUERY_LENGTH) {
+            "query must not exceed $MAX_QUERY_LENGTH characters"
         }
-
-        // Sort results
-        val sortedEditions = when (filters.sortBy?.lowercase()) {
-            "title" -> filtered.sortedBy { it.title }
-            "rating" -> filtered.sortedByDescending { works[it.workId]?.rating ?: 0.0 }
-            "publicationYear" -> filtered.sortedByDescending { it.publicationYear }
-            else -> filtered
+        require(normalizedGenre == null || normalizedGenre.length <= MAX_GENRE_LENGTH) {
+            "genre must not exceed $MAX_GENRE_LENGTH characters"
         }
+        val normalizedAuthor = authorId?.toIdentifier("authorId")?.toString()
+        val normalizedRating = minRating ?: 0.0
+        require(normalizedRating in 0.0..5.0) { "minRating must be between 0 and 5" }
+        val normalizedSort = sortBy?.trim()?.takeIf(String::isNotEmpty)
+        require(normalizedSort == null || normalizedSort in ALLOWED_SORTS) {
+            "sortBy must be one of title, rating, or publicationYear"
+        }
+        val normalizedPage = page ?: 0
+        require(normalizedPage in 0..MAX_PAGE) { "page must be between 0 and $MAX_PAGE" }
+        val normalizedLimit = limit ?: DEFAULT_LIMIT
+        require(normalizedLimit in 1..MAX_LIMIT) { "limit must be between 1 and $MAX_LIMIT" }
 
-        // Apply pagination
-        val page = (filters.page ?: 0).coerceAtLeast(0)
-        val limit = (filters.limit ?: 20).coerceIn(1, 100)
-        val fromIndex = page * limit
-        val pagedEditions = sortedEditions.drop(fromIndex).take(limit)
-
-        return CatalogSearchResult(
-            editions = pagedEditions,
-            total = filtered.size,
-            page = page,
-            totalPages = (filtered.size + limit - 1) / limit
+        return CatalogSearchFilters(
+            query = normalizedQuery,
+            genre = normalizedGenre,
+            authorId = normalizedAuthor,
+            availableOnly = availableOnly ?: false,
+            minRating = normalizedRating,
+            sortBy = normalizedSort,
+            page = normalizedPage,
+            limit = normalizedLimit,
         )
     }
 
-    override suspend fun getDistinctGenres(): List<String> {
-        return works.values.map { it.genre }.distinct().sorted()
+    private fun String.toIdentifier(name: String): UUID =
+        runCatching { UUID.fromString(this) }
+            .getOrElse { throw IllegalArgumentException("$name must be a canonical UUID") }
+
+    private companion object {
+        const val MAX_QUERY_LENGTH = 200
+        const val MAX_GENRE_LENGTH = 120
+        const val DEFAULT_LIMIT = 20
+        const val MAX_LIMIT = 100
+        const val MAX_PAGE = 10_000
+        val ALLOWED_SORTS = setOf("title", "rating", "publicationYear")
     }
 }

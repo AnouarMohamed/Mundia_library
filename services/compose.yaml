@@ -33,6 +33,23 @@ services:
     volumes:
       - membership_db_data:/var/lib/postgresql
 
+  catalog-db:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: catalog
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: catalog-local-only
+    ports:
+      - "127.0.0.1:55434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - catalog_db_data:/var/lib/postgresql
+
 volumes:
   circulation_db_data:
   membership_db_data:
+  catalog_db_data:

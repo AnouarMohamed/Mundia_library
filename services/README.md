@@ -16,8 +16,8 @@ cd services
 ./gradlew clean check
 ```
 
-`circulation-service` and `membership-service` generate jOOQ sources from their
-Flyway migrations before compilation. Integration tests start isolated
+All three services generate jOOQ sources from their Flyway migrations before
+compilation. Integration tests start isolated
 PostgreSQL containers and verify that Flyway, the persistence adapters, HTTP
 authorization, and published contracts work together.
 
@@ -30,7 +30,7 @@ local convenience is not part of the container runtime contract.
 Start PostgreSQL:
 
 ```bash
-docker compose up -d circulation-db membership-db
+docker compose up -d circulation-db membership-db catalog-db
 ```
 
 Run the service with a real development OIDC issuer and JWK set:
@@ -50,6 +50,15 @@ export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
 export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
 export AUTH_AUDIENCE=membership-api
 ./gradlew :membership-service:bootRun
+```
+
+Run Catalog against its local database:
+
+```bash
+export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
+export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
+export AUTH_AUDIENCE=catalog-api
+./gradlew :catalog-service:bootRun
 ```
 
 The local database defaults are defined in `compose.yaml`. Production must
@@ -128,6 +137,29 @@ disabled by default, so production deployment must apply the reviewed migration
 with its dedicated migration role before starting this service. Membership
 writes, outbox publication, legacy backfill, and BFF cutover remain later Phase
 4 gates; the Next.js application is still authoritative for those paths.
+
+## Catalog read API
+
+The first Catalog slice owns works, editions, contributors, media references,
+and review storage in its PostgreSQL schema. Circulation remains authoritative
+for physical copies: `totalCopies` and `availableCopies` are a disposable,
+versioned Catalog projection and default to zero until Circulation publishes a
+known state. The immutable contract is public at
+`GET /openapi/catalog-v1.json`.
+
+| Read | Endpoint | Required scope |
+|---|---|---|
+| Work metadata and ordered authors | `GET /api/v1/catalog/works/{workId}` | `catalog.read` |
+| Edition metadata and projected availability | `GET /api/v1/catalog/editions/{editionId}` | `catalog.read` |
+| Filtered, sorted catalog page | `GET /api/v1/catalog/search` | `catalog.search` |
+| Active-edition genres | `GET /api/v1/catalog/genres` | `catalog.search` |
+
+Search filtering, totals, and pagination execute in PostgreSQL and use a stable
+edition-ID tie breaker. The schema is installed from
+`catalog-service/src/main/resources/db/migration`; runtime Flyway remains
+disabled by default. Catalog writes, availability event consumption, outbox
+publication, legacy backfill/reconciliation, and BFF cutover remain later Phase
+4 gates, so Next.js is still the production authority.
 
 ## Circulation command API
 
@@ -253,4 +285,5 @@ Use `services` as the build context:
 ```bash
 docker build -f circulation-service/Dockerfile -t mundia/circulation-service:dev .
 docker build -f membership-service/Dockerfile -t mundia/membership-service:dev .
+docker build -f catalog-service/Dockerfile -t mundia/catalog-service:dev .
 ```
