@@ -10,7 +10,12 @@ import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generat
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK_CONTRIBUTOR
 import com.mundiapolis.library.catalog.dto.CatalogAuthorInput
+import com.mundiapolis.library.catalog.dto.BrokerAcknowledgement
+import com.mundiapolis.library.catalog.dto.CatalogOutboxFailureCode
+import com.mundiapolis.library.catalog.dto.CatalogOutboxFailureDisposition
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
+import com.mundiapolis.library.catalog.service.CatalogOutboxStore
 import com.mundiapolis.library.catalog.service.CatalogCommandService
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
@@ -36,6 +41,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.math.BigDecimal
 import java.time.OffsetDateTime
+import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -53,6 +59,9 @@ class CatalogServiceIntegrationTest {
 
     @Autowired
     private lateinit var commandService: CatalogCommandService
+
+    @Autowired
+    private lateinit var outboxStore: CatalogOutboxStore
 
     @BeforeEach
     fun seedCatalog() {
@@ -669,6 +678,95 @@ class CatalogServiceIntegrationTest {
         assertEquals(0, dsl.fetchCount(CATALOG_OUTBOX_EVENT))
         assertEquals(0, dsl.fetchCount(CATALOG_AUDIT_ENTRY))
         assertEquals(0, dsl.fetchCount(CATALOG_COMMAND_IDEMPOTENCY))
+    }
+
+    @Test
+    fun `outbox claims preserve aggregate order and recover expired retries`() {
+        val workId = UUID.fromString("4a000000-0000-0000-0000-000000000001")
+        val contributorId = UUID.fromString("4a000000-0000-0000-0000-000000000002")
+        val owner = "a".repeat(64)
+        commandService.createWork(
+            CreateWorkCommand(
+                workId = workId,
+                title = "Ordered Event Work",
+                summary = "Outbox ordering",
+                description = "Validate strict aggregate event ordering",
+                genre = "Systems",
+                authors = listOf(CatalogAuthorInput(contributorId, "Event Author", null)),
+                reason = "Create ordered outbox integration fixture",
+                idempotencyKey = "catalog-outbox-create01",
+                ownerFingerprint = owner,
+            ),
+        )
+        commandService.updateWork(
+            UpdateWorkCommand(
+                workId = workId,
+                expectedVersion = 0,
+                title = "Ordered Event Work Revised",
+                summary = "Outbox ordering revised",
+                description = "Validate strict aggregate event ordering after update",
+                genre = "Systems",
+                authors = listOf(CatalogAuthorInput(contributorId, "Event Author", null)),
+                reason = "Advance ordered outbox integration fixture",
+                idempotencyKey = "catalog-outbox-update01",
+                ownerFingerprint = owner,
+            ),
+        )
+
+        val claimAt = Instant.now().plusSeconds(1)
+        val first = outboxStore.claimBatch("catalog-test", claimAt, claimAt.plusSeconds(30), 10)
+        assertEquals(listOf(0L), first.filter { it.aggregateId == workId }.map { it.aggregateVersion })
+        val firstEvent = first.single { it.aggregateId == workId }
+        assertEquals(
+            true,
+            outboxStore.markPublished(
+                "catalog-test",
+                firstEvent,
+                BrokerAcknowledgement("mundia.catalog.events.v1", 0, 10),
+                claimAt.plusSeconds(1),
+            ),
+        )
+
+        val second = outboxStore.claimBatch("catalog-test", claimAt.plusSeconds(2), claimAt.plusSeconds(32), 10)
+            .single { it.aggregateId == workId }
+        assertEquals(1L, second.aggregateVersion)
+        assertEquals(
+            CatalogOutboxFailureDisposition.RETRY_SCHEDULED,
+            outboxStore.recordFailure(
+                "catalog-test",
+                second,
+                CatalogOutboxFailureCode.BROKER_TIMEOUT,
+                claimAt.plusSeconds(3),
+                claimAt.plusSeconds(10),
+                maximumAttempts = 3,
+                blockImmediately = false,
+            ),
+        )
+        assertEquals(
+            0,
+            outboxStore.claimBatch("catalog-test", claimAt.plusSeconds(9), claimAt.plusSeconds(39), 10)
+                .count { it.aggregateId == workId },
+        )
+        val retry = outboxStore.claimBatch(
+            "catalog-test",
+            claimAt.plusSeconds(10),
+            claimAt.plusSeconds(40),
+            10,
+        ).single { it.aggregateId == workId }
+        assertEquals(2, retry.deliveryAttempt)
+        assertEquals(
+            CatalogOutboxFailureDisposition.BLOCKED,
+            outboxStore.recordFailure(
+                "catalog-test",
+                retry,
+                CatalogOutboxFailureCode.CONTRACT_INVALID,
+                claimAt.plusSeconds(11),
+                claimAt.plusSeconds(20),
+                maximumAttempts = 3,
+                blockImmediately = true,
+            ),
+        )
+        assertEquals(1, outboxStore.statistics(claimAt.plusSeconds(12)).blocked)
     }
 
     private fun insertContributor(id: UUID, name: String, biography: String?) {

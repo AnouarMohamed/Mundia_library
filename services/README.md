@@ -169,9 +169,16 @@ commit atomically. Updates also require an exact aggregate-version ETag in
 Catalog commands never accept copy counts or copy state. The schema is installed from
 `catalog-service/src/main/resources/db/migration`; runtime Flyway remains
 disabled by default. Catalog review commands, availability event consumption,
-outbox delivery, legacy
-backfill/reconciliation, and BFF cutover remain later Phase 4 gates, so Next.js
-is still the production authority.
+legacy backfill/reconciliation, and BFF cutover remain later Phase 4 gates, so
+Next.js is still the production authority.
+
+Catalog outbox delivery is disabled by default and uses the same operational
+contract as Circulation when enabled: aggregate-ordered `SKIP LOCKED` leases,
+bounded exponential retries, poison-event blocking, synchronous Kafka
+acknowledgements, retention cleanup, health/metrics, and the immutable
+`mundia.catalog.v1.CatalogEvent` Protobuf envelope. Production must supply the
+broker TLS/SASL settings and enable `OUTBOX_DELIVERY_ENABLED=true` only after
+the topic, ACLs, and consumer contract are provisioned.
 
 ## Circulation command API
 

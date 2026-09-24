@@ -285,8 +285,11 @@ remains open. Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one
 transaction. Updates require exact version ETags and reject stale writers.
-Outbox delivery and all cutover gates remain open; these command APIs are not
-production-routed yet.
+Catalog outbox delivery now uses crash-recoverable aggregate-ordered leases,
+bounded retries, poison-event blocking, Protobuf v1 encoding, synchronous Kafka
+acknowledgements, retention cleanup, and health/metrics. Broker provisioning,
+availability consumption, review commands, and all cutover gates remain open;
+these command APIs are not production-routed yet.
 
 Exit gate: there are no cross-service database reads or writes and all privacy
 retention/deletion workflows pass.

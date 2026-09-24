@@ -42,6 +42,36 @@ spring:
     sql-dialect: postgres
 
 app:
+  outbox:
+    enabled: ${OUTBOX_DELIVERY_ENABLED:false}
+    instance-id: ${OUTBOX_INSTANCE_ID:${HOSTNAME:local}}
+    topic: ${OUTBOX_TOPIC:mundia.catalog.events.v1}
+    schema-subject: ${OUTBOX_SCHEMA_SUBJECT:mundia.catalog.v1.CatalogEvent}
+    poll-interval: ${OUTBOX_POLL_INTERVAL:PT0.5S}
+    lease-duration: ${OUTBOX_LEASE_DURATION:PT1M30S}
+    batch-size: ${OUTBOX_BATCH_SIZE:10}
+    maximum-attempts: ${OUTBOX_MAXIMUM_ATTEMPTS:20}
+    retry-base-delay: ${OUTBOX_RETRY_BASE_DELAY:PT1S}
+    retry-maximum-delay: ${OUTBOX_RETRY_MAXIMUM_DELAY:PT5M}
+    published-retention: ${OUTBOX_PUBLISHED_RETENTION:P30D}
+    cleanup-interval: ${OUTBOX_CLEANUP_INTERVAL:PT1H}
+    cleanup-batch-size: ${OUTBOX_CLEANUP_BATCH_SIZE:1000}
+    maximum-event-bytes: ${OUTBOX_MAXIMUM_EVENT_BYTES:262144}
+    maximum-pending-age: ${OUTBOX_MAXIMUM_PENDING_AGE:PT5M}
+    kafka:
+      bootstrap-servers: ${OUTBOX_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      security-protocol: ${OUTBOX_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+      allow-insecure-transport: ${OUTBOX_KAFKA_ALLOW_INSECURE_TRANSPORT:false}
+      sasl-mechanism: ${OUTBOX_KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      sasl-jaas-config: ${OUTBOX_KAFKA_SASL_JAAS_CONFIG:}
+      truststore-location: ${OUTBOX_KAFKA_TRUSTSTORE_LOCATION:}
+      truststore-password: ${OUTBOX_KAFKA_TRUSTSTORE_PASSWORD:}
+      keystore-location: ${OUTBOX_KAFKA_KEYSTORE_LOCATION:}
+      keystore-password: ${OUTBOX_KAFKA_KEYSTORE_PASSWORD:}
+      key-password: ${OUTBOX_KAFKA_KEY_PASSWORD:}
+      delivery-timeout: ${OUTBOX_KAFKA_DELIVERY_TIMEOUT:PT5S}
+      request-timeout: ${OUTBOX_KAFKA_REQUEST_TIMEOUT:PT3S}
+      maximum-block: ${OUTBOX_KAFKA_MAXIMUM_BLOCK:PT1S}
   security:
     jwt:
       issuer: ${AUTH_ISSUER_URI}
@@ -52,7 +82,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
@@ -60,7 +90,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,catalogOutbox
   health:
     livenessstate:
       enabled: true
@@ -69,3 +99,6 @@ management:
   info:
     env:
       enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
