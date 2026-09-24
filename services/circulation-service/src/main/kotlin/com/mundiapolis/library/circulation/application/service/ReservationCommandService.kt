@@ -65,6 +65,7 @@ class ReservationCommandService(
     private val reservationOutboxEventStore: ReservationOutboxEventStore,
     private val loanOutboxEventStore: OutboxEventStore,
     private val queueService: ReservationQueueService,
+    private val copyEventService: CopyEventService,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
     private val idempotencyRetention: Duration,
@@ -110,6 +111,12 @@ class ReservationCommandService(
                 if (copyId == null) {
                     waiting
                 } else {
+                    copyEventService.appendCurrent(
+                        copyId,
+                        now,
+                        command.principal.idempotencyOwner.fingerprint,
+                        "Copy assigned to placed reservation",
+                    )
                     val ready = waiting.makeReady(copyId, now, policy.reservationHoldPeriod)
                     if (!reservationStore.update(ready, waiting.version, now)) {
                         throw ConcurrentCirculationUpdateException()
@@ -181,6 +188,12 @@ class ReservationCommandService(
             if (!copyStore.reservedToLoan(copyId, now)) {
                 throw ConcurrentCirculationUpdateException()
             }
+            copyEventService.appendCurrent(
+                copyId,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+                "Reserved copy fulfilled as loan",
+            )
             val loan = Loan.request(
                 LoanId(identifierGenerator.next()),
                 ready.memberId,

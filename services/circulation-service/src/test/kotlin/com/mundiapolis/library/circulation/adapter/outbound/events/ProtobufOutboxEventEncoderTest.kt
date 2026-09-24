@@ -48,6 +48,33 @@ class ProtobufOutboxEventEncoderTest {
     }
 
     @Test
+    fun `copy status transition carries authoritative copy version`() {
+        val copyId = UUID.randomUUID()
+        val event = claimed(
+            aggregateType = "copy",
+            aggregateId = copyId,
+            aggregateVersion = 3,
+            eventType = "circulation.copy.status-changed",
+            payload = mapOf(
+                "copyId" to copyId.toString(),
+                "editionId" to UUID.randomUUID().toString(),
+                "branchId" to UUID.randomUUID().toString(),
+                "barcode" to "COPY-00003",
+                "status" to "ON_LOAN",
+                "shelfLocation" to "A-12",
+                "copyVersion" to 3,
+                "actorFingerprint" to "d".repeat(64),
+                "reason" to "Copy allocated to approved loan",
+            ),
+        )
+
+        val envelope = CirculationEvent.parseFrom(encoder.encode(event).payload)
+
+        assertThat(envelope.copy.status).isEqualTo(CopyStatus.COPY_STATUS_ON_LOAN)
+        assertThat(envelope.copy.copyVersion).isEqualTo(3)
+    }
+
+    @Test
     fun `settled fine state remains encodable after the last payment`() {
         val fineId = UUID.randomUUID()
         val event = claimed(

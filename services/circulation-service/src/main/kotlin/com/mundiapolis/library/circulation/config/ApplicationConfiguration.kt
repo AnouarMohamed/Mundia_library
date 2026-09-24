@@ -26,6 +26,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.Reservation
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.application.service.CirculationCommandService
+import com.mundiapolis.library.circulation.application.service.CopyEventService
 import com.mundiapolis.library.circulation.application.service.FineCommandService
 import com.mundiapolis.library.circulation.application.service.GetCirculationPolicyService
 import com.mundiapolis.library.circulation.application.service.GetCirculationStatusService
@@ -67,6 +68,7 @@ class ApplicationConfiguration {
         policyStore: CirculationPolicyStore,
         reservationStore: ReservationStore,
         reservationQueueService: ReservationQueueService,
+        copyEventService: CopyEventService,
     ): CirculationCommandService = CirculationCommandService(
         transactionRunner = transactionRunner,
         loanStore = loanStore,
@@ -79,6 +81,7 @@ class ApplicationConfiguration {
         policyStore = policyStore,
         reservationStore = reservationStore,
         reservationQueueService = reservationQueueService,
+        copyEventService = copyEventService,
         idempotencyRetention = idempotency.idempotencyRetention,
     )
 
@@ -113,7 +116,7 @@ class ApplicationConfiguration {
         copyStore: CopyStore,
         inventoryIdempotencyStore: InventoryIdempotencyStore,
         inventoryAuditStore: InventoryAuditStore,
-        inventoryOutboxEventStore: InventoryOutboxEventStore,
+        copyEventService: CopyEventService,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
         idempotency: CirculationIdempotencyProperties,
@@ -123,7 +126,7 @@ class ApplicationConfiguration {
         copyStore = copyStore,
         idempotencyStore = inventoryIdempotencyStore,
         auditStore = inventoryAuditStore,
-        outboxEventStore = inventoryOutboxEventStore,
+        copyEventService = copyEventService,
         timeProvider = timeProvider,
         identifierGenerator = identifierGenerator,
         reservationQueueService = reservationQueueService,
@@ -151,11 +154,24 @@ class ApplicationConfiguration {
         circulationPolicyStore: CirculationPolicyStore,
         reservationOutboxEventStore: ReservationOutboxEventStore,
         identifierGenerator: IdentifierGenerator,
+        copyEventService: CopyEventService,
     ): ReservationQueueService = ReservationQueueService(
         reservationStore,
         copyStore,
         circulationPolicyStore,
         reservationOutboxEventStore,
+        identifierGenerator,
+        copyEventService,
+    )
+
+    @Bean
+    fun copyEventService(
+        copyStore: CopyStore,
+        inventoryOutboxEventStore: InventoryOutboxEventStore,
+        identifierGenerator: IdentifierGenerator,
+    ): CopyEventService = CopyEventService(
+        copyStore,
+        inventoryOutboxEventStore,
         identifierGenerator,
     )
 
@@ -171,6 +187,7 @@ class ApplicationConfiguration {
         reservationOutboxEventStore: ReservationOutboxEventStore,
         outboxEventStore: OutboxEventStore,
         reservationQueueService: ReservationQueueService,
+        copyEventService: CopyEventService,
         timeProvider: TimeProvider,
         identifierGenerator: IdentifierGenerator,
         idempotency: CirculationIdempotencyProperties,
@@ -185,6 +202,7 @@ class ApplicationConfiguration {
         reservationOutboxEventStore,
         outboxEventStore,
         reservationQueueService,
+        copyEventService,
         timeProvider,
         identifierGenerator,
         idempotency.idempotencyRetention,

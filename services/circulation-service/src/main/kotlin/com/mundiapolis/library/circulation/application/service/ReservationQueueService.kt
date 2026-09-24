@@ -19,6 +19,7 @@ class ReservationQueueService(
     private val policyStore: CirculationPolicyStore,
     private val outboxEventStore: ReservationOutboxEventStore,
     private val identifierGenerator: IdentifierGenerator,
+    private val copyEventService: CopyEventService,
 ) {
     fun lockEdition(editionId: EditionId) = reservationStore.lockEdition(editionId)
 
@@ -34,6 +35,12 @@ class ReservationQueueService(
             if (!copyStore.reserve(copyId, now)) {
                 throw ConcurrentCirculationUpdateException()
             }
+            copyEventService.appendCurrent(
+                copyId,
+                now,
+                actorFingerprint,
+                "Copy assigned to waiting reservation",
+            )
             makeReady(waiting, copyId, now, actorFingerprint)
         }
         return copyStore.lockById(copyId) ?: throw ConcurrentCirculationUpdateException()
@@ -51,11 +58,23 @@ class ReservationQueueService(
             if (!copyStore.release(copyId, now)) {
                 throw ConcurrentCirculationUpdateException()
             }
+            copyEventService.appendCurrent(
+                copyId,
+                now,
+                actorFingerprint,
+                "Returned copy released to inventory",
+            )
             return
         }
         if (!copyStore.returnToReservation(copyId, now)) {
             throw ConcurrentCirculationUpdateException()
         }
+        copyEventService.appendCurrent(
+            copyId,
+            now,
+            actorFingerprint,
+            "Returned copy assigned to waiting reservation",
+        )
         makeReady(waiting, copyId, now, actorFingerprint)
     }
 
@@ -71,6 +90,12 @@ class ReservationQueueService(
             if (!copyStore.releaseReserved(copyId, now)) {
                 throw ConcurrentCirculationUpdateException()
             }
+            copyEventService.appendCurrent(
+                copyId,
+                now,
+                actorFingerprint,
+                "Reservation released copy to inventory",
+            )
             return
         }
         makeReady(waiting, copyId, now, actorFingerprint)

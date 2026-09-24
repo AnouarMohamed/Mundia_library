@@ -228,10 +228,14 @@ and an explicit state machine: staff cannot manually create `ON_LOAN` or
 `RESERVED`, mutate loaned/reserved copies, resurrect a withdrawn copy, or
 relocate anything except available inventory. Each command requires an audit
 reason and writes an append-only inventory audit entry with the actor
-fingerprint and before/after state. Loan/copy/fine state, exact replay result, immutable
-fine-ledger entry
-when applicable, and one versioned outbox event commit in the same PostgreSQL
-transaction.
+fingerprint and before/after state. Loan/copy/fine state, exact replay result,
+immutable fine-ledger entry when applicable, and the corresponding versioned
+outbox events commit in the same PostgreSQL transaction. Copy registration
+emits version zero before any immediate hold assignment; every later
+availability transition (`AVAILABLE`, `RESERVED`, or `ON_LOAN`) emits
+`circulation.copy.status-changed` at the exact copy aggregate version. Consumers
+can rebuild inventory without inferring copy state from independently ordered
+loan or reservation events.
 
 Reservation placement is serialized per edition with a PostgreSQL advisory
 transaction lock. Available copies become time-bounded holds immediately;

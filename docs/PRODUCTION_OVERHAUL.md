@@ -66,7 +66,9 @@ are implemented in the repository:
 - The service publishes a machine-validated OpenAPI 3.1 contract whose route,
   scope, idempotency, and transport field sets are checked against the Kotlin
   controllers in tests. Copy inventory events extend the additive Protobuf v1
-  envelope; terminal fine payments now encode the domain `SETTLED` state.
+  envelope; every copy availability mutation now emits its authoritative,
+  contiguous copy version, including hold, checkout, return, and release
+  transitions. Terminal fine payments encode the domain `SETTLED` state.
 - The service validates issuer, audience, and scopes, binds self-service
   requests to a UUID membership claim, isolates idempotency by authenticated
   actor/client, and has real PostgreSQL 18 tests for 100-way command races and

@@ -67,6 +67,7 @@ class CirculationCommandService(
     private val policyStore: CirculationPolicyStore,
     private val reservationStore: ReservationStore,
     private val reservationQueueService: ReservationQueueService,
+    private val copyEventService: CopyEventService,
     private val idempotencyRetention: Duration,
 ) : RequestLoanUseCase,
     ApproveLoanUseCase,
@@ -128,6 +129,12 @@ class CirculationCommandService(
 
             val copyId = copyStore.allocateAvailable(requested.editionId, now)
                 ?: throw NoAvailableCopyException(requested.editionId)
+            copyEventService.appendCurrent(
+                copyId,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+                "Copy allocated to approved loan",
+            )
             val approved = requested.approve(copyId, now, now.plus(policy.defaultLoanPeriod))
 
             if (!loanStore.update(approved, requested.version, now)) {

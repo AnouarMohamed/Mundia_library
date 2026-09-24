@@ -12,7 +12,6 @@ import com.mundiapolis.library.circulation.application.model.InventoryCommandExe
 import com.mundiapolis.library.circulation.application.model.InventoryCommandResult
 import com.mundiapolis.library.circulation.application.model.InventoryAuditEntry
 import com.mundiapolis.library.circulation.application.model.InventoryOperation
-import com.mundiapolis.library.circulation.application.model.InventoryOutboxEvent
 import com.mundiapolis.library.circulation.application.port.inbound.ChangeCopyConditionCommand
 import com.mundiapolis.library.circulation.application.port.inbound.ChangeCopyConditionUseCase
 import com.mundiapolis.library.circulation.application.port.inbound.RegisterCopyCommand
@@ -23,7 +22,6 @@ import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
 import com.mundiapolis.library.circulation.application.port.outbound.InventoryAuditStore
 import com.mundiapolis.library.circulation.application.port.outbound.InventoryIdempotencyStore
-import com.mundiapolis.library.circulation.application.port.outbound.InventoryOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
 import com.mundiapolis.library.circulation.domain.model.Copy
@@ -40,7 +38,7 @@ class InventoryCommandService(
     private val copyStore: CopyStore,
     private val idempotencyStore: InventoryIdempotencyStore,
     private val auditStore: InventoryAuditStore,
-    private val outboxEventStore: InventoryOutboxEventStore,
+    private val copyEventService: CopyEventService,
     private val timeProvider: TimeProvider,
     private val identifierGenerator: IdentifierGenerator,
     private val reservationQueueService: ReservationQueueService,
@@ -77,6 +75,13 @@ class InventoryCommandService(
             if (!copyStore.create(copy, now)) {
                 throw CopyAlreadyExistsException()
             }
+            copyEventService.append(
+                copy,
+                operation.eventType,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+                command.reason.value,
+            )
             val persisted = reservationQueueService.claimNewlyAvailableCopy(
                 copy.editionId,
                 copy.id,
@@ -126,6 +131,13 @@ class InventoryCommandService(
             if (!copyStore.update(changed, current.version, now)) {
                 throw ConcurrentInventoryUpdateException()
             }
+            copyEventService.append(
+                changed,
+                operation.eventType,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+                command.reason.value,
+            )
             val persisted = if (
                 changed.status == com.mundiapolis.library.circulation.domain.model.CopyStatus.AVAILABLE
             ) {
@@ -169,6 +181,13 @@ class InventoryCommandService(
             if (!copyStore.update(relocated, current.version, now)) {
                 throw ConcurrentInventoryUpdateException()
             }
+            copyEventService.append(
+                relocated,
+                operation.eventType,
+                now,
+                command.principal.idempotencyOwner.fingerprint,
+                command.reason.value,
+            )
             InventoryMutation(previous = current, current = relocated)
         }
     }
@@ -214,19 +233,6 @@ class InventoryCommandService(
                 previous = mutation.previous?.let { previous ->
                     InventoryCommandResult.from(previous, now)
                 },
-                result = result,
-                actorFingerprint = owner.fingerprint,
-                reason = reason,
-            ),
-        )
-        outboxEventStore.append(
-            InventoryOutboxEvent(
-                id = identifierGenerator.next(),
-                aggregateId = result.copyId,
-                aggregateVersion = result.version,
-                eventType = operation.eventType,
-                eventVersion = 1,
-                occurredAt = now,
                 result = result,
                 actorFingerprint = owner.fingerprint,
                 reason = reason,

@@ -393,6 +393,7 @@ class ProtobufOutboxEventEncoder(
             "circulation.copy.registered" to COPY_AGGREGATE,
             "circulation.copy.condition-changed" to COPY_AGGREGATE,
             "circulation.copy.relocated" to COPY_AGGREGATE,
+            "circulation.copy.status-changed" to COPY_AGGREGATE,
             "circulation.reservation.placed" to RESERVATION_AGGREGATE,
             "circulation.reservation.ready" to RESERVATION_AGGREGATE,
             "circulation.reservation.cancelled" to RESERVATION_AGGREGATE,
@@ -422,6 +423,11 @@ class ProtobufOutboxEventEncoder(
                 CopyStatus.COPY_STATUS_WITHDRAWN,
             ),
             "circulation.copy.relocated" to setOf(CopyStatus.COPY_STATUS_AVAILABLE),
+            "circulation.copy.status-changed" to setOf(
+                CopyStatus.COPY_STATUS_AVAILABLE,
+                CopyStatus.COPY_STATUS_ON_LOAN,
+                CopyStatus.COPY_STATUS_RESERVED,
+            ),
         )
         val RESERVATION_EVENT_STATUSES = mapOf(
             "circulation.reservation.placed" to setOf(

@@ -464,6 +464,9 @@ class CirculationPhase2IntegrationTest {
     @Test
     fun `expired outbox lease is replayed and stale owner cannot acknowledge it`() {
         createActiveLoan(MemberId(UUID.randomUUID()))
+        dsl.deleteFrom(OUTBOX_EVENT)
+            .where(OUTBOX_EVENT.AGGREGATE_TYPE.eq("copy"))
+            .execute()
         val claimTime = Instant.now().plusSeconds(5)
         val firstClaim =
             outboxDeliveryStore.claimBatch(
@@ -637,7 +640,7 @@ class CirculationPhase2IntegrationTest {
         }.isInstanceOf(LoanOverdueException::class.java)
 
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
-        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(3)
         assertThat(
             dsl.select(CIRCULATION_LOAN.RENEWAL_COUNT)
                 .from(CIRCULATION_LOAN)
@@ -1812,14 +1815,20 @@ class CirculationPhase2IntegrationTest {
             .fetchSingle()
         assertThat(audit.copyStatus).isEqualTo(CopyStatus.RESERVED.name)
         assertThat(audit.copyVersion).isOne()
-        val copyEvent = dsl.selectFrom(OUTBOX_EVENT)
+        val copyEvents = dsl.selectFrom(OUTBOX_EVENT)
             .where(
                 OUTBOX_EVENT.AGGREGATE_TYPE.eq("copy")
                     .and(OUTBOX_EVENT.AGGREGATE_ID.eq(copyId.value)),
             )
-            .fetchSingle()
-        assertThat(copyEvent.aggregateVersion).isOne()
-        assertThat(copyEvent.payload?.data()).contains("\"status\": \"RESERVED\"")
+            .orderBy(OUTBOX_EVENT.AGGREGATE_VERSION.asc())
+            .fetch()
+        assertThat(copyEvents.map { it.aggregateVersion }).containsExactly(0L, 1L)
+        assertThat(copyEvents.map { it.eventType }).containsExactly(
+            "circulation.copy.registered",
+            "circulation.copy.status-changed",
+        )
+        assertThat(copyEvents[0].payload?.data()).contains("\"status\": \"AVAILABLE\"")
+        assertThat(copyEvents[1].payload?.data()).contains("\"status\": \"RESERVED\"")
     }
 
     @Test

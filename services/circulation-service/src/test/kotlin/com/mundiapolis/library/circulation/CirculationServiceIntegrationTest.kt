@@ -592,7 +592,7 @@ class CirculationServiceIntegrationTest {
 
         assertThat(approved.replayed).isFalse()
         assertThat(approved.result.copyId?.value).isEqualTo(copyId)
-        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(2)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(3)
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(2)
     }
 
@@ -823,7 +823,7 @@ class CirculationServiceIntegrationTest {
             )
         }.isInstanceOf(LoanStateConflictException::class.java)
 
-        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(3)
+        assertThat(dsl.fetchCount(OUTBOX_EVENT)).isEqualTo(5)
         assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isEqualTo(3)
     }
 
@@ -940,6 +940,7 @@ class CirculationServiceIntegrationTest {
 
     private fun assertOutbox(expectedTypes: List<String>, expectedVersions: List<Long>) {
         val events = dsl.selectFrom(OUTBOX_EVENT)
+            .where(OUTBOX_EVENT.AGGREGATE_TYPE.eq("loan"))
             .orderBy(OUTBOX_EVENT.AGGREGATE_VERSION.asc())
             .fetch()
         assertThat(events.map { it.eventType }).containsExactlyElementsOf(expectedTypes)
