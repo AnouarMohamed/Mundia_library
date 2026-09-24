@@ -11,6 +11,8 @@ import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateEditionRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateWorkRequest
 import com.mundiapolis.library.catalog.dto.Author
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
+import com.mundiapolis.library.catalog.dto.CatalogReview
+import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import org.assertj.core.api.Assertions.assertThat
@@ -49,7 +51,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.2.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.3.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -59,6 +61,8 @@ class OpenApiContractTest {
         assertSchemaFields("Work", Work::class.java)
         assertSchemaFields("Edition", Edition::class.java)
         assertSchemaFields("CatalogSearchResult", CatalogSearchResult::class.java)
+        assertSchemaFields("CatalogReview", CatalogReview::class.java)
+        assertSchemaFields("CatalogReviewPage", CatalogReviewPage::class.java)
         assertSchemaFields("CreateAuthorRequest", CreateAuthorRequest::class.java)
         assertSchemaFields("CreateWorkRequest", CreateWorkRequest::class.java)
         assertSchemaFields("CreateEditionRequest", CreateEditionRequest::class.java)

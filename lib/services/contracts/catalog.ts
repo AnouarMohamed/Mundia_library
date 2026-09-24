@@ -58,6 +58,23 @@ export interface CatalogSearchResult {
   totalPages: number;
 }
 
+export interface CatalogReview {
+  reviewId: string;
+  workId: string;
+  rating: number;
+  content: string;
+  reviewerLabel: "Verified reader";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CatalogReviewPage {
+  reviews: CatalogReview[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export interface CreateCatalogAuthorInput {
   contributorId: string;
   name: string;
@@ -128,6 +145,11 @@ export interface CatalogService {
   getEdition(editionId: string): Promise<Edition | null>;
   searchCatalog(filters: CatalogSearchFilters): Promise<CatalogSearchResult>;
   getDistinctGenres(): Promise<string[]>;
+  getPublishedReviews(
+    workId: string,
+    page?: number,
+    limit?: number
+  ): Promise<CatalogReviewPage>;
   createWork(
     input: CreateCatalogWorkInput,
     idempotencyKey: string

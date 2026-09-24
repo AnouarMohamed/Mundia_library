@@ -3,6 +3,7 @@ package com.mundiapolis.library.catalog.service.impl
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.JooqCatalogRepository
 import com.mundiapolis.library.catalog.dto.CatalogSearchFilters
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
+import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import com.mundiapolis.library.catalog.service.CatalogService
@@ -22,6 +23,18 @@ class CatalogServiceImpl(
         repository.search(filters.normalized())
 
     override fun getDistinctGenres(): List<String> = repository.findDistinctGenres()
+
+    override fun getPublishedReviews(workId: String, page: Int?, limit: Int?): CatalogReviewPage {
+        val normalizedPage = page ?: 0
+        require(normalizedPage in 0..MAX_PAGE) { "page must be between 0 and $MAX_PAGE" }
+        val normalizedLimit = limit ?: DEFAULT_LIMIT
+        require(normalizedLimit in 1..MAX_LIMIT) { "limit must be between 1 and $MAX_LIMIT" }
+        return repository.findPublishedReviews(
+            workId.toIdentifier("workId"),
+            normalizedPage,
+            normalizedLimit,
+        )
+    }
 
     private fun CatalogSearchFilters.normalized(): CatalogSearchFilters {
         val normalizedQuery = query?.trim()?.takeIf(String::isNotEmpty)

@@ -3,11 +3,14 @@ package com.mundiapolis.library.catalog.adapter.outbound.persistence
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_CONTRIBUTOR
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION_AVAILABILITY_PROJECTION
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_REVIEW
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK_CONTRIBUTOR
 import com.mundiapolis.library.catalog.dto.Author
 import com.mundiapolis.library.catalog.dto.CatalogSearchFilters
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
+import com.mundiapolis.library.catalog.dto.CatalogReview
+import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import org.jooq.Condition
@@ -85,6 +88,34 @@ class JooqCatalogRepository(
         .orderBy(CATALOG_WORK.GENRE.asc())
         .fetch(CATALOG_WORK.GENRE)
         .filterNotNull()
+
+    fun findPublishedReviews(workId: UUID, page: Int, limit: Int): CatalogReviewPage {
+        val condition = CATALOG_REVIEW.WORK_ID.eq(workId)
+            .and(CATALOG_REVIEW.MODERATION_STATUS.eq(PUBLISHED_STATUS))
+        val total = dsl.fetchCount(CATALOG_REVIEW, condition)
+        val reviews = dsl.selectFrom(CATALOG_REVIEW)
+            .where(condition)
+            .orderBy(CATALOG_REVIEW.CREATED_AT.desc(), CATALOG_REVIEW.REVIEW_ID.desc())
+            .limit(limit)
+            .offset(Math.multiplyExact(page, limit))
+            .fetch { review ->
+                CatalogReview(
+                    reviewId = requireNotNull(review.reviewId).toString(),
+                    workId = requireNotNull(review.workId).toString(),
+                    rating = requireNotNull(review.rating).toInt(),
+                    content = requireNotNull(review.content),
+                    reviewerLabel = VERIFIED_READER_LABEL,
+                    createdAt = requireNotNull(review.createdAt).toInstant(),
+                    updatedAt = requireNotNull(review.updatedAt).toInstant(),
+                )
+            }
+        return CatalogReviewPage(
+            reviews = reviews,
+            total = total,
+            page = page,
+            totalPages = if (total == 0) 0 else (total + limit - 1) / limit,
+        )
+    }
 
     private fun findAuthors(workId: UUID): List<Author> = dsl
         .select(
@@ -208,5 +239,7 @@ class JooqCatalogRepository(
 
     private companion object {
         const val AUTHOR_ROLE = "AUTHOR"
+        const val PUBLISHED_STATUS = "PUBLISHED"
+        const val VERIFIED_READER_LABEL = "Verified reader"
     }
 }

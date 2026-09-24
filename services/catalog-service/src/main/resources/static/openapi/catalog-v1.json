@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.2.0",
-    "description": "Authoritative catalog metadata reads. Copy counts are a versioned projection owned by Circulation."
+    "version": "1.3.0",
+    "description": "Authoritative catalog metadata and privacy-safe published-review reads. Copy counts are a versioned projection owned by Circulation."
   },
   "paths": {
     "/api/v1/catalog/works": {
@@ -102,6 +102,23 @@
           "404": { "$ref": "#/components/responses/NotFound" },
           "409": { "$ref": "#/components/responses/Conflict" },
           "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
+    },
+    "/api/v1/catalog/works/{workId}/reviews": {
+      "get": {
+        "operationId": "getPublishedReviews",
+        "x-required-scopes": ["catalog.read"],
+        "parameters": [
+          { "$ref": "#/components/parameters/WorkId" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Published review page without member identifiers", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogReviewPage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
         }
       }
     },
@@ -230,6 +247,31 @@
         "required": ["editions", "total", "page", "totalPages"],
         "properties": {
           "editions": { "type": "array", "items": { "$ref": "#/components/schemas/Edition" } },
+          "total": { "type": "integer", "minimum": 0 },
+          "page": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "CatalogReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reviewId", "workId", "rating", "content", "reviewerLabel", "createdAt", "updatedAt"],
+        "properties": {
+          "reviewId": { "type": "string", "format": "uuid" },
+          "workId": { "type": "string", "format": "uuid" },
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "content": { "type": "string", "minLength": 1, "maxLength": 4000 },
+          "reviewerLabel": { "type": "string", "const": "Verified reader" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CatalogReviewPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reviews", "total", "page", "totalPages"],
+        "properties": {
+          "reviews": { "type": "array", "items": { "$ref": "#/components/schemas/CatalogReview" } },
           "total": { "type": "integer", "minimum": 0 },
           "page": { "type": "integer", "minimum": 0 },
           "totalPages": { "type": "integer", "minimum": 0 }

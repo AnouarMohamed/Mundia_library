@@ -271,8 +271,10 @@ operators demonstrate rollback. Dual-writing inventory is forbidden.
 Implementation checkpoint (2026-09-24): Membership has a PostgreSQL-backed read
 slice for authoritative profiles, fail-closed eligibility, and privacy-safe
 identity-evidence metadata. Catalog now has a separate PostgreSQL-backed read
-slice for works, editions, contributors, media references, reviews, and SQL
-search/pagination. Exact OIDC issuer/audience/type and scope enforcement,
+slice for works, editions, contributors, media references, privacy-safe
+published reviews, and SQL search/pagination. Review reads exclude member
+identifiers and hidden moderation content. Exact OIDC issuer/audience/type and
+scope enforcement,
 Flyway/jOOQ schema generation, versioned OpenAPI contracts, and real PostgreSQL
 integration coverage protect both boundaries. Physical copies remain owned by
 Circulation; Catalog stores only a disposable, versioned availability

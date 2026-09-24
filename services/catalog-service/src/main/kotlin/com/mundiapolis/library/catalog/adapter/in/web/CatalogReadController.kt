@@ -2,6 +2,7 @@ package com.mundiapolis.library.catalog.adapter.`in`.web
 
 import com.mundiapolis.library.catalog.dto.CatalogSearchFilters
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
+import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
 import com.mundiapolis.library.catalog.service.CatalogService
@@ -57,4 +58,12 @@ class CatalogReadController(
     @GetMapping("/genres")
     @PreAuthorize("hasAuthority('SCOPE_catalog.search')")
     fun genres(): List<String> = catalogService.getDistinctGenres()
+
+    @GetMapping("/works/{workId}/reviews")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.read')")
+    fun reviews(
+        @PathVariable workId: UUID,
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) limit: Int?,
+    ): CatalogReviewPage = catalogService.getPublishedReviews(workId.toString(), page, limit)
 }

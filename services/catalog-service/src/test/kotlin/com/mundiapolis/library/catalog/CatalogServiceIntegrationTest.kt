@@ -102,6 +102,33 @@ class CatalogServiceIntegrationTest {
         )
         insertAvailability(AVAILABLE_EDITION_ID, total = 4, available = 2, version = 8)
         insertAvailability(UNAVAILABLE_EDITION_ID, total = 3, available = 0, version = 5)
+        insertReview(
+            PUBLISHED_REVIEW_ID,
+            FICTION_WORK_ID,
+            UUID.fromString("50000000-0000-0000-0000-000000000001"),
+            rating = 5,
+            content = "Careful and memorable.",
+            status = "PUBLISHED",
+            createdAt = NOW.minusDays(1),
+        )
+        insertReview(
+            OLDER_REVIEW_ID,
+            FICTION_WORK_ID,
+            UUID.fromString("50000000-0000-0000-0000-000000000002"),
+            rating = 4,
+            content = "Strong archival detail.",
+            status = "PUBLISHED",
+            createdAt = NOW.minusDays(2),
+        )
+        insertReview(
+            HIDDEN_REVIEW_ID,
+            FICTION_WORK_ID,
+            UUID.fromString("50000000-0000-0000-0000-000000000003"),
+            rating = 1,
+            content = "Hidden moderation fixture.",
+            status = "HIDDEN",
+            createdAt = NOW,
+        )
     }
 
     @Test
@@ -135,6 +162,39 @@ class CatalogServiceIntegrationTest {
             .andExpect(jsonPath("$.totalCopies").value(0))
             .andExpect(jsonPath("$.availableCopies").value(0))
             .andExpect(jsonPath("$.coverUrl").doesNotExist())
+    }
+
+    @Test
+    fun `review reads expose only published content without member identifiers`() {
+        mockMvc.perform(
+            get("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .param("limit", "1")
+                .with(scope(READ_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.total").value(2))
+            .andExpect(jsonPath("$.totalPages").value(2))
+            .andExpect(jsonPath("$.reviews[0].reviewId").value(PUBLISHED_REVIEW_ID.toString()))
+            .andExpect(jsonPath("$.reviews[0].rating").value(5))
+            .andExpect(jsonPath("$.reviews[0].content").value("Careful and memorable."))
+            .andExpect(jsonPath("$.reviews[0].reviewerLabel").value("Verified reader"))
+            .andExpect(jsonPath("$.reviews[0].memberId").doesNotExist())
+            .andExpect(jsonPath("$.reviews[0].moderationStatus").doesNotExist())
+
+        mockMvc.perform(
+            get("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .param("page", "1")
+                .param("limit", "1")
+                .with(scope(READ_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviews[0].reviewId").value(OLDER_REVIEW_ID.toString()))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .param("limit", "0")
+                .with(scope(READ_SCOPE)),
+        ).andExpect(status().isBadRequest)
     }
 
     @Test
@@ -682,6 +742,27 @@ class CatalogServiceIntegrationTest {
             .execute()
     }
 
+    private fun insertReview(
+        reviewId: UUID,
+        workId: UUID,
+        memberId: UUID,
+        rating: Int,
+        content: String,
+        status: String,
+        createdAt: OffsetDateTime,
+    ) {
+        dsl.insertInto(CATALOG_REVIEW)
+            .set(CATALOG_REVIEW.REVIEW_ID, reviewId)
+            .set(CATALOG_REVIEW.WORK_ID, workId)
+            .set(CATALOG_REVIEW.MEMBER_ID, memberId)
+            .set(CATALOG_REVIEW.RATING, rating.toShort())
+            .set(CATALOG_REVIEW.CONTENT, content)
+            .set(CATALOG_REVIEW.MODERATION_STATUS, status)
+            .set(CATALOG_REVIEW.CREATED_AT, createdAt)
+            .set(CATALOG_REVIEW.UPDATED_AT, createdAt)
+            .execute()
+    }
+
     private fun scope(authority: String) = jwt().authorities(SimpleGrantedAuthority(authority))
 
     private fun commandScope() = jwt()
@@ -718,6 +799,9 @@ class CatalogServiceIntegrationTest {
         val AVAILABLE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000001")
         val UNAVAILABLE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000002")
         val INACTIVE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000003")
+        val PUBLISHED_REVIEW_ID: UUID = UUID.fromString("60000000-0000-0000-0000-000000000001")
+        val OLDER_REVIEW_ID: UUID = UUID.fromString("60000000-0000-0000-0000-000000000002")
+        val HIDDEN_REVIEW_ID: UUID = UUID.fromString("60000000-0000-0000-0000-000000000003")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 1, 1, 12, 0, 0, 0, ZoneOffset.UTC)
 
         const val READ_SCOPE = "SCOPE_catalog.read"

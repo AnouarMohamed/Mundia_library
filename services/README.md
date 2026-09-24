@@ -153,6 +153,7 @@ known state. The immutable contract is public at
 | Edition metadata and projected availability | `GET /api/v1/catalog/editions/{editionId}` | `catalog.read` |
 | Filtered, sorted catalog page | `GET /api/v1/catalog/search` | `catalog.search` |
 | Active-edition genres | `GET /api/v1/catalog/genres` | `catalog.search` |
+| Privacy-safe published reviews | `GET /api/v1/catalog/works/{workId}/reviews` | `catalog.read` |
 | Create a work and ordered authors | `POST /api/v1/catalog/works` | `catalog.manage` |
 | Create an edition under a work | `POST /api/v1/catalog/works/{workId}/editions` | `catalog.manage` |
 | Replace work metadata and ordered authors | `PUT /api/v1/catalog/works/{workId}` | `catalog.manage` |
@@ -160,7 +161,8 @@ known state. The immutable contract is public at
 | Activate or deactivate an edition | `POST /api/v1/catalog/editions/{editionId}/activation` | `catalog.manage` |
 
 Search filtering, totals, and pagination execute in PostgreSQL and use a stable
-edition-ID tie breaker. Commands require an actor-bound `Idempotency-Key`; the
+edition-ID tie breaker. Review reads exclude hidden content and never expose
+member identifiers. Commands require an actor-bound `Idempotency-Key`; the
 aggregate, exact replay snapshot, append-only audit, and versioned outbox event
 commit atomically. Updates also require an exact aggregate-version ETag in
 `If-Match`, reject stale versions, and return the new version in `ETag`.
