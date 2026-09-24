@@ -72,7 +72,12 @@ jobs:
       - name: Build Kotlin services
         if: matrix.language == 'java-kotlin'
         working-directory: services
-        run: ./gradlew classes -x jooqCodegen --no-daemon
+        # CodeQL's Kotlin compiler instrumentation materially increases the
+        # compiler heap. Keep compilation serial so the bounded 3 GiB daemon
+        # fits on the hosted runner alongside the extractor and Gradle.
+        run: >-
+          ./gradlew classes -x jooqCodegen --no-daemon --no-parallel
+          -Pkotlin.daemon.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=768m"
 
       - name: Autobuild JavaScript/TypeScript
         if: matrix.language == 'javascript-typescript'
