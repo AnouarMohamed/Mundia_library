@@ -26,6 +26,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -430,6 +431,186 @@ class CatalogServiceIntegrationTest {
         assertEquals(1, dsl.fetchCount(CATALOG_OUTBOX_EVENT, CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(workId)))
     }
 
+    @Test
+    fun `work updates require an exact version and replay after the version advances`() {
+        val replacementAuthor = UUID.fromString("48000000-0000-0000-0000-000000000001")
+        val body = """
+            {
+              "title": "Atlas of Revised Rooms",
+              "summary": "A revised summary",
+              "description": "A reviewed revised description",
+              "genre": "Architecture",
+              "authors": [{
+                "contributorId": "$replacementAuthor",
+                "name": "Revision Author",
+                "bio": null
+              }],
+              "reason": "Correct catalog metadata after review"
+            }
+        """.trimIndent()
+
+        repeat(2) { attempt ->
+            mockMvc.perform(
+                put("/api/v1/catalog/works/$FICTION_WORK_ID")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("If-Match", "\"0\"")
+                    .header("Idempotency-Key", "catalog-work-update01")
+                    .content(body)
+                    .with(commandScope()),
+            )
+                .andExpect(status().isOk)
+                .andExpect(header().string("ETag", "\"1\""))
+                .andExpect(
+                    header().string("Idempotency-Replayed", (attempt == 1).toString()),
+                )
+                .andExpect(jsonPath("$.aggregateVersion").value(1))
+        }
+
+        mockMvc.perform(
+            put("/api/v1/catalog/works/$FICTION_WORK_ID")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-stale-update1")
+                .content(body)
+                .with(commandScope()),
+        ).andExpect(status().isConflict)
+
+        assertEquals(
+            "Atlas of Revised Rooms",
+            dsl.select(CATALOG_WORK.TITLE)
+                .from(CATALOG_WORK)
+                .where(CATALOG_WORK.WORK_ID.eq(FICTION_WORK_ID))
+                .fetchOne(CATALOG_WORK.TITLE),
+        )
+        assertEquals(
+            listOf(replacementAuthor),
+            dsl.select(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTOR_ID)
+                .from(CATALOG_WORK_CONTRIBUTOR)
+                .where(CATALOG_WORK_CONTRIBUTOR.WORK_ID.eq(FICTION_WORK_ID))
+                .fetch(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTOR_ID),
+        )
+        assertEquals(
+            "catalog.work.updated",
+            dsl.select(CATALOG_OUTBOX_EVENT.EVENT_TYPE)
+                .from(CATALOG_OUTBOX_EVENT)
+                .where(CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(FICTION_WORK_ID))
+                .fetchOne(CATALOG_OUTBOX_EVENT.EVENT_TYPE),
+        )
+    }
+
+    @Test
+    fun `edition metadata and activation advance one version without changing availability`() {
+        val updateBody = """
+            {
+              "title": "Atlas Revised Edition",
+              "isbn": "9780000000099",
+              "publisher": "Mundiapolis Academic Press",
+              "publicationYear": 2027,
+              "language": "French",
+              "pageCount": 360,
+              "coverUrl": null,
+              "coverColor": "#FEDCBA",
+              "videoUrl": null,
+              "reason": "Apply reviewed edition metadata corrections"
+            }
+        """.trimIndent()
+        mockMvc.perform(
+            put("/api/v1/catalog/editions/$AVAILABLE_EDITION_ID")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-edition-update")
+                .content(updateBody)
+                .with(commandScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"1\""))
+
+        mockMvc.perform(
+            post("/api/v1/catalog/editions/$AVAILABLE_EDITION_ID/activation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"1\"")
+                .header("Idempotency-Key", "catalog-edition-active")
+                .content(
+                    """{"isActive":false,"reason":"Withdraw damaged edition from catalog"}""",
+                )
+                .with(commandScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"2\""))
+            .andExpect(jsonPath("$.aggregateVersion").value(2))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/search").param("query", "Atlas").with(scope(SEARCH_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.total").value(0))
+
+        assertEquals(
+            2,
+            dsl.select(CATALOG_EDITION_AVAILABILITY_PROJECTION.AVAILABLE_COPIES)
+                .from(CATALOG_EDITION_AVAILABILITY_PROJECTION)
+                .where(CATALOG_EDITION_AVAILABILITY_PROJECTION.EDITION_ID.eq(AVAILABLE_EDITION_ID))
+                .fetchOne(CATALOG_EDITION_AVAILABILITY_PROJECTION.AVAILABLE_COPIES),
+        )
+        assertEquals(
+            listOf("catalog.edition.updated", "catalog.edition.activation-changed"),
+            dsl.select(CATALOG_OUTBOX_EVENT.EVENT_TYPE)
+                .from(CATALOG_OUTBOX_EVENT)
+                .where(CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(AVAILABLE_EDITION_ID))
+                .orderBy(CATALOG_OUTBOX_EVENT.AGGREGATE_VERSION)
+                .fetch(CATALOG_OUTBOX_EVENT.EVENT_TYPE),
+        )
+    }
+
+    @Test
+    fun `update commands reject malformed versions missing targets and no-op activation`() {
+        val workBody = """
+            {
+              "title": "Atlas of Quiet Rooms",
+              "summary": "A hidden archive",
+              "description": "A hidden archive in depth",
+              "genre": "Fiction",
+              "authors": [{
+                "contributorId": "$PRIMARY_AUTHOR_ID",
+                "name": "Maya Author",
+                "bio": "Primary biography"
+              }],
+              "reason": "Verify rejected update command behavior"
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            put("/api/v1/catalog/works/$FICTION_WORK_ID")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "0")
+                .header("Idempotency-Key", "catalog-malformed-etag")
+                .content(workBody)
+                .with(commandScope()),
+        ).andExpect(status().isBadRequest)
+
+        mockMvc.perform(
+            put("/api/v1/catalog/works/49000000-0000-0000-0000-000000000001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-missing-work01")
+                .content(workBody)
+                .with(commandScope()),
+        ).andExpect(status().isNotFound)
+
+        mockMvc.perform(
+            post("/api/v1/catalog/editions/$AVAILABLE_EDITION_ID/activation")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-noop-active01")
+                .content("""{"isActive":true,"reason":"Verify no-op activation rejection"}""")
+                .with(commandScope()),
+        ).andExpect(status().isConflict)
+
+        assertEquals(0, dsl.fetchCount(CATALOG_OUTBOX_EVENT))
+        assertEquals(0, dsl.fetchCount(CATALOG_AUDIT_ENTRY))
+        assertEquals(0, dsl.fetchCount(CATALOG_COMMAND_IDEMPOTENCY))
+    }
+
     private fun insertContributor(id: UUID, name: String, biography: String?) {
         dsl.insertInto(CATALOG_CONTRIBUTOR)
             .set(CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID, id)
@@ -537,7 +718,7 @@ class CatalogServiceIntegrationTest {
         val AVAILABLE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000001")
         val UNAVAILABLE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000002")
         val INACTIVE_EDITION_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000003")
-        val NOW: OffsetDateTime = OffsetDateTime.of(2026, 9, 24, 12, 0, 0, 0, ZoneOffset.UTC)
+        val NOW: OffsetDateTime = OffsetDateTime.of(2026, 1, 1, 12, 0, 0, 0, ZoneOffset.UTC)
 
         const val READ_SCOPE = "SCOPE_catalog.read"
         const val SEARCH_SCOPE = "SCOPE_catalog.search"

@@ -39,6 +39,45 @@ data class CreateEditionCommand(
     val ownerFingerprint: String,
 )
 
+data class UpdateWorkCommand(
+    val workId: UUID,
+    val expectedVersion: Long,
+    val title: String,
+    val summary: String,
+    val description: String,
+    val genre: String,
+    val authors: List<CatalogAuthorInput>,
+    val reason: String,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
+data class UpdateEditionCommand(
+    val editionId: UUID,
+    val expectedVersion: Long,
+    val title: String,
+    val isbn: String,
+    val publisher: String,
+    val publicationYear: Int,
+    val language: String,
+    val pageCount: Int,
+    val coverUrl: String?,
+    val coverColor: String?,
+    val videoUrl: String?,
+    val reason: String,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
+data class SetEditionActiveCommand(
+    val editionId: UUID,
+    val expectedVersion: Long,
+    val active: Boolean,
+    val reason: String,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
 data class CatalogCommandResult(
     val aggregateType: String,
     val aggregateId: UUID,
@@ -52,6 +91,8 @@ data class CatalogCommandExecution(
 )
 
 class CatalogCommandConflictException(message: String) : RuntimeException(message)
+
+class CatalogCommandNotFoundException(message: String) : RuntimeException(message)
 
 class CatalogIdempotencyConflictException :
     RuntimeException("Idempotency key was already used for different catalog input")

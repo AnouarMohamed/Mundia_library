@@ -1,6 +1,7 @@
 package com.mundiapolis.library.catalog.adapter.`in`.web
 
 import com.mundiapolis.library.catalog.dto.CatalogCommandConflictException
+import com.mundiapolis.library.catalog.dto.CatalogCommandNotFoundException
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyConflictException
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyIncompleteException
 import com.mundiapolis.library.catalog.dto.InvalidCatalogActorException
@@ -27,6 +28,10 @@ class CatalogExceptionHandler {
     @ExceptionHandler(InvalidCatalogActorException::class)
     fun invalidActor(exception: InvalidCatalogActorException): ProblemDetail =
         problem(HttpStatus.FORBIDDEN, "invalid_catalog_actor", exception.message)
+
+    @ExceptionHandler(CatalogCommandNotFoundException::class)
+    fun commandTargetNotFound(exception: CatalogCommandNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "catalog_command_target_not_found", exception.message)
 
     @ExceptionHandler(
         CatalogCommandConflictException::class,

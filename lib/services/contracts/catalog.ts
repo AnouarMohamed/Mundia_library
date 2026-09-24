@@ -89,6 +89,33 @@ export interface CreateCatalogEditionInput {
   reason: string;
 }
 
+export interface UpdateCatalogWorkInput {
+  title: string;
+  summary: string;
+  description: string;
+  genre: string;
+  authors: CreateCatalogAuthorInput[];
+  reason: string;
+}
+
+export interface UpdateCatalogEditionInput {
+  title: string;
+  isbn: string;
+  publisher: string;
+  publicationYear: number;
+  language: string;
+  pageCount: number;
+  coverUrl?: string | null;
+  coverColor?: string | null;
+  videoUrl?: string | null;
+  reason: string;
+}
+
+export interface SetCatalogEditionActiveInput {
+  isActive: boolean;
+  reason: string;
+}
+
 export interface CatalogCommandResult {
   aggregateType: "work" | "edition";
   aggregateId: string;
@@ -108,6 +135,24 @@ export interface CatalogService {
   createEdition(
     workId: string,
     input: CreateCatalogEditionInput,
+    idempotencyKey: string
+  ): Promise<CatalogCommandResult>;
+  updateWork(
+    workId: string,
+    expectedVersion: number,
+    input: UpdateCatalogWorkInput,
+    idempotencyKey: string
+  ): Promise<CatalogCommandResult>;
+  updateEdition(
+    editionId: string,
+    expectedVersion: number,
+    input: UpdateCatalogEditionInput,
+    idempotencyKey: string
+  ): Promise<CatalogCommandResult>;
+  setEditionActive(
+    editionId: string,
+    expectedVersion: number,
+    input: SetCatalogEditionActiveInput,
     idempotencyKey: string
   ): Promise<CatalogCommandResult>;
 }

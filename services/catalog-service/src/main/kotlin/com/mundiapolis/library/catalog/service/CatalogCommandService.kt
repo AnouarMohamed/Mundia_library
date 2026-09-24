@@ -7,6 +7,9 @@ import com.mundiapolis.library.catalog.dto.CreateEditionCommand
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
 import com.mundiapolis.library.catalog.dto.InvalidCatalogCommandException
 import com.mundiapolis.library.catalog.dto.InvalidCatalogActorException
+import com.mundiapolis.library.catalog.dto.SetEditionActiveCommand
+import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
+import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import org.springframework.stereotype.Service
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -92,6 +95,93 @@ class CatalogCommandService(
         )
     }
 
+    fun updateWork(command: UpdateWorkCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        command.expectedVersion.requireValidVersion()
+        val normalized = command.copy(
+            title = command.title.requiredText("title", 500),
+            summary = command.summary.boundedText("summary", 1_000),
+            description = command.description.boundedText("description", 10_000),
+            genre = command.genre.requiredText("genre", 120),
+            authors = normalizeAuthors(command.authors),
+            reason = command.reason.requiredText("reason", 500, minimum = 8),
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        val values = mutableListOf(
+            normalized.workId.toString(),
+            normalized.expectedVersion.toString(),
+            normalized.title,
+            normalized.summary,
+            normalized.description,
+            normalized.genre,
+        )
+        normalized.authors.forEach { author ->
+            values += listOf(author.contributorId.toString(), author.name, author.bio ?: NULL_MARKER)
+        }
+        values += normalized.reason
+        return repository.updateWork(
+            normalized,
+            fingerprint("UPDATE_WORK", *values.toTypedArray()),
+            now(),
+        )
+    }
+
+    fun updateEdition(command: UpdateEditionCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        command.expectedVersion.requireValidVersion()
+        val normalized = command.copy(
+            title = command.title.requiredText("title", 500),
+            isbn = command.isbn.requiredText("isbn", 32),
+            publisher = command.publisher.requiredText("publisher", 300),
+            language = command.language.requiredText("language", 80),
+            coverUrl = command.coverUrl.optionalHttpsUrl("coverUrl"),
+            coverColor = command.coverColor.optionalCoverColor(),
+            videoUrl = command.videoUrl.optionalHttpsUrl("videoUrl"),
+            reason = command.reason.requiredText("reason", 500, minimum = 8),
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        normalized.requireValidEditionNumbers()
+        return repository.updateEdition(
+            normalized,
+            fingerprint(
+                "UPDATE_EDITION",
+                normalized.editionId.toString(),
+                normalized.expectedVersion.toString(),
+                normalized.title,
+                normalized.isbn,
+                normalized.publisher,
+                normalized.publicationYear.toString(),
+                normalized.language,
+                normalized.pageCount.toString(),
+                normalized.coverUrl ?: NULL_MARKER,
+                normalized.coverColor ?: NULL_MARKER,
+                normalized.videoUrl ?: NULL_MARKER,
+                normalized.reason,
+            ),
+            now(),
+        )
+    }
+
+    fun setEditionActive(command: SetEditionActiveCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        command.expectedVersion.requireValidVersion()
+        val normalized = command.copy(
+            reason = command.reason.requiredText("reason", 500, minimum = 8),
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        return repository.setEditionActive(
+            normalized,
+            fingerprint(
+                "SET_EDITION_ACTIVE",
+                normalized.editionId.toString(),
+                normalized.expectedVersion.toString(),
+                normalized.active.toString(),
+                normalized.reason,
+            ),
+            now(),
+        )
+    }
+
     private fun normalizeAuthors(authors: List<CatalogAuthorInput>): List<CatalogAuthorInput> {
         if (authors.isEmpty() || authors.size > MAX_AUTHORS) {
             throw InvalidCatalogCommandException("authors must contain between 1 and $MAX_AUTHORS entries")
@@ -139,6 +229,21 @@ class CatalogCommandService(
             throw InvalidCatalogActorException("Catalog command actor fingerprint is invalid")
         }
     }
+
+    private fun Long.requireValidVersion() {
+        if (this < 0) throw InvalidCatalogCommandException("If-Match version must not be negative")
+    }
+
+    private fun UpdateEditionCommand.requireValidEditionNumbers() {
+        if (publicationYear !in 1000..3000) {
+            throw InvalidCatalogCommandException("publicationYear must be between 1000 and 3000")
+        }
+        if (pageCount !in 1..100_000) {
+            throw InvalidCatalogCommandException("pageCount must be between 1 and 100000")
+        }
+    }
+
+    private fun now() = clock.instant().truncatedTo(ChronoUnit.MICROS)
 
     private fun String?.optionalHttpsUrl(name: String): String? {
         val value = this?.trim()?.takeIf(String::isNotEmpty) ?: return null

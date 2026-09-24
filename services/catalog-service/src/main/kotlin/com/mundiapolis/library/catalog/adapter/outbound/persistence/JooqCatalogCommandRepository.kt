@@ -7,15 +7,21 @@ import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generat
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_OUTBOX_EVENT
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK_CONTRIBUTOR
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.tables.records.CatalogEditionRecord
 import com.mundiapolis.library.catalog.dto.CatalogCommandConflictException
 import com.mundiapolis.library.catalog.dto.CatalogCommandExecution
+import com.mundiapolis.library.catalog.dto.CatalogCommandNotFoundException
 import com.mundiapolis.library.catalog.dto.CatalogCommandResult
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyConflictException
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyIncompleteException
 import com.mundiapolis.library.catalog.dto.CreateEditionCommand
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.dto.SetEditionActiveCommand
+import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
+import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import org.jooq.DSLContext
 import org.jooq.JSON
+import org.jooq.exception.DataAccessException
 import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import tools.jackson.databind.ObjectMapper
@@ -40,6 +46,7 @@ class JooqCatalogCommandRepository(
             ownerFingerprint = command.ownerFingerprint,
             idempotencyKey = command.idempotencyKey,
             operation = CREATE_WORK,
+            responseStatus = CREATED_STATUS,
             requestFingerprint = requestFingerprint,
             now = now,
         ) {
@@ -112,6 +119,8 @@ class JooqCatalogCommandRepository(
                 ownerFingerprint = command.ownerFingerprint,
                 reason = command.reason,
                 now = now,
+                aggregateVersion = INITIAL_VERSION,
+                previousState = null,
             )
             CatalogCommandResult(WORK_AGGREGATE, command.workId, INITIAL_VERSION, now)
         }
@@ -128,6 +137,7 @@ class JooqCatalogCommandRepository(
             ownerFingerprint = command.ownerFingerprint,
             idempotencyKey = command.idempotencyKey,
             operation = CREATE_EDITION,
+            responseStatus = CREATED_STATUS,
             requestFingerprint = requestFingerprint,
             now = now,
         ) {
@@ -181,16 +191,347 @@ class JooqCatalogCommandRepository(
                 ownerFingerprint = command.ownerFingerprint,
                 reason = command.reason,
                 now = now,
+                aggregateVersion = INITIAL_VERSION,
+                previousState = null,
             )
             CatalogCommandResult(EDITION_AGGREGATE, command.editionId, INITIAL_VERSION, now)
         }
     }
+
+    fun updateWork(
+        command: UpdateWorkCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx = tx,
+            ownerFingerprint = command.ownerFingerprint,
+            idempotencyKey = command.idempotencyKey,
+            operation = UPDATE_WORK,
+            responseStatus = OK_STATUS,
+            requestFingerprint = requestFingerprint,
+            now = now,
+        ) {
+            val existing = tx.selectFrom(CATALOG_WORK)
+                .where(CATALOG_WORK.WORK_ID.eq(command.workId))
+                .forUpdate()
+                .fetchOne()
+                ?: throw CatalogCommandNotFoundException("Work does not exist")
+            val currentVersion = requireNotNull(existing.aggregateVersion)
+            if (currentVersion != command.expectedVersion) {
+                throw CatalogCommandConflictException(
+                    "Work version is $currentVersion, not ${command.expectedVersion}",
+                )
+            }
+            val previousState = workState(tx, command.workId)
+            replaceAuthors(tx, command, now)
+            val nextVersion = Math.incrementExact(currentVersion)
+            val updated = tx.update(CATALOG_WORK)
+                .set(CATALOG_WORK.TITLE, command.title)
+                .set(CATALOG_WORK.SUMMARY, command.summary)
+                .set(CATALOG_WORK.DESCRIPTION, command.description)
+                .set(CATALOG_WORK.GENRE, command.genre)
+                .set(CATALOG_WORK.AGGREGATE_VERSION, nextVersion)
+                .set(CATALOG_WORK.UPDATED_AT, now.toOffsetDateTime())
+                .where(
+                    CATALOG_WORK.WORK_ID.eq(command.workId)
+                        .and(CATALOG_WORK.AGGREGATE_VERSION.eq(currentVersion)),
+                )
+                .execute()
+            check(updated == 1) { "Locked work update was lost" }
+            val resultingState = linkedMapOf<String, Any?>(
+                "workId" to command.workId.toString(),
+                "title" to command.title,
+                "summary" to command.summary,
+                "description" to command.description,
+                "genre" to command.genre,
+                "rating" to requireNotNull(existing.rating).toDouble(),
+                "authors" to command.authors.map { author ->
+                    linkedMapOf(
+                        "contributorId" to author.contributorId.toString(),
+                        "name" to author.name,
+                        "bio" to author.bio,
+                    )
+                },
+            )
+            persistAuditAndOutbox(
+                tx = tx,
+                operation = UPDATE_WORK,
+                aggregateType = WORK_AGGREGATE,
+                aggregateId = command.workId,
+                eventType = WORK_UPDATED_EVENT,
+                state = resultingState,
+                ownerFingerprint = command.ownerFingerprint,
+                reason = command.reason,
+                now = now,
+                aggregateVersion = nextVersion,
+                previousState = previousState,
+            )
+            CatalogCommandResult(WORK_AGGREGATE, command.workId, nextVersion, now)
+        }
+    }
+
+    fun updateEdition(
+        command: UpdateEditionCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx = tx,
+            ownerFingerprint = command.ownerFingerprint,
+            idempotencyKey = command.idempotencyKey,
+            operation = UPDATE_EDITION,
+            responseStatus = OK_STATUS,
+            requestFingerprint = requestFingerprint,
+            now = now,
+        ) {
+            val existing = lockEdition(tx, command.editionId)
+            val currentVersion = requireNotNull(existing.aggregateVersion)
+            if (currentVersion != command.expectedVersion) {
+                throw CatalogCommandConflictException(
+                    "Edition version is $currentVersion, not ${command.expectedVersion}",
+                )
+            }
+            val previousState = editionState(existing)
+            val nextVersion = Math.incrementExact(currentVersion)
+            val updated = try {
+                tx.update(CATALOG_EDITION)
+                    .set(CATALOG_EDITION.TITLE, command.title)
+                    .set(CATALOG_EDITION.ISBN, command.isbn)
+                    .set(CATALOG_EDITION.PUBLISHER, command.publisher)
+                    .set(CATALOG_EDITION.PUBLICATION_YEAR, command.publicationYear)
+                    .set(CATALOG_EDITION.LANGUAGE, command.language)
+                    .set(CATALOG_EDITION.PAGE_COUNT, command.pageCount)
+                    .set(CATALOG_EDITION.COVER_URL, command.coverUrl)
+                    .set(CATALOG_EDITION.COVER_COLOR, command.coverColor)
+                    .set(CATALOG_EDITION.VIDEO_URL, command.videoUrl)
+                    .set(CATALOG_EDITION.AGGREGATE_VERSION, nextVersion)
+                    .set(CATALOG_EDITION.UPDATED_AT, now.toOffsetDateTime())
+                    .where(
+                        CATALOG_EDITION.EDITION_ID.eq(command.editionId)
+                            .and(CATALOG_EDITION.AGGREGATE_VERSION.eq(currentVersion)),
+                    )
+                    .execute()
+            } catch (exception: DataAccessException) {
+                if (exception.sqlState() == UNIQUE_VIOLATION_SQLSTATE) {
+                    throw CatalogCommandConflictException("Edition ISBN already exists")
+                }
+                throw exception
+            }
+            check(updated == 1) { "Locked edition update was lost" }
+            val resultingState = editionState(
+                editionId = command.editionId,
+                workId = requireNotNull(existing.workId),
+                title = command.title,
+                isbn = command.isbn,
+                publisher = command.publisher,
+                publicationYear = command.publicationYear,
+                language = command.language,
+                pageCount = command.pageCount,
+                coverUrl = command.coverUrl,
+                coverColor = command.coverColor,
+                videoUrl = command.videoUrl,
+                active = requireNotNull(existing.isActive),
+            )
+            persistAuditAndOutbox(
+                tx = tx,
+                operation = UPDATE_EDITION,
+                aggregateType = EDITION_AGGREGATE,
+                aggregateId = command.editionId,
+                eventType = EDITION_UPDATED_EVENT,
+                state = resultingState,
+                ownerFingerprint = command.ownerFingerprint,
+                reason = command.reason,
+                now = now,
+                aggregateVersion = nextVersion,
+                previousState = previousState,
+            )
+            CatalogCommandResult(EDITION_AGGREGATE, command.editionId, nextVersion, now)
+        }
+    }
+
+    fun setEditionActive(
+        command: SetEditionActiveCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx = tx,
+            ownerFingerprint = command.ownerFingerprint,
+            idempotencyKey = command.idempotencyKey,
+            operation = SET_EDITION_ACTIVE,
+            responseStatus = OK_STATUS,
+            requestFingerprint = requestFingerprint,
+            now = now,
+        ) {
+            val existing = lockEdition(tx, command.editionId)
+            val currentVersion = requireNotNull(existing.aggregateVersion)
+            if (currentVersion != command.expectedVersion) {
+                throw CatalogCommandConflictException(
+                    "Edition version is $currentVersion, not ${command.expectedVersion}",
+                )
+            }
+            if (existing.isActive == command.active) {
+                throw CatalogCommandConflictException("Edition already has the requested active state")
+            }
+            val nextVersion = Math.incrementExact(currentVersion)
+            val updated = tx.update(CATALOG_EDITION)
+                .set(CATALOG_EDITION.IS_ACTIVE, command.active)
+                .set(CATALOG_EDITION.AGGREGATE_VERSION, nextVersion)
+                .set(CATALOG_EDITION.UPDATED_AT, now.toOffsetDateTime())
+                .where(
+                    CATALOG_EDITION.EDITION_ID.eq(command.editionId)
+                        .and(CATALOG_EDITION.AGGREGATE_VERSION.eq(currentVersion)),
+                )
+                .execute()
+            check(updated == 1) { "Locked edition activation update was lost" }
+            val previousState = editionState(existing)
+            val resultingState = previousState.toMutableMap().apply {
+                this["isActive"] = command.active
+            }
+            persistAuditAndOutbox(
+                tx = tx,
+                operation = SET_EDITION_ACTIVE,
+                aggregateType = EDITION_AGGREGATE,
+                aggregateId = command.editionId,
+                eventType = EDITION_ACTIVATION_CHANGED_EVENT,
+                state = resultingState,
+                ownerFingerprint = command.ownerFingerprint,
+                reason = command.reason,
+                now = now,
+                aggregateVersion = nextVersion,
+                previousState = previousState,
+            )
+            CatalogCommandResult(EDITION_AGGREGATE, command.editionId, nextVersion, now)
+        }
+    }
+
+    private fun replaceAuthors(tx: DSLContext, command: UpdateWorkCommand, now: Instant) {
+        tx.deleteFrom(CATALOG_WORK_CONTRIBUTOR)
+            .where(CATALOG_WORK_CONTRIBUTOR.WORK_ID.eq(command.workId))
+            .execute()
+        command.authors.forEachIndexed { index, author ->
+            tx.insertInto(CATALOG_CONTRIBUTOR)
+                .set(CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID, author.contributorId)
+                .set(CATALOG_CONTRIBUTOR.NAME, author.name)
+                .set(CATALOG_CONTRIBUTOR.BIOGRAPHY, author.bio)
+                .set(CATALOG_CONTRIBUTOR.CREATED_AT, now.toOffsetDateTime())
+                .set(CATALOG_CONTRIBUTOR.UPDATED_AT, now.toOffsetDateTime())
+                .onConflictDoNothing()
+                .execute()
+            val existing = tx.selectFrom(CATALOG_CONTRIBUTOR)
+                .where(CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID.eq(author.contributorId))
+                .fetchOne()
+                ?: error("Contributor insert was not observable")
+            if (existing.name != author.name || existing.biography != author.bio) {
+                throw CatalogCommandConflictException(
+                    "Contributor ${author.contributorId} already has different metadata",
+                )
+            }
+            tx.insertInto(CATALOG_WORK_CONTRIBUTOR)
+                .set(CATALOG_WORK_CONTRIBUTOR.WORK_ID, command.workId)
+                .set(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTOR_ID, author.contributorId)
+                .set(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTION_ROLE, AUTHOR_ROLE)
+                .set(CATALOG_WORK_CONTRIBUTOR.DISPLAY_ORDER, index)
+                .execute()
+        }
+    }
+
+    private fun workState(tx: DSLContext, workId: UUID): Map<String, Any?> {
+        val work = tx.selectFrom(CATALOG_WORK)
+            .where(CATALOG_WORK.WORK_ID.eq(workId))
+            .fetchOne()
+            ?: error("Locked work disappeared")
+        val authors = tx.select(
+            CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID,
+            CATALOG_CONTRIBUTOR.NAME,
+            CATALOG_CONTRIBUTOR.BIOGRAPHY,
+        )
+            .from(CATALOG_WORK_CONTRIBUTOR)
+            .join(CATALOG_CONTRIBUTOR)
+            .on(CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID.eq(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTOR_ID))
+            .where(
+                CATALOG_WORK_CONTRIBUTOR.WORK_ID.eq(workId)
+                    .and(CATALOG_WORK_CONTRIBUTOR.CONTRIBUTION_ROLE.eq(AUTHOR_ROLE)),
+            )
+            .orderBy(CATALOG_WORK_CONTRIBUTOR.DISPLAY_ORDER, CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID)
+            .fetch { author ->
+                linkedMapOf(
+                    "contributorId" to requireNotNull(author[CATALOG_CONTRIBUTOR.CONTRIBUTOR_ID]).toString(),
+                    "name" to requireNotNull(author[CATALOG_CONTRIBUTOR.NAME]),
+                    "bio" to author[CATALOG_CONTRIBUTOR.BIOGRAPHY],
+                )
+            }
+        return linkedMapOf(
+            "workId" to workId.toString(),
+            "title" to requireNotNull(work.title),
+            "summary" to requireNotNull(work.summary),
+            "description" to requireNotNull(work.description),
+            "genre" to requireNotNull(work.genre),
+            "rating" to requireNotNull(work.rating).toDouble(),
+            "authors" to authors,
+        )
+    }
+
+    private fun lockEdition(tx: DSLContext, editionId: UUID): CatalogEditionRecord = tx
+        .selectFrom(CATALOG_EDITION)
+        .where(CATALOG_EDITION.EDITION_ID.eq(editionId))
+        .forUpdate()
+        .fetchOne()
+        ?: throw CatalogCommandNotFoundException("Edition does not exist")
+
+    private fun editionState(record: CatalogEditionRecord): Map<String, Any?> = editionState(
+        editionId = requireNotNull(record.editionId),
+        workId = requireNotNull(record.workId),
+        title = requireNotNull(record.title),
+        isbn = requireNotNull(record.isbn),
+        publisher = requireNotNull(record.publisher),
+        publicationYear = requireNotNull(record.publicationYear),
+        language = requireNotNull(record.language),
+        pageCount = requireNotNull(record.pageCount),
+        coverUrl = record.coverUrl,
+        coverColor = record.coverColor?.trim(),
+        videoUrl = record.videoUrl,
+        active = requireNotNull(record.isActive),
+    )
+
+    private fun editionState(
+        editionId: UUID,
+        workId: UUID,
+        title: String,
+        isbn: String,
+        publisher: String,
+        publicationYear: Int,
+        language: String,
+        pageCount: Int,
+        coverUrl: String?,
+        coverColor: String?,
+        videoUrl: String?,
+        active: Boolean,
+    ): Map<String, Any?> = linkedMapOf(
+        "editionId" to editionId.toString(),
+        "workId" to workId.toString(),
+        "title" to title,
+        "isbn" to isbn,
+        "publisher" to publisher,
+        "publicationYear" to publicationYear,
+        "language" to language,
+        "pageCount" to pageCount,
+        "coverUrl" to coverUrl,
+        "coverColor" to coverColor,
+        "videoUrl" to videoUrl,
+        "isActive" to active,
+    )
 
     private fun executeIdempotently(
         tx: DSLContext,
         ownerFingerprint: String,
         idempotencyKey: String,
         operation: String,
+        responseStatus: Int,
         requestFingerprint: String,
         now: Instant,
         action: () -> CatalogCommandResult,
@@ -231,7 +572,7 @@ class JooqCatalogCommandRepository(
 
         val result = action()
         val completed = tx.update(CATALOG_COMMAND_IDEMPOTENCY)
-            .set(CATALOG_COMMAND_IDEMPOTENCY.RESPONSE_STATUS, CREATED_STATUS)
+            .set(CATALOG_COMMAND_IDEMPOTENCY.RESPONSE_STATUS, responseStatus)
             .set(CATALOG_COMMAND_IDEMPOTENCY.AGGREGATE_TYPE, result.aggregateType)
             .set(CATALOG_COMMAND_IDEMPOTENCY.AGGREGATE_ID, result.aggregateId)
             .set(CATALOG_COMMAND_IDEMPOTENCY.AGGREGATE_VERSION, result.aggregateVersion)
@@ -257,16 +598,22 @@ class JooqCatalogCommandRepository(
         ownerFingerprint: String,
         reason: String,
         now: Instant,
+        aggregateVersion: Long,
+        previousState: Map<String, Any?>?,
     ) {
         val stateJson = JSON.valueOf(objectMapper.writeValueAsString(state))
         tx.insertInto(CATALOG_AUDIT_ENTRY)
             .set(CATALOG_AUDIT_ENTRY.AUDIT_ID, UUID.randomUUID())
             .set(CATALOG_AUDIT_ENTRY.AGGREGATE_TYPE, aggregateType)
             .set(CATALOG_AUDIT_ENTRY.AGGREGATE_ID, aggregateId)
-            .set(CATALOG_AUDIT_ENTRY.AGGREGATE_VERSION, INITIAL_VERSION)
+            .set(CATALOG_AUDIT_ENTRY.AGGREGATE_VERSION, aggregateVersion)
             .set(CATALOG_AUDIT_ENTRY.OPERATION, operation)
             .set(CATALOG_AUDIT_ENTRY.ACTOR_FINGERPRINT, ownerFingerprint)
             .set(CATALOG_AUDIT_ENTRY.REASON, reason)
+            .set(
+                CATALOG_AUDIT_ENTRY.PREVIOUS_STATE,
+                previousState?.let { JSON.valueOf(objectMapper.writeValueAsString(it)) },
+            )
             .set(CATALOG_AUDIT_ENTRY.RESULTING_STATE, stateJson)
             .set(CATALOG_AUDIT_ENTRY.OCCURRED_AT, now.toOffsetDateTime())
             .execute()
@@ -278,7 +625,7 @@ class JooqCatalogCommandRepository(
             .set(CATALOG_OUTBOX_EVENT.EVENT_ID, UUID.randomUUID())
             .set(CATALOG_OUTBOX_EVENT.AGGREGATE_TYPE, aggregateType)
             .set(CATALOG_OUTBOX_EVENT.AGGREGATE_ID, aggregateId)
-            .set(CATALOG_OUTBOX_EVENT.AGGREGATE_VERSION, INITIAL_VERSION)
+            .set(CATALOG_OUTBOX_EVENT.AGGREGATE_VERSION, aggregateVersion)
             .set(CATALOG_OUTBOX_EVENT.EVENT_TYPE, eventType)
             .set(CATALOG_OUTBOX_EVENT.EVENT_VERSION, EVENT_VERSION)
             .set(CATALOG_OUTBOX_EVENT.OCCURRED_AT, now.toOffsetDateTime())
@@ -293,14 +640,22 @@ class JooqCatalogCommandRepository(
     private companion object {
         const val CREATE_WORK = "CREATE_WORK"
         const val CREATE_EDITION = "CREATE_EDITION"
+        const val UPDATE_WORK = "UPDATE_WORK"
+        const val UPDATE_EDITION = "UPDATE_EDITION"
+        const val SET_EDITION_ACTIVE = "SET_EDITION_ACTIVE"
         const val WORK_AGGREGATE = "work"
         const val EDITION_AGGREGATE = "edition"
         const val WORK_CREATED_EVENT = "catalog.work.created"
         const val EDITION_CREATED_EVENT = "catalog.edition.created"
+        const val WORK_UPDATED_EVENT = "catalog.work.updated"
+        const val EDITION_UPDATED_EVENT = "catalog.edition.updated"
+        const val EDITION_ACTIVATION_CHANGED_EVENT = "catalog.edition.activation-changed"
         const val AUTHOR_ROLE = "AUTHOR"
         const val INITIAL_VERSION = 0L
         const val EVENT_VERSION = 1
         const val CREATED_STATUS = 201
+        const val OK_STATUS = 200
         const val RETENTION_SECONDS = 86_400L * 7
+        const val UNIQUE_VIOLATION_SQLSTATE = "23505"
     }
 }
