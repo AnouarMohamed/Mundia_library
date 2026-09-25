@@ -20,7 +20,8 @@ RUN --mount=type=cache,target=/root/.gradle \
 FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
 WORKDIR /app
 
-RUN addgroup -S -g 10001 app \
+RUN apk add --no-cache --upgrade libexpat \
+    && addgroup -S -g 10001 app \
     && adduser -S -D -H -u 10001 -G app app \
     && rm -f /bin/ash /bin/sh /sbin/apk /bin/busybox
 
