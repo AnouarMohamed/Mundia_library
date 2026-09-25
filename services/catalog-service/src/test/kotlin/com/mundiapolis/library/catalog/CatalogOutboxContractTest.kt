@@ -118,6 +118,35 @@ class CatalogOutboxContractTest {
     }
 
     @Test
+    fun `review events encode lifecycle state without identity or review text`() {
+        val aggregateId = UUID.fromString("76000000-0000-0000-0000-000000000001")
+        val event = claimedEvent(
+            aggregateId,
+            "review",
+            "catalog.review.deleted",
+            aggregateVersion = 2,
+            payload = """
+                {
+                  "reviewId":"$aggregateId",
+                  "workId":"76000000-0000-0000-0000-000000000002",
+                  "rating":5,
+                  "moderationStatus":"PUBLISHED",
+                  "deleted":true
+                }
+            """.trimIndent(),
+        )
+        val contract = CatalogEvent.parseFrom(
+            ProtobufCatalogEventEncoder(objectMapper, properties()).encode(event).payload,
+        )
+
+        assertEquals(aggregateId.toString(), contract.review.reviewId)
+        assertEquals(5, contract.review.rating)
+        assertEquals(true, contract.review.deleted)
+        assertEquals(false, contract.review.toString().contains("member"))
+        assertEquals(false, contract.review.toString().contains("content"))
+    }
+
+    @Test
     fun `enabled delivery configuration fails closed on insecure broker settings`() {
         assertTrue(properties().isSafeConfiguration)
         val unsafe = properties().copy(

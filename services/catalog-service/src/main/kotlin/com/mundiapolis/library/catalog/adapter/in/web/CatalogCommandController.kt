@@ -3,10 +3,13 @@ package com.mundiapolis.library.catalog.adapter.`in`.web
 import com.mundiapolis.library.catalog.dto.CatalogAuthorInput
 import com.mundiapolis.library.catalog.dto.CatalogCommandExecution
 import com.mundiapolis.library.catalog.dto.CreateEditionCommand
+import com.mundiapolis.library.catalog.dto.CreateReviewCommand
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.dto.DeleteReviewCommand
 import com.mundiapolis.library.catalog.dto.InvalidCatalogCommandException
 import com.mundiapolis.library.catalog.dto.SetEditionActiveCommand
 import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
+import com.mundiapolis.library.catalog.dto.UpdateReviewCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import com.mundiapolis.library.catalog.service.CatalogCommandService
 import org.springframework.http.HttpStatus
@@ -14,6 +17,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -162,6 +166,68 @@ class CatalogCommandController(
         ),
     )
 
+    @PostMapping("/works/{workId}/reviews")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.review.write')")
+    fun createReview(
+        authentication: JwtAuthenticationToken,
+        @PathVariable workId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) idempotencyKey: String,
+        @RequestBody request: CreateReviewRequest,
+    ): ResponseEntity<CatalogCommandResponse> {
+        val execution = commandService.createReview(
+            CreateReviewCommand(
+                workId = workId,
+                memberId = principalResolver.membershipId(authentication),
+                rating = request.rating,
+                content = request.content,
+                idempotencyKey = idempotencyKey,
+                ownerFingerprint = principalResolver.ownerFingerprint(authentication),
+            ),
+        )
+        return created(execution, "/api/v1/catalog/reviews/${execution.result.aggregateId}")
+    }
+
+    @PutMapping("/reviews/{reviewId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.review.write')")
+    fun updateReview(
+        authentication: JwtAuthenticationToken,
+        @PathVariable reviewId: UUID,
+        @RequestHeader(IF_MATCH_HEADER) ifMatch: String,
+        @RequestHeader(IDEMPOTENCY_HEADER) idempotencyKey: String,
+        @RequestBody request: UpdateReviewRequest,
+    ): ResponseEntity<CatalogCommandResponse> = ok(
+        commandService.updateReview(
+            UpdateReviewCommand(
+                reviewId = reviewId,
+                memberId = principalResolver.membershipId(authentication),
+                expectedVersion = parseIfMatch(ifMatch),
+                rating = request.rating,
+                content = request.content,
+                idempotencyKey = idempotencyKey,
+                ownerFingerprint = principalResolver.ownerFingerprint(authentication),
+            ),
+        ),
+    )
+
+    @DeleteMapping("/reviews/{reviewId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.review.write')")
+    fun deleteReview(
+        authentication: JwtAuthenticationToken,
+        @PathVariable reviewId: UUID,
+        @RequestHeader(IF_MATCH_HEADER) ifMatch: String,
+        @RequestHeader(IDEMPOTENCY_HEADER) idempotencyKey: String,
+    ): ResponseEntity<CatalogCommandResponse> = ok(
+        commandService.deleteReview(
+            DeleteReviewCommand(
+                reviewId = reviewId,
+                memberId = principalResolver.membershipId(authentication),
+                expectedVersion = parseIfMatch(ifMatch),
+                idempotencyKey = idempotencyKey,
+                ownerFingerprint = principalResolver.ownerFingerprint(authentication),
+            ),
+        ),
+    )
+
     private fun created(
         execution: CatalogCommandExecution,
         location: String,
@@ -249,6 +315,16 @@ data class UpdateEditionRequest(
 data class SetEditionActiveRequest(
     val isActive: Boolean,
     val reason: String,
+)
+
+data class CreateReviewRequest(
+    val rating: Int,
+    val content: String,
+)
+
+data class UpdateReviewRequest(
+    val rating: Int,
+    val content: String,
 )
 
 data class CatalogCommandResponse(

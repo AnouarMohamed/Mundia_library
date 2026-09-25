@@ -5,6 +5,7 @@ import com.mundiapolis.library.catalog.config.CatalogOutboxProperties
 import com.mundiapolis.library.catalog.contract.v1.CatalogEvent
 import com.mundiapolis.library.catalog.contract.v1.Contributor
 import com.mundiapolis.library.catalog.contract.v1.EditionEvent
+import com.mundiapolis.library.catalog.contract.v1.ReviewEvent
 import com.mundiapolis.library.catalog.contract.v1.WorkEvent
 import com.mundiapolis.library.catalog.dto.CatalogOutboxContractException
 import com.mundiapolis.library.catalog.dto.CatalogOutboxPayloadTooLargeException
@@ -38,6 +39,7 @@ class ProtobufCatalogEventEncoder(
                 when (event.aggregateType) {
                     WORK_AGGREGATE -> setWork(encodeWork(event, payload))
                     EDITION_AGGREGATE -> setEdition(encodeEdition(event, payload))
+                    REVIEW_AGGREGATE -> setReview(encodeReview(event, payload))
                     else -> throw CatalogOutboxContractException("Unknown Catalog aggregate type")
                 }
             }
@@ -110,6 +112,23 @@ class ProtobufCatalogEventEncoder(
                 }
                 payload.optionalHttpsUrl("videoUrl")?.let(::setVideoUrl)
             }
+            .build()
+    }
+
+    private fun encodeReview(event: ClaimedCatalogOutboxEvent, payload: JsonNode): ReviewEvent {
+        requireContract(payload.isObject && payload.propertyNames().all(REVIEW_FIELDS::contains))
+        val reviewId = payload.requiredUuid("reviewId")
+        requireContract(reviewId == event.aggregateId)
+        val rating = payload.requiredInt("rating")
+        requireContract(rating in 1..5)
+        val moderationStatus = payload.requiredText("moderationStatus", 20)
+        requireContract(moderationStatus in REVIEW_STATUSES)
+        return ReviewEvent.newBuilder()
+            .setReviewId(reviewId.toString())
+            .setWorkId(payload.requiredUuid("workId").toString())
+            .setRating(rating)
+            .setModerationStatus(moderationStatus)
+            .setDeleted(payload.requiredBoolean("deleted"))
             .build()
     }
 
@@ -191,6 +210,7 @@ class ProtobufCatalogEventEncoder(
         const val CONTRACT_VERSION = 1
         const val WORK_AGGREGATE = "work"
         const val EDITION_AGGREGATE = "edition"
+        const val REVIEW_AGGREGATE = "review"
         val COVER_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
         val EVENT_TYPES = mapOf(
             "catalog.work.created" to WORK_AGGREGATE,
@@ -198,6 +218,9 @@ class ProtobufCatalogEventEncoder(
             "catalog.edition.created" to EDITION_AGGREGATE,
             "catalog.edition.updated" to EDITION_AGGREGATE,
             "catalog.edition.activation-changed" to EDITION_AGGREGATE,
+            "catalog.review.created" to REVIEW_AGGREGATE,
+            "catalog.review.updated" to REVIEW_AGGREGATE,
+            "catalog.review.deleted" to REVIEW_AGGREGATE,
         )
         val WORK_FIELDS = setOf("workId", "title", "summary", "description", "genre", "rating", "authors")
         val AUTHOR_FIELDS = setOf("contributorId", "name", "bio")
@@ -215,5 +238,7 @@ class ProtobufCatalogEventEncoder(
             "videoUrl",
             "isActive",
         )
+        val REVIEW_FIELDS = setOf("reviewId", "workId", "rating", "moderationStatus", "deleted")
+        val REVIEW_STATUSES = setOf("PUBLISHED", "HIDDEN")
     }
 }

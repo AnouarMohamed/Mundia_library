@@ -78,6 +78,33 @@ data class SetEditionActiveCommand(
     val ownerFingerprint: String,
 )
 
+data class CreateReviewCommand(
+    val workId: UUID,
+    val memberId: UUID,
+    val rating: Int,
+    val content: String,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
+data class UpdateReviewCommand(
+    val reviewId: UUID,
+    val memberId: UUID,
+    val expectedVersion: Long,
+    val rating: Int,
+    val content: String,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
+data class DeleteReviewCommand(
+    val reviewId: UUID,
+    val memberId: UUID,
+    val expectedVersion: Long,
+    val idempotencyKey: String,
+    val ownerFingerprint: String,
+)
+
 data class CatalogCommandResult(
     val aggregateType: String,
     val aggregateId: UUID,
@@ -103,3 +130,6 @@ class CatalogIdempotencyIncompleteException :
 class InvalidCatalogCommandException(message: String) : RuntimeException(message)
 
 class InvalidCatalogActorException(message: String) : RuntimeException(message)
+
+class ReviewNotEligibleException :
+    RuntimeException("A returned loan for this work is required before reviewing it")

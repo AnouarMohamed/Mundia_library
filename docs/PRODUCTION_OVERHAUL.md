@@ -285,8 +285,11 @@ through strict Protobuf/header validation, an atomic inbox, contiguous aggregate
 versions, manual offsets, derived edition counts, and readiness failure on
 poisoned or gapped input. The same consumer now retains an ordered minimal loan
 projection so review eligibility can be proven from returned-loan evidence
-without reading Circulation's database. Membership writes, Catalog review commands,
-backfill/reconciliation, retention/deletion automation, BFF routing, and
+without reading Circulation's database. Catalog now owns idempotent member review
+create/update/delete commands: identity is JWT-bound, create eligibility comes
+from that returned-loan projection, aggregate ratings update transactionally,
+and privacy-minimized audit/outbox events retain neither member IDs nor review
+text. Membership writes, backfill/reconciliation, retention/deletion automation, BFF routing, and
 production cutover are not complete, so the Phase 4 exit gate remains open.
 Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
@@ -295,7 +298,7 @@ transaction. Updates require exact version ETags and reject stale writers.
 Catalog outbox delivery now uses crash-recoverable aggregate-ordered leases,
 bounded retries, poison-event blocking, Protobuf v1 encoding, synchronous Kafka
 acknowledgements, retention cleanup, and health/metrics. Broker provisioning,
-availability replay/reconciliation evidence, review commands, and all cutover
+availability replay/reconciliation evidence and all cutover
 gates remain open; these command APIs are not production-routed yet.
 
 Exit gate: there are no cross-service database reads or writes and all privacy

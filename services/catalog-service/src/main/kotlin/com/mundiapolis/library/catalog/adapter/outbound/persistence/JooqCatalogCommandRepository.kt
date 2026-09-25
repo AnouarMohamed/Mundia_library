@@ -4,7 +4,9 @@ import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generat
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_COMMAND_IDEMPOTENCY
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_CONTRIBUTOR
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_LOAN_REVIEW_PROJECTION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_OUTBOX_EVENT
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_REVIEW
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK_CONTRIBUTOR
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.tables.records.CatalogEditionRecord
@@ -15,9 +17,13 @@ import com.mundiapolis.library.catalog.dto.CatalogCommandResult
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyConflictException
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyIncompleteException
 import com.mundiapolis.library.catalog.dto.CreateEditionCommand
+import com.mundiapolis.library.catalog.dto.CreateReviewCommand
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.dto.DeleteReviewCommand
+import com.mundiapolis.library.catalog.dto.ReviewNotEligibleException
 import com.mundiapolis.library.catalog.dto.SetEditionActiveCommand
 import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
+import com.mundiapolis.library.catalog.dto.UpdateReviewCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import org.jooq.DSLContext
 import org.jooq.JSON
@@ -28,6 +34,8 @@ import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.UUID
 
 @Repository
@@ -409,6 +417,263 @@ class JooqCatalogCommandRepository(
         }
     }
 
+    fun createReview(
+        command: CreateReviewCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx,
+            command.ownerFingerprint,
+            command.idempotencyKey,
+            CREATE_REVIEW,
+            CREATED_STATUS,
+            requestFingerprint,
+            now,
+        ) {
+            lockWork(tx, command.workId)
+            val eligible = tx.fetchExists(
+                tx.selectOne()
+                    .from(CATALOG_LOAN_REVIEW_PROJECTION)
+                    .join(CATALOG_EDITION)
+                    .on(CATALOG_EDITION.EDITION_ID.eq(CATALOG_LOAN_REVIEW_PROJECTION.EDITION_ID))
+                    .where(
+                        CATALOG_LOAN_REVIEW_PROJECTION.MEMBER_ID.eq(command.memberId)
+                            .and(CATALOG_LOAN_REVIEW_PROJECTION.STATUS.eq(RETURNED_STATUS))
+                            .and(CATALOG_EDITION.WORK_ID.eq(command.workId)),
+                    ),
+            )
+            if (!eligible) throw ReviewNotEligibleException()
+            if (
+                tx.fetchExists(
+                    CATALOG_REVIEW,
+                    CATALOG_REVIEW.WORK_ID.eq(command.workId)
+                        .and(CATALOG_REVIEW.MEMBER_ID.eq(command.memberId)),
+                )
+            ) {
+                throw CatalogCommandConflictException("Member already reviewed this work")
+            }
+            val reviewId = UUID.randomUUID()
+            val state = reviewState(reviewId, command.workId, command.rating, PUBLISHED_STATUS, false)
+            tx.insertInto(CATALOG_REVIEW)
+                .set(CATALOG_REVIEW.REVIEW_ID, reviewId)
+                .set(CATALOG_REVIEW.WORK_ID, command.workId)
+                .set(CATALOG_REVIEW.MEMBER_ID, command.memberId)
+                .set(CATALOG_REVIEW.RATING, command.rating.toShort())
+                .set(CATALOG_REVIEW.CONTENT, command.content)
+                .set(CATALOG_REVIEW.MODERATION_STATUS, PUBLISHED_STATUS)
+                .set(CATALOG_REVIEW.CREATED_AT, now.toOffsetDateTime())
+                .set(CATALOG_REVIEW.UPDATED_AT, now.toOffsetDateTime())
+                .set(CATALOG_REVIEW.AGGREGATE_VERSION, INITIAL_VERSION)
+                .execute()
+            refreshWorkRating(tx, command.workId, now)
+            persistAuditAndOutbox(
+                tx,
+                CREATE_REVIEW,
+                REVIEW_AGGREGATE,
+                reviewId,
+                REVIEW_CREATED_EVENT,
+                state,
+                command.ownerFingerprint,
+                CREATE_REVIEW_REASON,
+                now,
+                INITIAL_VERSION,
+                null,
+            )
+            CatalogCommandResult(REVIEW_AGGREGATE, reviewId, INITIAL_VERSION, now)
+        }
+    }
+
+    fun updateReview(
+        command: UpdateReviewCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx,
+            command.ownerFingerprint,
+            command.idempotencyKey,
+            UPDATE_REVIEW,
+            OK_STATUS,
+            requestFingerprint,
+            now,
+        ) {
+            val workId = findOwnedReviewWork(tx, command.reviewId, command.memberId)
+            lockWork(tx, workId)
+            val existing = lockOwnedReview(tx, command.reviewId, command.memberId)
+            val currentVersion = requireNotNull(existing.aggregateVersion)
+            if (currentVersion != command.expectedVersion) {
+                throw CatalogCommandConflictException(
+                    "Review version is $currentVersion, not ${command.expectedVersion}",
+                )
+            }
+            val nextVersion = Math.incrementExact(currentVersion)
+            val previousState = reviewState(
+                command.reviewId,
+                workId,
+                requireNotNull(existing.rating).toInt(),
+                requireNotNull(existing.moderationStatus),
+                false,
+            )
+            tx.update(CATALOG_REVIEW)
+                .set(CATALOG_REVIEW.RATING, command.rating.toShort())
+                .set(CATALOG_REVIEW.CONTENT, command.content)
+                .set(CATALOG_REVIEW.AGGREGATE_VERSION, nextVersion)
+                .set(CATALOG_REVIEW.UPDATED_AT, now.toOffsetDateTime())
+                .where(
+                    CATALOG_REVIEW.REVIEW_ID.eq(command.reviewId)
+                        .and(CATALOG_REVIEW.AGGREGATE_VERSION.eq(currentVersion)),
+                )
+                .execute()
+                .also { check(it == 1) { "Locked review update was lost" } }
+            refreshWorkRating(tx, workId, now)
+            val state = reviewState(
+                command.reviewId,
+                workId,
+                command.rating,
+                requireNotNull(existing.moderationStatus),
+                false,
+            )
+            persistAuditAndOutbox(
+                tx,
+                UPDATE_REVIEW,
+                REVIEW_AGGREGATE,
+                command.reviewId,
+                REVIEW_UPDATED_EVENT,
+                state,
+                command.ownerFingerprint,
+                UPDATE_REVIEW_REASON,
+                now,
+                nextVersion,
+                previousState,
+            )
+            CatalogCommandResult(REVIEW_AGGREGATE, command.reviewId, nextVersion, now)
+        }
+    }
+
+    fun deleteReview(
+        command: DeleteReviewCommand,
+        requestFingerprint: String,
+        now: Instant,
+    ): CatalogCommandExecution = dsl.transactionResult { configuration ->
+        val tx = DSL.using(configuration)
+        executeIdempotently(
+            tx,
+            command.ownerFingerprint,
+            command.idempotencyKey,
+            DELETE_REVIEW,
+            OK_STATUS,
+            requestFingerprint,
+            now,
+        ) {
+            val workId = findOwnedReviewWork(tx, command.reviewId, command.memberId)
+            lockWork(tx, workId)
+            val existing = lockOwnedReview(tx, command.reviewId, command.memberId)
+            val currentVersion = requireNotNull(existing.aggregateVersion)
+            if (currentVersion != command.expectedVersion) {
+                throw CatalogCommandConflictException(
+                    "Review version is $currentVersion, not ${command.expectedVersion}",
+                )
+            }
+            val nextVersion = Math.incrementExact(currentVersion)
+            val previousState = reviewState(
+                command.reviewId,
+                workId,
+                requireNotNull(existing.rating).toInt(),
+                requireNotNull(existing.moderationStatus),
+                false,
+            )
+            tx.deleteFrom(CATALOG_REVIEW)
+                .where(
+                    CATALOG_REVIEW.REVIEW_ID.eq(command.reviewId)
+                        .and(CATALOG_REVIEW.AGGREGATE_VERSION.eq(currentVersion)),
+                )
+                .execute()
+                .also { check(it == 1) { "Locked review delete was lost" } }
+            refreshWorkRating(tx, workId, now)
+            val state = previousState.toMutableMap().apply { this["deleted"] = true }
+            persistAuditAndOutbox(
+                tx,
+                DELETE_REVIEW,
+                REVIEW_AGGREGATE,
+                command.reviewId,
+                REVIEW_DELETED_EVENT,
+                state,
+                command.ownerFingerprint,
+                DELETE_REVIEW_REASON,
+                now,
+                nextVersion,
+                previousState,
+            )
+            CatalogCommandResult(REVIEW_AGGREGATE, command.reviewId, nextVersion, now)
+        }
+    }
+
+    private fun findOwnedReviewWork(tx: DSLContext, reviewId: UUID, memberId: UUID): UUID =
+        tx.select(CATALOG_REVIEW.WORK_ID)
+            .from(CATALOG_REVIEW)
+            .where(
+                CATALOG_REVIEW.REVIEW_ID.eq(reviewId)
+                    .and(CATALOG_REVIEW.MEMBER_ID.eq(memberId)),
+            )
+            .fetchOne(CATALOG_REVIEW.WORK_ID)
+            ?: throw CatalogCommandNotFoundException("Review does not exist")
+
+    private fun lockOwnedReview(tx: DSLContext, reviewId: UUID, memberId: UUID) = tx
+        .selectFrom(CATALOG_REVIEW)
+        .where(
+            CATALOG_REVIEW.REVIEW_ID.eq(reviewId)
+                .and(CATALOG_REVIEW.MEMBER_ID.eq(memberId)),
+        )
+        .forUpdate()
+        .fetchOne()
+        ?: throw CatalogCommandNotFoundException("Review does not exist")
+
+    private fun lockWork(tx: DSLContext, workId: UUID) = tx.selectFrom(CATALOG_WORK)
+        .where(CATALOG_WORK.WORK_ID.eq(workId))
+        .forUpdate()
+        .fetchOne()
+        ?: throw CatalogCommandNotFoundException("Work does not exist")
+
+    private fun refreshWorkRating(tx: DSLContext, workId: UUID, now: Instant) {
+        val ratings = tx.select(CATALOG_REVIEW.RATING)
+            .from(CATALOG_REVIEW)
+            .where(
+                CATALOG_REVIEW.WORK_ID.eq(workId)
+                    .and(CATALOG_REVIEW.MODERATION_STATUS.eq(PUBLISHED_STATUS)),
+            )
+            .fetch(CATALOG_REVIEW.RATING)
+        val average = if (ratings.isEmpty()) {
+            BigDecimal.ZERO
+        } else {
+            ratings.fold(BigDecimal.ZERO) { sum, rating -> sum + BigDecimal.valueOf(rating.toLong()) }
+                .divide(BigDecimal.valueOf(ratings.size.toLong()), 2, RoundingMode.HALF_UP)
+        }
+        tx.update(CATALOG_WORK)
+            .set(CATALOG_WORK.RATING, average)
+            .set(CATALOG_WORK.RATING_COUNT, ratings.size)
+            .set(CATALOG_WORK.UPDATED_AT, now.toOffsetDateTime())
+            .where(CATALOG_WORK.WORK_ID.eq(workId))
+            .execute()
+            .also { check(it == 1) { "Locked work rating update was lost" } }
+    }
+
+    private fun reviewState(
+        reviewId: UUID,
+        workId: UUID,
+        rating: Int,
+        moderationStatus: String,
+        deleted: Boolean,
+    ): Map<String, Any?> = linkedMapOf(
+        "reviewId" to reviewId.toString(),
+        "workId" to workId.toString(),
+        "rating" to rating,
+        "moderationStatus" to moderationStatus,
+        "deleted" to deleted,
+    )
+
     private fun replaceAuthors(tx: DSLContext, command: UpdateWorkCommand, now: Instant) {
         tx.deleteFrom(CATALOG_WORK_CONTRIBUTOR)
             .where(CATALOG_WORK_CONTRIBUTOR.WORK_ID.eq(command.workId))
@@ -643,13 +908,25 @@ class JooqCatalogCommandRepository(
         const val UPDATE_WORK = "UPDATE_WORK"
         const val UPDATE_EDITION = "UPDATE_EDITION"
         const val SET_EDITION_ACTIVE = "SET_EDITION_ACTIVE"
+        const val CREATE_REVIEW = "CREATE_REVIEW"
+        const val UPDATE_REVIEW = "UPDATE_REVIEW"
+        const val DELETE_REVIEW = "DELETE_REVIEW"
         const val WORK_AGGREGATE = "work"
         const val EDITION_AGGREGATE = "edition"
+        const val REVIEW_AGGREGATE = "review"
         const val WORK_CREATED_EVENT = "catalog.work.created"
         const val EDITION_CREATED_EVENT = "catalog.edition.created"
         const val WORK_UPDATED_EVENT = "catalog.work.updated"
         const val EDITION_UPDATED_EVENT = "catalog.edition.updated"
         const val EDITION_ACTIVATION_CHANGED_EVENT = "catalog.edition.activation-changed"
+        const val REVIEW_CREATED_EVENT = "catalog.review.created"
+        const val REVIEW_UPDATED_EVENT = "catalog.review.updated"
+        const val REVIEW_DELETED_EVENT = "catalog.review.deleted"
+        const val PUBLISHED_STATUS = "PUBLISHED"
+        const val RETURNED_STATUS = "RETURNED"
+        const val CREATE_REVIEW_REASON = "Member created review"
+        const val UPDATE_REVIEW_REASON = "Member updated review"
+        const val DELETE_REVIEW_REASON = "Member deleted review"
         const val AUTHOR_ROLE = "AUTHOR"
         const val INITIAL_VERSION = 0L
         const val EVENT_VERSION = 1

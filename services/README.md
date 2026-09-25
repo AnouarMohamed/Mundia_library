@@ -159,6 +159,9 @@ known state. The immutable contract is public at
 | Replace work metadata and ordered authors | `PUT /api/v1/catalog/works/{workId}` | `catalog.manage` |
 | Replace edition metadata | `PUT /api/v1/catalog/editions/{editionId}` | `catalog.manage` |
 | Activate or deactivate an edition | `POST /api/v1/catalog/editions/{editionId}/activation` | `catalog.manage` |
+| Create an eligible member review | `POST /api/v1/catalog/works/{workId}/reviews` | `catalog.review.write` |
+| Replace the authenticated member's review | `PUT /api/v1/catalog/reviews/{reviewId}` | `catalog.review.write` |
+| Delete the authenticated member's review | `DELETE /api/v1/catalog/reviews/{reviewId}` | `catalog.review.write` |
 
 Search filtering, totals, and pagination execute in PostgreSQL and use a stable
 edition-ID tie breaker. Review reads exclude hidden content and never expose
@@ -166,11 +169,14 @@ member identifiers. Commands require an actor-bound `Idempotency-Key`; the
 aggregate, exact replay snapshot, append-only audit, and versioned outbox event
 commit atomically. Updates also require an exact aggregate-version ETag in
 `If-Match`, reject stale versions, and return the new version in `ETag`.
-Catalog commands never accept copy counts or copy state. The schema is installed
+Review commands bind ownership to the canonical `membership_id` JWT claim and
+authorize creation only from the local, ordered returned-loan projection. A
+member can publish at most one review per work. Review deletion physically
+removes the text; audit and broker events intentionally retain neither member
+identity nor review content. Catalog commands never accept copy counts or copy state. The schema is installed
 from `catalog-service/src/main/resources/db/migration`; runtime Flyway remains
-disabled by default. Catalog review commands, legacy backfill/reconciliation,
-and BFF cutover remain later Phase 4 gates, so Next.js is still the production
-authority.
+disabled by default. Legacy backfill/reconciliation and BFF cutover remain
+later Phase 4 gates, so Next.js is still the production authority.
 
 When `CIRCULATION_CONSUMER_ENABLED=true`, Catalog consumes Circulation's shared
 v1 event topic with an independent consumer group and broker credentials. It
@@ -180,8 +186,8 @@ projection and atomic inbox before manually committing the Kafka offset.
 Edition totals are derived transactionally from those rows: withdrawn copies
 are excluded from total inventory and only `AVAILABLE` copies are available.
 The ordered loan projection retains the minimal member/edition relationship and
-returned timestamp required to authorize a future review command; it contains
-no member profile data.
+returned timestamp required to authorize review creation; it contains no member
+profile data.
 Exact redelivery replays safely; gaps, conflicting event IDs/versions,
 future-skewed events, malformed contracts, and fatal broker failures stop the
 consumer and make readiness unhealthy. The disposable edition-level cache is

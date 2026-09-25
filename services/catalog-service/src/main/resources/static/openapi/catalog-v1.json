@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.3.0",
-    "description": "Authoritative catalog metadata and privacy-safe published-review reads. Copy counts are a versioned projection owned by Circulation."
+    "version": "1.4.0",
+    "description": "Authoritative catalog metadata and privacy-safe review commands and reads. Copy counts and returned-loan eligibility are versioned projections owned by Circulation."
   },
   "paths": {
     "/api/v1/catalog/works": {
@@ -120,6 +120,62 @@
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" }
         }
+      },
+      "post": {
+        "operationId": "createReview",
+        "x-required-scopes": ["catalog.review.write"],
+        "parameters": [
+          { "$ref": "#/components/parameters/WorkId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReviewRequest" } } } },
+        "responses": {
+          "201": { "description": "Review created or exact command replayed", "headers": { "Location": { "description": "Canonical review command resource.", "schema": { "type": "string", "format": "uri-reference" } }, "ETag": { "description": "Quoted aggregate version.", "schema": { "type": "string" } }, "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommandResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+    "/api/v1/catalog/reviews/{reviewId}": {
+      "put": {
+        "operationId": "updateReview",
+        "x-required-scopes": ["catalog.review.write"],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReviewId" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateReviewRequest" } } } },
+        "responses": {
+          "200": { "description": "Review updated or exact command replayed", "headers": { "ETag": { "description": "Quoted aggregate version.", "schema": { "type": "string" } }, "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommandResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteReview",
+        "x-required-scopes": ["catalog.review.write"],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReviewId" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Review deleted or exact command replayed", "headers": { "ETag": { "description": "Quoted terminal aggregate version.", "schema": { "type": "string" } }, "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommandResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
       }
     },
     "/api/v1/catalog/editions/{editionId}/activation": {
@@ -184,6 +240,7 @@
     "parameters": {
       "WorkId": { "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
       "EditionId": { "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "ReviewId": { "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
       "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 16, "maxLength": 128, "pattern": "^[ -~]+$" } },
       "IfMatch": { "name": "If-Match", "in": "header", "required": true, "description": "Exact quoted aggregate version, for example \"0\".", "schema": { "type": "string", "pattern": "^\"(0|[1-9][0-9]*)\"$" } }
     },
@@ -193,7 +250,8 @@
       "Forbidden": { "description": "Required scope is missing" },
       "NotFound": { "description": "Resource not found" },
       "Conflict": { "description": "Aggregate, contributor metadata, or idempotency conflict" },
-      "PayloadTooLarge": { "description": "Command body exceeds 128 KiB" }
+      "PayloadTooLarge": { "description": "Command body exceeds 128 KiB" },
+      "UnprocessableEntity": { "description": "Returned-loan evidence does not authorize this review" }
     },
     "schemas": {
       "Author": {
@@ -359,12 +417,30 @@
           "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
         }
       },
+      "CreateReviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rating", "content"],
+        "properties": {
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "content": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        }
+      },
+      "UpdateReviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rating", "content"],
+        "properties": {
+          "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "content": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        }
+      },
       "CatalogCommandResponse": {
         "type": "object",
         "additionalProperties": false,
         "required": ["aggregateType", "aggregateId", "aggregateVersion", "occurredAt"],
         "properties": {
-          "aggregateType": { "type": "string", "enum": ["work", "edition"] },
+          "aggregateType": { "type": "string", "enum": ["work", "edition", "review"] },
           "aggregateId": { "type": "string", "format": "uuid" },
           "aggregateVersion": { "type": "integer", "minimum": 0 },
           "occurredAt": { "type": "string", "format": "date-time" }

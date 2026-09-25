@@ -4,11 +4,14 @@ import com.mundiapolis.library.catalog.adapter.outbound.persistence.JooqCatalogC
 import com.mundiapolis.library.catalog.dto.CatalogAuthorInput
 import com.mundiapolis.library.catalog.dto.CatalogCommandExecution
 import com.mundiapolis.library.catalog.dto.CreateEditionCommand
+import com.mundiapolis.library.catalog.dto.CreateReviewCommand
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
+import com.mundiapolis.library.catalog.dto.DeleteReviewCommand
 import com.mundiapolis.library.catalog.dto.InvalidCatalogCommandException
 import com.mundiapolis.library.catalog.dto.InvalidCatalogActorException
 import com.mundiapolis.library.catalog.dto.SetEditionActiveCommand
 import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
+import com.mundiapolis.library.catalog.dto.UpdateReviewCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import org.springframework.stereotype.Service
 import java.net.URI
@@ -182,6 +185,66 @@ class CatalogCommandService(
         )
     }
 
+    fun createReview(command: CreateReviewCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        val normalized = command.copy(
+            content = command.content.requiredText("content", 4_000),
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        normalized.rating.requireValidRating()
+        return repository.createReview(
+            normalized,
+            fingerprint(
+                "CREATE_REVIEW",
+                normalized.workId.toString(),
+                normalized.memberId.toString(),
+                normalized.rating.toString(),
+                normalized.content,
+            ),
+            now(),
+        )
+    }
+
+    fun updateReview(command: UpdateReviewCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        command.expectedVersion.requireValidVersion()
+        val normalized = command.copy(
+            content = command.content.requiredText("content", 4_000),
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        normalized.rating.requireValidRating()
+        return repository.updateReview(
+            normalized,
+            fingerprint(
+                "UPDATE_REVIEW",
+                normalized.reviewId.toString(),
+                normalized.memberId.toString(),
+                normalized.expectedVersion.toString(),
+                normalized.rating.toString(),
+                normalized.content,
+            ),
+            now(),
+        )
+    }
+
+    fun deleteReview(command: DeleteReviewCommand): CatalogCommandExecution {
+        command.ownerFingerprint.requireValidOwner()
+        command.expectedVersion.requireValidVersion()
+        val normalized = command.copy(
+            idempotencyKey = command.idempotencyKey.validIdempotencyKey(),
+        )
+        return repository.deleteReview(
+            normalized,
+            fingerprint(
+                "DELETE_REVIEW",
+                normalized.reviewId.toString(),
+                normalized.memberId.toString(),
+                normalized.expectedVersion.toString(),
+            ),
+            now(),
+        )
+    }
+
     private fun normalizeAuthors(authors: List<CatalogAuthorInput>): List<CatalogAuthorInput> {
         if (authors.isEmpty() || authors.size > MAX_AUTHORS) {
             throw InvalidCatalogCommandException("authors must contain between 1 and $MAX_AUTHORS entries")
@@ -232,6 +295,10 @@ class CatalogCommandService(
 
     private fun Long.requireValidVersion() {
         if (this < 0) throw InvalidCatalogCommandException("If-Match version must not be negative")
+    }
+
+    private fun Int.requireValidRating() {
+        if (this !in 1..5) throw InvalidCatalogCommandException("rating must be between 1 and 5")
     }
 
     private fun UpdateEditionCommand.requireValidEditionNumbers() {

@@ -5,9 +5,11 @@ import com.mundiapolis.library.catalog.adapter.`in`.web.CatalogCommandController
 import com.mundiapolis.library.catalog.adapter.`in`.web.CatalogCommandResponse
 import com.mundiapolis.library.catalog.adapter.`in`.web.CreateAuthorRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.CreateEditionRequest
+import com.mundiapolis.library.catalog.adapter.`in`.web.CreateReviewRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.CreateWorkRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.SetEditionActiveRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateEditionRequest
+import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateReviewRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateWorkRequest
 import com.mundiapolis.library.catalog.dto.Author
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
@@ -20,6 +22,7 @@ import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -51,7 +54,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.3.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.4.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -69,6 +72,8 @@ class OpenApiContractTest {
         assertSchemaFields("UpdateWorkRequest", UpdateWorkRequest::class.java)
         assertSchemaFields("UpdateEditionRequest", UpdateEditionRequest::class.java)
         assertSchemaFields("SetEditionActiveRequest", SetEditionActiveRequest::class.java)
+        assertSchemaFields("CreateReviewRequest", CreateReviewRequest::class.java)
+        assertSchemaFields("UpdateReviewRequest", UpdateReviewRequest::class.java)
         assertSchemaFields("CatalogCommandResponse", CatalogCommandResponse::class.java)
     }
 
@@ -80,6 +85,9 @@ class OpenApiContractTest {
             Triple("/api/v1/catalog/works/{workId}", "put", "200"),
             Triple("/api/v1/catalog/editions/{editionId}", "put", "200"),
             Triple("/api/v1/catalog/editions/{editionId}/activation", "post", "200"),
+            Triple("/api/v1/catalog/works/{workId}/reviews", "post", "201"),
+            Triple("/api/v1/catalog/reviews/{reviewId}", "put", "200"),
+            Triple("/api/v1/catalog/reviews/{reviewId}", "delete", "200"),
         ).forEach { (path, method, status) ->
             val headers = contract["paths"][path][method]["responses"][status]["headers"]
             assertThat(headers.has("ETag")).isTrue()
@@ -103,7 +111,7 @@ class OpenApiContractTest {
         val paths = contract["paths"]
         val operations = mutableMapOf<Route, Set<String>>()
         paths.propertyNames().forEach { path ->
-            listOf("get", "post", "put").forEach { httpMethod ->
+            listOf("get", "post", "put", "delete").forEach { httpMethod ->
                 val operation = paths[path][httpMethod]
                 if (operation != null) {
                     val scopes = operation["x-required-scopes"]
@@ -125,15 +133,18 @@ class OpenApiContractTest {
             val get = method.getAnnotation(GetMapping::class.java)
             val post = method.getAnnotation(PostMapping::class.java)
             val put = method.getAnnotation(PutMapping::class.java)
+            val delete = method.getAnnotation(DeleteMapping::class.java)
             val httpMethod = when {
                 get != null -> "get"
                 post != null -> "post"
                 put != null -> "put"
+                delete != null -> "delete"
                 else -> return@mapNotNull null
             }
             val relativePath = get?.value?.single()
                 ?: post?.value?.single()
-                ?: requireNotNull(put).value.single()
+                ?: put?.value?.single()
+                ?: requireNotNull(delete).value.single()
             val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java))
             val scopes = SCOPE_PATTERN.findAll(authorization.value)
                 .map { match -> match.groupValues[1] }

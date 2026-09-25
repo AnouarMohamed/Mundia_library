@@ -6,6 +6,7 @@ import com.mundiapolis.library.catalog.dto.CatalogIdempotencyConflictException
 import com.mundiapolis.library.catalog.dto.CatalogIdempotencyIncompleteException
 import com.mundiapolis.library.catalog.dto.InvalidCatalogActorException
 import com.mundiapolis.library.catalog.dto.InvalidCatalogCommandException
+import com.mundiapolis.library.catalog.dto.ReviewNotEligibleException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -40,6 +41,10 @@ class CatalogExceptionHandler {
     )
     fun commandConflict(exception: RuntimeException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "catalog_command_conflict", exception.message)
+
+    @ExceptionHandler(ReviewNotEligibleException::class)
+    fun reviewNotEligible(exception: ReviewNotEligibleException): ProblemDetail =
+        problem(HttpStatus.UNPROCESSABLE_ENTITY, "review_not_eligible", exception.message)
 
     private fun problem(status: HttpStatus, code: String, detail: String?): ProblemDetail =
         ProblemDetail.forStatusAndDetail(status, requireNotNull(detail)).apply {

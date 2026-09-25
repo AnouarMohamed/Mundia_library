@@ -43,6 +43,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
@@ -52,6 +53,7 @@ import org.springframework.http.MediaType
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.time.Instant
@@ -66,6 +68,9 @@ import java.util.concurrent.Executors
 class CatalogServiceIntegrationTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
 
     @Autowired
     private lateinit var dsl: DSLContext
@@ -351,6 +356,193 @@ class CatalogServiceIntegrationTest {
                 .param("limit", "0")
                 .with(scope(READ_SCOPE)),
         ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `eligible member can idempotently create update and physically delete own review`() {
+        val memberId = UUID.fromString("51000000-0000-0000-0000-000000000001")
+        val loanId = UUID.fromString("52000000-0000-0000-0000-000000000001")
+        val copyId = UUID.fromString("53000000-0000-0000-0000-000000000001")
+        reviewEligibilityProjectionService.apply(
+            circulationLoanEvent(loanId, memberId, 0, ProjectedLoanStatus.REQUESTED),
+        )
+        reviewEligibilityProjectionService.apply(
+            circulationLoanEvent(loanId, memberId, 1, ProjectedLoanStatus.ACTIVE, copyId),
+        )
+        reviewEligibilityProjectionService.apply(
+            circulationLoanEvent(
+                loanId,
+                memberId,
+                2,
+                ProjectedLoanStatus.RETURNED,
+                copyId,
+                NOW.toInstant(),
+            ),
+        )
+
+        val createBody = """{"rating":3,"content":"A thoughtful member review."}"""
+        val firstCreate = mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-review-create01")
+                .content(createBody)
+                .with(reviewCommandScope(memberId)),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("ETag", "\"0\""))
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.aggregateType").value("review"))
+            .andReturn()
+        val reviewId = UUID.fromString(
+            objectMapper.readTree(firstCreate.response.contentAsString)["aggregateId"].stringValue(),
+        )
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-review-create01")
+                .content(createBody)
+                .with(reviewCommandScope(memberId)),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+            .andExpect(jsonPath("$.aggregateId").value(reviewId.toString()))
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-review-duplicate")
+                .content(createBody)
+                .with(reviewCommandScope(memberId)),
+        ).andExpect(status().isConflict)
+        assertEquals(
+            0,
+            dsl.fetchCount(
+                CATALOG_COMMAND_IDEMPOTENCY,
+                CATALOG_COMMAND_IDEMPOTENCY.IDEMPOTENCY_KEY.eq("catalog-review-duplicate"),
+            ),
+        )
+
+        mockMvc.perform(
+            put("/api/v1/catalog/reviews/$reviewId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-review-update01")
+                .content("""{"rating":5,"content":"An improved and precise review."}""")
+                .with(reviewCommandScope(memberId)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"1\""))
+
+        repeat(2) { attempt ->
+            mockMvc.perform(
+                delete("/api/v1/catalog/reviews/$reviewId")
+                    .header("If-Match", "\"1\"")
+                    .header("Idempotency-Key", "catalog-review-delete01")
+                    .with(reviewCommandScope(memberId)),
+            )
+                .andExpect(status().isOk)
+                .andExpect(header().string("ETag", "\"2\""))
+                .andExpect(header().string("Idempotency-Replayed", (attempt == 1).toString()))
+        }
+
+        assertEquals(0, dsl.fetchCount(CATALOG_REVIEW, CATALOG_REVIEW.REVIEW_ID.eq(reviewId)))
+        assertEquals(
+            BigDecimal("4.50"),
+            dsl.select(CATALOG_WORK.RATING)
+                .from(CATALOG_WORK)
+                .where(CATALOG_WORK.WORK_ID.eq(FICTION_WORK_ID))
+                .fetchSingle(CATALOG_WORK.RATING),
+        )
+        assertEquals(
+            2,
+            dsl.select(CATALOG_WORK.RATING_COUNT)
+                .from(CATALOG_WORK)
+                .where(CATALOG_WORK.WORK_ID.eq(FICTION_WORK_ID))
+                .fetchSingle(CATALOG_WORK.RATING_COUNT),
+        )
+        assertEquals(
+            listOf("catalog.review.created", "catalog.review.updated", "catalog.review.deleted"),
+            dsl.select(CATALOG_OUTBOX_EVENT.EVENT_TYPE)
+                .from(CATALOG_OUTBOX_EVENT)
+                .where(CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(reviewId))
+                .orderBy(CATALOG_OUTBOX_EVENT.AGGREGATE_VERSION)
+                .fetch(CATALOG_OUTBOX_EVENT.EVENT_TYPE),
+        )
+        val retainedJson = dsl.select(
+            CATALOG_OUTBOX_EVENT.PAYLOAD,
+            CATALOG_AUDIT_ENTRY.PREVIOUS_STATE,
+            CATALOG_AUDIT_ENTRY.RESULTING_STATE,
+        )
+            .from(CATALOG_OUTBOX_EVENT)
+            .join(CATALOG_AUDIT_ENTRY)
+            .on(
+                CATALOG_AUDIT_ENTRY.AGGREGATE_ID.eq(CATALOG_OUTBOX_EVENT.AGGREGATE_ID)
+                    .and(
+                        CATALOG_AUDIT_ENTRY.AGGREGATE_VERSION.eq(
+                            CATALOG_OUTBOX_EVENT.AGGREGATE_VERSION,
+                        ),
+                    ),
+            )
+            .where(CATALOG_OUTBOX_EVENT.AGGREGATE_ID.eq(reviewId))
+            .fetch()
+            .flatMap { row ->
+                listOf(row.value1(), row.value2(), row.value3())
+                    .filterNotNull()
+                    .map(Any::toString)
+            }
+            .joinToString(" ")
+        assertEquals(false, retainedJson.contains(memberId.toString()))
+        assertEquals(false, retainedJson.contains("thoughtful"))
+        assertEquals(false, retainedJson.contains("improved"))
+    }
+
+    @Test
+    fun `review commands fail closed without returned evidence or matching member identity`() {
+        val memberId = UUID.fromString("54000000-0000-0000-0000-000000000001")
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-review-ineligible")
+                .content("""{"rating":4,"content":"No returned loan yet."}""")
+                .with(reviewCommandScope(memberId)),
+        )
+            .andExpect(status().is4xxClientError)
+            .andExpect(jsonPath("$.status").value(422))
+            .andExpect(jsonPath("$.code").value("review_not_eligible"))
+
+        mockMvc.perform(
+            put("/api/v1/catalog/reviews/$PUBLISHED_REVIEW_ID")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("If-Match", "\"0\"")
+                .header("Idempotency-Key", "catalog-review-not-owner")
+                .content("""{"rating":4,"content":"Attempted ownership bypass."}""")
+                .with(reviewCommandScope(memberId)),
+        ).andExpect(status().isNotFound)
+
+        mockMvc.perform(
+            post("/api/v1/catalog/works/$FICTION_WORK_ID/reviews")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", "catalog-review-no-member")
+                .content("""{"rating":4,"content":"Missing member identity."}""")
+                .with(
+                    jwt()
+                        .jwt {
+                            it.issuer("https://issuer.example.test")
+                                .subject("catalog-member")
+                                .claim("azp", "catalog-bff")
+                        }
+                        .authorities(SimpleGrantedAuthority(REVIEW_WRITE_SCOPE)),
+                ),
+        ).andExpect(status().isForbidden)
+
+        assertEquals(
+            0,
+            dsl.fetchCount(
+                CATALOG_COMMAND_IDEMPOTENCY,
+                CATALOG_COMMAND_IDEMPOTENCY.IDEMPOTENCY_KEY.like("catalog-review-%"),
+            ),
+        )
     }
 
     @Test
@@ -1074,6 +1266,15 @@ class CatalogServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(MANAGE_SCOPE))
 
+    private fun reviewCommandScope(memberId: UUID) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject("catalog-member")
+                .claim("azp", "catalog-bff")
+                .claim("membership_id", memberId.toString())
+        }
+        .authorities(SimpleGrantedAuthority(REVIEW_WRITE_SCOPE))
+
     private fun createWorkBody(workId: UUID, contributorId: UUID, title: String): String = """
         {
           "workId": "$workId",
@@ -1108,6 +1309,7 @@ class CatalogServiceIntegrationTest {
         const val READ_SCOPE = "SCOPE_catalog.read"
         const val SEARCH_SCOPE = "SCOPE_catalog.search"
         const val MANAGE_SCOPE = "SCOPE_catalog.manage"
+        const val REVIEW_WRITE_SCOPE = "SCOPE_catalog.review.write"
 
         @Container
         @JvmStatic

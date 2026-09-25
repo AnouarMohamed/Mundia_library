@@ -22,6 +22,7 @@ message CatalogEvent {
   oneof payload {
     WorkEvent work = 20;
     EditionEvent edition = 21;
+    ReviewEvent review = 22;
   }
 
   reserved 8 to 19;
@@ -56,4 +57,15 @@ message EditionEvent {
   optional string cover_color = 10;
   optional string video_url = 11;
   bool is_active = 12;
+}
+
+// Review events intentionally exclude member identity and review text. They
+// are invalidation/lifecycle signals; consumers fetch public content through
+// the Catalog API so deletion does not leave personal content in the broker.
+message ReviewEvent {
+  string review_id = 1;
+  string work_id = 2;
+  uint32 rating = 3;
+  string moderation_status = 4;
+  bool deleted = 5;
 }

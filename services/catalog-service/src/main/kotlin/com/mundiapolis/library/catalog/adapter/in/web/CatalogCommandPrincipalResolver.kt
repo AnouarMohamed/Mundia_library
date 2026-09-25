@@ -7,9 +7,20 @@ import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.UUID
 
 @Component
 class CatalogCommandPrincipalResolver {
+    fun membershipId(authentication: JwtAuthenticationToken): UUID {
+        val raw = optionalClaim(authentication.token, "membership_id")
+            ?: throw InvalidCatalogActorException("JWT membership_id claim is required")
+        val membershipId = runCatching { UUID.fromString(raw) }.getOrNull()
+        if (membershipId == null || membershipId.toString() != raw) {
+            throw InvalidCatalogActorException("JWT membership_id claim must be a canonical UUID")
+        }
+        return membershipId
+    }
+
     fun ownerFingerprint(authentication: JwtAuthenticationToken): String {
         val jwt = authentication.token
         val issuer = jwt.issuer?.toString()
