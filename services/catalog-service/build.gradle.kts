@@ -109,6 +109,21 @@ tasks.named("jooqCodegen") {
     inputs.files(fileTree("src/main/resources/db/migration"))
 }
 
+val verifyCirculationEventContract = tasks.register("verifyCirculationEventContract") {
+    val producerContract = file("../circulation-service/src/main/proto/mundia/circulation/v1/circulation_events.proto")
+    val consumerContract = file("src/main/proto/mundia/circulation/v1/circulation_events.proto")
+    inputs.files(producerContract, consumerContract)
+    doLast {
+        check(producerContract.readBytes().contentEquals(consumerContract.readBytes())) {
+            "Catalog's Circulation Protobuf contract must exactly match the producer contract"
+        }
+    }
+}
+
+tasks.named("generateProto") {
+    dependsOn(verifyCirculationEventContract)
+}
+
 tasks.withType<KotlinCompile>().configureEach {
     dependsOn(tasks.named("jooqCodegen"))
 }

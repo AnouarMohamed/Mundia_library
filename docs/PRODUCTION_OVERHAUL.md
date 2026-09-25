@@ -280,18 +280,21 @@ scope enforcement,
 Flyway/jOOQ schema generation, versioned OpenAPI contracts, and real PostgreSQL
 integration coverage protect both boundaries. Physical copies remain owned by
 Circulation; Catalog stores only a disposable, versioned availability
-projection. Membership writes, Catalog review commands, availability event
-consumption, backfill/reconciliation, retention/deletion automation, BFF
-routing, and production cutover are not complete, so the Phase 4 exit gate
-remains open. Catalog create, metadata-update, and edition-activation commands
+projection. Catalog now consumes authoritative per-copy Circulation events
+through strict Protobuf/header validation, an atomic inbox, contiguous aggregate
+versions, manual offsets, derived edition counts, and readiness failure on
+poisoned or gapped input. Membership writes, Catalog review commands,
+backfill/reconciliation, retention/deletion automation, BFF routing, and
+production cutover are not complete, so the Phase 4 exit gate remains open.
+Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one
 transaction. Updates require exact version ETags and reject stale writers.
 Catalog outbox delivery now uses crash-recoverable aggregate-ordered leases,
 bounded retries, poison-event blocking, Protobuf v1 encoding, synchronous Kafka
 acknowledgements, retention cleanup, and health/metrics. Broker provisioning,
-availability consumption, review commands, and all cutover gates remain open;
-these command APIs are not production-routed yet.
+availability replay/reconciliation evidence, review commands, and all cutover
+gates remain open; these command APIs are not production-routed yet.
 
 Exit gate: there are no cross-service database reads or writes and all privacy
 retention/deletion workflows pass.

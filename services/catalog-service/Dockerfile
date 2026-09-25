@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --quiet :catalog-service:dependencies --no-daemon
 
 COPY catalog-service/src ./catalog-service/src
+COPY circulation-service/src/main/proto ./circulation-service/src/main/proto
 
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew :catalog-service:bootJar --no-daemon

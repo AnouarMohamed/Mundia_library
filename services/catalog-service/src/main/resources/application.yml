@@ -42,6 +42,34 @@ spring:
     sql-dialect: postgres
 
 app:
+  circulation-consumer:
+    enabled: ${CIRCULATION_CONSUMER_ENABLED:false}
+    instance-id: ${CIRCULATION_CONSUMER_INSTANCE_ID:${HOSTNAME:local}}
+    group-id: ${CIRCULATION_CONSUMER_GROUP_ID:catalog-availability-v1}
+    topic: ${CIRCULATION_CONSUMER_TOPIC:mundia.circulation.events.v1}
+    schema-subject: ${CIRCULATION_CONSUMER_SCHEMA_SUBJECT:mundia.circulation.v1.CirculationEvent}
+    schema-version: ${CIRCULATION_CONSUMER_SCHEMA_VERSION:1}
+    poll-timeout: ${CIRCULATION_CONSUMER_POLL_TIMEOUT:PT0.5S}
+    commit-timeout: ${CIRCULATION_CONSUMER_COMMIT_TIMEOUT:PT5S}
+    retry-backoff: ${CIRCULATION_CONSUMER_RETRY_BACKOFF:PT0.25S}
+    startup-grace-period: ${CIRCULATION_CONSUMER_STARTUP_GRACE:PT30S}
+    maximum-poll-silence: ${CIRCULATION_CONSUMER_MAXIMUM_POLL_SILENCE:PT30S}
+    maximum-poll-records: ${CIRCULATION_CONSUMER_MAXIMUM_POLL_RECORDS:50}
+    maximum-event-bytes: ${CIRCULATION_CONSUMER_MAXIMUM_EVENT_BYTES:262144}
+    kafka:
+      bootstrap-servers: ${CIRCULATION_CONSUMER_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      security-protocol: ${CIRCULATION_CONSUMER_KAFKA_SECURITY_PROTOCOL:SASL_SSL}
+      allow-insecure-transport: ${CIRCULATION_CONSUMER_KAFKA_ALLOW_INSECURE_TRANSPORT:false}
+      sasl-mechanism: ${CIRCULATION_CONSUMER_KAFKA_SASL_MECHANISM:SCRAM-SHA-512}
+      sasl-jaas-config: ${CIRCULATION_CONSUMER_KAFKA_SASL_JAAS_CONFIG:}
+      truststore-location: ${CIRCULATION_CONSUMER_KAFKA_TRUSTSTORE_LOCATION:}
+      truststore-password: ${CIRCULATION_CONSUMER_KAFKA_TRUSTSTORE_PASSWORD:}
+      keystore-location: ${CIRCULATION_CONSUMER_KAFKA_KEYSTORE_LOCATION:}
+      keystore-password: ${CIRCULATION_CONSUMER_KAFKA_KEYSTORE_PASSWORD:}
+      key-password: ${CIRCULATION_CONSUMER_KAFKA_KEY_PASSWORD:}
+      request-timeout: ${CIRCULATION_CONSUMER_KAFKA_REQUEST_TIMEOUT:PT10S}
+      session-timeout: ${CIRCULATION_CONSUMER_KAFKA_SESSION_TIMEOUT:PT30S}
+      heartbeat-interval: ${CIRCULATION_CONSUMER_KAFKA_HEARTBEAT_INTERVAL:PT3S}
   outbox:
     enabled: ${OUTBOX_DELIVERY_ENABLED:false}
     instance-id: ${OUTBOX_INSTANCE_ID:${HOSTNAME:local}}
@@ -90,7 +118,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db,catalogOutbox
+          include: readinessState,db,catalogOutbox,catalogCirculationConsumer
   health:
     livenessstate:
       enabled: true

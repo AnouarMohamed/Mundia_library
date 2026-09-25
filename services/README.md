@@ -166,11 +166,24 @@ member identifiers. Commands require an actor-bound `Idempotency-Key`; the
 aggregate, exact replay snapshot, append-only audit, and versioned outbox event
 commit atomically. Updates also require an exact aggregate-version ETag in
 `If-Match`, reject stale versions, and return the new version in `ETag`.
-Catalog commands never accept copy counts or copy state. The schema is installed from
-`catalog-service/src/main/resources/db/migration`; runtime Flyway remains
-disabled by default. Catalog review commands, availability event consumption,
-legacy backfill/reconciliation, and BFF cutover remain later Phase 4 gates, so
-Next.js is still the production authority.
+Catalog commands never accept copy counts or copy state. The schema is installed
+from `catalog-service/src/main/resources/db/migration`; runtime Flyway remains
+disabled by default. Catalog review commands, legacy backfill/reconciliation,
+and BFF cutover remain later Phase 4 gates, so Next.js is still the production
+authority.
+
+When `CIRCULATION_CONSUMER_ENABLED=true`, Catalog consumes Circulation's shared
+v1 event topic with an independent consumer group and broker credentials. It
+ignores valid non-copy aggregates, strictly validates copy event headers and
+Protobuf state combinations, and applies each copy version to a per-copy
+projection and atomic inbox before manually committing the Kafka offset.
+Edition totals are derived transactionally from those rows: withdrawn copies
+are excluded from total inventory and only `AVAILABLE` copies are available.
+Exact redelivery replays safely; gaps, conflicting event IDs/versions,
+future-skewed events, malformed contracts, and fatal broker failures stop the
+consumer and make readiness unhealthy. The disposable edition-level cache is
+cleared by migration V5 and must be rebuilt from retained version-zero copy
+history before production routing.
 
 Catalog outbox delivery is disabled by default and uses the same operational
 contract as Circulation when enabled: aggregate-ordered `SKIP LOCKED` leases,

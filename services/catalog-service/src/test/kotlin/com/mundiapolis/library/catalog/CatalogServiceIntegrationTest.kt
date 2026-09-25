@@ -3,6 +3,8 @@ package com.mundiapolis.library.catalog
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_CONTRIBUTOR
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_AUDIT_ENTRY
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_COMMAND_IDEMPOTENCY
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_CONSUMER_INBOX
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_COPY_AVAILABILITY_PROJECTION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION_AVAILABILITY_PROJECTION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_OUTBOX_EVENT
@@ -15,12 +17,19 @@ import com.mundiapolis.library.catalog.dto.CatalogOutboxFailureCode
 import com.mundiapolis.library.catalog.dto.CatalogOutboxFailureDisposition
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
+import com.mundiapolis.library.catalog.dto.CirculationCopyEvent
+import com.mundiapolis.library.catalog.dto.CirculationEventConflictException
+import com.mundiapolis.library.catalog.dto.CirculationEventGapException
+import com.mundiapolis.library.catalog.dto.ConsumerEventDisposition
+import com.mundiapolis.library.catalog.dto.ProjectedCopyStatus
 import com.mundiapolis.library.catalog.service.CatalogOutboxStore
 import com.mundiapolis.library.catalog.service.CatalogCommandService
+import com.mundiapolis.library.catalog.service.CirculationAvailabilityProjectionService
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -63,12 +72,17 @@ class CatalogServiceIntegrationTest {
     @Autowired
     private lateinit var outboxStore: CatalogOutboxStore
 
+    @Autowired
+    private lateinit var availabilityProjectionService: CirculationAvailabilityProjectionService
+
     @BeforeEach
     fun seedCatalog() {
         dsl.deleteFrom(CATALOG_OUTBOX_EVENT).execute()
         dsl.deleteFrom(CATALOG_AUDIT_ENTRY).execute()
         dsl.deleteFrom(CATALOG_COMMAND_IDEMPOTENCY).execute()
         dsl.deleteFrom(CATALOG_REVIEW).execute()
+        dsl.deleteFrom(CATALOG_CONSUMER_INBOX).execute()
+        dsl.deleteFrom(CATALOG_COPY_AVAILABILITY_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_EDITION_AVAILABILITY_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_EDITION).execute()
         dsl.deleteFrom(CATALOG_WORK_CONTRIBUTOR).execute()
@@ -171,6 +185,76 @@ class CatalogServiceIntegrationTest {
             .andExpect(jsonPath("$.totalCopies").value(0))
             .andExpect(jsonPath("$.availableCopies").value(0))
             .andExpect(jsonPath("$.coverUrl").doesNotExist())
+    }
+
+    @Test
+    fun `copy events atomically project availability with replay and ordering guards`() {
+        val copyId = UUID.randomUUID()
+        val registered = circulationCopyEvent(
+            copyId = copyId,
+            version = 0,
+            status = ProjectedCopyStatus.AVAILABLE,
+        )
+
+        val first = availabilityProjectionService.apply(registered)
+        val replay = availabilityProjectionService.apply(registered)
+
+        assertEquals(ConsumerEventDisposition.APPLIED, first.disposition)
+        assertEquals(false, first.replayed)
+        assertEquals(true, replay.replayed)
+        assertEquals(1, dsl.fetchCount(CATALOG_CONSUMER_INBOX))
+        assertEquals(1, dsl.fetchCount(CATALOG_COPY_AVAILABILITY_PROJECTION))
+        assertAvailability(total = 1, available = 1)
+
+        val checkedOut = circulationCopyEvent(
+            copyId = copyId,
+            version = 1,
+            status = ProjectedCopyStatus.ON_LOAN,
+        )
+        availabilityProjectionService.apply(checkedOut)
+
+        assertAvailability(total = 1, available = 0)
+        assertEquals(
+            "ON_LOAN",
+            dsl.select(CATALOG_COPY_AVAILABILITY_PROJECTION.STATUS)
+                .from(CATALOG_COPY_AVAILABILITY_PROJECTION)
+                .where(CATALOG_COPY_AVAILABILITY_PROJECTION.COPY_ID.eq(copyId))
+                .fetchSingle(CATALOG_COPY_AVAILABILITY_PROJECTION.STATUS),
+        )
+
+        val additionalCopies = listOf(UUID.randomUUID(), UUID.randomUUID())
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            executor.invokeAll(
+                additionalCopies.map { additionalCopyId ->
+                    Callable {
+                        availabilityProjectionService.apply(
+                            circulationCopyEvent(
+                                additionalCopyId,
+                                version = 0,
+                                status = ProjectedCopyStatus.AVAILABLE,
+                            ),
+                        )
+                    }
+                },
+            ).forEach { it.get() }
+        } finally {
+            executor.shutdownNow()
+        }
+        assertAvailability(total = 3, available = 2)
+
+        assertThrows(CirculationEventGapException::class.java) {
+            availabilityProjectionService.apply(
+                circulationCopyEvent(copyId, version = 3, status = ProjectedCopyStatus.AVAILABLE),
+            )
+        }
+        assertThrows(CirculationEventConflictException::class.java) {
+            availabilityProjectionService.apply(
+                registered.copy(payloadSha256 = "f".repeat(64)),
+            )
+        }
+        assertEquals(4, dsl.fetchCount(CATALOG_CONSUMER_INBOX))
+        assertAvailability(total = 3, available = 2)
     }
 
     @Test
@@ -859,6 +943,34 @@ class CatalogServiceIntegrationTest {
             .set(CATALOG_REVIEW.CREATED_AT, createdAt)
             .set(CATALOG_REVIEW.UPDATED_AT, createdAt)
             .execute()
+    }
+
+    private fun circulationCopyEvent(
+        copyId: UUID,
+        version: Long,
+        status: ProjectedCopyStatus,
+    ): CirculationCopyEvent = CirculationCopyEvent(
+        eventId = UUID.randomUUID(),
+        eventType = if (version == 0L) {
+            "circulation.copy.registered"
+        } else {
+            "circulation.copy.status-changed"
+        },
+        eventVersion = 1,
+        copyId = copyId,
+        editionId = AVAILABLE_EDITION_ID,
+        aggregateVersion = version,
+        status = status,
+        occurredAt = NOW.toInstant(),
+        payloadSha256 = UUID.randomUUID().toString().replace("-", "").repeat(2),
+    )
+
+    private fun assertAvailability(total: Int, available: Int) {
+        val projection = dsl.selectFrom(CATALOG_EDITION_AVAILABILITY_PROJECTION)
+            .where(CATALOG_EDITION_AVAILABILITY_PROJECTION.EDITION_ID.eq(AVAILABLE_EDITION_ID))
+            .fetchSingle()
+        assertEquals(total, projection.totalCopies)
+        assertEquals(available, projection.availableCopies)
     }
 
     private fun scope(authority: String) = jwt().authorities(SimpleGrantedAuthority(authority))
