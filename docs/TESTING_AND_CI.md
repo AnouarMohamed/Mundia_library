@@ -88,7 +88,7 @@ UI-only layout changes do not always need unit tests, but they should still be m
 
 | Workflow                   | File                                       | Purpose                                                                               |
 | -------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| CI                         | `.github/workflows/ci.yml`                 | Lint, typecheck, tests, Playwright E2E, production build, Docker image build on push. |
+| CI                         | `.github/workflows/ci.yml`                 | Lint, typecheck, tests, Playwright E2E, production builds, and gated multi-architecture GHCR publication on `main` or release tags. |
 | API Performance Benchmarks | `.github/workflows/api-benchmarks.yml`     | PR and main benchmark gate for key API routes.                                        |
 | Nightly API Load Test      | `.github/workflows/nightly-load-test.yml`  | Scheduled load and regression trend checks.                                           |
 | CodeQL                     | `.github/workflows/codeql.yml`             | Static analysis for JavaScript/TypeScript security.                                   |
@@ -211,7 +211,10 @@ Use this when:
 
 ## Docker Build Validation
 
-CI builds the production image on push. Local validation:
+CI builds all four production images on push. After every required gate passes
+on `main` or a strict semantic-version tag, it scans each release candidate and
+publishes the multi-architecture image, provenance, SBOM, and an immutable
+digest-reference artifact to GHCR. Local validation:
 
 ```bash
 docker build -t mundia-library:ci .

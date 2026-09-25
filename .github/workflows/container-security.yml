@@ -57,6 +57,16 @@ jobs:
             dockerfile: ./services/circulation-service/Dockerfile
             image: mundia-circulation-service:security-scan
             build_args: ""
+          - name: membership
+            context: ./services
+            dockerfile: ./services/membership-service/Dockerfile
+            image: mundia-membership-service:security-scan
+            build_args: ""
+          - name: catalog
+            context: ./services
+            dockerfile: ./services/catalog-service/Dockerfile
+            image: mundia-catalog-service:security-scan
+            build_args: ""
 
     steps:
       - name: Checkout

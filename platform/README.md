@@ -154,6 +154,13 @@ review of the templates.
 8. Promote a digest already verified in dev and staging. Do not rebuild between
    environments.
 
+The application release workflow publishes deployable images under
+`ghcr.io/anouarmohamed`. Replace each `REPLACE_APPROVED_REGISTRY` application
+placeholder with the appropriate GHCR repository only after package visibility,
+pull credentials, signature policy, and environment approval are configured.
+Copy the exact digest from the CI `container-reference-*` artifact; never put a
+mutable GHCR tag into a workload or migration manifest.
+
 ## What is deliberately not claimed
 
 This tree has not been applied to a cloud account. It has not passed a real

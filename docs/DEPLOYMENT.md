@@ -221,6 +221,45 @@ docker compose --profile tools run --rm seed
   it is enabled or if institutional OIDC settings are incomplete.
 - Run migrations as a separate release step before the app rolls forward.
 
+### Published GHCR Images
+
+After all CI gates pass on `main`, GitHub Actions publishes these OCI images:
+
+| Component | Image |
+| --- | --- |
+| Next.js web/BFF | `ghcr.io/anouarmohamed/mundia-library` |
+| Catalog Service | `ghcr.io/anouarmohamed/mundia-catalog-service` |
+| Circulation Service | `ghcr.io/anouarmohamed/mundia-circulation-service` |
+| Membership Service | `ghcr.io/anouarmohamed/mundia-membership-service` |
+
+Every build publishes `linux/amd64` and `linux/arm64` manifests, BuildKit
+provenance, and an SPDX SBOM. Main builds receive `main` and
+`sha-<12-character-commit>` tags. A strict `vMAJOR.MINOR.PATCH` Git tag also
+publishes the full version, major/minor, major, and `latest` aliases.
+
+Tags are discovery conveniences, not deployment identities. Each matrix build
+uploads a `container-reference-*` artifact containing the exact repository and
+`sha256` digest. Helm and Argo CD values must use that digest:
+
+```yaml
+image:
+  repository: ghcr.io/anouarmohamed/mundia-circulation-service
+  digest: sha256:REPLACE_WITH_VERIFIED_DIGEST
+```
+
+The web image compiles browser-visible URLs into its client bundle. Configure
+the repository variables `NEXT_PUBLIC_API_ENDPOINT`,
+`NEXT_PUBLIC_PROD_API_ENDPOINT`, and optionally
+`NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` before an AWS release. Until overridden,
+the first two use the currently documented Vercel production URL. None of
+these values may contain secrets.
+
+GHCR package visibility is controlled in GitHub package settings. If images
+remain private, create a read-only GHCR credential in the target secret manager
+and expose it to Kubernetes as an `imagePullSecret`; do not reuse the workflow's
+repository-scoped publishing token. EKS deployments should promote the same
+verified digest between environments rather than rebuilding it.
+
 ## Option 3: Standalone Package
 
 Next.js standalone output is enabled, so a release package can contain:

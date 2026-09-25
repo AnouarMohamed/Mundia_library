@@ -59,13 +59,17 @@ Commit the version change with the release changes.
 
 ## Production Deployment
 
-Deploy before or after tagging depending on your release policy. Current flow:
+The web application remains on Vercel until Kubernetes cutover. The container
+release flow is available for staging and future EKS deployment:
 
 1. Merge or push the release commit.
-2. Deploy to Vercel production.
-3. Verify production.
-4. Tag the verified commit.
-5. Publish GitHub release notes and artifacts.
+2. Wait for every CI gate and all four GHCR publication matrix jobs.
+3. Download the `container-reference-*` artifacts and retain the image digests.
+4. Deploy the digest to development, then promote the identical digest through
+   staging and production.
+5. Verify production.
+6. Tag the verified commit when producing a versioned release.
+7. Publish GitHub release notes and artifact digests.
 
 Production verification:
 
@@ -92,6 +96,10 @@ git push origin v0.2.1
 ```
 
 Use the actual version number.
+
+The strict `vMAJOR.MINOR.PATCH` tag causes CI to publish version aliases for all
+four images. Kubernetes manifests must continue to reference the resulting
+digest rather than `latest` or another mutable tag.
 
 ## Release Notes Standard
 
