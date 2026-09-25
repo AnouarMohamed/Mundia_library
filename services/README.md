@@ -174,11 +174,14 @@ authority.
 
 When `CIRCULATION_CONSUMER_ENABLED=true`, Catalog consumes Circulation's shared
 v1 event topic with an independent consumer group and broker credentials. It
-ignores valid non-copy aggregates, strictly validates copy event headers and
-Protobuf state combinations, and applies each copy version to a per-copy
+ignores unrelated aggregates, strictly validates copy and loan event headers
+and Protobuf state combinations, and applies each aggregate version to a local
 projection and atomic inbox before manually committing the Kafka offset.
 Edition totals are derived transactionally from those rows: withdrawn copies
 are excluded from total inventory and only `AVAILABLE` copies are available.
+The ordered loan projection retains the minimal member/edition relationship and
+returned timestamp required to authorize a future review command; it contains
+no member profile data.
 Exact redelivery replays safely; gaps, conflicting event IDs/versions,
 future-skewed events, malformed contracts, and fatal broker failures stop the
 consumer and make readiness unhealthy. The disposable edition-level cache is

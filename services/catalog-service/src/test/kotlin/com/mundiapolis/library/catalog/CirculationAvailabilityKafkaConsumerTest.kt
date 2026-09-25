@@ -9,6 +9,7 @@ import com.mundiapolis.library.catalog.dto.AvailabilityEventExecution
 import com.mundiapolis.library.catalog.dto.ConsumerEventDisposition
 import com.mundiapolis.library.catalog.dto.CirculationEventGapException
 import com.mundiapolis.library.catalog.service.CirculationAvailabilityEventHandler
+import com.mundiapolis.library.catalog.service.CirculationLoanEventHandler
 import com.mundiapolis.library.circulation.contract.v1.CirculationEvent
 import com.mundiapolis.library.circulation.contract.v1.CopyEvent
 import com.mundiapolis.library.circulation.contract.v1.CopyStatus
@@ -49,6 +50,7 @@ class CirculationAvailabilityKafkaConsumerTest {
             kafka,
             CirculationEventRecordDecoder(properties),
             handler,
+            CirculationLoanEventHandler { error("Unexpected loan event") },
             Clock.systemUTC(),
             properties,
             SimpleMeterRegistry(),
@@ -81,6 +83,7 @@ class CirculationAvailabilityKafkaConsumerTest {
                 attempted.countDown()
                 throw CirculationEventGapException(expected = 0, actual = 2)
             },
+            CirculationLoanEventHandler { error("Unexpected loan event") },
             Clock.systemUTC(),
             properties,
             SimpleMeterRegistry(),

@@ -7,6 +7,7 @@ import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generat
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_COPY_AVAILABILITY_PROJECTION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_EDITION_AVAILABILITY_PROJECTION
+import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_LOAN_REVIEW_PROJECTION
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_OUTBOX_EVENT
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_REVIEW
 import com.mundiapolis.library.catalog.adapter.outbound.persistence.jooq.generated.Tables.CATALOG_WORK
@@ -18,13 +19,16 @@ import com.mundiapolis.library.catalog.dto.CatalogOutboxFailureDisposition
 import com.mundiapolis.library.catalog.dto.CreateWorkCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import com.mundiapolis.library.catalog.dto.CirculationCopyEvent
+import com.mundiapolis.library.catalog.dto.CirculationLoanEvent
 import com.mundiapolis.library.catalog.dto.CirculationEventConflictException
 import com.mundiapolis.library.catalog.dto.CirculationEventGapException
 import com.mundiapolis.library.catalog.dto.ConsumerEventDisposition
 import com.mundiapolis.library.catalog.dto.ProjectedCopyStatus
+import com.mundiapolis.library.catalog.dto.ProjectedLoanStatus
 import com.mundiapolis.library.catalog.service.CatalogOutboxStore
 import com.mundiapolis.library.catalog.service.CatalogCommandService
 import com.mundiapolis.library.catalog.service.CirculationAvailabilityProjectionService
+import com.mundiapolis.library.catalog.service.CirculationReviewEligibilityProjectionService
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -75,6 +79,9 @@ class CatalogServiceIntegrationTest {
     @Autowired
     private lateinit var availabilityProjectionService: CirculationAvailabilityProjectionService
 
+    @Autowired
+    private lateinit var reviewEligibilityProjectionService: CirculationReviewEligibilityProjectionService
+
     @BeforeEach
     fun seedCatalog() {
         dsl.deleteFrom(CATALOG_OUTBOX_EVENT).execute()
@@ -82,6 +89,7 @@ class CatalogServiceIntegrationTest {
         dsl.deleteFrom(CATALOG_COMMAND_IDEMPOTENCY).execute()
         dsl.deleteFrom(CATALOG_REVIEW).execute()
         dsl.deleteFrom(CATALOG_CONSUMER_INBOX).execute()
+        dsl.deleteFrom(CATALOG_LOAN_REVIEW_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_COPY_AVAILABILITY_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_EDITION_AVAILABILITY_PROJECTION).execute()
         dsl.deleteFrom(CATALOG_EDITION).execute()
@@ -255,6 +263,61 @@ class CatalogServiceIntegrationTest {
         }
         assertEquals(4, dsl.fetchCount(CATALOG_CONSUMER_INBOX))
         assertAvailability(total = 3, available = 2)
+    }
+
+    @Test
+    fun `ordered loan events retain returned-work evidence for review eligibility`() {
+        val loanId = UUID.randomUUID()
+        val memberId = UUID.randomUUID()
+        val copyId = UUID.randomUUID()
+        val requested = circulationLoanEvent(
+            loanId,
+            memberId,
+            version = 0,
+            status = ProjectedLoanStatus.REQUESTED,
+        )
+        val active = circulationLoanEvent(
+            loanId,
+            memberId,
+            version = 1,
+            status = ProjectedLoanStatus.ACTIVE,
+            copyId = copyId,
+        )
+        val returned = circulationLoanEvent(
+            loanId,
+            memberId,
+            version = 2,
+            status = ProjectedLoanStatus.RETURNED,
+            copyId = copyId,
+            returnedAt = NOW.toInstant(),
+        )
+
+        reviewEligibilityProjectionService.apply(requested)
+        reviewEligibilityProjectionService.apply(active)
+        reviewEligibilityProjectionService.apply(returned)
+        val replay = reviewEligibilityProjectionService.apply(returned)
+
+        val projection = dsl.selectFrom(CATALOG_LOAN_REVIEW_PROJECTION)
+            .where(CATALOG_LOAN_REVIEW_PROJECTION.LOAN_ID.eq(loanId))
+            .fetchSingle()
+        assertEquals("RETURNED", projection.status)
+        assertEquals(memberId, projection.memberId)
+        assertEquals(AVAILABLE_EDITION_ID, projection.editionId)
+        assertEquals(2L, projection.sourceVersion)
+        assertEquals(true, replay.replayed)
+        assertEquals(3, dsl.fetchCount(CATALOG_CONSUMER_INBOX))
+
+        assertThrows(CirculationEventGapException::class.java) {
+            reviewEligibilityProjectionService.apply(
+                circulationLoanEvent(
+                    UUID.randomUUID(),
+                    memberId,
+                    version = 1,
+                    status = ProjectedLoanStatus.ACTIVE,
+                    copyId = UUID.randomUUID(),
+                ),
+            )
+        }
     }
 
     @Test
@@ -961,6 +1024,34 @@ class CatalogServiceIntegrationTest {
         editionId = AVAILABLE_EDITION_ID,
         aggregateVersion = version,
         status = status,
+        occurredAt = NOW.toInstant(),
+        payloadSha256 = UUID.randomUUID().toString().replace("-", "").repeat(2),
+    )
+
+    private fun circulationLoanEvent(
+        loanId: UUID,
+        memberId: UUID,
+        version: Long,
+        status: ProjectedLoanStatus,
+        copyId: UUID? = null,
+        returnedAt: Instant? = null,
+    ): CirculationLoanEvent = CirculationLoanEvent(
+        eventId = UUID.randomUUID(),
+        eventType = when (status) {
+            ProjectedLoanStatus.REQUESTED -> "circulation.loan.requested"
+            ProjectedLoanStatus.ACTIVE -> "circulation.loan.approved"
+            ProjectedLoanStatus.RETURNED -> "circulation.loan.returned"
+            ProjectedLoanStatus.REJECTED -> "circulation.loan.rejected"
+            ProjectedLoanStatus.CANCELLED -> "circulation.loan.cancelled"
+        },
+        eventVersion = 1,
+        loanId = loanId,
+        memberId = memberId,
+        editionId = AVAILABLE_EDITION_ID,
+        copyId = copyId,
+        aggregateVersion = version,
+        status = status,
+        returnedAt = returnedAt,
         occurredAt = NOW.toInstant(),
         payloadSha256 = UUID.randomUUID().toString().replace("-", "").repeat(2),
     )

@@ -7,6 +7,7 @@ import com.mundiapolis.library.catalog.dto.CirculationEventGapException
 import com.mundiapolis.library.catalog.dto.ConsumerEventDisposition
 import com.mundiapolis.library.catalog.dto.DecodedCirculationRecord
 import com.mundiapolis.library.catalog.service.CirculationAvailabilityEventHandler
+import com.mundiapolis.library.catalog.service.CirculationLoanEventHandler
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.consumer.CloseOptions
 import org.apache.kafka.clients.consumer.Consumer
@@ -33,6 +34,7 @@ class CirculationAvailabilityKafkaConsumer(
     private val consumer: Consumer<String, ByteArray>,
     private val decoder: CirculationEventRecordDecoder,
     private val projectionService: CirculationAvailabilityEventHandler,
+    private val loanProjectionService: CirculationLoanEventHandler,
     private val clock: Clock,
     private val properties: CirculationConsumerProperties,
     meterRegistry: MeterRegistry,
@@ -112,6 +114,12 @@ class CirculationAvailabilityKafkaConsumer(
                     when (val decoded = decoder.decode(record)) {
                         is DecodedCirculationRecord.Copy -> {
                             val execution = projectionService.apply(decoded.event)
+                            processedCounter.increment()
+                            if (execution.replayed) replayCounter.increment()
+                            if (execution.disposition == ConsumerEventDisposition.STALE) staleCounter.increment()
+                        }
+                        is DecodedCirculationRecord.Loan -> {
+                            val execution = loanProjectionService.apply(decoded.event)
                             processedCounter.increment()
                             if (execution.replayed) replayCounter.increment()
                             if (execution.disposition == ConsumerEventDisposition.STALE) staleCounter.increment()

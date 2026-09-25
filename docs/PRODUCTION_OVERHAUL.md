@@ -283,7 +283,9 @@ Circulation; Catalog stores only a disposable, versioned availability
 projection. Catalog now consumes authoritative per-copy Circulation events
 through strict Protobuf/header validation, an atomic inbox, contiguous aggregate
 versions, manual offsets, derived edition counts, and readiness failure on
-poisoned or gapped input. Membership writes, Catalog review commands,
+poisoned or gapped input. The same consumer now retains an ordered minimal loan
+projection so review eligibility can be proven from returned-loan evidence
+without reading Circulation's database. Membership writes, Catalog review commands,
 backfill/reconciliation, retention/deletion automation, BFF routing, and
 production cutover are not complete, so the Phase 4 exit gate remains open.
 Catalog create, metadata-update, and edition-activation commands

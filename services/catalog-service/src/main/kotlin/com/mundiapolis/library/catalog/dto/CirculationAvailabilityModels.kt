@@ -24,8 +24,33 @@ data class CirculationCopyEvent(
     val payloadSha256: String,
 )
 
+enum class ProjectedLoanStatus {
+    REQUESTED,
+    ACTIVE,
+    RETURNED,
+    REJECTED,
+    CANCELLED,
+}
+
+data class CirculationLoanEvent(
+    val eventId: UUID,
+    val eventType: String,
+    val eventVersion: Int,
+    val loanId: UUID,
+    val memberId: UUID,
+    val editionId: UUID,
+    val copyId: UUID?,
+    val aggregateVersion: Long,
+    val status: ProjectedLoanStatus,
+    val returnedAt: Instant?,
+    val occurredAt: Instant,
+    val payloadSha256: String,
+)
+
 sealed interface DecodedCirculationRecord {
     data class Copy(val event: CirculationCopyEvent) : DecodedCirculationRecord
+
+    data class Loan(val event: CirculationLoanEvent) : DecodedCirculationRecord
 
     data object Ignored : DecodedCirculationRecord
 }

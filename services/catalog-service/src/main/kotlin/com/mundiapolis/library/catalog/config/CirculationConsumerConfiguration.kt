@@ -3,6 +3,7 @@ package com.mundiapolis.library.catalog.config
 import com.mundiapolis.library.catalog.adapter.`in`.events.CirculationAvailabilityKafkaConsumer
 import com.mundiapolis.library.catalog.adapter.`in`.events.CirculationEventRecordDecoder
 import com.mundiapolis.library.catalog.service.CirculationAvailabilityEventHandler
+import com.mundiapolis.library.catalog.service.CirculationLoanEventHandler
 import io.micrometer.core.instrument.MeterRegistry
 import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.consumer.Consumer
@@ -67,6 +68,7 @@ class CirculationConsumerConfiguration {
         consumer: Consumer<String, ByteArray>,
         decoder: CirculationEventRecordDecoder,
         projectionService: CirculationAvailabilityEventHandler,
+        loanProjectionService: CirculationLoanEventHandler,
         clock: Clock,
         properties: CirculationConsumerProperties,
         meterRegistry: MeterRegistry,
@@ -74,6 +76,7 @@ class CirculationConsumerConfiguration {
         consumer,
         decoder,
         projectionService,
+        loanProjectionService,
         clock,
         properties,
         meterRegistry,

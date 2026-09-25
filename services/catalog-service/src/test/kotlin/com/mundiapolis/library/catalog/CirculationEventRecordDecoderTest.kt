@@ -6,9 +6,12 @@ import com.mundiapolis.library.catalog.adapter.`in`.events.CirculationEventRecor
 import com.mundiapolis.library.catalog.config.CirculationConsumerProperties
 import com.mundiapolis.library.catalog.dto.DecodedCirculationRecord
 import com.mundiapolis.library.catalog.dto.ProjectedCopyStatus
+import com.mundiapolis.library.catalog.dto.ProjectedLoanStatus
 import com.mundiapolis.library.circulation.contract.v1.CirculationEvent
 import com.mundiapolis.library.circulation.contract.v1.CopyEvent
 import com.mundiapolis.library.circulation.contract.v1.CopyStatus
+import com.mundiapolis.library.circulation.contract.v1.LoanEvent
+import com.mundiapolis.library.circulation.contract.v1.LoanStatus
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -23,7 +26,7 @@ class CirculationEventRecordDecoderTest {
     private val decoder = CirculationEventRecordDecoder(properties)
 
     @Test
-    fun `decodes authoritative copy state and ignores other circulation aggregates`() {
+    fun `decodes authoritative copy and loan state`() {
         val copyId = UUID.randomUUID()
         val editionId = UUID.randomUUID()
         val copyEnvelope = envelope(
@@ -58,8 +61,19 @@ class CirculationEventRecordDecoderTest {
             aggregateType = "loan",
             eventType = "circulation.loan.requested",
             aggregateVersion = 0,
-        )
-        assertThat(decoder.decode(record(loanEnvelope))).isEqualTo(DecodedCirculationRecord.Ignored)
+        ).toBuilder()
+            .setLoan(
+                LoanEvent.newBuilder()
+                    .setLoanId(loanId.toString())
+                    .setMemberId(UUID.randomUUID().toString())
+                    .setEditionId(UUID.randomUUID().toString())
+                    .setStatus(LoanStatus.LOAN_STATUS_REQUESTED)
+                    .setRequestedAt(Timestamp.newBuilder().setSeconds(1_790_316_000L))
+                    .setLoanVersion(0),
+            )
+            .build()
+        val decodedLoan = decoder.decode(record(loanEnvelope)) as DecodedCirculationRecord.Loan
+        assertThat(decodedLoan.event.status).isEqualTo(ProjectedLoanStatus.REQUESTED)
     }
 
     @Test
