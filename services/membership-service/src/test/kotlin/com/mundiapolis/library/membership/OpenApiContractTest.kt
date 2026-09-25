@@ -1,5 +1,8 @@
 package com.mundiapolis.library.membership
 
+import com.mundiapolis.library.membership.adapter.`in`.web.ChangeAccountStatusRequest
+import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandController
+import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandResponse
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipReadController
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
 import com.mundiapolis.library.membership.dto.MemberEligibility
@@ -9,6 +12,7 @@ import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.JsonNode
@@ -47,6 +51,8 @@ class OpenApiContractTest {
         assertSchemaFields("MemberProfile", MemberProfile::class.java)
         assertSchemaFields("MemberEligibility", MemberEligibility::class.java)
         assertSchemaFields("IdentityEvidenceRef", IdentityEvidenceRef::class.java)
+        assertSchemaFields("ChangeAccountStatusRequest", ChangeAccountStatusRequest::class.java)
+        assertSchemaFields("MembershipCommandResponse", MembershipCommandResponse::class.java)
     }
 
     private fun assertSchemaFields(schemaName: String, model: Class<*>) {
@@ -65,11 +71,13 @@ class OpenApiContractTest {
         val paths = contract["paths"]
         val operations = mutableMapOf<Route, Set<String>>()
         paths.propertyNames().forEach { path ->
-            val operation = paths[path]["get"]
-            val scopes = operation["x-required-scopes"]
-            operations[Route("get", path)] = (0 until scopes.size())
-                .map { index -> scopes[index].stringValue() }
-                .toSet()
+            paths[path].propertyNames().forEach { method ->
+                val operation = paths[path][method]
+                val scopes = operation["x-required-scopes"]
+                operations[Route(method, path)] = (0 until scopes.size())
+                    .map { index -> scopes[index].stringValue() }
+                    .toSet()
+            }
         }
         return operations
     }
@@ -78,14 +86,26 @@ class OpenApiContractTest {
         val basePath = requireNotNull(
             MembershipReadController::class.java.getAnnotation(RequestMapping::class.java),
         ).value.single()
-        return MembershipReadController::class.java.declaredMethods.mapNotNull { method ->
+        val reads = MembershipReadController::class.java.declaredMethods.mapNotNull { method ->
             val mapping = method.getAnnotation(GetMapping::class.java) ?: return@mapNotNull null
             val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java))
             val scopes = SCOPE_PATTERN.findAll(authorization.value)
                 .map { match -> match.groupValues[1] }
                 .toSet()
             Route("get", basePath + mapping.value.single()) to scopes
-        }.toMap()
+        }
+        val commandBasePath = requireNotNull(
+            MembershipCommandController::class.java.getAnnotation(RequestMapping::class.java),
+        ).value.single()
+        val commands = MembershipCommandController::class.java.declaredMethods.mapNotNull { method ->
+            val mapping = method.getAnnotation(PostMapping::class.java) ?: return@mapNotNull null
+            val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java))
+            val scopes = SCOPE_PATTERN.findAll(authorization.value)
+                .map { match -> match.groupValues[1] }
+                .toSet()
+            Route("post", commandBasePath + mapping.value.single()) to scopes
+        }
+        return (reads + commands).toMap()
     }
 
     private data class Route(val method: String, val path: String)

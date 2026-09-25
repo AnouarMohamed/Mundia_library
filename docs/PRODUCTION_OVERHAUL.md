@@ -270,9 +270,14 @@ operators demonstrate rollback. Dual-writing inventory is forbidden.
 - Replace BFF database imports with service contracts.
 - Migrate identity documents to private object storage and apply retention.
 
-Implementation checkpoint (2026-09-24): Membership has a PostgreSQL-backed read
+Implementation checkpoint (2026-09-25): Membership has a PostgreSQL-backed read
 slice for authoritative profiles, fail-closed eligibility, and privacy-safe
-identity-evidence metadata. Catalog now has a separate PostgreSQL-backed read
+identity-evidence metadata. Membership now owns version-checked, actor-bound,
+idempotent account-status changes; state, privacy-minimized audit evidence, and
+minimal eligibility outbox events commit atomically. Self-status changes and
+suspension of the final approved administrator are rejected. Event delivery,
+remaining profile and eligibility writes, backfill, and BFF routing remain pending.
+Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member
 identifiers and hidden moderation content. Exact OIDC issuer/audience/type and
@@ -289,8 +294,9 @@ without reading Circulation's database. Catalog now owns idempotent member revie
 create/update/delete commands: identity is JWT-bound, create eligibility comes
 from that returned-loan projection, aggregate ratings update transactionally,
 and privacy-minimized audit/outbox events retain neither member IDs nor review
-text. Membership writes, backfill/reconciliation, retention/deletion automation, BFF routing, and
-production cutover are not complete, so the Phase 4 exit gate remains open.
+text. Membership backfill/reconciliation, retention/deletion automation, BFF
+routing, and production cutover are not complete, so the Phase 4 exit gate
+remains open.
 Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one

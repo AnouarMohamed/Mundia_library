@@ -3,7 +3,7 @@
   "info": {
     "title": "Mundiapolis Membership API",
     "version": "1.0.0",
-    "description": "Authoritative version 1 read contract for member profiles, borrowing eligibility, and privacy-safe identity-evidence metadata.",
+    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata, and versioned account-status commands.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [
@@ -15,11 +15,21 @@
         "operationId": "getMemberProfile",
         "summary": "Read an authoritative member profile",
         "description": "Self-service callers must request the membership_id bound to their token. The read-any scope permits delegated access.",
-        "x-required-scopes": ["membership.profile.read", "membership.profile.read.any"],
+        "x-required-scopes": [
+          "membership.profile.read",
+          "membership.profile.read.any"
+        ],
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
         "responses": {
-          "200": { "description": "Member profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberProfile" } } } },
+          "200": {
+            "description": "Member profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MemberProfile" }
+              }
+            }
+          },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
@@ -31,11 +41,21 @@
         "operationId": "getMemberEligibility",
         "summary": "Evaluate borrowing eligibility from authoritative membership state",
         "description": "Unknown members and incomplete state fail closed. Self-service callers must request the membership_id bound to their token.",
-        "x-required-scopes": ["membership.eligibility.read", "membership.eligibility.read.any"],
+        "x-required-scopes": [
+          "membership.eligibility.read",
+          "membership.eligibility.read.any"
+        ],
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
         "responses": {
-          "200": { "description": "Current eligibility decision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberEligibility" } } } },
+          "200": {
+            "description": "Current eligibility decision",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MemberEligibility" }
+              }
+            }
+          },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" }
         }
@@ -50,17 +70,80 @@
         "security": [{ "bearerAuth": [] }],
         "parameters": [{ "$ref": "#/components/parameters/MemberId" }],
         "responses": {
-          "200": { "description": "Identity-evidence metadata", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdentityEvidenceRef" } } } },
+          "200": {
+            "description": "Identity-evidence metadata",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdentityEvidenceRef" }
+              }
+            }
+          },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
           "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/members/{memberId}/status": {
+      "post": {
+        "operationId": "changeMemberAccountStatus",
+        "summary": "Change authoritative member account status",
+        "description": "Requires an actor-bound idempotency key, a canonical membership_id claim, and an exact aggregate-version ETag. Operators cannot change their own status, and the final approved administrator is protected. The state change, audit entry, and eligibility outbox event commit atomically.",
+        "x-required-scopes": ["membership.status.manage"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/MemberId" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAccountStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account status changed or exact prior result replayed",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\\\"(0|[1-9][0-9]*)\\\"$"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": { "type": "string", "enum": ["true", "false"] }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipCommandResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     },
     "parameters": {
       "MemberId": {
@@ -68,13 +151,34 @@
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "pattern": "^\\\"(0|[1-9][0-9]*)\\\"$" }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 16, "maxLength": 128 }
       }
     },
     "schemas": {
       "MemberProfile": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["memberId", "email", "fullName", "universityId", "status", "role", "createdAt", "updatedAt"],
+        "required": [
+          "memberId",
+          "email",
+          "fullName",
+          "universityId",
+          "status",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ],
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
           "email": { "type": "string", "format": "email", "maxLength": 320 },
@@ -89,7 +193,15 @@
       "MemberEligibility": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["memberId", "eligible", "status", "maxActiveLoans", "currentActiveLoans", "hasUnpaidOverdueFines", "evaluatedAt"],
+        "required": [
+          "memberId",
+          "eligible",
+          "status",
+          "maxActiveLoans",
+          "currentActiveLoans",
+          "hasUnpaidOverdueFines",
+          "evaluatedAt"
+        ],
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
           "eligible": { "type": "boolean" },
@@ -104,23 +216,73 @@
       "IdentityEvidenceRef": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["evidenceId", "memberId", "mimeType", "fileSize", "checksumSha256", "uploadedAt"],
+        "required": [
+          "evidenceId",
+          "memberId",
+          "mimeType",
+          "fileSize",
+          "checksumSha256",
+          "uploadedAt"
+        ],
         "properties": {
           "evidenceId": { "type": "string", "format": "uuid" },
           "memberId": { "type": "string", "format": "uuid" },
-          "mimeType": { "type": "string", "enum": ["application/pdf", "image/jpeg", "image/png"] },
+          "mimeType": {
+            "type": "string",
+            "enum": ["application/pdf", "image/jpeg", "image/png"]
+          },
           "fileSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
           "checksumSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "uploadedAt": { "type": "string", "format": "date-time" }
         }
       },
-      "AccountStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+      "ChangeAccountStatusRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "reason"],
+        "properties": {
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        }
+      },
+      "MembershipCommandResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memberId",
+          "aggregateVersion",
+          "status",
+          "occurredAt",
+          "replayed"
+        ],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "aggregateVersion": { "type": "integer", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
+        }
+      },
+      "AccountStatus": {
+        "type": "string",
+        "enum": ["PENDING", "APPROVED", "REJECTED"]
+      },
       "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN"] }
     },
     "responses": {
+      "BadRequest": {
+        "description": "The command headers or body are invalid"
+      },
       "Unauthorized": { "description": "A valid bearer token is required" },
-      "Forbidden": { "description": "The token lacks the required scope or member binding" },
-      "NotFound": { "description": "The requested membership resource does not exist" }
+      "Forbidden": {
+        "description": "The token lacks the required scope or member binding"
+      },
+      "NotFound": {
+        "description": "The requested membership resource does not exist"
+      },
+      "Conflict": {
+        "description": "The aggregate version or idempotency claim conflicts"
+      }
     }
   }
 }
