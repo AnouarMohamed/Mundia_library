@@ -275,8 +275,11 @@ slice for authoritative profiles, fail-closed eligibility, and privacy-safe
 identity-evidence metadata. Membership now owns version-checked, actor-bound,
 idempotent account-status changes; state, privacy-minimized audit evidence, and
 minimal eligibility outbox events commit atomically. Self-status changes and
-suspension of the final approved administrator are rejected. Event delivery,
-remaining profile and eligibility writes, backfill, and BFF routing remain pending.
+suspension of the final approved administrator are rejected. Membership owns
+the privacy-minimal Protobuf v1 eligibility contract and strictly encodes
+outbox payloads against it; Circulation verifies its consumer copy byte for
+byte during every build. Broker delivery, remaining profile and eligibility
+writes, backfill, and BFF routing remain pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member

@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.spring)
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.jooq.codegen)
+    alias(libs.plugins.protobuf)
 }
 
 java {
@@ -37,6 +38,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("com.google.protobuf:protobuf-java:${libs.versions.protobuf.java.get()}")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql:42.7.12")
 
@@ -50,6 +52,16 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${libs.versions.protobuf.java.get()}"
+    }
+    plugins {
+        maybeCreate("grpc").artifact =
+            "io.grpc:protoc-gen-grpc-java:${libs.versions.grpc.java.get()}"
+    }
 }
 
 jooq {

@@ -13,6 +13,8 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --quiet :circulation-service:dependencies --no-daemon
 
 COPY circulation-service/src ./circulation-service/src
+COPY membership-service/src/main/proto/mundia/membership/v1/membership_events.proto \
+    ./membership-service/src/main/proto/mundia/membership/v1/membership_events.proto
 
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew :circulation-service:bootJar --no-daemon

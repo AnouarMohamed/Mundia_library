@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package mundia.membership.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.mundiapolis.library.membership.contract.v1";
+option java_outer_classname = "MembershipEventsProto";
+
+// Minimal event consumed by Circulation. It intentionally contains no profile
+// or identity-document data. Field numbers and enum values are never reused.
+message MemberEligibilityChanged {
+  string event_id = 1;
+  string event_type = 2;
+  uint32 event_version = 3;
+  string member_id = 4;
+  uint64 aggregate_version = 5;
+  MemberEligibilityStatus status = 6;
+  optional string reason_code = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+}
+
+enum MemberEligibilityStatus {
+  MEMBER_ELIGIBILITY_STATUS_UNSPECIFIED = 0;
+  MEMBER_ELIGIBILITY_STATUS_ELIGIBLE = 1;
+  MEMBER_ELIGIBILITY_STATUS_INELIGIBLE = 2;
+  MEMBER_ELIGIBILITY_STATUS_SUSPENDED = 3;
+}
