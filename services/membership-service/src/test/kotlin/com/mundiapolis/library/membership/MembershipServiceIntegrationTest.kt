@@ -5,6 +5,8 @@ import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.gene
 import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.generated.Tables.MEMBERSHIP_IDENTITY_EVIDENCE
 import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.generated.Tables.MEMBERSHIP_MEMBER
 import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.generated.Tables.MEMBERSHIP_OUTBOX_EVENT
+import com.mundiapolis.library.membership.dto.MembershipBrokerAcknowledgement
+import com.mundiapolis.library.membership.service.MembershipOutboxStore
 import org.jooq.DSLContext
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -27,6 +29,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.OffsetDateTime
+import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -39,6 +42,9 @@ class MembershipServiceIntegrationTest {
 
     @Autowired
     private lateinit var dsl: DSLContext
+
+    @Autowired
+    private lateinit var outboxStore: MembershipOutboxStore
 
     @BeforeEach
     fun seedMembership() {
@@ -199,6 +205,48 @@ class MembershipServiceIntegrationTest {
             .data()
         assertThat(payload).contains("\"status\": \"ELIGIBLE\"")
         assertThat(payload).doesNotContain("@example.test", "Integration Member")
+
+        val claimAt = Instant.now().plusSeconds(1)
+        val firstClaim = outboxStore.claimBatch(
+            "membership-worker-a",
+            claimAt,
+            claimAt.plusSeconds(10),
+            10,
+        ).single()
+        assertThat(firstClaim.aggregateId).isEqualTo(PENDING_MEMBER_ID)
+        assertThat(firstClaim.deliveryAttempt).isEqualTo(1)
+        assertThat(
+            outboxStore.claimBatch(
+                "membership-worker-b",
+                claimAt.plusSeconds(5),
+                claimAt.plusSeconds(15),
+                10,
+            ),
+        ).isEmpty()
+
+        val recoveredClaim = outboxStore.claimBatch(
+            "membership-worker-b",
+            claimAt.plusSeconds(10),
+            claimAt.plusSeconds(20),
+            10,
+        ).single()
+        assertThat(recoveredClaim.deliveryAttempt).isEqualTo(2)
+        assertThat(
+            outboxStore.markPublished(
+                "membership-worker-a",
+                firstClaim,
+                MembershipBrokerAcknowledgement("mundia.membership.events.v1", 0, 1),
+                claimAt.plusSeconds(11),
+            ),
+        ).isFalse()
+        assertThat(
+            outboxStore.markPublished(
+                "membership-worker-b",
+                recoveredClaim,
+                MembershipBrokerAcknowledgement("mundia.membership.events.v1", 0, 2),
+                claimAt.plusSeconds(11),
+            ),
+        ).isTrue()
     }
 
     @Test

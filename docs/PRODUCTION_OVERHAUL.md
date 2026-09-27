@@ -278,8 +278,11 @@ minimal eligibility outbox events commit atomically. Self-status changes and
 suspension of the final approved administrator are rejected. Membership owns
 the privacy-minimal Protobuf v1 eligibility contract and strictly encodes
 outbox payloads against it; Circulation verifies its consumer copy byte for
-byte during every build. Broker delivery, remaining profile and eligibility
-writes, backfill, and BFF routing remain pending.
+byte during every build. Membership delivery now uses crash-recoverable,
+member-ordered leases, synchronous idempotent Kafka acknowledgements, bounded
+retries, poison-event blocking, retention cleanup, and lag/blocked readiness
+and metrics. Broker provisioning, remaining profile and eligibility writes,
+backfill, and BFF routing remain pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member

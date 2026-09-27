@@ -1,6 +1,7 @@
 package com.mundiapolis.library.membership
 
 import com.mundiapolis.library.membership.adapter.outbound.events.ProtobufMembershipEventEncoder
+import com.mundiapolis.library.membership.config.MembershipOutboxProperties
 import com.mundiapolis.library.membership.contract.v1.MemberEligibilityChanged
 import com.mundiapolis.library.membership.contract.v1.MemberEligibilityStatus
 import com.mundiapolis.library.membership.dto.ClaimedMembershipOutboxEvent
@@ -10,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
+import java.time.Duration
 import java.util.UUID
 
 class MembershipOutboxContractTest {
@@ -71,6 +73,20 @@ class MembershipOutboxContractTest {
         }.isInstanceOf(MembershipOutboxContractException::class.java)
     }
 
+    @Test
+    fun `enabled delivery configuration fails closed on insecure broker settings`() {
+        assertThat(properties().isSafeConfiguration).isTrue()
+        val unsafe = properties().copy(
+            kafka = properties().kafka.copy(
+                securityProtocol = "SASL_SSL",
+                allowInsecureTransport = false,
+                saslMechanism = null,
+                saslJaasConfig = null,
+            ),
+        )
+        assertThat(unsafe.isSafeConfiguration).isFalse()
+    }
+
     private fun event(payload: String): ClaimedMembershipOutboxEvent = ClaimedMembershipOutboxEvent(
         eventId = EVENT_ID,
         aggregateId = MEMBER_ID,
@@ -87,6 +103,39 @@ class MembershipOutboxContractTest {
         val reason = reasonCode?.let { ",\"reasonCode\":\"$it\"" } ?: ""
         return """{"eventId":"$EVENT_ID","eventType":"$EVENT_TYPE","eventVersion":1,"memberId":"$MEMBER_ID","aggregateVersion":7,"status":"$status"$reason,"occurredAt":"$OCCURRED_AT"}"""
     }
+
+    private fun properties() = MembershipOutboxProperties(
+        enabled = true,
+        instanceId = "membership-test",
+        topic = "mundia.membership.events.v1",
+        schemaSubject = "mundia.membership.v1.MemberEligibilityChanged",
+        pollInterval = Duration.ofMillis(500),
+        leaseDuration = Duration.ofSeconds(90),
+        batchSize = 10,
+        maximumAttempts = 20,
+        retryBaseDelay = Duration.ofSeconds(1),
+        retryMaximumDelay = Duration.ofMinutes(5),
+        publishedRetention = Duration.ofDays(30),
+        cleanupInterval = Duration.ofHours(1),
+        cleanupBatchSize = 1_000,
+        maximumEventBytes = 262_144,
+        maximumPendingAge = Duration.ofMinutes(5),
+        kafka = MembershipOutboxProperties.KafkaProperties(
+            bootstrapServers = listOf("localhost:9092"),
+            securityProtocol = "PLAINTEXT",
+            allowInsecureTransport = true,
+            saslMechanism = null,
+            saslJaasConfig = null,
+            truststoreLocation = null,
+            truststorePassword = null,
+            keystoreLocation = null,
+            keystorePassword = null,
+            keyPassword = null,
+            deliveryTimeout = Duration.ofSeconds(5),
+            requestTimeout = Duration.ofSeconds(3),
+            maximumBlock = Duration.ofSeconds(1),
+        ),
+    )
 
     private companion object {
         val EVENT_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
