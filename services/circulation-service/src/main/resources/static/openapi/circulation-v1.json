@@ -244,6 +244,30 @@
         }
       }
     },
+    "/api/v1/circulation/loans/me/{loanId}/cancel": {
+      "post": {
+        "operationId": "cancelOwnLoan",
+        "tags": ["Loans"],
+        "summary": "Cancel the caller's requested loan",
+        "description": "Derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.loan.cancel"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
     "/api/v1/circulation/loans/{loanId}/return": {
       "post": {
         "operationId": "returnLoan",
@@ -273,6 +297,31 @@
         "tags": ["Loans"],
         "summary": "Renew an eligible active loan",
         "x-required-scopes": ["circulation.loan.renew", "circulation.loan.renew.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/me/{loanId}/renew": {
+      "post": {
+        "operationId": "renewOwnLoan",
+        "tags": ["Loans"],
+        "summary": "Renew the caller's eligible active loan",
+        "description": "Derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.loan.renew"],
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/LoanId" },

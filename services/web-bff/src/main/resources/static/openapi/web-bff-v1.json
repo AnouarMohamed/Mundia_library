@@ -164,6 +164,51 @@
           "504": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/v1/circulation/loans/{loanId}/cancel": {
+      "post": {
+        "operationId": "cancelOwnLoan",
+        "summary": "Cancel the authenticated member's pending loan request",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/{loanId}/renew": {
+      "post": {
+        "operationId": "renewOwnLoan",
+        "summary": "Renew the authenticated member's eligible active loan",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/LoanId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/LoanCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "422": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -177,9 +222,25 @@
         "content": {
           "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } }
         }
+      },
+      "LoanCommandSucceeded": {
+        "description": "Loan command committed or its original result replayed",
+        "headers": {
+          "Cache-Control": { "schema": { "type": "string", "const": "no-store" } },
+          "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } }
+        },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/LoanCommand" } }
+        }
       }
     },
     "parameters": {
+      "LoanId": {
+        "name": "loanId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "IdempotencyKey": {
         "name": "Idempotency-Key",
         "in": "header",

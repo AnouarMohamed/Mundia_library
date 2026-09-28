@@ -8,10 +8,12 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/circulation")
@@ -48,6 +50,46 @@ class CirculationController(
             .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
             .body(result.loan)
     }
+
+    @PostMapping("/loans/{loanId}/cancel")
+    fun cancelLoan(
+        authentication: OAuth2AuthenticationToken,
+        servletRequest: HttpServletRequest,
+        servletResponse: HttpServletResponse,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_KEY) idempotencyKey: String,
+    ): ResponseEntity<LoanCommandView> = mutationResponse(
+        circulation.cancelLoan(
+            authentication,
+            servletRequest,
+            servletResponse,
+            loanId,
+            idempotencyKey,
+        ),
+    )
+
+    @PostMapping("/loans/{loanId}/renew")
+    fun renewLoan(
+        authentication: OAuth2AuthenticationToken,
+        servletRequest: HttpServletRequest,
+        servletResponse: HttpServletResponse,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_KEY) idempotencyKey: String,
+    ): ResponseEntity<LoanCommandView> = mutationResponse(
+        circulation.renewLoan(
+            authentication,
+            servletRequest,
+            servletResponse,
+            loanId,
+            idempotencyKey,
+        ),
+    )
+
+    private fun mutationResponse(result: LoanMutationResult): ResponseEntity<LoanCommandView> =
+        ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
+            .body(result.loan)
 
     private companion object {
         const val IDEMPOTENCY_KEY = "Idempotency-Key"

@@ -47,3 +47,8 @@ data class LoanRequestResult(
     val loan: LoanCommandView,
     val idempotencyReplayed: Boolean,
 )
+
+data class LoanMutationResult(
+    val loan: LoanCommandView,
+    val idempotencyReplayed: Boolean,
+)

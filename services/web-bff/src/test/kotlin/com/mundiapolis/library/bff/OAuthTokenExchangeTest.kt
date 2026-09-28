@@ -94,6 +94,8 @@ class OAuthTokenExchangeTest {
             .andExpect(content().string(containsString("audience=circulation-api")))
             .andExpect(content().string(containsString("circulation.eligibility.read")))
             .andExpect(content().string(containsString("circulation.loan.request")))
+            .andExpect(content().string(containsString("circulation.loan.cancel")))
+            .andExpect(content().string(containsString("circulation.loan.renew")))
             .andRespond(
                 withSuccess(
                     """
@@ -102,7 +104,7 @@ class OAuthTokenExchangeTest {
                           "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
                           "token_type": "Bearer",
                           "expires_in": 120,
-                          "scope": "circulation.eligibility.read circulation.loan.request"
+                          "scope": "circulation.eligibility.read circulation.loan.request circulation.loan.cancel circulation.loan.renew"
                         }
                     """.trimIndent(),
                     MediaType.APPLICATION_JSON,
@@ -112,13 +114,23 @@ class OAuthTokenExchangeTest {
         val registration = registration(
             registrationId = "circulation-service",
             clientId = "web-bff-circulation",
-            scopes = arrayOf("circulation.eligibility.read", "circulation.loan.request"),
+            scopes = arrayOf(
+                "circulation.eligibility.read",
+                "circulation.loan.request",
+                "circulation.loan.cancel",
+                "circulation.loan.renew",
+            ),
         )
         val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))
 
         assertThat(response.accessToken.tokenValue).isEqualTo("delegated-circulation-token")
         assertThat(response.accessToken.scopes)
-            .containsExactlyInAnyOrder("circulation.eligibility.read", "circulation.loan.request")
+            .containsExactlyInAnyOrder(
+                "circulation.eligibility.read",
+                "circulation.loan.request",
+                "circulation.loan.cancel",
+                "circulation.loan.renew",
+            )
         server.verify()
     }
 

@@ -98,11 +98,11 @@ are implemented in the repository:
 - The service exposes revisioned policy and privacy-preserving eligibility
   reads with separate self-service and staff scopes. Routes and admission
   outcomes are enforced by the machine-checked OpenAPI contract.
-- The Kotlin BFF now exposes caller-bound eligibility and idempotent loan
-  request routes through RFC 8693 token exchange. Fixed Circulation `/me`
-  endpoints remove member identifiers from browser input, while canonical
-  claim binding, CSRF, bounded clients, response validation, and delegated
-  token eviction preserve the service boundary.
+- The Kotlin BFF now exposes caller-bound eligibility plus idempotent loan
+  request, cancellation, and renewal routes through RFC 8693 token exchange.
+  Fixed Circulation `/me` endpoints remove member identifiers from browser
+  input, while canonical claim binding, CSRF, bounded clients, response
+  validation, and delegated token eviction preserve the service boundary.
 - GitOps now isolates runtime, platform, and migration layers. Schema-owner
   credentials and Jobs live in protected `*-migrations` namespaces; the
   workload Argo project cannot manage Jobs, RBAC, secret stores, or those

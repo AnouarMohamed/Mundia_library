@@ -143,6 +143,22 @@ class LoanCommandController(
         return ok(execution)
     }
 
+    @PostMapping("/me/{loanId}/cancel")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.loan.cancel')")
+    fun cancelOwn(
+        authentication: JwtAuthenticationToken,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+    ): ResponseEntity<LoanCommandResponse> = ok(
+        cancelLoanUseCase.cancel(
+            CancelLoanCommand(
+                loanId = LoanId(loanId),
+                idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
+                principal = principalResolver.forStrictSelf(authentication),
+            ),
+        ),
+    )
+
     @PostMapping("/{loanId}/return")
     @PreAuthorize("hasAuthority('SCOPE_circulation.loan.return')")
     fun returnLoan(
@@ -180,6 +196,22 @@ class LoanCommandController(
         )
         return ok(execution)
     }
+
+    @PostMapping("/me/{loanId}/renew")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.loan.renew')")
+    fun renewOwn(
+        authentication: JwtAuthenticationToken,
+        @PathVariable loanId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+    ): ResponseEntity<LoanCommandResponse> = ok(
+        renewLoanUseCase.renew(
+            RenewLoanCommand(
+                loanId = LoanId(loanId),
+                idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
+                principal = principalResolver.forStrictSelf(authentication),
+            ),
+        ),
+    )
 
     private fun ok(execution: CommandExecution): ResponseEntity<LoanCommandResponse> =
         ResponseEntity.ok()

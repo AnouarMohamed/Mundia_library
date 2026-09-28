@@ -99,6 +99,64 @@ class CirculationClientTest {
         server.verify()
     }
 
+    @Test
+    fun `loan cancellation uses the fixed me route and validates terminal state`() {
+        server.expect(
+            requestTo("https://circulation.internal/api/v1/circulation/loans/me/$LOAN_ID/cancel"),
+        )
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header("Idempotency-Key", IDEMPOTENCY_KEY))
+            .andRespond(
+                withSuccess(VALID_CANCELLED_LOAN, MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "false"),
+            )
+
+        val result = client.cancelOwnLoan(authorizedClient(), LOAN_ID, IDEMPOTENCY_KEY)
+
+        assertThat(result.loan.status.name).isEqualTo("CANCELLED")
+        assertThat(result.idempotencyReplayed).isFalse()
+        server.verify()
+    }
+
+    @Test
+    fun `loan renewal uses the fixed me route and validates active lifecycle`() {
+        server.expect(
+            requestTo("https://circulation.internal/api/v1/circulation/loans/me/$LOAN_ID/renew"),
+        )
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header("Idempotency-Key", IDEMPOTENCY_KEY))
+            .andRespond(
+                withSuccess(VALID_RENEWED_LOAN, MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "true"),
+            )
+
+        val result = client.renewOwnLoan(authorizedClient(), LOAN_ID, IDEMPOTENCY_KEY)
+
+        assertThat(result.loan.renewalCount).isOne()
+        assertThat(result.idempotencyReplayed).isTrue()
+        server.verify()
+    }
+
+    @Test
+    fun `renewal response with an impossible lifecycle is rejected`() {
+        server.expect(
+            requestTo("https://circulation.internal/api/v1/circulation/loans/me/$LOAN_ID/renew"),
+        ).andRespond(
+            withSuccess(
+                VALID_RENEWED_LOAN.replace(
+                    "2026-10-02T00:00:00Z",
+                    "2026-09-01T12:00:00Z",
+                ),
+                MediaType.APPLICATION_JSON,
+            ).header("Idempotency-Replayed", "false"),
+        )
+
+        assertThatThrownBy {
+            client.renewOwnLoan(authorizedClient(), LOAN_ID, IDEMPOTENCY_KEY)
+        }.isInstanceOf(CirculationProtocolException::class.java)
+        server.verify()
+    }
+
     private fun authorizedClient(): OAuth2AuthorizedClient {
         val registration = ClientRegistration.withRegistrationId("circulation-service")
             .clientId("web-bff-circulation")
@@ -129,6 +187,7 @@ class CirculationClientTest {
     private companion object {
         val MEMBER_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
         val EDITION_ID: UUID = UUID.fromString("20000000-0000-0000-0000-000000000001")
+        val LOAN_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000001")
         const val IDEMPOTENCY_KEY = "loan-request-00000001"
         val VALID_ELIGIBILITY = """
             {
@@ -152,6 +211,36 @@ class CirculationClientTest {
               "returnedAt": null,
               "renewalCount": 0,
               "version": 0
+            }
+        """.trimIndent()
+        val VALID_CANCELLED_LOAN = """
+            {
+              "loanId": "$LOAN_ID",
+              "memberId": "$MEMBER_ID",
+              "editionId": "$EDITION_ID",
+              "copyId": null,
+              "status": "CANCELLED",
+              "requestedAt": "2026-09-01T00:00:00Z",
+              "checkedOutAt": null,
+              "dueAt": null,
+              "returnedAt": null,
+              "renewalCount": 0,
+              "version": 1
+            }
+        """.trimIndent()
+        val VALID_RENEWED_LOAN = """
+            {
+              "loanId": "$LOAN_ID",
+              "memberId": "$MEMBER_ID",
+              "editionId": "$EDITION_ID",
+              "copyId": "40000000-0000-0000-0000-000000000001",
+              "status": "ACTIVE",
+              "requestedAt": "2026-09-01T00:00:00Z",
+              "checkedOutAt": "2026-09-02T00:00:00Z",
+              "dueAt": "2026-10-02T00:00:00Z",
+              "returnedAt": null,
+              "renewalCount": 1,
+              "version": 2
             }
         """.trimIndent()
     }

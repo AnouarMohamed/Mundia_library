@@ -65,7 +65,7 @@ spring:
             client-secret: ${CIRCULATION_CLIENT_SECRET}
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
-            scope: circulation.eligibility.read,circulation.loan.request
+            scope: circulation.eligibility.read,circulation.loan.request,circulation.loan.cancel,circulation.loan.renew
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}

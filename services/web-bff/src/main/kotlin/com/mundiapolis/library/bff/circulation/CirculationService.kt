@@ -22,6 +22,22 @@ interface CirculationSelfServiceUseCase {
         command: RequestLoanView,
         idempotencyKey: String,
     ): LoanRequestResult
+
+    fun cancelLoan(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult
+
+    fun renewLoan(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult
 }
 
 @Service
@@ -44,6 +60,26 @@ class CirculationService(
         idempotencyKey: String,
     ): LoanRequestResult = withClient(authentication, request, response) { authorizedClient ->
         client.requestOwnLoan(authorizedClient, command, idempotencyKey)
+    }
+
+    override fun cancelLoan(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult = withClient(authentication, request, response) { authorizedClient ->
+        client.cancelOwnLoan(authorizedClient, loanId, idempotencyKey)
+    }
+
+    override fun renewLoan(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult = withClient(authentication, request, response) { authorizedClient ->
+        client.renewOwnLoan(authorizedClient, loanId, idempotencyKey)
     }
 
     private fun <T> withClient(

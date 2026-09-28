@@ -438,7 +438,7 @@ class CirculationServiceIntegrationTest {
                 principal = eligibleSelfPrincipal(memberId, "http-cancel-member"),
             ),
         )
-        val path = "$LOANS_PATH/${requested.result.loanId.value}/cancel"
+        val path = "$LOANS_PATH/me/${requested.result.loanId.value}/cancel"
         val key = "cancel-http-${UUID.randomUUID()}"
 
         mockMvc.post(path) {

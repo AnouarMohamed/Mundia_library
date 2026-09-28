@@ -616,6 +616,50 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `caller bound renewal endpoint requires the canonical member claim and replays exactly`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val active = createActiveLoan(memberId)
+        val path = "$LOANS_PATH/me/${active.value}/renew"
+        val key = "renew-self-http-${UUID.randomUUID()}"
+
+        mockMvc.post(path) {
+            with(jwtFor("missing-member", RENEW_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("missing_membership_claim") }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("delegated-staff", RENEW_ON_BEHALF_SCOPE))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        val first = mockMvc.post(path) {
+            with(jwtFor("renewing-member", RENEW_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.status") { value("ACTIVE") }
+            jsonPath("$.renewalCount") { value(1) }
+            jsonPath("$.version") { value(2) }
+        }.andReturn().response.contentAsString
+
+        val replay = mockMvc.post(path) {
+            with(jwtFor("renewing-member", RENEW_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, key)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+        }.andReturn().response.contentAsString
+
+        assertThat(replay).isEqualTo(first)
+    }
+
+    @Test
     fun `overdue loan renewal fails atomically without retaining idempotency claim`() {
         val memberId = MemberId(UUID.randomUUID())
         val active = createActiveLoan(memberId)

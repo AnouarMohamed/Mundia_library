@@ -72,8 +72,9 @@ domains.
 The first Circulation self-service routes are
 `GET /api/v1/circulation/eligibility` and `POST /api/v1/circulation/loans`.
 They exchange the same server-side user token for a separate
-`circulation-api` token limited to `circulation.eligibility.read` and
-`circulation.loan.request`. The loan request accepts only an edition UUID and
-an `Idempotency-Key`; Circulation derives the member from the canonical token
-claim and owns the actor-scoped idempotency record. Mutations require the BFF's
-CSRF header, and all responses are non-cacheable.
+`circulation-api` token limited to eligibility and self-service loan request,
+cancellation, and renewal scopes. Loan requests accept only an edition UUID;
+loan mutations accept only the target loan UUID in the route. Every command
+requires an `Idempotency-Key`, while Circulation derives the member from the
+canonical token claim and owns the actor-scoped idempotency record. Mutations
+require the BFF's CSRF header, and all responses are non-cacheable.

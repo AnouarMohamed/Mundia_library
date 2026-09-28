@@ -51,6 +51,52 @@ class CirculationClient(
             }
     }
 
+    fun cancelOwnLoan(
+        authorizedClient: OAuth2AuthorizedClient,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult = mutateOwnLoan(
+        authorizedClient = authorizedClient,
+        loanId = loanId,
+        operation = "cancel",
+        idempotencyKey = idempotencyKey,
+        validator = ::validateCancelledLoan,
+    )
+
+    fun renewOwnLoan(
+        authorizedClient: OAuth2AuthorizedClient,
+        loanId: java.util.UUID,
+        idempotencyKey: String,
+    ): LoanMutationResult = mutateOwnLoan(
+        authorizedClient = authorizedClient,
+        loanId = loanId,
+        operation = "renew",
+        idempotencyKey = idempotencyKey,
+        validator = ::validateRenewedLoan,
+    )
+
+    private fun mutateOwnLoan(
+        authorizedClient: OAuth2AuthorizedClient,
+        loanId: java.util.UUID,
+        operation: String,
+        idempotencyKey: String,
+        validator: (LoanCommandView, java.util.UUID) -> Unit,
+    ): LoanMutationResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        circulationRestClient.post()
+            .uri("/api/v1/circulation/loans/me/{loanId}/{operation}", loanId, operation)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                val replayed = response.headers.getFirst(IDEMPOTENCY_REPLAYED)?.let(::strictBoolean)
+                    ?: throw CirculationProtocolException()
+                val loan = decode(response, LoanCommandView::class.java)
+                validator(loan, loanId)
+                LoanMutationResult(loan, replayed)
+            }
+    }
+
     private fun <T> exchange(operation: () -> T): T {
         try {
             return operation()
@@ -115,6 +161,40 @@ class CirculationClient(
             view.returnedAt != null ||
             view.renewalCount != 0 ||
             view.version != 0L
+        ) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun validateCancelledLoan(view: LoanCommandView, requestedLoanId: java.util.UUID) {
+        if (
+            view.loanId != requestedLoanId ||
+            view.status != LoanStatusView.CANCELLED ||
+            view.copyId != null ||
+            view.checkedOutAt != null ||
+            view.dueAt != null ||
+            view.returnedAt != null ||
+            view.renewalCount != 0 ||
+            view.version < 1
+        ) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun validateRenewedLoan(view: LoanCommandView, requestedLoanId: java.util.UUID) {
+        val checkedOutAt = view.checkedOutAt
+        val dueAt = view.dueAt
+        if (
+            view.loanId != requestedLoanId ||
+            view.status != LoanStatusView.ACTIVE ||
+            view.copyId == null ||
+            checkedOutAt == null ||
+            dueAt == null ||
+            view.returnedAt != null ||
+            view.renewalCount < 1 ||
+            view.version < 2 ||
+            checkedOutAt < view.requestedAt ||
+            dueAt <= checkedOutAt
         ) {
             throw CirculationProtocolException()
         }
