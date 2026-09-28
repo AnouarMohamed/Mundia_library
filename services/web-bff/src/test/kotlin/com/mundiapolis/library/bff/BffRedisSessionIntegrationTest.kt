@@ -108,6 +108,7 @@ class BffRedisSessionIntegrationTest {
             registry.add("OIDC_CLIENT_ID") { "web-bff-test" }
             registry.add("OIDC_CLIENT_SECRET") { "integration-test-only" }
             registry.add("CATALOG_SERVICE_URL") { "https://catalog.example.test" }
+            registry.add("MEMBERSHIP_SERVICE_URL") { "https://membership.example.test" }
             registry.add("DEPLOYMENT_TIER") { "production" }
             registry.add("BFF_PUBLIC_BASE_URL") { "https://library.example.test" }
             registry.add("BFF_SECURE_COOKIES") { "true" }

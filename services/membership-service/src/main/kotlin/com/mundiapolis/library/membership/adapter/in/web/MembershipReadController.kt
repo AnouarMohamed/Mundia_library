@@ -20,6 +20,14 @@ import java.util.UUID
 class MembershipReadController(
     private val membershipService: MembershipService,
 ) {
+    @GetMapping("/me/profile")
+    @PreAuthorize("hasAuthority('SCOPE_membership.profile.read')")
+    fun ownProfile(authentication: JwtAuthenticationToken): MemberProfile {
+        val memberId = requiredMembershipId(authentication)
+        return membershipService.getMemberProfile(memberId.toString())
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found")
+    }
+
     @GetMapping("/{memberId}/profile")
     @PreAuthorize(
         "hasAnyAuthority(" +
@@ -64,9 +72,18 @@ class MembershipReadController(
         if (authentication.authorities.any { it.authority == delegatedAuthority }) {
             return
         }
-        val claim = authentication.token.getClaimAsString("membership_id")
-        if (claim == null || runCatching { UUID.fromString(claim) }.getOrNull() != memberId) {
+        if (requiredMembershipId(authentication) != memberId) {
             throw AccessDeniedException("The membership_id claim does not match the requested member")
         }
+    }
+
+    private fun requiredMembershipId(authentication: JwtAuthenticationToken): UUID {
+        val claim = authentication.token.getClaimAsString("membership_id")
+            ?: throw AccessDeniedException("The membership_id claim is required")
+        val memberId = runCatching { UUID.fromString(claim) }.getOrNull()
+        if (memberId == null || memberId.toString() != claim) {
+            throw AccessDeniedException("The membership_id claim must be a canonical UUID")
+        }
+        return memberId
     }
 }

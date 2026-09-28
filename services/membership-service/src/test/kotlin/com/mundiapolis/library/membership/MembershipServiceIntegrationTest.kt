@@ -78,6 +78,13 @@ class MembershipServiceIntegrationTest {
     @Test
     fun `self-service profile read requires a matching membership claim`() {
         mockMvc.perform(
+            get("/api/v1/members/me/profile")
+                .with(memberJwt(APPROVED_MEMBER_ID, PROFILE_SELF_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.memberId").value(APPROVED_MEMBER_ID.toString()))
+
+        mockMvc.perform(
             get("/api/v1/members/$APPROVED_MEMBER_ID/profile")
                 .with(memberJwt(APPROVED_MEMBER_ID, PROFILE_SELF_SCOPE)),
         )
@@ -89,6 +96,19 @@ class MembershipServiceIntegrationTest {
         mockMvc.perform(
             get("/api/v1/members/$APPROVED_MEMBER_ID/profile")
                 .with(memberJwt(LIMITED_MEMBER_ID, PROFILE_SELF_SCOPE)),
+        ).andExpect(status().isForbidden)
+
+        mockMvc.perform(
+            get("/api/v1/members/me/profile")
+                .with(jwt().authorities(SimpleGrantedAuthority(PROFILE_SELF_SCOPE))),
+        ).andExpect(status().isForbidden)
+
+        mockMvc.perform(
+            get("/api/v1/members/me/profile")
+                .with(
+                    jwt().jwt { it.claim("membership_id", "10000000-0000-0000-0000-00000000000A") }
+                        .authorities(SimpleGrantedAuthority(PROFILE_SELF_SCOPE)),
+                ),
         ).andExpect(status().isForbidden)
     }
 

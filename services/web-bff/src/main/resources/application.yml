@@ -52,6 +52,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: client_credentials
             scope: catalog.search
+          membership-service:
+            provider: institutional
+            client-id: ${MEMBERSHIP_CLIENT_ID}
+            client-secret: ${MEMBERSHIP_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: membership.profile.read
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}
@@ -62,6 +69,10 @@ spring:
             scope: openid,profile,email
 
 app:
+  oauth-token-client:
+    connect-timeout: ${OAUTH_TOKEN_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${OAUTH_TOKEN_READ_TIMEOUT:PT5S}
+    maximum-response-bytes: ${OAUTH_TOKEN_MAXIMUM_RESPONSE_BYTES:65536}
   bff:
     deployment-tier: ${DEPLOYMENT_TIER:local}
     public-base-url: ${BFF_PUBLIC_BASE_URL:http://localhost:8080}
@@ -73,6 +84,13 @@ app:
       connect-timeout: ${CATALOG_CONNECT_TIMEOUT:PT1S}
       read-timeout: ${CATALOG_READ_TIMEOUT:PT3S}
       maximum-response-bytes: ${CATALOG_MAXIMUM_RESPONSE_BYTES:524288}
+    membership:
+      base-url: ${MEMBERSHIP_SERVICE_URL:http://localhost:8081}
+      audience: ${MEMBERSHIP_AUDIENCE:membership-api}
+      connect-timeout: ${MEMBERSHIP_CONNECT_TIMEOUT:PT1S}
+      read-timeout: ${MEMBERSHIP_READ_TIMEOUT:PT3S}
+      maximum-response-bytes: ${MEMBERSHIP_MAXIMUM_RESPONSE_BYTES:65536}
+      maximum-delegated-token-lifetime: ${MEMBERSHIP_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
 
 management:
   endpoints:

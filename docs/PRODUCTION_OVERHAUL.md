@@ -275,7 +275,7 @@ operators demonstrate rollback. Dual-writing inventory is forbidden.
 - Replace BFF database imports with service contracts.
 - Migrate identity documents to private object storage and apply retention.
 
-Implementation checkpoint (2026-09-25): Membership has a PostgreSQL-backed read
+Implementation checkpoint (2026-09-28): Membership has a PostgreSQL-backed read
 slice for authoritative profiles, fail-closed eligibility, and privacy-safe
 identity-evidence metadata. Membership now owns version-checked, actor-bound,
 idempotent account-status changes; state, privacy-minimized audit evidence, and
@@ -286,8 +286,11 @@ outbox payloads against it; Circulation verifies its consumer copy byte for
 byte during every build. Membership delivery now uses crash-recoverable,
 member-ordered leases, synchronous idempotent Kafka acknowledgements, bounded
 retries, poison-event blocking, retention cleanup, and lag/blocked readiness
-and metrics. Broker provisioning, remaining profile and eligibility writes,
-backfill, and BFF routing remain pending.
+and metrics. The Kotlin BFF now routes the authenticated self-profile read
+through RFC 8693 token exchange, a fixed `/me` service route, strict
+audience/scope/claim binding, bounded network clients, and fail-closed response
+validation. Broker provisioning, remaining profile and eligibility writes,
+backfill, other BFF routes, and production cutover remain pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member

@@ -39,7 +39,7 @@ The BFF owns browser authentication and sessions but owns no domain database.
 ## Current checkpoint
 
 The `services/web-bff` deployable completes the code-level identity boundary
-in step 1 and starts step 2 with the first typed Catalog read slice:
+in step 1 and now has typed Catalog and Membership read slices in step 2:
 
 - `GET /api/v1/catalog/search` requires a valid browser session, validates and
   bounds its inputs, enforces connect/read/response-size limits, and maps
@@ -48,10 +48,20 @@ in step 1 and starts step 2 with the first typed Catalog read slice:
   `catalog.search`; no browser token is forwarded. The authorization server
   must issue the Catalog service audience (`catalog-api` by default). This is
   suitable only for non-user-specific catalog reads.
+- `GET /api/v1/membership/profile` performs RFC 8693 token exchange from the
+  signed-in user's server-side OIDC access token into a short-lived token with
+  only the `membership-api` audience and `membership.profile.read` scope. The
+  Membership service binds the request to the canonical UUID
+  `membership_id` claim through its fixed `/api/v1/members/me/profile` route;
+  caller-controlled member identifiers and machine credentials are not used.
+- OAuth and Membership calls have bounded connect/read timeouts and response
+  sizes, no redirects, strict endpoint validation, stable non-sensitive error
+  responses, and delegated-client eviction on downstream authorization
+  rejection. Tokens remain server-side and profile responses are `no-store`.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 
 The deployment is not production-routed. Institutional IdP client
-registration, Redis failover testing, delegated end-user token design for
-profile/circulation/admin operations, Kubernetes values, edge routing, and the
-React shell remain required before a UI slice moves.
+registration with token exchange, Redis failover testing, delegated end-user
+authorization for circulation/admin operations, Kubernetes values, edge
+routing, and the React shell remain required before a UI slice moves.

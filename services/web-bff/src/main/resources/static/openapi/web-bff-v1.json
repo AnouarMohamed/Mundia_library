@@ -81,6 +81,30 @@
           "504": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/v1/membership/profile": {
+      "get": {
+        "operationId": "getOwnMembershipProfile",
+        "summary": "Get the authenticated member's profile through delegated authorization",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Authoritative membership profile bound to the authenticated session",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MemberProfile" } }
+            }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -149,6 +173,21 @@
           "totalCopies": { "type": "integer", "minimum": 0 },
           "availableCopies": { "type": "integer", "minimum": 0 },
           "isActive": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "MemberProfile": {
+        "type": "object",
+        "required": ["memberId", "email", "fullName", "universityId", "status", "role", "createdAt", "updatedAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email", "maxLength": 320 },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "universityId": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+          "role": { "type": "string", "enum": ["USER", "ADMIN"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         },
         "additionalProperties": false
       },

@@ -20,6 +20,9 @@ OIDC_CLIENT_SECRET=replace-locally \
 CATALOG_CLIENT_ID=library-web-bff-catalog \
 CATALOG_CLIENT_SECRET=replace-locally \
 CATALOG_SERVICE_URL=http://localhost:8082 \
+MEMBERSHIP_CLIENT_ID=library-web-bff-membership \
+MEMBERSHIP_CLIENT_SECRET=replace-locally \
+MEMBERSHIP_SERVICE_URL=http://localhost:8081 \
 BFF_PUBLIC_BASE_URL=http://localhost:8080 \
 REDIS_URL=redis://localhost:56379 \
 ./gradlew :web-bff:bootRun
@@ -43,3 +46,22 @@ This application credential is intentionally limited to non-user-specific
 catalog reads. Profile, circulation, reviews, and administrative operations
 must preserve end-user identity through the approved delegated-token design;
 do not reuse the catalog credential for those routes.
+
+Authenticated sessions can also call `GET /api/v1/membership/profile`. For
+this user-specific route, the BFF exchanges the current institutional access
+token using RFC 8693 and requests exactly the `membership-api` audience and
+`membership.profile.read` scope. The Membership service derives the member
+identifier from the canonical `membership_id` token claim; neither the browser
+nor the BFF supplies a member ID in the URL. The browser never receives either
+access token.
+
+The authorization server must enable token exchange for the separate
+`membership-service` confidential client and issue a short-lived Bearer access
+token with that exact audience, scope, and a canonical UUID `membership_id`
+claim. The BFF rejects overlong delegated tokens, bounds token and service
+response sizes and timeouts, forbids token-endpoint redirects, and discards a
+cached delegated client after a downstream `401` or `403`. Outside local
+development, issuer, authorization, token, and service endpoints must use
+HTTPS; authorization and token endpoints must share an exact origin. The
+issuer may use a different HTTPS origin, as it does with Amazon Cognito hosted
+domains.

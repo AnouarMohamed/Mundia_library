@@ -10,6 +10,28 @@
     { "url": "/", "description": "The same origin as the published contract" }
   ],
   "paths": {
+    "/api/v1/members/me/profile": {
+      "get": {
+        "operationId": "getOwnMemberProfile",
+        "summary": "Read the profile bound to the caller's membership identity",
+        "description": "Resolves the member exclusively from the canonical membership_id claim. No caller-controlled member identifier is accepted.",
+        "x-required-scopes": ["membership.profile.read"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Caller-bound member profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MemberProfile" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/members/{memberId}/profile": {
       "get": {
         "operationId": "getMemberProfile",

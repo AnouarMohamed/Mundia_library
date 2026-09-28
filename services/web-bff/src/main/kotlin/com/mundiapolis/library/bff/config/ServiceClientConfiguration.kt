@@ -43,4 +43,29 @@ class ServiceClientConfiguration {
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build()
     }
+
+    @Bean
+    fun membershipRestClient(
+        observationRegistry: ObservationRegistry,
+        membership: MembershipClientProperties,
+        bff: BffProperties,
+    ): RestClient {
+        require(membership.isSafeFor(bff.deploymentTier)) {
+            "Membership service transport must use HTTPS outside local development"
+        }
+        val httpClient = HttpClient.newBuilder()
+            .connectTimeout(membership.connectTimeout)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
+            setReadTimeout(membership.readTimeout)
+        }
+
+        return RestClient.builder()
+            .baseUrl(membership.baseUrl.toASCIIString())
+            .requestFactory(requestFactory)
+            .observationRegistry(observationRegistry)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+            .build()
+    }
 }
