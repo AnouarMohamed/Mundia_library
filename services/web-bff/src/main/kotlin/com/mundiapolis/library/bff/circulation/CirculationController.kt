@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -29,6 +30,18 @@ class CirculationController(
         ResponseEntity.ok()
             .cacheControl(CacheControl.noStore())
             .body(circulation.eligibility(authentication, request, response))
+
+    @GetMapping("/loans")
+    fun loans(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        @RequestParam(required = false) status: LoanStatusView?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<MemberLoanPageView> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(circulation.loans(authentication, request, response, status, limit, cursor))
 
     @PostMapping("/loans")
     fun requestLoan(
@@ -111,6 +124,18 @@ class CirculationController(
             .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
             .body(result.reservation)
     }
+
+    @GetMapping("/reservations")
+    fun reservations(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        @RequestParam(required = false) status: ReservationStatusView?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ResponseEntity<MemberReservationPageView> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(circulation.reservations(authentication, request, response, status, limit, cursor))
 
     @PostMapping("/reservations/{reservationId}/cancel")
     fun cancelReservation(

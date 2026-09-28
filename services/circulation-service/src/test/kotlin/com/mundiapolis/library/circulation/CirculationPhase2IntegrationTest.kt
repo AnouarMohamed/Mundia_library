@@ -114,6 +114,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
+import tools.jackson.databind.ObjectMapper
 
 @Testcontainers
 @AutoConfigureMockMvc
@@ -187,6 +188,9 @@ class CirculationPhase2IntegrationTest {
 
     @Autowired
     private lateinit var transactionRunner: TransactionRunner
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
 
     @Autowired
     private lateinit var outboxDeliveryStore: OutboxDeliveryStore
@@ -1798,6 +1802,70 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `caller bound history is filtered bounded and keyset paginated`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val otherMemberId = MemberId(UUID.randomUUID())
+        seedEligible(memberId)
+        seedEligible(otherMemberId)
+
+        repeat(3) { index ->
+            mockMvc.post("/api/v1/circulation/loans/me") {
+                with(jwtFor("history-member", "SCOPE_circulation.loan.request", memberId.value))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"editionId":"${UUID.randomUUID()}"}"""
+                header(IDEMPOTENCY_HEADER, "history-loan-$index-${UUID.randomUUID()}")
+            }.andExpect { status { isCreated() } }
+        }
+        requestLoan.request(
+            RequestLoanCommand(
+                otherMemberId,
+                EditionId(UUID.randomUUID()),
+                IdempotencyKey.parse("other-history-${UUID.randomUUID()}"),
+                selfPrincipal(otherMemberId, "other-history"),
+            ),
+        )
+
+        mockMvc.get("/api/v1/circulation/loans/me?limit=2&status=REQUESTED") {
+            with(jwtFor("history-member", LOAN_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.items[0].memberId") { value(memberId.value.toString()) }
+            jsonPath("$.nextCursor") { exists() }
+        }.andReturn().response.contentAsString.let { firstPage ->
+            val cursor = objectMapper.readTree(firstPage).get("nextCursor").stringValue()
+            mockMvc.get("/api/v1/circulation/loans/me?limit=2&status=REQUESTED&cursor=$cursor") {
+                with(jwtFor("history-member", LOAN_READ_SCOPE, memberId.value))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].memberId") { value(memberId.value.toString()) }
+                jsonPath("$.nextCursor") { doesNotExist() }
+            }
+        }
+
+        mockMvc.get("/api/v1/circulation/loans/me?cursor=not+canonical") {
+            with(jwtFor("history-member", LOAN_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("invalid_history_query") }
+        }
+
+        mockMvc.get("/api/v1/circulation/reservations/me") {
+            with(jwtFor("history-member", RESERVATION_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+            jsonPath("$.items.length()") { value(0) }
+        }
+
+        mockMvc.get("/api/v1/circulation/loans/me") {
+            with(jwtFor("wrong-scope", RESERVATION_READ_SCOPE, memberId.value))
+        }.andExpect { status { isForbidden() } }
+    }
+
+    @Test
     fun `reservation fulfillment and expiry reject unrelated member principals`() {
         val memberId = MemberId(UUID.randomUUID())
         val unrelatedMemberId = MemberId(UUID.randomUUID())
@@ -2197,6 +2265,8 @@ class CirculationPhase2IntegrationTest {
         const val RESERVATION_PLACE_ON_BEHALF_SCOPE =
             "SCOPE_circulation.reservation.place.on-behalf"
         const val RESERVATION_CANCEL_SCOPE = "SCOPE_circulation.reservation.cancel"
+        const val LOAN_READ_SCOPE = "SCOPE_circulation.loan.read"
+        const val RESERVATION_READ_SCOPE = "SCOPE_circulation.reservation.read"
         const val ASSESS_FINE_SCOPE = "SCOPE_circulation.fine.assess"
         const val RECORD_PAYMENT_SCOPE = "SCOPE_circulation.fine.payment.record"
         const val POLICY_READ_SCOPE = "SCOPE_circulation.policy.read"

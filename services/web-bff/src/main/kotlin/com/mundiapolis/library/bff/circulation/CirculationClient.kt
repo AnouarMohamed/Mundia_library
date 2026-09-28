@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.client.ResourceAccessException
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
+import org.springframework.web.util.UriComponentsBuilder
 import tools.jackson.databind.ObjectMapper
 import java.net.SocketTimeoutException
 import java.net.http.HttpTimeoutException
@@ -28,6 +29,42 @@ class CirculationClient(
                     decode(response, CirculationEligibilityView::class.java).also(::validateEligibility)
                 }
         }
+
+    fun ownLoans(
+        authorizedClient: OAuth2AuthorizedClient,
+        status: LoanStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberLoanPageView = exchange {
+        val pageSize = validatePageRequest(limit, cursor)
+        circulationRestClient.get()
+            .uri(historyUri("/api/v1/circulation/loans/me", status?.name, limit, cursor))
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, MemberLoanPageView::class.java).also {
+                    validateLoanPage(it, pageSize)
+                }
+            }
+    }
+
+    fun ownReservations(
+        authorizedClient: OAuth2AuthorizedClient,
+        status: ReservationStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberReservationPageView = exchange {
+        val pageSize = validatePageRequest(limit, cursor)
+        circulationRestClient.get()
+            .uri(historyUri("/api/v1/circulation/reservations/me", status?.name, limit, cursor))
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, MemberReservationPageView::class.java).also {
+                    validateReservationPage(it, pageSize)
+                }
+            }
+    }
 
     fun requestOwnLoan(
         authorizedClient: OAuth2AuthorizedClient,
@@ -299,6 +336,96 @@ class CirculationClient(
             (copyId != null && readyAt != null && expiresAt != null &&
                 readyAt >= placedAt && expiresAt > readyAt)
 
+    private fun historyUri(path: String, status: String?, limit: Int?, cursor: String?): String {
+        val builder = UriComponentsBuilder.fromPath(path)
+        status?.let { builder.queryParam("status", it) }
+        limit?.let { builder.queryParam("limit", it) }
+        cursor?.let { builder.queryParam("cursor", it) }
+        return builder.build().encode().toUriString()
+    }
+
+    private fun validatePageRequest(limit: Int?, cursor: String?): Int {
+        val pageSize = limit ?: DEFAULT_PAGE_SIZE
+        if (pageSize !in 1..MAX_PAGE_SIZE) throw CirculationInvalidRequestException()
+        if (cursor != null && (cursor.isBlank() || !CURSOR.matches(cursor))) {
+            throw CirculationInvalidRequestException()
+        }
+        return pageSize
+    }
+
+    private fun validateLoanPage(page: MemberLoanPageView, pageSize: Int) {
+        if (
+            page.items.size > pageSize ||
+            (page.nextCursor != null && page.items.size != pageSize) ||
+            !validNextCursor(page.nextCursor)
+        ) {
+            throw CirculationProtocolException()
+        }
+        page.items.forEach { loan ->
+            if (loan.memberId != page.memberId || !loan.hasValidLifecycle()) {
+                throw CirculationProtocolException()
+            }
+        }
+        if (!page.items.isStrictlyOrderedBy { it.requestedAt to it.loanId }) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun validateReservationPage(page: MemberReservationPageView, pageSize: Int) {
+        if (
+            page.items.size > pageSize ||
+            (page.nextCursor != null && page.items.size != pageSize) ||
+            !validNextCursor(page.nextCursor)
+        ) {
+            throw CirculationProtocolException()
+        }
+        page.items.forEach { reservation ->
+            if (reservation.memberId != page.memberId || !reservation.hasValidLifecycle()) {
+                throw CirculationProtocolException()
+            }
+        }
+        if (!page.items.isStrictlyOrderedBy { it.placedAt to it.reservationId }) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun LoanHistoryItemView.hasValidLifecycle(): Boolean = version >= 0 && renewalCount >= 0 &&
+        when (status) {
+            LoanStatusView.REQUESTED, LoanStatusView.CANCELLED ->
+                copyId == null && checkedOutAt == null && dueAt == null && returnedAt == null &&
+                    rejectedAt == null
+            LoanStatusView.ACTIVE -> copyId != null && checkedOutAt != null && dueAt != null &&
+                dueAt > checkedOutAt && returnedAt == null && rejectedAt == null
+            LoanStatusView.RETURNED -> copyId != null && checkedOutAt != null && dueAt != null &&
+                returnedAt != null && returnedAt >= checkedOutAt && rejectedAt == null
+            LoanStatusView.REJECTED -> copyId == null && checkedOutAt == null && dueAt == null &&
+                returnedAt == null && rejectedAt != null && rejectedAt >= requestedAt
+        }
+
+    private fun ReservationCommandView.hasValidLifecycle(): Boolean = version >= 0 && when (status) {
+        ReservationStatusView.WAITING -> copyId == null && readyAt == null && expiresAt == null &&
+            fulfilledAt == null && cancelledAt == null
+        ReservationStatusView.READY -> hasValidReadyState()
+        ReservationStatusView.FULFILLED -> copyId != null && readyAt != null && expiresAt != null &&
+            fulfilledAt != null && readyAt >= placedAt && expiresAt > readyAt &&
+            fulfilledAt >= readyAt && fulfilledAt <= expiresAt && cancelledAt == null
+        ReservationStatusView.CANCELLED -> fulfilledAt == null && cancelledAt != null &&
+            cancelledAt >= placedAt && hasValidOpenStateShape()
+        ReservationStatusView.EXPIRED -> copyId != null && readyAt != null && expiresAt != null &&
+            readyAt >= placedAt && expiresAt > readyAt && fulfilledAt == null && cancelledAt == null
+    }
+
+    private fun <T> List<T>.isStrictlyOrderedBy(key: (T) -> Pair<java.time.Instant, java.util.UUID>): Boolean =
+        zipWithNext().all { (left, right) ->
+            val leftKey = key(left)
+            val rightKey = key(right)
+            leftKey.first > rightKey.first ||
+                (leftKey.first == rightKey.first && leftKey.second.toString() > rightKey.second.toString())
+        }
+
+    private fun validNextCursor(cursor: String?): Boolean =
+        cursor == null || CURSOR.matches(cursor)
+
     private fun validateIdempotencyKey(value: String) {
         if (value.length !in 16..128 || value.any { it.code !in 0x21..0x7e }) {
             throw CirculationInvalidRequestException()
@@ -318,10 +445,13 @@ class CirculationClient(
         .any { it is HttpTimeoutException || it is SocketTimeoutException }
 
     private companion object {
+        const val DEFAULT_PAGE_SIZE = 20
+        const val MAX_PAGE_SIZE = 100
         const val IDEMPOTENCY_KEY = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED = "Idempotency-Replayed"
         val RETRYABLE_STATUSES = setOf(429, 502, 503, 504)
         val REASON_CODE = Regex("^[A-Z][A-Z0-9_]{0,63}$")
+        val CURSOR = Regex("^[A-Za-z0-9_-]{1,160}$")
     }
 }
 

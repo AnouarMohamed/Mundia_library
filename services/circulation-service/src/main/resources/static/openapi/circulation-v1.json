@@ -126,6 +126,27 @@
       }
     },
     "/api/v1/circulation/loans/me": {
+      "get": {
+        "operationId": "getOwnLoans",
+        "tags": ["Loans"],
+        "summary": "List the caller-bound member's loan history",
+        "description": "Uses bounded keyset pagination and derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.loan.read"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Caller-bound loan page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberLoanPage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
       "post": {
         "operationId": "requestOwnLoan",
         "tags": ["Loans"],
@@ -341,6 +362,27 @@
       }
     },
     "/api/v1/circulation/reservations/me": {
+      "get": {
+        "operationId": "getOwnReservations",
+        "tags": ["Reservations"],
+        "summary": "List the caller-bound member's reservation history",
+        "description": "Uses bounded keyset pagination and derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.reservation.read"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Caller-bound reservation page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberReservationPage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
       "post": {
         "operationId": "placeOwnReservation",
         "tags": ["Reservations"],
@@ -879,6 +921,35 @@
           "editionId": { "type": "string", "format": "uuid" }
         }
       },
+      "MemberLoanPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "items", "nextCursor"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/LoanHistoryItem" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        }
+      },
+      "LoanHistoryItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["loanId", "memberId", "editionId", "copyId", "status", "requestedAt", "checkedOutAt", "dueAt", "returnedAt", "rejectedAt", "renewalCount", "version"],
+        "properties": {
+          "loanId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "copyId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string", "enum": ["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"] },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "checkedOutAt": { "type": ["string", "null"], "format": "date-time" },
+          "dueAt": { "type": ["string", "null"], "format": "date-time" },
+          "returnedAt": { "type": ["string", "null"], "format": "date-time" },
+          "rejectedAt": { "type": ["string", "null"], "format": "date-time" },
+          "renewalCount": { "type": "integer", "minimum": 0 },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
       "PlaceReservationRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -912,6 +983,16 @@
           "fulfilledAt": { "type": ["string", "null"], "format": "date-time" },
           "cancelledAt": { "type": ["string", "null"], "format": "date-time" },
           "version": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "MemberReservationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "items", "nextCursor"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/ReservationCommandResponse" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
         }
       },
       "RegisterCopyRequest": {

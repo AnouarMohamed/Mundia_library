@@ -262,6 +262,11 @@ and an isolated environment can be rebuilt from source.
 Exit gate: the invariant and replay suite passes, outbox recovery is proven, and
 backfill reconciliation is exact.
 
+The caller-bound circulation API now includes deterministic, status-filtered
+keyset pages for member loan and reservation history. Both the service and
+Kotlin BFF derive membership from the delegated token, cap pages at 100 items,
+reject non-canonical cursors, and emit non-cacheable browser responses.
+
 ### Phase 3 — Shadow and circulation cutover
 
 - Mirror sanitized commands to a non-authoritative shadow evaluator.

@@ -2,6 +2,7 @@ package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.circulation.CirculationClient
 import com.mundiapolis.library.bff.circulation.CirculationProtocolException
+import com.mundiapolis.library.bff.circulation.LoanStatusView
 import com.mundiapolis.library.bff.circulation.RequestLoanView
 import com.mundiapolis.library.bff.circulation.RequestReservationView
 import com.mundiapolis.library.bff.config.CirculationClientProperties
@@ -57,6 +58,42 @@ class CirculationClientTest {
 
         assertThat(eligibility.status.name).isEqualTo("ELIGIBLE")
         assertThat(eligibility.sourceVersion).isZero()
+        server.verify()
+    }
+
+    @Test
+    fun `loan history forwards bounded filters and validates caller consistency`() {
+        server.expect(
+            requestTo(
+                "https://circulation.internal/api/v1/circulation/loans/me" +
+                    "?status=ACTIVE&limit=10&cursor=next_page-1",
+            ),
+        )
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andRespond(withSuccess(VALID_LOAN_PAGE, MediaType.APPLICATION_JSON))
+
+        val page = client.ownLoans(
+            authorizedClient(), LoanStatusView.ACTIVE, 10, "next_page-1",
+        )
+
+        assertThat(page.memberId).isEqualTo(MEMBER_ID)
+        assertThat(page.items).hasSize(1)
+        server.verify()
+    }
+
+    @Test
+    fun `reservation history rejects a cross member item`() {
+        server.expect(requestTo("https://circulation.internal/api/v1/circulation/reservations/me?limit=20"))
+            .andRespond(
+                withSuccess(
+                    CROSS_MEMBER_RESERVATION_PAGE,
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        assertThatThrownBy {
+            client.ownReservations(authorizedClient(), null, 20, null)
+        }.isInstanceOf(CirculationProtocolException::class.java)
         server.verify()
     }
 
@@ -273,6 +310,45 @@ class CirculationClientTest {
               "reasonCode": null,
               "sourceVersion": 0,
               "sourceOccurredAt": "2026-09-01T00:00:00Z"
+            }
+        """.trimIndent()
+        val VALID_LOAN_PAGE = """
+            {
+              "memberId": "$MEMBER_ID",
+              "items": [{
+                "loanId": "$LOAN_ID",
+                "memberId": "$MEMBER_ID",
+                "editionId": "$EDITION_ID",
+                "copyId": "40000000-0000-0000-0000-000000000001",
+                "status": "ACTIVE",
+                "requestedAt": "2026-09-01T00:00:00Z",
+                "checkedOutAt": "2026-09-02T00:00:00Z",
+                "dueAt": "2026-10-02T00:00:00Z",
+                "returnedAt": null,
+                "rejectedAt": null,
+                "renewalCount": 0,
+                "version": 1
+              }],
+              "nextCursor": null
+            }
+        """.trimIndent()
+        val CROSS_MEMBER_RESERVATION_PAGE = """
+            {
+              "memberId": "$MEMBER_ID",
+              "items": [{
+                "reservationId": "$RESERVATION_ID",
+                "memberId": "90000000-0000-0000-0000-000000000001",
+                "editionId": "$EDITION_ID",
+                "copyId": null,
+                "status": "WAITING",
+                "placedAt": "2026-09-01T00:00:00Z",
+                "readyAt": null,
+                "expiresAt": null,
+                "fulfilledAt": null,
+                "cancelledAt": null,
+                "version": 0
+              }],
+              "nextCursor": null
             }
         """.trimIndent()
         val VALID_LOAN = """

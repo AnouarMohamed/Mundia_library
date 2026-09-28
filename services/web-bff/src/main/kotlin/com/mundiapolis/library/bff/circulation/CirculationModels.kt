@@ -53,6 +53,27 @@ data class LoanMutationResult(
     val idempotencyReplayed: Boolean,
 )
 
+data class MemberLoanPageView(
+    val memberId: UUID,
+    val items: List<LoanHistoryItemView>,
+    val nextCursor: String?,
+)
+
+data class LoanHistoryItemView(
+    val loanId: UUID,
+    val memberId: UUID,
+    val editionId: UUID,
+    val copyId: UUID?,
+    val status: LoanStatusView,
+    val requestedAt: Instant,
+    val checkedOutAt: Instant?,
+    val dueAt: Instant?,
+    val returnedAt: Instant?,
+    val rejectedAt: Instant?,
+    val renewalCount: Int,
+    val version: Long,
+)
+
 data class RequestReservationView(val editionId: UUID)
 
 internal data class DownstreamReservationRequest(val editionId: UUID)
@@ -82,4 +103,10 @@ enum class ReservationStatusView {
 data class ReservationCommandResult(
     val reservation: ReservationCommandView,
     val idempotencyReplayed: Boolean,
+)
+
+data class MemberReservationPageView(
+    val memberId: UUID,
+    val items: List<ReservationCommandView>,
+    val nextCursor: String?,
 )

@@ -20,6 +20,7 @@ import com.mundiapolis.library.circulation.application.model.InvalidFineCurrency
 import com.mundiapolis.library.circulation.application.model.InvalidFineNarrativeException
 import com.mundiapolis.library.circulation.application.model.InvalidIdempotencyKeyException
 import com.mundiapolis.library.circulation.application.model.InvalidInventoryInputException
+import com.mundiapolis.library.circulation.application.model.InvalidHistoryQueryException
 import com.mundiapolis.library.circulation.application.model.InvalidPaymentReferenceException
 import com.mundiapolis.library.circulation.application.model.LoanNotEligibleForFineException
 import com.mundiapolis.library.circulation.application.model.LoanNotFoundException
@@ -53,6 +54,10 @@ import java.net.URI
 
 @RestControllerAdvice
 class CirculationExceptionHandler {
+    @ExceptionHandler(InvalidHistoryQueryException::class)
+    fun invalidHistoryQuery(exception: InvalidHistoryQueryException): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, "invalid_history_query", exception.message)
+
     @ExceptionHandler(InvalidCirculationPolicyException::class)
     fun invalidPolicy(exception: InvalidCirculationPolicyException): ProblemDetail =
         problem(HttpStatus.BAD_REQUEST, "invalid_circulation_policy", exception.message)

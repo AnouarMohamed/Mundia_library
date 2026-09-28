@@ -69,13 +69,12 @@ HTTPS; authorization and token endpoints must share an exact origin. The
 issuer may use a different HTTPS origin, as it does with Amazon Cognito hosted
 domains.
 
-The Circulation self-service routes cover eligibility, loan request/cancel/
-renew, and reservation place/cancel. They exchange the same server-side user
-token for a separate
-`circulation-api` token limited to eligibility plus self-service loan and
-reservation scopes. Loan and reservation placement accept only an edition
-UUID; cancellation and renewal accept only the target resource UUID in the
-route. Every command requires an `Idempotency-Key`, while Circulation derives
-the member from the canonical token claim and owns the actor-scoped
-idempotency record. Mutations require the BFF's CSRF header, and all responses
-are non-cacheable.
+The Circulation self-service routes cover eligibility, bounded keyset-paginated
+loan and reservation history, loan request/cancel/renew, and reservation
+place/cancel. They exchange the same server-side user token for a separate
+`circulation-api` token limited to the exact self-service read and command
+scopes. History accepts only status, limit, and opaque cursor inputs. Commands
+accept only edition or target-resource UUIDs and an `Idempotency-Key`, while
+Circulation derives the member from the canonical token claim and owns the
+actor-scoped idempotency record. Mutations require the BFF's CSRF header, and
+all caller-specific responses are non-cacheable.

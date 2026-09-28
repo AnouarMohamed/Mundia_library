@@ -7,6 +7,9 @@ import com.mundiapolis.library.bff.circulation.CirculationRequestBodyLimitFilter
 import com.mundiapolis.library.bff.circulation.EligibilityStatusView
 import com.mundiapolis.library.bff.circulation.LoanCommandView
 import com.mundiapolis.library.bff.circulation.LoanMutationResult
+import com.mundiapolis.library.bff.circulation.LoanHistoryItemView
+import com.mundiapolis.library.bff.circulation.MemberLoanPageView
+import com.mundiapolis.library.bff.circulation.MemberReservationPageView
 import com.mundiapolis.library.bff.circulation.LoanRequestResult
 import com.mundiapolis.library.bff.circulation.LoanStatusView
 import com.mundiapolis.library.bff.circulation.RequestLoanView
@@ -126,6 +129,25 @@ class CirculationSecurityIntegrationTest {
     }
 
     @Test
+    fun `caller bound history reads require a session and are non cacheable`() {
+        mockMvc.perform(get("/api/v1/circulation/loans"))
+            .andExpect(status().isUnauthorized)
+
+        mockMvc.perform(
+            get("/api/v1/circulation/loans?status=ACTIVE&limit=10").with(oidcLogin()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.items[0].status").value("ACTIVE"))
+
+        mockMvc.perform(get("/api/v1/circulation/reservations?limit=10").with(oidcLogin()))
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.items[0].status").value("WAITING"))
+    }
+
+    @Test
     fun `oversized circulation command is rejected before deserialization`() {
         mockMvc.perform(
             post("/api/v1/circulation/loans")
@@ -235,6 +257,26 @@ class CirculationSecurityIntegrationTest {
             idempotencyReplayed = false,
         )
 
+        override fun loans(
+            authentication: OAuth2AuthenticationToken,
+            request: HttpServletRequest,
+            response: HttpServletResponse,
+            status: LoanStatusView?,
+            limit: Int?,
+            cursor: String?,
+        ) = MemberLoanPageView(
+            MEMBER_ID,
+            listOf(
+                LoanHistoryItemView(
+                    LOAN_ID, MEMBER_ID, EDITION_ID, COPY_ID, LoanStatusView.ACTIVE,
+                    Instant.parse("2026-09-01T00:00:00Z"),
+                    Instant.parse("2026-09-02T00:00:00Z"),
+                    Instant.parse("2026-10-02T00:00:00Z"), null, null, 0, 1,
+                ),
+            ),
+            null,
+        )
+
         override fun cancelLoan(
             authentication: OAuth2AuthenticationToken,
             request: HttpServletRequest,
@@ -267,6 +309,15 @@ class CirculationSecurityIntegrationTest {
             reservation = reservation(ReservationStatusView.WAITING),
             idempotencyReplayed = false,
         )
+
+        override fun reservations(
+            authentication: OAuth2AuthenticationToken,
+            request: HttpServletRequest,
+            response: HttpServletResponse,
+            status: ReservationStatusView?,
+            limit: Int?,
+            cursor: String?,
+        ) = MemberReservationPageView(MEMBER_ID, listOf(reservation(ReservationStatusView.WAITING)), null)
 
         override fun cancelReservation(
             authentication: OAuth2AuthenticationToken,

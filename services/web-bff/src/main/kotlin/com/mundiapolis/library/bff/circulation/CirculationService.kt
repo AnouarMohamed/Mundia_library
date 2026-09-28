@@ -23,6 +23,15 @@ interface CirculationSelfServiceUseCase {
         idempotencyKey: String,
     ): LoanRequestResult
 
+    fun loans(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        status: LoanStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberLoanPageView
+
     fun cancelLoan(
         authentication: OAuth2AuthenticationToken,
         request: HttpServletRequest,
@@ -46,6 +55,15 @@ interface CirculationSelfServiceUseCase {
         command: RequestReservationView,
         idempotencyKey: String,
     ): ReservationCommandResult
+
+    fun reservations(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        status: ReservationStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberReservationPageView
 
     fun cancelReservation(
         authentication: OAuth2AuthenticationToken,
@@ -78,6 +96,17 @@ class CirculationService(
         client.requestOwnLoan(authorizedClient, command, idempotencyKey)
     }
 
+    override fun loans(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        status: LoanStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberLoanPageView = withClient(authentication, request, response) { authorizedClient ->
+        client.ownLoans(authorizedClient, status, limit, cursor)
+    }
+
     override fun cancelLoan(
         authentication: OAuth2AuthenticationToken,
         request: HttpServletRequest,
@@ -106,6 +135,17 @@ class CirculationService(
         idempotencyKey: String,
     ): ReservationCommandResult = withClient(authentication, request, response) { authorizedClient ->
         client.placeOwnReservation(authorizedClient, command, idempotencyKey)
+    }
+
+    override fun reservations(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        status: ReservationStatusView?,
+        limit: Int?,
+        cursor: String?,
+    ): MemberReservationPageView = withClient(authentication, request, response) { authorizedClient ->
+        client.ownReservations(authorizedClient, status, limit, cursor)
     }
 
     override fun cancelReservation(

@@ -12,7 +12,10 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandCont
 import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.LoanHistoryItemResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.MemberLoanPageResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.MemberEligibilityResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.MemberReservationPageResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.PlaceReservationRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.PolicyCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.ReservationCommandController
@@ -115,9 +118,12 @@ class OpenApiContractTest {
         assertSchemaFields("RequestLoanRequest", RequestLoanRequest::class.java)
         assertSchemaFields("SelfRequestLoanRequest", SelfRequestLoanRequest::class.java)
         assertSchemaFields("LoanCommandResponse", LoanCommandResponse::class.java)
+        assertSchemaFields("LoanHistoryItem", LoanHistoryItemResponse::class.java)
+        assertSchemaFields("MemberLoanPage", MemberLoanPageResponse::class.java)
         assertSchemaFields("PlaceReservationRequest", PlaceReservationRequest::class.java)
         assertSchemaFields("SelfPlaceReservationRequest", SelfPlaceReservationRequest::class.java)
         assertSchemaFields("ReservationCommandResponse", ReservationCommandResponse::class.java)
+        assertSchemaFields("MemberReservationPage", MemberReservationPageResponse::class.java)
         assertSchemaFields(
             "UpdateCirculationPolicyRequest",
             UpdateCirculationPolicyRequest::class.java,
