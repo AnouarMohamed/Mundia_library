@@ -11,13 +11,12 @@ COPY membership-service/build.gradle.kts membership-service/gradle.lockfile ./me
 COPY web-bff/build.gradle.kts web-bff/gradle.lockfile ./web-bff/
 
 RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew --quiet :catalog-service:dependencies --no-daemon
+    ./gradlew --quiet :web-bff:dependencies --no-daemon
 
-COPY catalog-service/src ./catalog-service/src
-COPY circulation-service/src/main/proto ./circulation-service/src/main/proto
+COPY web-bff/src ./web-bff/src
 
 RUN --mount=type=cache,target=/root/.gradle \
-    ./gradlew :catalog-service:bootJar --no-daemon
+    ./gradlew :web-bff:bootJar --no-daemon
 
 FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
 WORKDIR /app
@@ -28,12 +27,12 @@ RUN apk add --no-cache --upgrade libexpat \
     && rm -f /bin/ash /bin/sh /sbin/apk /bin/busybox
 
 COPY --from=builder --chown=10001:10001 \
-    /workspace/catalog-service/build/libs/catalog-service.jar \
-    /app/catalog-service.jar
+    /workspace/web-bff/build/libs/web-bff.jar \
+    /app/web-bff.jar
 
 USER 10001:10001
 EXPOSE 8080
 
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
-ENTRYPOINT ["java", "-jar", "/app/catalog-service.jar"]
+ENTRYPOINT ["java", "-jar", "/app/web-bff.jar"]

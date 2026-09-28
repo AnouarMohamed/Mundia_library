@@ -227,7 +227,8 @@ After all CI gates pass on `main`, GitHub Actions publishes these OCI images:
 
 | Component | Image |
 | --- | --- |
-| Next.js web/BFF | `ghcr.io/anouarmohamed/mundia-library` |
+| Legacy Next.js migration shell | `ghcr.io/anouarmohamed/mundia-library` |
+| Kotlin Web BFF | `ghcr.io/anouarmohamed/mundia-web-bff` |
 | Catalog Service | `ghcr.io/anouarmohamed/mundia-catalog-service` |
 | Circulation Service | `ghcr.io/anouarmohamed/mundia-circulation-service` |
 | Membership Service | `ghcr.io/anouarmohamed/mundia-membership-service` |

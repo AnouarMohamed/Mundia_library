@@ -384,6 +384,17 @@ jobs:
           cache-from: type=gha,scope=membership
           cache-to: type=gha,mode=max,scope=membership
 
+      - name: Build web BFF image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./services
+          file: ./services/web-bff/Dockerfile
+          pull: true
+          push: false
+          tags: mundia-web-bff:ci
+          cache-from: type=gha,scope=web-bff
+          cache-to: type=gha,mode=max,scope=web-bff
+
       - name: Build catalog service image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -436,6 +447,11 @@ jobs:
             context: ./services
             dockerfile: ./services/catalog-service/Dockerfile
             cache_scope: publish-catalog
+          - name: web-bff
+            image: mundia-web-bff
+            context: ./services
+            dockerfile: ./services/web-bff/Dockerfile
+            cache_scope: publish-web-bff
 
     steps:
       - name: Checkout verified source

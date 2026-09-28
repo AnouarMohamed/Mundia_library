@@ -1,0 +1,87 @@
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: none
+  max-http-request-header-size: 16KB
+  servlet:
+    session:
+      cookie:
+        name: MUNDIA_SESSION
+        http-only: true
+        secure: ${BFF_SECURE_COOKIES:false}
+        same-site: lax
+        path: /
+      timeout: ${BFF_SESSION_MAXIMUM_AGE:PT8H}
+  tomcat:
+    connection-timeout: 5s
+    keep-alive-timeout: 15s
+    max-keep-alive-requests: 100
+    max-http-form-post-size: 16KB
+    max-swallow-size: 16KB
+    max-parameter-count: 32
+
+spring:
+  application:
+    name: web-bff
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  threads:
+    virtual:
+      enabled: true
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:PT2S}
+      timeout: ${REDIS_COMMAND_TIMEOUT:PT2S}
+  session:
+    timeout: ${BFF_SESSION_MAXIMUM_AGE:PT8H}
+    redis:
+      namespace: mundia:web-bff:session
+      cleanup-cron: "0 * * * * *"
+  security:
+    oauth2:
+      client:
+        provider:
+          institutional:
+            issuer-uri: ${OIDC_ISSUER}
+        registration:
+          institutional:
+            provider: institutional
+            client-id: ${OIDC_CLIENT_ID}
+            client-secret: ${OIDC_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: authorization_code
+            redirect-uri: ${BFF_PUBLIC_BASE_URL:http://localhost:8080}/login/oauth2/code/{registrationId}
+            scope: openid,profile,email
+
+app:
+  bff:
+    deployment-tier: ${DEPLOYMENT_TIER:local}
+    public-base-url: ${BFF_PUBLIC_BASE_URL:http://localhost:8080}
+    secure-cookies: ${BFF_SECURE_COOKIES:false}
+    session-maximum-age: ${BFF_SESSION_MAXIMUM_AGE:PT8H}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      group:
+        readiness:
+          include: readinessState,redis
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  info:
+    env:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}

@@ -105,8 +105,8 @@ flowchart TD
 
   subgraph Services ["Strangler Service Layer"]
     Circulation["Circulation Service\nKotlin / Spring"]
-    Membership["Membership Service\nplanned extraction"]
-    Catalog["Catalog Service\nplanned extraction"]
+    Membership["Membership Service\nKotlin / Spring"]
+    Catalog["Catalog Service\nKotlin / Spring"]
     Broker["Kafka-compatible Broker"]
   end
 

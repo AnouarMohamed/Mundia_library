@@ -10,16 +10,17 @@ below pass.
 
 ## Executive decision
 
-Keep the Next.js application as the web frontend and backend-for-frontend (BFF)
-during a strangler migration. Move business capabilities into a small set of
-Kotlin/Spring services. PostgreSQL remains the authoritative database. This is
-not a rewrite into dozens of services and it is not a big-bang cutover.
+Keep Next.js only as a temporary migration shell. The final web tier is a
+static React/Vite application behind a Kotlin/Spring BFF. Move business
+capabilities into a small set of Kotlin/Spring services. PostgreSQL remains the
+authoritative database. This is not a rewrite into dozens of services and it
+is not a big-bang cutover.
 
 The target platform is:
 
 | Concern         | Decision                                                                   |
 | --------------- | -------------------------------------------------------------------------- |
-| Web/BFF         | Next.js 15 during migration; browser receives only secure BFF cookies      |
+| Web/BFF         | Static React/Vite SPA plus Kotlin/Spring BFF; Next.js is migration-only     |
 | Services        | Kotlin 2.3, Spring Boot 4.1, JDK 25, Spring MVC with virtual threads       |
 | Persistence     | PostgreSQL 18, one owned database/schema and credentials per service       |
 | SQL/migrations  | jOOQ-generated types and Flyway forward migrations                         |
@@ -33,7 +34,9 @@ The target platform is:
 
 The detailed decisions are in
 [ADR 0001](./adr/0001-backend-platform-stack.md) and
-[ADR 0002](./adr/0002-service-boundaries-and-data-ownership.md).
+[ADR 0002](./adr/0002-service-boundaries-and-data-ownership.md), with the
+final web tier superseded by
+[ADR 0003](./adr/0003-static-spa-and-kotlin-bff.md).
 
 ## Implemented checkpoint
 
@@ -113,7 +116,9 @@ test, restore/DR exercise, and operational sign-off remain mandatory.
 ```mermaid
 flowchart LR
     Browser["Browser / mobile web"] --> Edge["CDN + WAF + rate controls"]
-    Edge --> BFF["Next.js BFF"]
+    Edge --> SPA["Static React SPA"]
+    Edge --> BFF["Kotlin/Spring BFF"]
+    SPA --> BFF
     BFF --> IdP["Managed institutional OIDC"]
     BFF --> Membership["Membership service"]
     BFF --> Catalog["Catalog service"]
@@ -331,8 +336,8 @@ replay and full projection rebuilds are demonstrated.
 
 - Remove legacy domain write paths, obsolete tables, direct database access,
   duplicate caches, credentials auth, and migration scripts.
-- Keep Next.js only as UI/BFF unless measured evidence justifies a later frontend
-  change.
+- Complete vertical-slice migration to the static React SPA and Kotlin BFF.
+- Remove Next.js only after parity, rollback, and retention gates pass.
 - Archive reconciliations and migration evidence.
 
 Exit gate: dependency and data-flow scans find no legacy ownership violations,
