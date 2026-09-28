@@ -38,6 +38,22 @@ interface CirculationSelfServiceUseCase {
         loanId: java.util.UUID,
         idempotencyKey: String,
     ): LoanMutationResult
+
+    fun placeReservation(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        command: RequestReservationView,
+        idempotencyKey: String,
+    ): ReservationCommandResult
+
+    fun cancelReservation(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        reservationId: java.util.UUID,
+        idempotencyKey: String,
+    ): ReservationCommandResult
 }
 
 @Service
@@ -80,6 +96,26 @@ class CirculationService(
         idempotencyKey: String,
     ): LoanMutationResult = withClient(authentication, request, response) { authorizedClient ->
         client.renewOwnLoan(authorizedClient, loanId, idempotencyKey)
+    }
+
+    override fun placeReservation(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        command: RequestReservationView,
+        idempotencyKey: String,
+    ): ReservationCommandResult = withClient(authentication, request, response) { authorizedClient ->
+        client.placeOwnReservation(authorizedClient, command, idempotencyKey)
+    }
+
+    override fun cancelReservation(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        reservationId: java.util.UUID,
+        idempotencyKey: String,
+    ): ReservationCommandResult = withClient(authentication, request, response) { authorizedClient ->
+        client.cancelOwnReservation(authorizedClient, reservationId, idempotencyKey)
     }
 
     private fun <T> withClient(

@@ -52,3 +52,34 @@ data class LoanMutationResult(
     val loan: LoanCommandView,
     val idempotencyReplayed: Boolean,
 )
+
+data class RequestReservationView(val editionId: UUID)
+
+internal data class DownstreamReservationRequest(val editionId: UUID)
+
+data class ReservationCommandView(
+    val reservationId: UUID,
+    val memberId: UUID,
+    val editionId: UUID,
+    val copyId: UUID?,
+    val status: ReservationStatusView,
+    val placedAt: Instant,
+    val readyAt: Instant?,
+    val expiresAt: Instant?,
+    val fulfilledAt: Instant?,
+    val cancelledAt: Instant?,
+    val version: Long,
+)
+
+enum class ReservationStatusView {
+    WAITING,
+    READY,
+    FULFILLED,
+    CANCELLED,
+    EXPIRED,
+}
+
+data class ReservationCommandResult(
+    val reservation: ReservationCommandView,
+    val idempotencyReplayed: Boolean,
+)

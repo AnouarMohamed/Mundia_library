@@ -3,6 +3,7 @@ package com.mundiapolis.library.bff
 import com.mundiapolis.library.bff.circulation.CirculationClient
 import com.mundiapolis.library.bff.circulation.CirculationProtocolException
 import com.mundiapolis.library.bff.circulation.RequestLoanView
+import com.mundiapolis.library.bff.circulation.RequestReservationView
 import com.mundiapolis.library.bff.config.CirculationClientProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -157,6 +158,81 @@ class CirculationClientTest {
         server.verify()
     }
 
+    @Test
+    fun `reservation placement sends only edition id to the fixed me route`() {
+        server.expect(requestTo("https://circulation.internal/api/v1/circulation/reservations/me"))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header("Idempotency-Key", IDEMPOTENCY_KEY))
+            .andExpect(content().json("""{"editionId":"$EDITION_ID"}""", JsonCompareMode.STRICT))
+            .andRespond(
+                withStatus(HttpStatus.CREATED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "false")
+                    .body(VALID_WAITING_RESERVATION),
+            )
+
+        val result = client.placeOwnReservation(
+            authorizedClient(),
+            RequestReservationView(EDITION_ID),
+            IDEMPOTENCY_KEY,
+        )
+
+        assertThat(result.reservation.status.name).isEqualTo("WAITING")
+        assertThat(result.idempotencyReplayed).isFalse()
+        server.verify()
+    }
+
+    @Test
+    fun `reservation cancellation validates identity and terminal lifecycle`() {
+        server.expect(
+            requestTo(
+                "https://circulation.internal/api/v1/circulation/reservations/me/" +
+                    "$RESERVATION_ID/cancel",
+            ),
+        )
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header("Idempotency-Key", IDEMPOTENCY_KEY))
+            .andRespond(
+                withSuccess(VALID_CANCELLED_RESERVATION, MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "true"),
+            )
+
+        val result = client.cancelOwnReservation(
+            authorizedClient(),
+            RESERVATION_ID,
+            IDEMPOTENCY_KEY,
+        )
+
+        assertThat(result.reservation.status.name).isEqualTo("CANCELLED")
+        assertThat(result.idempotencyReplayed).isTrue()
+        server.verify()
+    }
+
+    @Test
+    fun `reservation response with a mismatched edition is rejected`() {
+        server.expect(requestTo("https://circulation.internal/api/v1/circulation/reservations/me"))
+            .andRespond(
+                withStatus(HttpStatus.CREATED)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "false")
+                    .body(
+                        VALID_WAITING_RESERVATION.replace(
+                            EDITION_ID.toString(),
+                            UUID.randomUUID().toString(),
+                        ),
+                    ),
+            )
+
+        assertThatThrownBy {
+            client.placeOwnReservation(
+                authorizedClient(),
+                RequestReservationView(EDITION_ID),
+                IDEMPOTENCY_KEY,
+            )
+        }.isInstanceOf(CirculationProtocolException::class.java)
+        server.verify()
+    }
+
     private fun authorizedClient(): OAuth2AuthorizedClient {
         val registration = ClientRegistration.withRegistrationId("circulation-service")
             .clientId("web-bff-circulation")
@@ -188,6 +264,7 @@ class CirculationClientTest {
         val MEMBER_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
         val EDITION_ID: UUID = UUID.fromString("20000000-0000-0000-0000-000000000001")
         val LOAN_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000001")
+        val RESERVATION_ID: UUID = UUID.fromString("50000000-0000-0000-0000-000000000001")
         const val IDEMPOTENCY_KEY = "loan-request-00000001"
         val VALID_ELIGIBILITY = """
             {
@@ -241,6 +318,36 @@ class CirculationClientTest {
               "returnedAt": null,
               "renewalCount": 1,
               "version": 2
+            }
+        """.trimIndent()
+        val VALID_WAITING_RESERVATION = """
+            {
+              "reservationId": "$RESERVATION_ID",
+              "memberId": "$MEMBER_ID",
+              "editionId": "$EDITION_ID",
+              "copyId": null,
+              "status": "WAITING",
+              "placedAt": "2026-09-01T00:00:00Z",
+              "readyAt": null,
+              "expiresAt": null,
+              "fulfilledAt": null,
+              "cancelledAt": null,
+              "version": 0
+            }
+        """.trimIndent()
+        val VALID_CANCELLED_RESERVATION = """
+            {
+              "reservationId": "$RESERVATION_ID",
+              "memberId": "$MEMBER_ID",
+              "editionId": "$EDITION_ID",
+              "copyId": null,
+              "status": "CANCELLED",
+              "placedAt": "2026-09-01T00:00:00Z",
+              "readyAt": null,
+              "expiresAt": null,
+              "fulfilledAt": null,
+              "cancelledAt": "2026-09-02T00:00:00Z",
+              "version": 1
             }
         """.trimIndent()
     }

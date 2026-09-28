@@ -91,6 +91,48 @@ class CirculationController(
             .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
             .body(result.loan)
 
+    @PostMapping("/reservations")
+    fun placeReservation(
+        authentication: OAuth2AuthenticationToken,
+        servletRequest: HttpServletRequest,
+        servletResponse: HttpServletResponse,
+        @RequestHeader(IDEMPOTENCY_KEY) idempotencyKey: String,
+        @RequestBody request: RequestReservationView,
+    ): ResponseEntity<ReservationCommandView> {
+        val result = circulation.placeReservation(
+            authentication,
+            servletRequest,
+            servletResponse,
+            request,
+            idempotencyKey,
+        )
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .cacheControl(CacheControl.noStore())
+            .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
+            .body(result.reservation)
+    }
+
+    @PostMapping("/reservations/{reservationId}/cancel")
+    fun cancelReservation(
+        authentication: OAuth2AuthenticationToken,
+        servletRequest: HttpServletRequest,
+        servletResponse: HttpServletResponse,
+        @PathVariable reservationId: UUID,
+        @RequestHeader(IDEMPOTENCY_KEY) idempotencyKey: String,
+    ): ResponseEntity<ReservationCommandView> {
+        val result = circulation.cancelReservation(
+            authentication,
+            servletRequest,
+            servletResponse,
+            reservationId,
+            idempotencyKey,
+        )
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore())
+            .header(IDEMPOTENCY_REPLAYED, result.idempotencyReplayed.toString())
+            .body(result.reservation)
+    }
+
     private companion object {
         const val IDEMPOTENCY_KEY = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED = "Idempotency-Replayed"

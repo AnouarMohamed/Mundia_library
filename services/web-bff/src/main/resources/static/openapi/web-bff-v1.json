@@ -209,6 +209,54 @@
           "504": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/v1/circulation/reservations": {
+      "post": {
+        "operationId": "placeOwnReservation",
+        "summary": "Place a reservation for the authenticated member",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RequestReservation" } }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "413": { "$ref": "#/components/responses/Problem" },
+          "422": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations/{reservationId}/cancel": {
+      "post": {
+        "operationId": "cancelOwnReservation",
+        "summary": "Cancel the authenticated member's open reservation",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReservationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -232,11 +280,27 @@
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/LoanCommand" } }
         }
+      },
+      "ReservationCommandSucceeded": {
+        "description": "Reservation command committed or its original result replayed",
+        "headers": {
+          "Cache-Control": { "schema": { "type": "string", "const": "no-store" } },
+          "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } }
+        },
+        "content": {
+          "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommand" } }
+        }
       }
     },
     "parameters": {
       "LoanId": {
         "name": "loanId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ReservationId": {
+        "name": "reservationId",
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -354,6 +418,32 @@
           "dueAt": { "type": ["string", "null"], "format": "date-time" },
           "returnedAt": { "type": ["string", "null"], "format": "date-time" },
           "renewalCount": { "type": "integer", "minimum": 0 },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 }
+        },
+        "additionalProperties": false
+      },
+      "RequestReservation": {
+        "type": "object",
+        "required": ["editionId"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" }
+        },
+        "additionalProperties": false
+      },
+      "ReservationCommand": {
+        "type": "object",
+        "required": ["reservationId", "memberId", "editionId", "copyId", "status", "placedAt", "readyAt", "expiresAt", "fulfilledAt", "cancelledAt", "version"],
+        "properties": {
+          "reservationId": { "type": "string", "format": "uuid" },
+          "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" },
+          "copyId": { "type": ["string", "null"], "format": "uuid" },
+          "status": { "type": "string", "enum": ["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"] },
+          "placedAt": { "type": "string", "format": "date-time" },
+          "readyAt": { "type": ["string", "null"], "format": "date-time" },
+          "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+          "fulfilledAt": { "type": ["string", "null"], "format": "date-time" },
+          "cancelledAt": { "type": ["string", "null"], "format": "date-time" },
           "version": { "type": "integer", "format": "int64", "minimum": 0 }
         },
         "additionalProperties": false

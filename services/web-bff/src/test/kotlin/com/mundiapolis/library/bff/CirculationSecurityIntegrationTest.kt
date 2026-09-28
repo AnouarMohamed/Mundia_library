@@ -10,6 +10,10 @@ import com.mundiapolis.library.bff.circulation.LoanMutationResult
 import com.mundiapolis.library.bff.circulation.LoanRequestResult
 import com.mundiapolis.library.bff.circulation.LoanStatusView
 import com.mundiapolis.library.bff.circulation.RequestLoanView
+import com.mundiapolis.library.bff.circulation.RequestReservationView
+import com.mundiapolis.library.bff.circulation.ReservationCommandResult
+import com.mundiapolis.library.bff.circulation.ReservationCommandView
+import com.mundiapolis.library.bff.circulation.ReservationStatusView
 import com.mundiapolis.library.bff.config.BffProperties
 import com.mundiapolis.library.bff.config.SecurityConfiguration
 import jakarta.servlet.http.HttpServletRequest
@@ -84,6 +88,23 @@ class CirculationSecurityIntegrationTest {
     }
 
     @Test
+    fun `reservation placement and cancellation require csrf`() {
+        mockMvc.perform(
+            post("/api/v1/circulation/reservations")
+                .with(oidcLogin())
+                .header("Idempotency-Key", "browser-reserve-0001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"editionId":"$EDITION_ID"}"""),
+        ).andExpect(status().isForbidden)
+
+        mockMvc.perform(
+            post("/api/v1/circulation/reservations/$RESERVATION_ID/cancel")
+                .with(oidcLogin())
+                .header("Idempotency-Key", "browser-reserve-cancel-0001"),
+        ).andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `caller bound circulation responses are no store`() {
         mockMvc.perform(get("/api/v1/circulation/eligibility").with(oidcLogin()))
             .andExpect(status().isOk)
@@ -142,6 +163,34 @@ class CirculationSecurityIntegrationTest {
             .andExpect(header().string("Idempotency-Replayed", "false"))
             .andExpect(jsonPath("$.status").value("ACTIVE"))
             .andExpect(jsonPath("$.renewalCount").value(1))
+    }
+
+    @Test
+    fun `reservation commands are caller bound non cacheable and replay aware`() {
+        mockMvc.perform(
+            post("/api/v1/circulation/reservations")
+                .with(oidcLogin())
+                .with(csrf())
+                .header("Idempotency-Key", "browser-reserve-0001")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"editionId":"$EDITION_ID"}"""),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.status").value("WAITING"))
+
+        mockMvc.perform(
+            post("/api/v1/circulation/reservations/$RESERVATION_ID/cancel")
+                .with(oidcLogin())
+                .with(csrf())
+                .header("Idempotency-Key", "browser-reserve-cancel-0001"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.status").value("CANCELLED"))
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -208,6 +257,28 @@ class CirculationSecurityIntegrationTest {
             idempotencyReplayed = false,
         )
 
+        override fun placeReservation(
+            authentication: OAuth2AuthenticationToken,
+            request: HttpServletRequest,
+            response: HttpServletResponse,
+            command: RequestReservationView,
+            idempotencyKey: String,
+        ) = ReservationCommandResult(
+            reservation = reservation(ReservationStatusView.WAITING),
+            idempotencyReplayed = false,
+        )
+
+        override fun cancelReservation(
+            authentication: OAuth2AuthenticationToken,
+            request: HttpServletRequest,
+            response: HttpServletResponse,
+            reservationId: UUID,
+            idempotencyKey: String,
+        ) = ReservationCommandResult(
+            reservation = reservation(ReservationStatusView.CANCELLED),
+            idempotencyReplayed = false,
+        )
+
         private fun loan(loanId: UUID, status: LoanStatusView): LoanCommandView {
             val active = status == LoanStatusView.ACTIVE
             return LoanCommandView(
@@ -224,6 +295,25 @@ class CirculationSecurityIntegrationTest {
                 version = if (active) 2 else 1,
             )
         }
+
+        private fun reservation(status: ReservationStatusView): ReservationCommandView =
+            ReservationCommandView(
+                reservationId = RESERVATION_ID,
+                memberId = MEMBER_ID,
+                editionId = EDITION_ID,
+                copyId = null,
+                status = status,
+                placedAt = Instant.parse("2026-09-01T00:00:00Z"),
+                readyAt = null,
+                expiresAt = null,
+                fulfilledAt = null,
+                cancelledAt = if (status == ReservationStatusView.CANCELLED) {
+                    Instant.parse("2026-09-02T00:00:00Z")
+                } else {
+                    null
+                },
+                version = if (status == ReservationStatusView.CANCELLED) 1 else 0,
+            )
     }
 
     private companion object {
@@ -231,5 +321,6 @@ class CirculationSecurityIntegrationTest {
         val EDITION_ID: UUID = UUID.fromString("20000000-0000-0000-0000-000000000001")
         val LOAN_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000001")
         val COPY_ID: UUID = UUID.fromString("40000000-0000-0000-0000-000000000001")
+        val RESERVATION_ID: UUID = UUID.fromString("50000000-0000-0000-0000-000000000001")
     }
 }

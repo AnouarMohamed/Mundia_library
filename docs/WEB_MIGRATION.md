@@ -59,17 +59,18 @@ in step 2:
   sizes, no redirects, strict endpoint validation, stable non-sensitive error
   responses, and delegated-client eviction on downstream authorization
   rejection. Tokens remain server-side and profile responses are `no-store`.
-- `GET /api/v1/circulation/eligibility`, `POST /api/v1/circulation/loans`, and
-  the caller-bound loan cancellation and renewal routes use a separate
-  delegated token limited to the `circulation-api` audience and their four
-  required self-service scopes.
+- `GET /api/v1/circulation/eligibility`, caller-bound loan request,
+  cancellation, and renewal, plus reservation placement and cancellation use
+  a separate delegated token limited to the `circulation-api` audience and
+  their six required self-service scopes.
   Circulation's fixed `/me` routes derive the member from a canonical token
-  claim. The browser supplies only an edition or loan UUID, CSRF token, and
-  bounded actor-scoped idempotency key; it cannot select a member identity.
+  claim. The browser supplies only an edition, loan, or reservation UUID, CSRF
+  token, and bounded actor-scoped idempotency key; it cannot select a member
+  identity.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 
 The deployment is not production-routed. Institutional IdP client
 registration with token exchange, Redis failover testing, remaining
-circulation/admin routes, Kubernetes values, edge routing, and the React shell
-remain required before a UI slice moves.
+circulation read models and admin routes, Kubernetes values, edge routing,
+and the React shell remain required before a UI slice moves.

@@ -96,6 +96,8 @@ class OAuthTokenExchangeTest {
             .andExpect(content().string(containsString("circulation.loan.request")))
             .andExpect(content().string(containsString("circulation.loan.cancel")))
             .andExpect(content().string(containsString("circulation.loan.renew")))
+            .andExpect(content().string(containsString("circulation.reservation.place")))
+            .andExpect(content().string(containsString("circulation.reservation.cancel")))
             .andRespond(
                 withSuccess(
                     """
@@ -104,7 +106,7 @@ class OAuthTokenExchangeTest {
                           "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
                           "token_type": "Bearer",
                           "expires_in": 120,
-                          "scope": "circulation.eligibility.read circulation.loan.request circulation.loan.cancel circulation.loan.renew"
+                          "scope": "circulation.eligibility.read circulation.loan.request circulation.loan.cancel circulation.loan.renew circulation.reservation.place circulation.reservation.cancel"
                         }
                     """.trimIndent(),
                     MediaType.APPLICATION_JSON,
@@ -119,6 +121,8 @@ class OAuthTokenExchangeTest {
                 "circulation.loan.request",
                 "circulation.loan.cancel",
                 "circulation.loan.renew",
+                "circulation.reservation.place",
+                "circulation.reservation.cancel",
             ),
         )
         val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))
@@ -130,6 +134,8 @@ class OAuthTokenExchangeTest {
                 "circulation.loan.request",
                 "circulation.loan.cancel",
                 "circulation.loan.renew",
+                "circulation.reservation.place",
+                "circulation.reservation.cancel",
             )
         server.verify()
     }

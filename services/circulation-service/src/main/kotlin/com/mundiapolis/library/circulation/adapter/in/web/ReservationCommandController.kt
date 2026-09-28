@@ -37,6 +37,26 @@ class ReservationCommandController(
     private val expireReservation: ExpireReservationUseCase,
     private val principalResolver: JwtCommandPrincipalResolver,
 ) {
+    @PostMapping("/me")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.reservation.place')")
+    fun placeOwn(
+        authentication: JwtAuthenticationToken,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+        @RequestBody request: SelfPlaceReservationRequest,
+    ): ResponseEntity<ReservationCommandResponse> {
+        val principal = principalResolver.forStrictSelf(authentication)
+        return created(
+            placeReservation.place(
+                PlaceReservationCommand(
+                    requireNotNull(principal.membershipId),
+                    EditionId(request.editionId),
+                    IdempotencyKey.parse(rawIdempotencyKey),
+                    principal,
+                ),
+            ),
+        )
+    }
+
     @PostMapping
     @PreAuthorize(
         "hasAnyAuthority(" +
@@ -56,9 +76,7 @@ class ReservationCommandController(
                 principalResolver.forReservationRequest(authentication),
             ),
         )
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
-            .body(execution.toResponse())
+        return created(execution)
     }
 
     @PostMapping("/{reservationId}/cancel")
@@ -77,6 +95,22 @@ class ReservationCommandController(
                 ReservationId(reservationId),
                 IdempotencyKey.parse(rawIdempotencyKey),
                 principalResolver.forReservationCancellation(authentication),
+            ),
+        ),
+    )
+
+    @PostMapping("/me/{reservationId}/cancel")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.reservation.cancel')")
+    fun cancelOwn(
+        authentication: JwtAuthenticationToken,
+        @PathVariable reservationId: UUID,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+    ): ResponseEntity<ReservationCommandResponse> = ok(
+        cancelReservation.cancel(
+            CancelReservationCommand(
+                ReservationId(reservationId),
+                IdempotencyKey.parse(rawIdempotencyKey),
+                principalResolver.forStrictSelf(authentication),
             ),
         ),
     )
@@ -118,6 +152,11 @@ class ReservationCommandController(
             .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
             .body(execution.toResponse())
 
+    private fun created(execution: ReservationCommandExecution): ResponseEntity<ReservationCommandResponse> =
+        ResponseEntity.status(HttpStatus.CREATED)
+            .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
+            .body(execution.toResponse())
+
     private fun ReservationCommandExecution.toResponse(): ReservationCommandResponse =
         ReservationCommandResponse.from(result)
 
@@ -128,6 +167,8 @@ class ReservationCommandController(
 }
 
 data class PlaceReservationRequest(val memberId: UUID, val editionId: UUID)
+
+data class SelfPlaceReservationRequest(val editionId: UUID)
 
 data class ReservationCommandResponse(
     val reservationId: UUID,

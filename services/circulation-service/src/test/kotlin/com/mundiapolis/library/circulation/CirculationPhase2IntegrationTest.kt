@@ -1710,6 +1710,94 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `caller bound reservation endpoints hide member selection and replay exactly`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val editionId = EditionId(UUID.randomUUID())
+        val placeKey = "place-self-http-${UUID.randomUUID()}"
+        seedEligible(memberId)
+
+        mockMvc.post("$RESERVATIONS_PATH/me") {
+            with(jwtFor("missing-member", RESERVATION_PLACE_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"${editionId.value}"}"""
+            header(IDEMPOTENCY_HEADER, placeKey)
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("missing_membership_claim") }
+        }
+
+        mockMvc.post("$RESERVATIONS_PATH/me") {
+            with(jwtFor("delegated-staff", RESERVATION_PLACE_ON_BEHALF_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"${editionId.value}"}"""
+            header(IDEMPOTENCY_HEADER, placeKey)
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        val placed = mockMvc.post("$RESERVATIONS_PATH/me") {
+            with(jwtFor("reservation-member", RESERVATION_PLACE_SCOPE, memberId.value))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"${editionId.value}"}"""
+            header(IDEMPOTENCY_HEADER, placeKey)
+        }.andExpect {
+            status { isCreated() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+            jsonPath("$.editionId") { value(editionId.value.toString()) }
+            jsonPath("$.status") { value("WAITING") }
+            jsonPath("$.version") { value(0) }
+        }.andReturn().response.contentAsString
+
+        val placedReplay = mockMvc.post("$RESERVATIONS_PATH/me") {
+            with(jwtFor("reservation-member", RESERVATION_PLACE_SCOPE, memberId.value))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"${editionId.value}"}"""
+            header(IDEMPOTENCY_HEADER, placeKey)
+        }.andExpect {
+            status { isCreated() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+        }.andReturn().response.contentAsString
+        assertThat(placedReplay).isEqualTo(placed)
+
+        val reservationId = requireNotNull(
+            dsl.select(CIRCULATION_RESERVATION.ID)
+                .from(CIRCULATION_RESERVATION)
+                .where(CIRCULATION_RESERVATION.MEMBER_ID.eq(memberId.value))
+                .fetchOne(CIRCULATION_RESERVATION.ID),
+        )
+        val cancelPath = "$RESERVATIONS_PATH/me/$reservationId/cancel"
+        val cancelKey = "cancel-reservation-self-${UUID.randomUUID()}"
+
+        mockMvc.post(cancelPath) {
+            with(jwtFor("wrong-member", RESERVATION_CANCEL_SCOPE, UUID.randomUUID()))
+            header(IDEMPOTENCY_HEADER, cancelKey)
+        }.andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("reservation_not_found") }
+        }
+
+        val cancelled = mockMvc.post(cancelPath) {
+            with(jwtFor("reservation-member", RESERVATION_CANCEL_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, cancelKey)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.status") { value("CANCELLED") }
+            jsonPath("$.version") { value(1) }
+        }.andReturn().response.contentAsString
+
+        val cancelledReplay = mockMvc.post(cancelPath) {
+            with(jwtFor("reservation-member", RESERVATION_CANCEL_SCOPE, memberId.value))
+            header(IDEMPOTENCY_HEADER, cancelKey)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+        }.andReturn().response.contentAsString
+        assertThat(cancelledReplay).isEqualTo(cancelled)
+    }
+
+    @Test
     fun `reservation fulfillment and expiry reject unrelated member principals`() {
         val memberId = MemberId(UUID.randomUUID())
         val unrelatedMemberId = MemberId(UUID.randomUUID())
@@ -2100,10 +2188,15 @@ class CirculationPhase2IntegrationTest {
         const val COPIES_PATH = "/api/v1/circulation/copies"
         const val POLICY_PATH = "/api/v1/circulation/policy"
         const val MEMBERS_PATH = "/api/v1/circulation/members"
+        const val RESERVATIONS_PATH = "/api/v1/circulation/reservations"
         const val IDEMPOTENCY_HEADER = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED_HEADER = "Idempotency-Replayed"
         const val RENEW_SCOPE = "SCOPE_circulation.loan.renew"
         const val RENEW_ON_BEHALF_SCOPE = "SCOPE_circulation.loan.renew.on-behalf"
+        const val RESERVATION_PLACE_SCOPE = "SCOPE_circulation.reservation.place"
+        const val RESERVATION_PLACE_ON_BEHALF_SCOPE =
+            "SCOPE_circulation.reservation.place.on-behalf"
+        const val RESERVATION_CANCEL_SCOPE = "SCOPE_circulation.reservation.cancel"
         const val ASSESS_FINE_SCOPE = "SCOPE_circulation.fine.assess"
         const val RECORD_PAYMENT_SCOPE = "SCOPE_circulation.fine.payment.record"
         const val POLICY_READ_SCOPE = "SCOPE_circulation.policy.read"

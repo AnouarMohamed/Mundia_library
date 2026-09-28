@@ -97,6 +97,55 @@ class CirculationClient(
             }
     }
 
+    fun placeOwnReservation(
+        authorizedClient: OAuth2AuthorizedClient,
+        request: RequestReservationView,
+        idempotencyKey: String,
+    ): ReservationCommandResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        circulationRestClient.post()
+            .uri("/api/v1/circulation/reservations/me")
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(DownstreamReservationRequest(request.editionId))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value(), expected = 201)
+                reservationResult(response) { reservation ->
+                    validatePlacedReservation(reservation, request.editionId)
+                }
+            }
+    }
+
+    fun cancelOwnReservation(
+        authorizedClient: OAuth2AuthorizedClient,
+        reservationId: java.util.UUID,
+        idempotencyKey: String,
+    ): ReservationCommandResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        circulationRestClient.post()
+            .uri("/api/v1/circulation/reservations/me/{reservationId}/cancel", reservationId)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                reservationResult(response) { reservation ->
+                    validateCancelledReservation(reservation, reservationId)
+                }
+            }
+    }
+
+    private fun reservationResult(
+        response: org.springframework.http.client.ClientHttpResponse,
+        validator: (ReservationCommandView) -> Unit,
+    ): ReservationCommandResult {
+        val replayed = response.headers.getFirst(IDEMPOTENCY_REPLAYED)?.let(::strictBoolean)
+            ?: throw CirculationProtocolException()
+        val reservation = decode(response, ReservationCommandView::class.java)
+        validator(reservation)
+        return ReservationCommandResult(reservation, replayed)
+    }
+
     private fun <T> exchange(operation: () -> T): T {
         try {
             return operation()
@@ -199,6 +248,56 @@ class CirculationClient(
             throw CirculationProtocolException()
         }
     }
+
+    private fun validatePlacedReservation(
+        view: ReservationCommandView,
+        requestedEditionId: java.util.UUID,
+    ) {
+        if (view.editionId != requestedEditionId) {
+            throw CirculationProtocolException()
+        }
+        when (view.status) {
+            ReservationStatusView.WAITING -> if (
+                view.copyId != null || view.readyAt != null || view.expiresAt != null ||
+                view.fulfilledAt != null || view.cancelledAt != null || view.version != 0L
+            ) {
+                throw CirculationProtocolException()
+            }
+
+            ReservationStatusView.READY -> if (!view.hasValidReadyState() || view.version != 1L) {
+                throw CirculationProtocolException()
+            }
+
+            else -> throw CirculationProtocolException()
+        }
+    }
+
+    private fun validateCancelledReservation(
+        view: ReservationCommandView,
+        requestedReservationId: java.util.UUID,
+    ) {
+        if (
+            view.reservationId != requestedReservationId ||
+            view.status != ReservationStatusView.CANCELLED ||
+            view.fulfilledAt != null ||
+            view.cancelledAt == null ||
+            view.cancelledAt < view.placedAt ||
+            view.version < 1 ||
+            !view.hasValidOpenStateShape()
+        ) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun ReservationCommandView.hasValidReadyState(): Boolean =
+        copyId != null && readyAt != null && expiresAt != null &&
+            readyAt >= placedAt && expiresAt > readyAt &&
+            fulfilledAt == null && cancelledAt == null
+
+    private fun ReservationCommandView.hasValidOpenStateShape(): Boolean =
+        (copyId == null && readyAt == null && expiresAt == null) ||
+            (copyId != null && readyAt != null && expiresAt != null &&
+                readyAt >= placedAt && expiresAt > readyAt)
 
     private fun validateIdempotencyKey(value: String) {
         if (value.length !in 16..128 || value.any { it.code !in 0x21..0x7e }) {

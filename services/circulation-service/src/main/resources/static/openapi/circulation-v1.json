@@ -340,6 +340,31 @@
         }
       }
     },
+    "/api/v1/circulation/reservations/me": {
+      "post": {
+        "operationId": "placeOwnReservation",
+        "tags": ["Reservations"],
+        "summary": "Join the fair reservation queue for the caller-bound member",
+        "description": "Derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.reservation.place"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SelfPlaceReservationRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/ReservationCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
     "/api/v1/circulation/reservations": {
       "post": {
         "operationId": "placeReservation",
@@ -370,6 +395,30 @@
         "tags": ["Reservations"],
         "summary": "Cancel an open reservation and promote the next member",
         "x-required-scopes": ["circulation.reservation.cancel", "circulation.reservation.cancel.on-behalf"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ReservationId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ReservationCommandSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/circulation/reservations/me/{reservationId}/cancel": {
+      "post": {
+        "operationId": "cancelOwnReservation",
+        "tags": ["Reservations"],
+        "summary": "Cancel the caller's open reservation",
+        "description": "Derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.reservation.cancel"],
         "security": [{ "bearerAuth": [] }],
         "parameters": [
           { "$ref": "#/components/parameters/ReservationId" },
@@ -836,6 +885,14 @@
         "required": ["memberId", "editionId"],
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "SelfPlaceReservationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editionId"],
+        "properties": {
           "editionId": { "type": "string", "format": "uuid" }
         }
       },
