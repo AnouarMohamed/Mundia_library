@@ -1,0 +1,169 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mundiapolis Library Web BFF API",
+    "version": "1.0.0",
+    "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
+  },
+  "servers": [{ "url": "/" }],
+  "paths": {
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Get the safe browser-session projection",
+        "responses": {
+          "200": {
+            "description": "Current authentication state",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Session" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/csrf": {
+      "get": {
+        "operationId": "getCsrfToken",
+        "summary": "Bootstrap a CSRF token for state-changing requests",
+        "responses": {
+          "200": {
+            "description": "CSRF token and submission fields",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CsrfToken" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Invalidate the current browser session",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "responses": {
+          "204": { "description": "Session invalidated" },
+          "403": { "description": "CSRF token missing or invalid" }
+        }
+      }
+    },
+    "/api/v1/catalog/search": {
+      "get": {
+        "operationId": "searchCatalog",
+        "summary": "Search the catalog through the BFF",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "genre", "in": "query", "schema": { "type": "string", "maxLength": 120 } },
+          { "name": "authorId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "availableOnly", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "minRating", "in": "query", "schema": { "type": "number", "minimum": 0, "maximum": 5 } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["title", "rating", "publicationYear"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded catalog search results",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/CatalogSearch" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Authenticated browser session required" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": { "type": "apiKey", "in": "cookie", "name": "MUNDIA_SESSION" },
+      "csrfHeader": { "type": "apiKey", "in": "header", "name": "X-XSRF-TOKEN" }
+    },
+    "responses": {
+      "Problem": {
+        "description": "Stable non-sensitive error response",
+        "content": {
+          "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } }
+        }
+      }
+    },
+    "schemas": {
+      "Session": {
+        "type": "object",
+        "required": ["authenticated"],
+        "properties": {
+          "authenticated": { "type": "boolean" },
+          "displayName": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      },
+      "CsrfToken": {
+        "type": "object",
+        "required": ["headerName", "parameterName", "token"],
+        "properties": {
+          "headerName": { "type": "string" },
+          "parameterName": { "type": "string" },
+          "token": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "CatalogSearch": {
+        "type": "object",
+        "required": ["editions", "total", "page", "totalPages"],
+        "properties": {
+          "editions": {
+            "type": "array",
+            "maxItems": 100,
+            "items": { "$ref": "#/components/schemas/CatalogEdition" }
+          },
+          "total": { "type": "integer", "minimum": 0 },
+          "page": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      },
+      "CatalogEdition": {
+        "type": "object",
+        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "workId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "isbn": { "type": "string" },
+          "publisher": { "type": "string" },
+          "publicationYear": { "type": "integer" },
+          "language": { "type": "string" },
+          "pageCount": { "type": "integer", "minimum": 1 },
+          "coverUrl": { "type": ["string", "null"], "format": "uri" },
+          "coverColor": { "type": ["string", "null"] },
+          "videoUrl": { "type": ["string", "null"], "format": "uri" },
+          "totalCopies": { "type": "integer", "minimum": 0 },
+          "availableCopies": { "type": "integer", "minimum": 0 },
+          "isActive": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "Problem": {
+        "type": "object",
+        "required": ["title", "status", "detail", "code"],
+        "properties": {
+          "type": { "type": "string", "format": "uri-reference" },
+          "title": { "type": "string" },
+          "status": { "type": "integer" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string", "format": "uri-reference" },
+          "code": { "type": "string" }
+        }
+      }
+    }
+  }
+}

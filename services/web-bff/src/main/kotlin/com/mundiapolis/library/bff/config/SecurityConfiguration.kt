@@ -49,6 +49,7 @@ class SecurityConfiguration {
                 requests
                     .requestMatchers(
                         "/actuator/health/**",
+                        "/openapi/**",
                         "/api/v1/auth/session",
                         "/api/v1/auth/csrf",
                         "/oauth2/authorization/**",

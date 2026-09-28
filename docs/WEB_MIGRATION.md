@@ -38,7 +38,20 @@ The BFF owns browser authentication and sessions but owns no domain database.
 
 ## Current checkpoint
 
-The `services/web-bff` deployable establishes the first part of step 1. It does
-not yet proxy domain APIs and is not production-routed. Institutional IdP
-integration, Redis failover behavior, service-token exchange, Kubernetes
-values, and edge routing remain required before the first UI slice moves.
+The `services/web-bff` deployable completes the code-level identity boundary
+in step 1 and starts step 2 with the first typed Catalog read slice:
+
+- `GET /api/v1/catalog/search` requires a valid browser session, validates and
+  bounds its inputs, enforces connect/read/response-size limits, and maps
+  downstream failures to stable problem codes.
+- The BFF obtains a dedicated client-credentials token scoped to
+  `catalog.search`; no browser token is forwarded. The authorization server
+  must issue the Catalog service audience (`catalog-api` by default). This is
+  suitable only for non-user-specific catalog reads.
+- The browser contract is versioned at
+  `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
+
+The deployment is not production-routed. Institutional IdP client
+registration, Redis failover testing, delegated end-user token design for
+profile/circulation/admin operations, Kubernetes values, edge routing, and the
+React shell remain required before a UI slice moves.

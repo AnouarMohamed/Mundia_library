@@ -45,6 +45,13 @@ spring:
           institutional:
             issuer-uri: ${OIDC_ISSUER}
         registration:
+          catalog-service:
+            provider: institutional
+            client-id: ${CATALOG_CLIENT_ID}
+            client-secret: ${CATALOG_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: client_credentials
+            scope: catalog.search
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}
@@ -60,6 +67,12 @@ app:
     public-base-url: ${BFF_PUBLIC_BASE_URL:http://localhost:8080}
     secure-cookies: ${BFF_SECURE_COOKIES:false}
     session-maximum-age: ${BFF_SESSION_MAXIMUM_AGE:PT8H}
+  clients:
+    catalog:
+      base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+      connect-timeout: ${CATALOG_CONNECT_TIMEOUT:PT1S}
+      read-timeout: ${CATALOG_READ_TIMEOUT:PT3S}
+      maximum-response-bytes: ${CATALOG_MAXIMUM_RESPONSE_BYTES:524288}
 
 management:
   endpoints:
