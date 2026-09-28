@@ -1,5 +1,8 @@
 package com.mundiapolis.library.bff.membership
 
+import com.mundiapolis.library.bff.security.DelegatedAuthorizationProtocolException
+import com.mundiapolis.library.bff.security.DelegatedAuthorizationUnavailableException
+import com.mundiapolis.library.bff.security.DelegatedReauthenticationRequiredException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -7,7 +10,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice(assignableTypes = [MembershipProfileController::class])
 class MembershipExceptionHandler {
-    @ExceptionHandler(MembershipReauthenticationRequiredException::class)
+    @ExceptionHandler(
+        MembershipReauthenticationRequiredException::class,
+        DelegatedReauthenticationRequiredException::class,
+    )
     fun reauthenticationRequired(): ProblemDetail = problem(
         HttpStatus.UNAUTHORIZED,
         "reauthentication_required",
@@ -35,14 +41,22 @@ class MembershipExceptionHandler {
         "Membership did not respond in time",
     )
 
-    @ExceptionHandler(MembershipDelegationUnavailableException::class, MembershipUnavailableException::class)
+    @ExceptionHandler(
+        MembershipDelegationUnavailableException::class,
+        MembershipUnavailableException::class,
+        DelegatedAuthorizationUnavailableException::class,
+    )
     fun unavailable(): ProblemDetail = problem(
         HttpStatus.SERVICE_UNAVAILABLE,
         "membership_unavailable",
         "Membership is temporarily unavailable",
     )
 
-    @ExceptionHandler(MembershipDelegationProtocolException::class, MembershipProtocolException::class)
+    @ExceptionHandler(
+        MembershipDelegationProtocolException::class,
+        MembershipProtocolException::class,
+        DelegatedAuthorizationProtocolException::class,
+    )
     fun invalidResponse(): ProblemDetail = problem(
         HttpStatus.BAD_GATEWAY,
         "membership_invalid_response",

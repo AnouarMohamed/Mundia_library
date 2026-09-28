@@ -280,6 +280,40 @@ class CirculationServiceIntegrationTest {
     }
 
     @Test
+    fun `caller bound request endpoint derives member only from a canonical token claim`() {
+        val memberId = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001")
+        val editionId = UUID.randomUUID()
+        val path = "$LOANS_PATH/me"
+        seedEligible(MemberId(memberId))
+
+        mockMvc.post(path) {
+            with(jwtFor("self-request-user", REQUEST_SCOPE, memberId))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"$editionId"}"""
+            header(IDEMPOTENCY_HEADER, "self-request-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isCreated() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.memberId") { value(memberId.toString()) }
+            jsonPath("$.editionId") { value(editionId.toString()) }
+            jsonPath("$.status") { value("REQUESTED") }
+        }
+
+        mockMvc.post(path) {
+            with(jwtFor("uppercase-claim-user", REQUEST_SCOPE, memberId.toString().uppercase()))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"editionId":"${UUID.randomUUID()}"}"""
+            header(IDEMPOTENCY_HEADER, "uppercase-claim-${UUID.randomUUID()}")
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("invalid_authentication_claim") }
+        }
+
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN)).isOne()
+        assertThat(dsl.fetchCount(CIRCULATION_IDEMPOTENCY)).isOne()
+    }
+
+    @Test
     fun `self service membership claim fails closed while staff scope permits on behalf`() {
         val targetMemberId = UUID.randomUUID()
         val requestBody = requestJson(targetMemberId, UUID.randomUUID())

@@ -31,6 +31,13 @@ class JwtCommandPrincipalResolver {
     fun forEligibilityRead(authentication: JwtAuthenticationToken): CommandPrincipal =
         forMemberCommand(authentication, ELIGIBILITY_READ_ANY_AUTHORITY)
 
+    fun forStrictSelf(authentication: JwtAuthenticationToken): CommandPrincipal =
+        resolve(
+            authentication.token,
+            membershipId = requiredMembershipId(authentication.token),
+            canActOnBehalf = false,
+        )
+
     private fun forMemberCommand(
         authentication: JwtAuthenticationToken,
         onBehalfAuthority: String,
@@ -76,7 +83,7 @@ class JwtCommandPrincipalResolver {
         } catch (_: IllegalArgumentException) {
             throw InvalidAuthenticationClaimException(MEMBERSHIP_ID_CLAIM)
         }
-        if (!parsed.toString().equals(rawMembershipId, ignoreCase = true)) {
+        if (parsed.toString() != rawMembershipId) {
             throw InvalidAuthenticationClaimException(MEMBERSHIP_ID_CLAIM)
         }
         return MemberId(parsed)

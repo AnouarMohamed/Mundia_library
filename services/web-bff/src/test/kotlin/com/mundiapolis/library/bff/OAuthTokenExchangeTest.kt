@@ -1,5 +1,6 @@
 package com.mundiapolis.library.bff
 
+import com.mundiapolis.library.bff.config.CirculationClientProperties
 import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.config.OAuthClientConfiguration
 import com.mundiapolis.library.bff.config.withOAuthTokenProtocolSupport
@@ -32,6 +33,7 @@ class OAuthTokenExchangeTest {
         val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
             builder.build(),
             properties(),
+            circulationProperties(),
         )
         val now = Instant.now()
         val source = OAuth2AccessToken(
@@ -71,19 +73,81 @@ class OAuthTokenExchangeTest {
         server.verify()
     }
 
-    private fun registration(): ClientRegistration =
-        ClientRegistration.withRegistrationId("membership-service")
-            .clientId("web-bff-membership")
+    @Test
+    fun `circulation token exchange requests only its audience and self service scopes`() {
+        val builder = RestClient.builder().withOAuthTokenProtocolSupport()
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
+            builder.build(),
+            properties(),
+            circulationProperties(),
+        )
+        val now = Instant.now()
+        val source = OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "source-user-token",
+            now,
+            now.plusSeconds(300),
+        )
+
+        server.expect(requestTo("https://issuer.example.test/oauth2/token"))
+            .andExpect(content().string(containsString("audience=circulation-api")))
+            .andExpect(content().string(containsString("circulation.eligibility.read")))
+            .andExpect(content().string(containsString("circulation.loan.request")))
+            .andRespond(
+                withSuccess(
+                    """
+                        {
+                          "access_token": "delegated-circulation-token",
+                          "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+                          "token_type": "Bearer",
+                          "expires_in": 120,
+                          "scope": "circulation.eligibility.read circulation.loan.request"
+                        }
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val registration = registration(
+            registrationId = "circulation-service",
+            clientId = "web-bff-circulation",
+            scopes = arrayOf("circulation.eligibility.read", "circulation.loan.request"),
+        )
+        val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))
+
+        assertThat(response.accessToken.tokenValue).isEqualTo("delegated-circulation-token")
+        assertThat(response.accessToken.scopes)
+            .containsExactlyInAnyOrder("circulation.eligibility.read", "circulation.loan.request")
+        server.verify()
+    }
+
+    private fun registration(
+        registrationId: String = "membership-service",
+        clientId: String = "web-bff-membership",
+        scopes: Array<String> = arrayOf("membership.profile.read"),
+    ): ClientRegistration =
+        ClientRegistration.withRegistrationId(registrationId)
+            .clientId(clientId)
             .clientSecret("test-only-secret")
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
             .authorizationGrantType(AuthorizationGrantType.TOKEN_EXCHANGE)
-            .scope("membership.profile.read")
+            .scope(*scopes)
             .tokenUri("https://issuer.example.test/oauth2/token")
             .build()
 
     private fun properties() = MembershipClientProperties(
         baseUrl = URI("https://membership.internal"),
         audience = "membership-api",
+        connectTimeout = Duration.ofSeconds(1),
+        readTimeout = Duration.ofSeconds(3),
+        maximumResponseBytes = 64 * 1024,
+        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
+    )
+
+    private fun circulationProperties() = CirculationClientProperties(
+        baseUrl = URI("https://circulation.internal"),
+        audience = "circulation-api",
         connectTimeout = Duration.ofSeconds(1),
         readTimeout = Duration.ofSeconds(3),
         maximumResponseBytes = 64 * 1024,

@@ -44,6 +44,27 @@ class LoanCommandController(
     private val returnLoanUseCase: ReturnLoanUseCase,
     private val principalResolver: JwtCommandPrincipalResolver,
 ) {
+    @PostMapping("/me")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.loan.request')")
+    fun requestOwn(
+        authentication: JwtAuthenticationToken,
+        @RequestHeader(IDEMPOTENCY_HEADER) rawIdempotencyKey: String,
+        @RequestBody request: SelfRequestLoanRequest,
+    ): ResponseEntity<LoanCommandResponse> {
+        val principal = principalResolver.forStrictSelf(authentication)
+        val memberId = requireNotNull(principal.membershipId)
+        return created(
+            requestLoanUseCase.request(
+                RequestLoanCommand(
+                    memberId = memberId,
+                    editionId = EditionId(request.editionId),
+                    idempotencyKey = IdempotencyKey.parse(rawIdempotencyKey),
+                    principal = principal,
+                ),
+            ),
+        )
+    }
+
     @PostMapping
     @PreAuthorize(
         "hasAnyAuthority(" +
@@ -64,10 +85,7 @@ class LoanCommandController(
             ),
         )
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .location(URI.create("/api/v1/circulation/loans/${execution.result.loanId.value}"))
-            .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
-            .body(execution.toResponse())
+        return created(execution)
     }
 
     @PostMapping("/{loanId}/approve")
@@ -168,6 +186,12 @@ class LoanCommandController(
             .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
             .body(execution.toResponse())
 
+    private fun created(execution: CommandExecution): ResponseEntity<LoanCommandResponse> =
+        ResponseEntity.status(HttpStatus.CREATED)
+            .location(URI.create("/api/v1/circulation/loans/${execution.result.loanId.value}"))
+            .header(IDEMPOTENCY_REPLAYED_HEADER, execution.replayed.toString())
+            .body(execution.toResponse())
+
     private fun CommandExecution.toResponse(): LoanCommandResponse =
         LoanCommandResponse.from(result)
 
@@ -181,6 +205,8 @@ data class RequestLoanRequest(
     val memberId: UUID,
     val editionId: UUID,
 )
+
+data class SelfRequestLoanRequest(val editionId: UUID)
 
 data class LoanCommandResponse(
     val loanId: UUID,

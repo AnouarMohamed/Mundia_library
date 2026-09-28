@@ -39,7 +39,8 @@ The BFF owns browser authentication and sessions but owns no domain database.
 ## Current checkpoint
 
 The `services/web-bff` deployable completes the code-level identity boundary
-in step 1 and now has typed Catalog and Membership read slices in step 2:
+in step 1 and now has typed Catalog, Membership, and initial Circulation slices
+in step 2:
 
 - `GET /api/v1/catalog/search` requires a valid browser session, validates and
   bounds its inputs, enforces connect/read/response-size limits, and maps
@@ -58,10 +59,16 @@ in step 1 and now has typed Catalog and Membership read slices in step 2:
   sizes, no redirects, strict endpoint validation, stable non-sensitive error
   responses, and delegated-client eviction on downstream authorization
   rejection. Tokens remain server-side and profile responses are `no-store`.
+- `GET /api/v1/circulation/eligibility` and
+  `POST /api/v1/circulation/loans` use a separate delegated token limited to
+  the `circulation-api` audience and the two required self-service scopes.
+  Circulation's fixed `/me` routes derive the member from a canonical token
+  claim. The browser supplies only an edition UUID, CSRF token, and bounded
+  actor-scoped idempotency key; it cannot select a member identity.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 
 The deployment is not production-routed. Institutional IdP client
-registration with token exchange, Redis failover testing, delegated end-user
-authorization for circulation/admin operations, Kubernetes values, edge
-routing, and the React shell remain required before a UI slice moves.
+registration with token exchange, Redis failover testing, remaining
+circulation/admin routes, Kubernetes values, edge routing, and the React shell
+remain required before a UI slice moves.

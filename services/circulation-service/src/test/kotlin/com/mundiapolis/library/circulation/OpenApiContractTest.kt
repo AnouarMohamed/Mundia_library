@@ -21,6 +21,7 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.RecordFinePaymentReq
 import com.mundiapolis.library.circulation.adapter.`in`.web.RegisterCopyRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RelocateCopyRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.RequestLoanRequest
+import com.mundiapolis.library.circulation.adapter.`in`.web.SelfRequestLoanRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.UpdateCirculationPolicyRequest
 import com.mundiapolis.library.circulation.application.port.inbound.CirculationStatus
 import org.assertj.core.api.Assertions.assertThat
@@ -111,6 +112,7 @@ class OpenApiContractTest {
         assertSchemaFields("CirculationPolicyResponse", CirculationPolicyResponse::class.java)
         assertSchemaFields("MemberEligibilityResponse", MemberEligibilityResponse::class.java)
         assertSchemaFields("RequestLoanRequest", RequestLoanRequest::class.java)
+        assertSchemaFields("SelfRequestLoanRequest", SelfRequestLoanRequest::class.java)
         assertSchemaFields("LoanCommandResponse", LoanCommandResponse::class.java)
         assertSchemaFields("PlaceReservationRequest", PlaceReservationRequest::class.java)
         assertSchemaFields("ReservationCommandResponse", ReservationCommandResponse::class.java)

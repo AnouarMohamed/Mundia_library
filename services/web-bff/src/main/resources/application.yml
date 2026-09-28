@@ -59,6 +59,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: membership.profile.read
+          circulation-service:
+            provider: institutional
+            client-id: ${CIRCULATION_CLIENT_ID}
+            client-secret: ${CIRCULATION_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: circulation.eligibility.read,circulation.loan.request
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}
@@ -91,6 +98,13 @@ app:
       read-timeout: ${MEMBERSHIP_READ_TIMEOUT:PT3S}
       maximum-response-bytes: ${MEMBERSHIP_MAXIMUM_RESPONSE_BYTES:65536}
       maximum-delegated-token-lifetime: ${MEMBERSHIP_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
+    circulation:
+      base-url: ${CIRCULATION_SERVICE_URL:http://localhost:8083}
+      audience: ${CIRCULATION_AUDIENCE:circulation-api}
+      connect-timeout: ${CIRCULATION_CONNECT_TIMEOUT:PT1S}
+      read-timeout: ${CIRCULATION_READ_TIMEOUT:PT5S}
+      maximum-response-bytes: ${CIRCULATION_MAXIMUM_RESPONSE_BYTES:65536}
+      maximum-delegated-token-lifetime: ${CIRCULATION_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
 
 management:
   endpoints:

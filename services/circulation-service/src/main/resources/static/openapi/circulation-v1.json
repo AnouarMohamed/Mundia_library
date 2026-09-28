@@ -104,6 +104,52 @@
         }
       }
     },
+    "/api/v1/circulation/me/eligibility": {
+      "get": {
+        "operationId": "getOwnCirculationEligibility",
+        "tags": ["Membership"],
+        "summary": "Read the eligibility projection bound to the caller",
+        "description": "Resolves the member exclusively from the canonical membership_id claim. No caller-controlled member identifier is accepted.",
+        "x-required-scopes": ["circulation.eligibility.read"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current caller-bound membership eligibility",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MemberEligibilityResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/circulation/loans/me": {
+      "post": {
+        "operationId": "requestOwnLoan",
+        "tags": ["Loans"],
+        "summary": "Request a loan for the caller-bound member",
+        "description": "Derives the member exclusively from the canonical membership_id claim.",
+        "x-required-scopes": ["circulation.loan.request"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SelfRequestLoanRequest" } } }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/LoanCreated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
     "/api/v1/circulation/loans": {
       "post": {
         "operationId": "requestLoan",
@@ -724,6 +770,14 @@
         "required": ["memberId", "editionId"],
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
+          "editionId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "SelfRequestLoanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editionId"],
+        "properties": {
           "editionId": { "type": "string", "format": "uuid" }
         }
       },

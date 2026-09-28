@@ -23,6 +23,15 @@ class CirculationReadController(
     private val getMemberEligibility: GetMemberEligibilityQuery,
     private val principalResolver: JwtCommandPrincipalResolver,
 ) {
+    @GetMapping("/me/eligibility")
+    @PreAuthorize("hasAuthority('SCOPE_circulation.eligibility.read')")
+    fun ownEligibility(authentication: JwtAuthenticationToken): MemberEligibilityResponse {
+        val principal = principalResolver.forStrictSelf(authentication)
+        return MemberEligibilityResponse.from(
+            getMemberEligibility.get(requireNotNull(principal.membershipId), principal),
+        )
+    }
+
     @GetMapping("/policy")
     @PreAuthorize("hasAuthority('SCOPE_circulation.policy.read')")
     fun policy(): ResponseEntity<CirculationPolicyResponse> {

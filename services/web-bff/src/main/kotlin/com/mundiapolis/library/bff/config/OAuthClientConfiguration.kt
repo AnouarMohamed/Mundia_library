@@ -90,13 +90,15 @@ class OAuthClientConfiguration {
     fun tokenExchangeTokenResponseClient(
         oauthTokenRestClient: RestClient,
         membership: MembershipClientProperties,
+        circulation: CirculationClientProperties,
     ): OAuth2AccessTokenResponseClient<TokenExchangeGrantRequest> =
         RestClientTokenExchangeTokenResponseClient().apply {
             setRestClient(oauthTokenRestClient)
             addParametersConverter { request ->
                 LinkedMultiValueMap<String, String>().apply {
-                    if (request.clientRegistration.registrationId == MEMBERSHIP_REGISTRATION) {
-                        add("audience", membership.audience)
+                    when (request.clientRegistration.registrationId) {
+                        MEMBERSHIP_REGISTRATION -> add("audience", membership.audience)
+                        CIRCULATION_REGISTRATION -> add("audience", circulation.audience)
                     }
                 }
             }
@@ -179,9 +181,15 @@ class OAuthClientConfiguration {
 
     companion object {
         const val MEMBERSHIP_REGISTRATION = "membership-service"
+        const val CIRCULATION_REGISTRATION = "circulation-service"
         const val SUBJECT_TOKEN_ATTRIBUTE = "mundia.delegation.subject-token"
         private val TOKEN_CLOCK_SKEW: Duration = Duration.ofSeconds(10)
-        private val KNOWN_REGISTRATIONS = listOf("institutional", "catalog-service", MEMBERSHIP_REGISTRATION)
+        private val KNOWN_REGISTRATIONS = listOf(
+            "institutional",
+            "catalog-service",
+            MEMBERSHIP_REGISTRATION,
+            CIRCULATION_REGISTRATION,
+        )
     }
 }
 

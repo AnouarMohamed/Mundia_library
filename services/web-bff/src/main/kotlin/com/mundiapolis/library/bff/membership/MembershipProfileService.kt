@@ -1,5 +1,8 @@
 package com.mundiapolis.library.bff.membership
 
+import com.mundiapolis.library.bff.config.MembershipClientProperties
+import com.mundiapolis.library.bff.config.OAuthClientConfiguration.Companion.MEMBERSHIP_REGISTRATION
+import com.mundiapolis.library.bff.security.DelegatedClientAuthorizer
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken
@@ -17,17 +20,24 @@ fun interface MembershipProfileUseCase {
 class MembershipProfileService(
     private val authorizer: DelegatedClientAuthorizer,
     private val membershipClient: MembershipClient,
+    private val properties: MembershipClientProperties,
 ) : MembershipProfileUseCase {
     override fun profile(
         authentication: OAuth2AuthenticationToken,
         request: HttpServletRequest,
         response: HttpServletResponse,
     ): MemberProfileView {
-        val authorizedClient = authorizer.authorizeMembership(authentication, request, response)
+        val authorizedClient = authorizer.authorize(
+            MEMBERSHIP_REGISTRATION,
+            properties.maximumDelegatedTokenLifetime,
+            authentication,
+            request,
+            response,
+        )
         return try {
             membershipClient.ownProfile(authorizedClient)
         } catch (failure: MembershipAuthorizationRejectedException) {
-            authorizer.invalidateMembership(authentication, request, response)
+            authorizer.invalidate(MEMBERSHIP_REGISTRATION, authentication, request, response)
             throw failure
         }
     }

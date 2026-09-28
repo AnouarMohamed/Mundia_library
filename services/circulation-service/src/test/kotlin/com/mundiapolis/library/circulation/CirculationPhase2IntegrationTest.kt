@@ -1549,6 +1549,19 @@ class CirculationPhase2IntegrationTest {
             jsonPath("$.sourceVersion") { value(0) }
             jsonPath("$.sourceOccurredAt") { exists() }
         }
+        mockMvc.get("/api/v1/circulation/me/eligibility") {
+            with(jwtFor("self-eligibility-reader", ELIGIBILITY_READ_SCOPE, memberId.value))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.memberId") { value(memberId.value.toString()) }
+            jsonPath("$.status") { value("ELIGIBLE") }
+        }
+        mockMvc.get("/api/v1/circulation/me/eligibility") {
+            with(jwtFor("missing-member-reader", ELIGIBILITY_READ_SCOPE))
+        }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("missing_membership_claim") }
+        }
         mockMvc.get("$MEMBERS_PATH/${UUID.randomUUID()}/eligibility") {
             with(jwtFor("self-eligibility-reader", ELIGIBILITY_READ_SCOPE, memberId.value))
         }.andExpect {

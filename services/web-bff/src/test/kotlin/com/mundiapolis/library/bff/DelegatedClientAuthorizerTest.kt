@@ -1,9 +1,8 @@
 package com.mundiapolis.library.bff
 
-import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.config.OAuthClientConfiguration
-import com.mundiapolis.library.bff.membership.DelegatedClientAuthorizer
-import com.mundiapolis.library.bff.membership.MembershipDelegationProtocolException
+import com.mundiapolis.library.bff.security.DelegatedAuthorizationProtocolException
+import com.mundiapolis.library.bff.security.DelegatedClientAuthorizer
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -22,7 +21,6 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod
 import org.springframework.security.oauth2.core.OAuth2AccessToken
 import org.springframework.security.oauth2.core.oidc.OidcIdToken
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser
-import java.net.URI
 import java.time.Duration
 import java.time.Instant
 
@@ -33,12 +31,18 @@ class DelegatedClientAuthorizerTest {
         val delegated = authorizedClient("membership-service", AuthorizationGrantType.TOKEN_EXCHANGE, 120)
         val manager = RecordingManager(source, delegated)
         val repository = mock(OAuth2AuthorizedClientRepository::class.java)
-        val authorizer = DelegatedClientAuthorizer(manager, repository, properties())
+        val authorizer = DelegatedClientAuthorizer(manager, repository)
         val authentication = authentication()
         val request = MockHttpServletRequest()
         val response = MockHttpServletResponse()
 
-        val result = authorizer.authorizeMembership(authentication, request, response)
+        val result = authorizer.authorize(
+            "membership-service",
+            Duration.ofMinutes(5),
+            authentication,
+            request,
+            response,
+        )
 
         assertThat(result).isSameAs(delegated)
         assertThat(manager.requests.map(OAuth2AuthorizeRequest::getClientRegistrationId))
@@ -57,16 +61,17 @@ class DelegatedClientAuthorizerTest {
         val authorizer = DelegatedClientAuthorizer(
             RecordingManager(source, delegated),
             mock(OAuth2AuthorizedClientRepository::class.java),
-            properties(),
         )
 
         assertThatThrownBy {
-            authorizer.authorizeMembership(
+            authorizer.authorize(
+                "membership-service",
+                Duration.ofMinutes(5),
                 authentication(),
                 MockHttpServletRequest(),
                 MockHttpServletResponse(),
             )
-        }.isInstanceOf(MembershipDelegationProtocolException::class.java)
+        }.isInstanceOf(DelegatedAuthorizationProtocolException::class.java)
     }
 
     @Test
@@ -75,13 +80,12 @@ class DelegatedClientAuthorizerTest {
         val authorizer = DelegatedClientAuthorizer(
             RecordingManager(null, null),
             repository,
-            properties(),
         )
         val authentication = authentication()
         val request = MockHttpServletRequest()
         val response = MockHttpServletResponse()
 
-        authorizer.invalidateMembership(authentication, request, response)
+        authorizer.invalidate("membership-service", authentication, request, response)
 
         verify(repository).removeAuthorizedClient(
             "membership-service",
@@ -133,15 +137,6 @@ class DelegatedClientAuthorizerTest {
         )
         return OAuth2AuthorizedClient(registration, "member-subject", token)
     }
-
-    private fun properties() = MembershipClientProperties(
-        baseUrl = URI("https://membership.internal"),
-        audience = "membership-api",
-        connectTimeout = Duration.ofSeconds(1),
-        readTimeout = Duration.ofSeconds(3),
-        maximumResponseBytes = 64 * 1024,
-        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
-    )
 
     private class RecordingManager(
         private val source: OAuth2AuthorizedClient?,

@@ -68,4 +68,29 @@ class ServiceClientConfiguration {
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build()
     }
+
+    @Bean
+    fun circulationRestClient(
+        observationRegistry: ObservationRegistry,
+        circulation: CirculationClientProperties,
+        bff: BffProperties,
+    ): RestClient {
+        require(circulation.isSafeFor(bff.deploymentTier)) {
+            "Circulation service transport must use HTTPS outside local development"
+        }
+        val httpClient = HttpClient.newBuilder()
+            .connectTimeout(circulation.connectTimeout)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
+            setReadTimeout(circulation.readTimeout)
+        }
+
+        return RestClient.builder()
+            .baseUrl(circulation.baseUrl.toASCIIString())
+            .requestFactory(requestFactory)
+            .observationRegistry(observationRegistry)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+            .build()
+    }
 }

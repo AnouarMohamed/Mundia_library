@@ -1,7 +1,5 @@
-package com.mundiapolis.library.bff.membership
+package com.mundiapolis.library.bff.security
 
-import com.mundiapolis.library.bff.config.MembershipClientProperties
-import com.mundiapolis.library.bff.config.OAuthClientConfiguration.Companion.MEMBERSHIP_REGISTRATION
 import com.mundiapolis.library.bff.config.OAuthClientConfiguration.Companion.SUBJECT_TOKEN_ATTRIBUTE
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -21,9 +19,10 @@ import java.time.Instant
 class DelegatedClientAuthorizer(
     private val authorizedClientManager: OAuth2AuthorizedClientManager,
     private val authorizedClients: OAuth2AuthorizedClientRepository,
-    private val properties: MembershipClientProperties,
 ) {
-    fun authorizeMembership(
+    fun authorize(
+        registrationId: String,
+        maximumTokenLifetime: Duration,
         authentication: OAuth2AuthenticationToken,
         request: HttpServletRequest,
         response: HttpServletResponse,
@@ -34,42 +33,38 @@ class DelegatedClientAuthorizer(
                     .principal(authentication)
                     .servletAttributes(request, response)
                     .build(),
-            ) ?: throw MembershipReauthenticationRequiredException()
+            ) ?: throw DelegatedReauthenticationRequiredException()
             val delegated = authorizedClientManager.authorize(
-                OAuth2AuthorizeRequest.withClientRegistrationId(MEMBERSHIP_REGISTRATION)
+                OAuth2AuthorizeRequest.withClientRegistrationId(registrationId)
                     .principal(authentication)
                     .attribute(SUBJECT_TOKEN_ATTRIBUTE, source.accessToken)
                     .servletAttributes(request, response)
                     .build(),
-            ) ?: throw MembershipDelegationUnavailableException()
-            validateDelegatedToken(delegated.accessToken)
+            ) ?: throw DelegatedAuthorizationUnavailableException()
+            validateDelegatedToken(delegated.accessToken, maximumTokenLifetime)
             return delegated
-        } catch (failure: MembershipClientException) {
+        } catch (failure: DelegatedAuthorizationException) {
             throw failure
         } catch (failure: ClientAuthorizationException) {
             if (failure.error.errorCode in REAUTHENTICATION_ERRORS) {
-                throw MembershipReauthenticationRequiredException(failure)
+                throw DelegatedReauthenticationRequiredException(failure)
             }
-            throw MembershipDelegationUnavailableException(failure)
+            throw DelegatedAuthorizationUnavailableException(failure)
         } catch (failure: OAuth2AuthorizationException) {
             if (failure.error.errorCode in REAUTHENTICATION_ERRORS) {
-                throw MembershipReauthenticationRequiredException(failure)
+                throw DelegatedReauthenticationRequiredException(failure)
             }
-            throw MembershipDelegationUnavailableException(failure)
+            throw DelegatedAuthorizationUnavailableException(failure)
         }
     }
 
-    fun invalidateMembership(
+    fun invalidate(
+        registrationId: String,
         authentication: OAuth2AuthenticationToken,
         request: HttpServletRequest,
         response: HttpServletResponse,
     ) {
-        authorizedClients.removeAuthorizedClient(
-            MEMBERSHIP_REGISTRATION,
-            authentication,
-            request,
-            response,
-        )
+        authorizedClients.removeAuthorizedClient(registrationId, authentication, request, response)
     }
 
     private fun OAuth2AuthorizeRequest.Builder.servletAttributes(
@@ -79,18 +74,21 @@ class DelegatedClientAuthorizer(
         attribute(HttpServletRequest::class.java.name, request)
             .attribute(HttpServletResponse::class.java.name, response)
 
-    private fun validateDelegatedToken(token: OAuth2AccessToken) {
-        val issuedAt = token.issuedAt ?: throw MembershipDelegationProtocolException()
-        val expiresAt = token.expiresAt ?: throw MembershipDelegationProtocolException()
+    private fun validateDelegatedToken(
+        token: OAuth2AccessToken,
+        maximumTokenLifetime: Duration,
+    ) {
+        val issuedAt = token.issuedAt ?: throw DelegatedAuthorizationProtocolException()
+        val expiresAt = token.expiresAt ?: throw DelegatedAuthorizationProtocolException()
         val lifetime = Duration.between(issuedAt, expiresAt)
         if (
             token.tokenType != OAuth2AccessToken.TokenType.BEARER ||
             lifetime.isNegative ||
             lifetime.isZero ||
-            lifetime > properties.maximumDelegatedTokenLifetime ||
+            lifetime > maximumTokenLifetime ||
             expiresAt <= Instant.now().plus(MINIMUM_REMAINING_LIFETIME)
         ) {
-            throw MembershipDelegationProtocolException()
+            throw DelegatedAuthorizationProtocolException()
         }
     }
 
@@ -100,3 +98,14 @@ class DelegatedClientAuthorizer(
         val MINIMUM_REMAINING_LIFETIME: Duration = Duration.ofSeconds(5)
     }
 }
+
+sealed class DelegatedAuthorizationException(cause: Throwable? = null) : RuntimeException(cause)
+
+class DelegatedReauthenticationRequiredException(cause: Throwable? = null) :
+    DelegatedAuthorizationException(cause)
+
+class DelegatedAuthorizationUnavailableException(cause: Throwable? = null) :
+    DelegatedAuthorizationException(cause)
+
+class DelegatedAuthorizationProtocolException(cause: Throwable? = null) :
+    DelegatedAuthorizationException(cause)
