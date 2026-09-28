@@ -27,11 +27,22 @@ npm run dev
 
 ## Quality Gate
 
-Run before opening a production-bound PR:
+Run the fast code gate while iterating:
 
 ```bash
-npm run ci:quality
+make ci-fast
 ```
+
+Before opening a production-bound PR, run the full push-CI rehearsal. It
+provisions the local Compose database, installs locked dependencies, exercises
+database invariants, and builds every image:
+
+```bash
+make ci
+```
+
+GitHub-only security workflows (such as CodeQL, dependency review, Scorecard,
+and secret scanning) remain authoritative after push.
 
 For API, cache, or database-sensitive changes:
 

@@ -4,13 +4,28 @@ This project uses local scripts and GitHub Actions to prevent regressions before
 
 ## Local Quality Gate
 
-Run the full local gate before opening or merging a production-bound PR:
+Run the fast code gate during development:
 
 ```bash
-npm run ci:quality
+make ci-fast
 ```
 
-This runs:
+Run the full local push-CI rehearsal before opening or merging a
+production-bound PR:
+
+```bash
+make ci
+```
+
+The full target checks Node 24.17+, installs locked dependencies, provisions
+the Compose PostgreSQL service, verifies migrations and concurrency invariants,
+tests/packages all Kotlin services, applies the circulation schema and runs the
+migration tool's PostgreSQL integration suite, checks the platform contracts,
+runs the web quality gate, and builds every production image. The fast target
+runs contracts, Kotlin services, and the web gate without provisioning or
+container builds.
+
+The web portion runs:
 
 1. `npm run lint`
 2. `npm run typecheck`

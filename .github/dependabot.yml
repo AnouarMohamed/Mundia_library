@@ -165,3 +165,20 @@ updates:
     commit-message:
       prefix: docker
       include: scope
+
+  - package-ecosystem: docker
+    directory: /services/web-bff
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:50"
+      timezone: Africa/Casablanca
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - docker
+      - backend
+      - security
+    commit-message:
+      prefix: docker
+      include: scope

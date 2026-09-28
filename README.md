@@ -244,6 +244,8 @@ The database schema ([database/schema.ts](database/schema.ts)) is managed via Dr
 | `npm run test:e2e` | Run end-to-end browser tests with Playwright |
 | `npm run security:audit` | Execute npm vulnerability audit (low threshold) |
 | `npm run ci:quality` | Full CI quality check: audit → lint → typecheck → test → test:e2e → build |
+| `make ci-fast` | Contracts, all Kotlin service gates, and the legacy web quality gate |
+| `make ci` | Full local push-CI rehearsal: dependencies, DB invariants, services, migration tool, platform, web, and images |
 | **Database & Schema Management** | |
 | `npm run db:migrate` | Apply canonical PostgreSQL migration scripts |
 | `npm run db:generate` | Generate new migration files from Drizzle schema updates |
