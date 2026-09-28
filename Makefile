@@ -79,9 +79,14 @@ services-ci: toolchain contracts ## Compile, test, and package all Kotlin servic
 
 migration-tool-ci: toolchain ## Rehearse the circulation migration tool against PostgreSQL 18
 	@docker compose up -d --wait db
-	@docker compose exec -T db psql -U $(MIGRATION_DATABASE_USERNAME) -d postgres -Atqc \
-		"SELECT 1 FROM pg_database WHERE datname = '$(MIGRATION_DATABASE_NAME)'" | grep -qx 1 || \
-		docker compose exec -T db createdb -U $(MIGRATION_DATABASE_USERNAME) $(MIGRATION_DATABASE_NAME)
+	@case "$(MIGRATION_DATABASE_NAME)" in \
+		circulation_migration_*) ;; \
+		*) echo "refusing to recreate non-test migration database: $(MIGRATION_DATABASE_NAME)" >&2; exit 1 ;; \
+	esac
+	@docker compose exec -T db dropdb --if-exists --force \
+		-U $(MIGRATION_DATABASE_USERNAME) $(MIGRATION_DATABASE_NAME)
+	@docker compose exec -T db createdb \
+		-U $(MIGRATION_DATABASE_USERNAME) $(MIGRATION_DATABASE_NAME)
 	@$(MAKE) -C tools/circulation-migration check-ci
 	@cd services && $(GRADLE) :circulation-service:bootJar --no-daemon
 	@cd services && \
