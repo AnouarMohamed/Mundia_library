@@ -171,6 +171,16 @@ topic and Protobuf subject. The Circulation producer's broker principal needs
 write ACLs for both its domain-event topic and the notification-intent topic,
 while the Notification consumer principal needs read access only to the latter.
 
+## Notification Preferences
+
+The Notification API exposes caller-bound preference reads and updates under
+the `notification.preferences.read` and `notification.preferences.write`
+scopes. Updates require the strong `ETag` returned by the read endpoint in an
+`If-Match` header. Missing preconditions return `428`, stale conflicting writes
+return `409`, and exact retries converge without another version increment.
+In-app delivery cannot be disabled; email and category preferences suppress
+provider delivery while preserving an auditable delivery row.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

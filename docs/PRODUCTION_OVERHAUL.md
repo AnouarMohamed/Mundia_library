@@ -365,10 +365,12 @@ of the Protobuf contract byte-for-byte against the consumer. Containerized Kafka
 integration tests prove that Circulation's production idempotent/zstd producer
 delivers the contract with its required routing metadata and that Notification's
 configured consumer durably creates the inbox/delivery state before committing
-the offset. Scheduled due/overdue and legitimate catalog-triggered intents,
-preference commands, provider workers, retry/DLQ and suppression behavior,
-callbacks, BFF routing, and Kubernetes values remain required before this service
-is production-routed.
+the offset. Caller-bound preference reads and strongly versioned updates now
+enforce mandatory in-app delivery, converge exact concurrent retries, reject
+stale conflicting writes, and record disabled email/category deliveries as
+`SUPPRESSED`. Scheduled due/overdue and legitimate catalog-triggered intents,
+provider workers, retry/DLQ behavior, callbacks, BFF routing, and Kubernetes
+values remain required before this service is production-routed.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

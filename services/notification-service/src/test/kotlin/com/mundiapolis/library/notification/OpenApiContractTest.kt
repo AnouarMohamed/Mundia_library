@@ -3,12 +3,15 @@ package com.mundiapolis.library.notification
 import com.mundiapolis.library.notification.adapter.`in`.web.NotificationController
 import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
+import com.mundiapolis.library.notification.dto.NotificationPreference
+import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import tools.jackson.core.StreamReadFeature
 import tools.jackson.core.json.JsonFactory
@@ -32,6 +35,8 @@ class OpenApiContractTest {
     fun `transport schemas match Kotlin models`() {
         assertSchemaFields("NotificationItem", NotificationItem::class.java)
         assertSchemaFields("NotificationPage", NotificationPage::class.java)
+        assertSchemaFields("NotificationPreference", NotificationPreference::class.java)
+        assertSchemaFields("UpdateNotificationPreferenceRequest", UpdateNotificationPreferenceRequest::class.java)
     }
 
     private fun assertSchemaFields(name: String, model: Class<*>) {
@@ -58,8 +63,13 @@ class OpenApiContractTest {
         return NotificationController::class.java.declaredMethods.mapNotNull { method ->
             val path = method.getAnnotation(GetMapping::class.java)?.value?.singleOrNull()
                 ?: method.getAnnotation(PatchMapping::class.java)?.value?.singleOrNull()
+                ?: method.getAnnotation(PutMapping::class.java)?.value?.singleOrNull()
                 ?: return@mapNotNull null
-            val verb = if (method.isAnnotationPresent(GetMapping::class.java)) "get" else "patch"
+            val verb = when {
+                method.isAnnotationPresent(GetMapping::class.java) -> "get"
+                method.isAnnotationPresent(PatchMapping::class.java) -> "patch"
+                else -> "put"
+            }
             val scopes = SCOPE_PATTERN.findAll(requireNotNull(method.getAnnotation(PreAuthorize::class.java)).value)
                 .map { it.groupValues[1] }.toSet()
             Route(verb, base + path) to scopes

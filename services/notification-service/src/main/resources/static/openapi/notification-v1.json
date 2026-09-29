@@ -26,6 +26,50 @@
         }
       }
     },
+    "/api/v1/notifications/preferences/me": {
+      "get": {
+        "operationId": "getOwnNotificationPreference",
+        "x-required-scopes": ["notification.preferences.read"],
+        "responses": {
+          "200": {
+            "description": "Caller-bound notification preference",
+            "headers": {
+              "Cache-Control": {"schema": {"type": "string"}},
+              "ETag": {"schema": {"type": "string", "pattern": "^\\\"[0-9]+\\\"$"}}
+            },
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationPreference"}}}
+          },
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Required scope or canonical membership claim missing"}
+        }
+      },
+      "put": {
+        "operationId": "updateOwnNotificationPreference",
+        "x-required-scopes": ["notification.preferences.write"],
+        "parameters": [
+          {"name": "If-Match", "in": "header", "required": true, "schema": {"type": "string", "pattern": "^\\\"[0-9]+\\\"$"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateNotificationPreferenceRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Preference updated or an identical request replayed",
+            "headers": {
+              "Cache-Control": {"schema": {"type": "string"}},
+              "ETag": {"schema": {"type": "string", "pattern": "^\\\"[0-9]+\\\"$"}}
+            },
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationPreference"}}}
+          },
+          "400": {"description": "Malformed strong preference version or request"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Required scope or canonical membership claim missing"},
+          "409": {"description": "Preference version conflict"},
+          "428": {"description": "If-Match preference version required"}
+        }
+      }
+    },
     "/api/v1/notifications/{notificationId}/read": {
       "patch": {
         "operationId": "markOwnNotificationRead",
@@ -68,6 +112,33 @@
           "memberId": {"type": "string", "format": "uuid"},
           "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/components/schemas/NotificationItem"}},
           "nextCursor": {"type": ["string", "null"], "maxLength": 128}
+        }
+      },
+      "NotificationPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "emailEnabled", "dueSoonEnabled", "overdueEnabled", "holdReadyEnabled", "accountStatusEnabled", "version"],
+        "properties": {
+          "memberId": {"type": "string", "format": "uuid"},
+          "emailEnabled": {"type": "boolean"},
+          "dueSoonEnabled": {"type": "boolean"},
+          "overdueEnabled": {"type": "boolean"},
+          "holdReadyEnabled": {"type": "boolean"},
+          "accountStatusEnabled": {"type": "boolean"},
+          "version": {"type": "integer", "format": "int64", "minimum": 0},
+          "updatedAt": {"type": ["string", "null"], "format": "date-time"}
+        }
+      },
+      "UpdateNotificationPreferenceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["emailEnabled", "dueSoonEnabled", "overdueEnabled", "holdReadyEnabled", "accountStatusEnabled"],
+        "properties": {
+          "emailEnabled": {"type": "boolean"},
+          "dueSoonEnabled": {"type": "boolean"},
+          "overdueEnabled": {"type": "boolean"},
+          "holdReadyEnabled": {"type": "boolean"},
+          "accountStatusEnabled": {"type": "boolean"}
         }
       }
     }

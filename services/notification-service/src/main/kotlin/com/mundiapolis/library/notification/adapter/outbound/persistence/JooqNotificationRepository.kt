@@ -3,12 +3,16 @@ package com.mundiapolis.library.notification.adapter.outbound.persistence
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_PREFERENCE
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.tables.records.NotificationPreferenceRecord
 import com.mundiapolis.library.notification.dto.NotificationChannel
 import com.mundiapolis.library.notification.dto.NotificationCategory
 import com.mundiapolis.library.notification.dto.NotificationIntentCommand
 import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
+import com.mundiapolis.library.notification.dto.NotificationPreference
 import com.mundiapolis.library.notification.dto.NotificationReadStatus
+import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import org.jooq.Condition
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
@@ -43,21 +47,73 @@ class JooqNotificationRepository(private val dsl: DSLContext) {
         notificationId: UUID,
         channel: NotificationChannel,
         createdAt: Instant,
+        suppressed: Boolean = false,
     ) {
         val timestamp = createdAt.atOffset(ZoneOffset.UTC)
         val inApp = channel == NotificationChannel.IN_APP
+        val status = when {
+            inApp -> "DELIVERED"
+            suppressed -> "SUPPRESSED"
+            else -> "PENDING"
+        }
         dsl.insertInto(NOTIFICATION_DELIVERY)
             .set(NOTIFICATION_DELIVERY.DELIVERY_ID, UUID.randomUUID())
             .set(NOTIFICATION_DELIVERY.NOTIFICATION_ID, notificationId)
             .set(NOTIFICATION_DELIVERY.CHANNEL, channel.name)
-            .set(NOTIFICATION_DELIVERY.STATUS, if (inApp) "DELIVERED" else "PENDING")
+            .set(NOTIFICATION_DELIVERY.STATUS, status)
             .set(NOTIFICATION_DELIVERY.ATTEMPT_COUNT, 0)
-            .set(NOTIFICATION_DELIVERY.NEXT_ATTEMPT_AT, if (inApp) null else timestamp)
+            .set(NOTIFICATION_DELIVERY.NEXT_ATTEMPT_AT, if (status == "PENDING") timestamp else null)
             .set(NOTIFICATION_DELIVERY.DELIVERED_AT, if (inApp) timestamp else null)
             .set(NOTIFICATION_DELIVERY.CREATED_AT, timestamp)
             .set(NOTIFICATION_DELIVERY.UPDATED_AT, timestamp)
             .execute()
     }
+
+    fun findPreference(memberId: UUID): NotificationPreference? =
+        dsl.selectFrom(NOTIFICATION_PREFERENCE)
+            .where(NOTIFICATION_PREFERENCE.MEMBER_ID.eq(memberId))
+            .fetchOne { it.toPreference() }
+
+    fun insertPreference(
+        memberId: UUID,
+        request: UpdateNotificationPreferenceRequest,
+        updatedAt: Instant,
+    ): NotificationPreference? = dsl.insertInto(NOTIFICATION_PREFERENCE)
+        .set(NOTIFICATION_PREFERENCE.MEMBER_ID, memberId)
+        .set(NOTIFICATION_PREFERENCE.IN_APP_ENABLED, true)
+        .set(NOTIFICATION_PREFERENCE.EMAIL_ENABLED, request.emailEnabled)
+        .set(NOTIFICATION_PREFERENCE.DUE_SOON_ENABLED, request.dueSoonEnabled)
+        .set(NOTIFICATION_PREFERENCE.OVERDUE_ENABLED, request.overdueEnabled)
+        .set(NOTIFICATION_PREFERENCE.HOLD_READY_ENABLED, request.holdReadyEnabled)
+        .set(NOTIFICATION_PREFERENCE.ACCOUNT_STATUS_ENABLED, request.accountStatusEnabled)
+        .set(NOTIFICATION_PREFERENCE.VERSION, 1L)
+        .set(NOTIFICATION_PREFERENCE.UPDATED_AT, updatedAt.atOffset(ZoneOffset.UTC))
+        .onConflict(NOTIFICATION_PREFERENCE.MEMBER_ID)
+        .doNothing()
+        .returning()
+        .fetchOne()
+        ?.toPreference()
+
+    fun updatePreference(
+        memberId: UUID,
+        expectedVersion: Long,
+        request: UpdateNotificationPreferenceRequest,
+        updatedAt: Instant,
+    ): NotificationPreference? = dsl.update(NOTIFICATION_PREFERENCE)
+        .set(NOTIFICATION_PREFERENCE.EMAIL_ENABLED, request.emailEnabled)
+        .set(NOTIFICATION_PREFERENCE.DUE_SOON_ENABLED, request.dueSoonEnabled)
+        .set(NOTIFICATION_PREFERENCE.OVERDUE_ENABLED, request.overdueEnabled)
+        .set(NOTIFICATION_PREFERENCE.HOLD_READY_ENABLED, request.holdReadyEnabled)
+        .set(NOTIFICATION_PREFERENCE.ACCOUNT_STATUS_ENABLED, request.accountStatusEnabled)
+        .set(NOTIFICATION_PREFERENCE.VERSION, NOTIFICATION_PREFERENCE.VERSION.plus(1L))
+        .set(NOTIFICATION_PREFERENCE.UPDATED_AT, updatedAt.atOffset(ZoneOffset.UTC))
+        .where(
+            NOTIFICATION_PREFERENCE.MEMBER_ID.eq(memberId)
+                .and(NOTIFICATION_PREFERENCE.VERSION.eq(expectedVersion)),
+        )
+        .returning()
+        .fetchOne()
+        ?.toPreference()
 
     fun insertIntentReceipt(
         intent: NotificationIntentCommand,
@@ -180,6 +236,18 @@ class JooqNotificationRepository(private val dsl: DSLContext) {
         require(canonical == value) { "cursor is invalid" }
         return Cursor(OffsetDateTime.ofInstant(instant, ZoneOffset.UTC), id)
     }
+
+    private fun NotificationPreferenceRecord.toPreference(): NotificationPreference =
+        NotificationPreference(
+            memberId = requireNotNull(memberId).toString(),
+            emailEnabled = requireNotNull(emailEnabled),
+            dueSoonEnabled = requireNotNull(dueSoonEnabled),
+            overdueEnabled = requireNotNull(overdueEnabled),
+            holdReadyEnabled = requireNotNull(holdReadyEnabled),
+            accountStatusEnabled = requireNotNull(accountStatusEnabled),
+            version = requireNotNull(version),
+            updatedAt = requireNotNull(updatedAt).toInstant(),
+        )
 
     private data class Cursor(val createdAt: OffsetDateTime, val notificationId: UUID)
 

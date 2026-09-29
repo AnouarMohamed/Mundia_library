@@ -5,13 +5,16 @@ import com.mundiapolis.library.notification.adapter.`in`.events.NotificationInte
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_PREFERENCE
 import com.mundiapolis.library.notification.contract.v1.DeliveryChannel
 import com.mundiapolis.library.notification.contract.v1.NotificationIntent
 import com.mundiapolis.library.notification.dto.NotificationCategory
 import com.mundiapolis.library.notification.dto.NotificationChannel
 import com.mundiapolis.library.notification.dto.NotificationIntentCommand
 import com.mundiapolis.library.notification.dto.NotificationIntentConflictException
+import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import com.mundiapolis.library.notification.service.NotificationIntentHandler
+import com.mundiapolis.library.notification.service.NotificationService
 import org.jooq.DSLContext
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -30,6 +33,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -55,12 +59,14 @@ class NotificationServiceIntegrationTest {
     @Autowired lateinit var dsl: DSLContext
     @Autowired lateinit var intentHandler: NotificationIntentHandler
     @Autowired lateinit var intentConsumer: NotificationIntentKafkaConsumer
+    @Autowired lateinit var notificationService: NotificationService
 
     @BeforeEach
     fun seed() {
         dsl.deleteFrom(NOTIFICATION_INTENT_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_DELIVERY).execute()
         dsl.deleteFrom(NOTIFICATION_INBOX).execute()
+        dsl.deleteFrom(NOTIFICATION_PREFERENCE).execute()
         insert(FIRST_ID, MEMBER_ID, NOW, null)
         insert(SECOND_ID, MEMBER_ID, NOW.minusMinutes(1), NOW)
         insert(OTHER_ID, OTHER_MEMBER_ID, NOW.plusMinutes(1), null)
@@ -173,6 +179,112 @@ class NotificationServiceIntegrationTest {
     }
 
     @Test
+    fun `email preference suppression is applied atomically while in-app remains mandatory`() {
+        notificationService.updatePreference(
+            MEMBER_ID,
+            0,
+            preferenceRequest(dueSoonEnabled = false),
+        )
+
+        val created = intentHandler.apply(intentCommand())
+        val deliveries = dsl.select(
+            NOTIFICATION_DELIVERY.CHANNEL,
+            NOTIFICATION_DELIVERY.STATUS,
+            NOTIFICATION_DELIVERY.NEXT_ATTEMPT_AT,
+        )
+            .from(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(created.notificationId))
+            .fetchMap(NOTIFICATION_DELIVERY.CHANNEL)
+
+        org.assertj.core.api.Assertions.assertThat(deliveries.getValue("IN_APP")[NOTIFICATION_DELIVERY.STATUS])
+            .isEqualTo("DELIVERED")
+        org.assertj.core.api.Assertions.assertThat(deliveries.getValue("EMAIL")[NOTIFICATION_DELIVERY.STATUS])
+            .isEqualTo("SUPPRESSED")
+        org.assertj.core.api.Assertions.assertThat(deliveries.getValue("EMAIL")[NOTIFICATION_DELIVERY.NEXT_ATTEMPT_AT])
+            .isNull()
+    }
+
+    @Test
+    fun `preference API requires strong versions and makes exact retries idempotent`() {
+        mockMvc.perform(
+            get("/api/v1/notifications/preferences/me")
+                .with(memberJwt(MEMBER_ID, PREFERENCE_READ_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"0\""))
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.emailEnabled").value(true))
+            .andExpect(jsonPath("$.updatedAt").doesNotExist())
+
+        val payload = """
+            {
+              "emailEnabled": true,
+              "dueSoonEnabled": false,
+              "overdueEnabled": true,
+              "holdReadyEnabled": true,
+              "accountStatusEnabled": true
+            }
+        """.trimIndent()
+        mockMvc.perform(
+            put("/api/v1/notifications/preferences/me")
+                .with(memberJwt(MEMBER_ID, PREFERENCE_WRITE_SCOPE))
+                .contentType("application/json")
+                .content(payload),
+        ).andExpect(status().isPreconditionRequired)
+
+        fun update(body: String = payload, version: String = "\"0\"") = mockMvc.perform(
+            put("/api/v1/notifications/preferences/me")
+                .with(memberJwt(MEMBER_ID, PREFERENCE_WRITE_SCOPE))
+                .header("If-Match", version)
+                .contentType("application/json")
+                .content(body),
+        )
+        update()
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"1\""))
+            .andExpect(jsonPath("$.version").value(1))
+            .andExpect(jsonPath("$.dueSoonEnabled").value(false))
+            .andExpect(jsonPath("$.updatedAt").isString)
+        update()
+            .andExpect(status().isOk)
+            .andExpect(header().string("ETag", "\"1\""))
+        update(version = "\"999\"")
+            .andExpect(status().isConflict)
+        update(payload.replace("\"overdueEnabled\": true", "\"overdueEnabled\": false"))
+            .andExpect(status().isConflict)
+        update(payload.dropLast(2) + ",\n  \"unexpected\": true\n}", "\"1\"")
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `concurrent identical initial preference updates converge on one version`() {
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val attempts = (0 until 8).map {
+                executor.submit<com.mundiapolis.library.notification.dto.NotificationPreference> {
+                    start.await(5, TimeUnit.SECONDS)
+                    notificationService.updatePreference(
+                        MEMBER_ID,
+                        0,
+                        preferenceRequest(emailEnabled = false),
+                    )
+                }
+            }
+            start.countDown()
+            val preferences = attempts.map { it.get(10, TimeUnit.SECONDS) }
+
+            org.assertj.core.api.Assertions.assertThat(preferences.map { it.version }).containsOnly(1L)
+            org.assertj.core.api.Assertions.assertThat(
+                dsl.fetchCount(NOTIFICATION_PREFERENCE, NOTIFICATION_PREFERENCE.MEMBER_ID.eq(MEMBER_ID)),
+            ).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `concurrent exact intent deliveries create one notification`() {
         val command = intentCommand()
         val start = CountDownLatch(1)
@@ -247,6 +359,16 @@ class NotificationServiceIntegrationTest {
             .andExpect(status().isForbidden)
         mockMvc.perform(get("/api/v1/notifications/me").with(memberJwt(MEMBER_ID, WRITE_SCOPE)))
             .andExpect(status().isForbidden)
+        mockMvc.perform(
+            get("/api/v1/notifications/preferences/me").with(memberJwt(MEMBER_ID, READ_SCOPE)),
+        ).andExpect(status().isForbidden)
+        mockMvc.perform(
+            put("/api/v1/notifications/preferences/me")
+                .with(memberJwt(MEMBER_ID, PREFERENCE_READ_SCOPE))
+                .header("If-Match", "\"0\"")
+                .contentType("application/json")
+                .content(tools.jackson.databind.ObjectMapper().writeValueAsString(preferenceRequest())),
+        ).andExpect(status().isForbidden)
     }
 
     private fun insert(id: UUID, memberId: UUID, createdAt: OffsetDateTime, readAt: OffsetDateTime?) {
@@ -279,6 +401,17 @@ class NotificationServiceIntegrationTest {
         offset = 10,
     )
 
+    private fun preferenceRequest(
+        emailEnabled: Boolean = true,
+        dueSoonEnabled: Boolean = true,
+    ) = UpdateNotificationPreferenceRequest(
+        emailEnabled = emailEnabled,
+        dueSoonEnabled = dueSoonEnabled,
+        overdueEnabled = true,
+        holdReadyEnabled = true,
+        accountStatusEnabled = true,
+    )
+
     private fun memberJwt(memberId: UUID, scope: String) = jwt()
         .jwt { it.claim("membership_id", memberId.toString()) }
         .authorities(SimpleGrantedAuthority(scope))
@@ -304,6 +437,8 @@ class NotificationServiceIntegrationTest {
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 9, 28, 12, 0, 0, 0, ZoneOffset.UTC)
         const val READ_SCOPE = "SCOPE_notification.inbox.read"
         const val WRITE_SCOPE = "SCOPE_notification.inbox.write"
+        const val PREFERENCE_READ_SCOPE = "SCOPE_notification.preferences.read"
+        const val PREFERENCE_WRITE_SCOPE = "SCOPE_notification.preferences.write"
         const val TOPIC = "mundia.notification.intents.v1"
         const val SCHEMA_SUBJECT = "mundia.notification.v1.NotificationIntent"
 

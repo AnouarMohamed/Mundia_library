@@ -1,6 +1,8 @@
 package com.mundiapolis.library.notification.adapter.`in`.web
 
 import com.mundiapolis.library.notification.service.NotificationNotFoundException
+import com.mundiapolis.library.notification.service.NotificationPreferencePreconditionRequiredException
+import com.mundiapolis.library.notification.service.NotificationPreferenceVersionConflictException
 import jakarta.validation.ConstraintViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
@@ -24,6 +26,14 @@ class NotificationExceptionHandler {
     @ExceptionHandler(NotificationNotFoundException::class)
     fun notFound(exception: NotificationNotFoundException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "notification_not_found", requireNotNull(exception.message))
+
+    @ExceptionHandler(NotificationPreferencePreconditionRequiredException::class)
+    fun preconditionRequired(exception: NotificationPreferencePreconditionRequiredException): ProblemDetail =
+        problem(HttpStatus.PRECONDITION_REQUIRED, "preference_precondition_required", requireNotNull(exception.message))
+
+    @ExceptionHandler(NotificationPreferenceVersionConflictException::class)
+    fun versionConflict(exception: NotificationPreferenceVersionConflictException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "preference_version_conflict", requireNotNull(exception.message))
 
     private fun problem(status: HttpStatus, code: String, detail: String): ProblemDetail =
         ProblemDetail.forStatusAndDetail(status, detail).apply {

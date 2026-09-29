@@ -2,6 +2,7 @@ package com.mundiapolis.library.notification.service
 
 import com.mundiapolis.library.notification.adapter.outbound.persistence.JooqNotificationRepository
 import com.mundiapolis.library.notification.dto.NotificationIntentClockSkewException
+import com.mundiapolis.library.notification.dto.NotificationChannel
 import com.mundiapolis.library.notification.dto.NotificationIntentCommand
 import com.mundiapolis.library.notification.dto.NotificationIntentConflictException
 import com.mundiapolis.library.notification.dto.NotificationIntentExecution
@@ -40,8 +41,11 @@ class NotificationIntentService(
                 }
                 return@execute NotificationIntentExecution(receipt.notificationId, replayed = true)
             }
+            val preference = repository.findPreference(normalized.memberId)
             normalized.channels.sortedBy { it.name }.forEach {
-                repository.insertDelivery(notificationId, it, createdAt)
+                val suppressed = it == NotificationChannel.EMAIL &&
+                    preference?.allowsEmail(normalized.category) == false
+                repository.insertDelivery(notificationId, it, createdAt, suppressed)
             }
             repository.insertIntentReceipt(normalized, notificationId, now)
             NotificationIntentExecution(notificationId, replayed = false)
