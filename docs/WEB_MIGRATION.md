@@ -76,6 +76,6 @@ routes, Notification BFF routing, Kubernetes values, edge routing, and the
 React shell remain required before a UI slice moves. A Kotlin Notification
 service boundary now exists for caller-bound inbox reads and mark-read state,
 with production-shaped Kafka ingestion and a lease/retry/dead-letter email
-worker core. The service-authenticated Membership recipient resolver,
-provider-specific sender and callbacks, and browser routing are still Phase 5
-work.
+worker core. Its service-authenticated, audience-scoped Membership recipient
+resolver is implemented; the provider-specific sender, signed callbacks, and
+browser routing are still Phase 5 work.

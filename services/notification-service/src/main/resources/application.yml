@@ -53,6 +53,17 @@ app:
     retry-maximum-delay: ${NOTIFICATION_EMAIL_WORKER_RETRY_MAXIMUM_DELAY:PT1H}
     operation-timeout: ${NOTIFICATION_EMAIL_WORKER_OPERATION_TIMEOUT:PT10S}
     maximum-pending-age: ${NOTIFICATION_EMAIL_WORKER_MAXIMUM_PENDING_AGE:PT5M}
+    membership-client:
+      enabled: ${NOTIFICATION_EMAIL_WORKER_ENABLED:false}
+      base-url: ${NOTIFICATION_MEMBERSHIP_URL:http://127.0.0.1:8081}
+      token-uri: ${NOTIFICATION_MEMBERSHIP_TOKEN_URI:http://127.0.0.1:8080/oauth2/token}
+      client-id: ${NOTIFICATION_MEMBERSHIP_CLIENT_ID:disabled}
+      client-secret: ${NOTIFICATION_MEMBERSHIP_CLIENT_SECRET:disabled-not-a-secret}
+      audience: ${NOTIFICATION_MEMBERSHIP_AUDIENCE:membership-api}
+      allow-insecure-transport: ${NOTIFICATION_MEMBERSHIP_ALLOW_INSECURE_TRANSPORT:false}
+      connect-timeout: ${NOTIFICATION_MEMBERSHIP_CONNECT_TIMEOUT:PT2S}
+      read-timeout: ${NOTIFICATION_MEMBERSHIP_READ_TIMEOUT:PT5S}
+      maximum-response-bytes: ${NOTIFICATION_MEMBERSHIP_MAXIMUM_RESPONSE_BYTES:8192}
   intent-consumer:
     enabled: ${NOTIFICATION_INTENT_CONSUMER_ENABLED:false}
     instance-id: ${NOTIFICATION_INTENT_CONSUMER_INSTANCE_ID:${HOSTNAME:local}}

@@ -190,12 +190,20 @@ idempotency keys, and terminal dead-letter state. Polling, lease, batch, attempt
 timeout, retry, and backlog-objective bounds are configured by the
 `NOTIFICATION_EMAIL_WORKER_*` variables in the service's `application.yml`.
 
-Enabling the worker without both a service-authenticated Membership recipient
-resolver and an email-provider sender bean fails application startup. This is
-intentional: member email addresses remain owned by Membership and are never
-copied into Kafka events or read through another service's database. Keep the
-worker disabled until workload identity/client credentials, provider secrets,
-sender verification, egress policy, and provider timeouts are configured.
+The recipient resolver uses OAuth 2.0 client credentials with only the
+`membership.profile.read.any` scope. Configure `NOTIFICATION_MEMBERSHIP_URL`,
+`NOTIFICATION_MEMBERSHIP_TOKEN_URI`, `NOTIFICATION_MEMBERSHIP_CLIENT_ID`,
+`NOTIFICATION_MEMBERSHIP_CLIENT_SECRET`, and
+`NOTIFICATION_MEMBERSHIP_AUDIENCE` (`membership-api` by default). Both endpoints
+must use HTTPS unless `NOTIFICATION_MEMBERSHIP_ALLOW_INSECURE_TRANSPORT=true` is
+explicitly set for an isolated local environment. Connect, read, and response
+size limits are bounded by the remaining `NOTIFICATION_MEMBERSHIP_*` settings.
+
+Member email addresses remain owned by Membership and are never copied into
+Kafka events or read through another service's database. Enabling the worker
+without an email-provider sender bean fails application startup. Keep it
+disabled until workload identity/client credentials, provider secrets, sender
+verification, egress policy, and provider timeouts are configured.
 
 ## Secrets Handling
 
