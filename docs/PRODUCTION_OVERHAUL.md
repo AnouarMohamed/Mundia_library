@@ -361,11 +361,14 @@ concurrent replays are idempotent while conflicting bytes poison-stop the
 consumer without committing the offset. Circulation now emits hold-ready intents
 from its transactional outbox for both immediate and queued reservation readiness,
 routes them to the dedicated notification topic, and verifies its producer copy
-of the Protobuf contract byte-for-byte against the consumer. Scheduled due/overdue
-and legitimate catalog-triggered intents, preference commands, provider workers,
-retry/DLQ and suppression behavior, callbacks, BFF routing, live-broker end-to-end
-evidence, and Kubernetes values remain required before this service is
-production-routed.
+of the Protobuf contract byte-for-byte against the consumer. Containerized Kafka
+integration tests prove that Circulation's production idempotent/zstd producer
+delivers the contract with its required routing metadata and that Notification's
+configured consumer durably creates the inbox/delivery state before committing
+the offset. Scheduled due/overdue and legitimate catalog-triggered intents,
+preference commands, provider workers, retry/DLQ and suppression behavior,
+callbacks, BFF routing, and Kubernetes values remain required before this service
+is production-routed.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.
