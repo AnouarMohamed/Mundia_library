@@ -5,6 +5,7 @@ import java.util.UUID
 
 data class ClaimedOutboxEvent(
     val id: UUID,
+    val stream: OutboxEventStream,
     val aggregateType: String,
     val aggregateId: UUID,
     val aggregateVersion: Long,
@@ -20,6 +21,7 @@ data class ClaimedOutboxEvent(
 
 data class EncodedOutboxEvent(
     val eventId: UUID,
+    val topic: String,
     val key: String,
     val eventType: String,
     val eventVersion: Int,
@@ -30,6 +32,19 @@ data class EncodedOutboxEvent(
     val schemaSubject: String,
     val schemaVersion: Int,
     val payload: ByteArray,
+)
+
+enum class OutboxEventStream { DOMAIN, NOTIFICATION }
+
+data class NotificationIntentOutboxEvent(
+    val id: UUID,
+    val memberId: UUID,
+    val sourceType: String,
+    val category: String,
+    val subject: String,
+    val body: String,
+    val channels: Set<String>,
+    val occurredAt: Instant,
 )
 
 data class BrokerPublishAcknowledgement(

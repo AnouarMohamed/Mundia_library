@@ -79,7 +79,11 @@ are implemented in the repository:
 - The circulation outbox now has crash-recoverable leasing, bounded retries,
   poison-event blocking, Protobuf v1 encoding, synchronous Kafka acknowledgement,
   lag/blocked health and metrics, retention cleanup, and a lease-expiry recovery
-  integration test. Delivery remains correctly classified as at least once.
+  integration test. Its domain and notification streams share the delivery
+  machinery but retain independent aggregate ordering, topics, schemas, and
+  uniqueness. Hold-ready notification intents commit atomically with both
+  immediately-ready and queue-promoted reservations. Delivery remains correctly
+  classified as at least once.
 - Circulation now consumes Membership's minimal versioned eligibility event
   into a local projection with an atomic immutable inbox, strict transport and
   Protobuf validation, per-member ordering, manual offsets after database
@@ -354,10 +358,14 @@ bounded `read_committed` fetches, manual post-transaction acknowledgement,
 TLS/SASL-safe configuration, fail-closed readiness, and atomic creation of the
 inbox item, channel deliveries, and a payload-digest receipt. Exact and
 concurrent replays are idempotent while conflicting bytes poison-stop the
-consumer without committing the offset. Circulation/catalog intent producers,
-preference commands, provider workers, retry/DLQ and suppression behavior,
-callbacks, BFF routing, and Kubernetes values remain required before this
-service is production-routed.
+consumer without committing the offset. Circulation now emits hold-ready intents
+from its transactional outbox for both immediate and queued reservation readiness,
+routes them to the dedicated notification topic, and verifies its producer copy
+of the Protobuf contract byte-for-byte against the consumer. Scheduled due/overdue
+and legitimate catalog-triggered intents, preference commands, provider workers,
+retry/DLQ and suppression behavior, callbacks, BFF routing, live-broker end-to-end
+evidence, and Kubernetes values remain required before this service is
+production-routed.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

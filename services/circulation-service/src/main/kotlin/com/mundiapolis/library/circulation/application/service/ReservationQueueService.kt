@@ -3,10 +3,12 @@ package com.mundiapolis.library.circulation.application.service
 import com.mundiapolis.library.circulation.application.model.ConcurrentCirculationUpdateException
 import com.mundiapolis.library.circulation.application.model.ReservationCommandResult
 import com.mundiapolis.library.circulation.application.model.ReservationOutboxEvent
+import com.mundiapolis.library.circulation.application.model.NotificationIntentOutboxEvent
 import com.mundiapolis.library.circulation.application.port.outbound.CirculationPolicyStore
 import com.mundiapolis.library.circulation.application.port.outbound.CopyStore
 import com.mundiapolis.library.circulation.application.port.outbound.IdentifierGenerator
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationOutboxEventStore
+import com.mundiapolis.library.circulation.application.port.outbound.NotificationIntentOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationStore
 import com.mundiapolis.library.circulation.domain.model.Copy
 import com.mundiapolis.library.circulation.domain.model.CopyId
@@ -18,6 +20,7 @@ class ReservationQueueService(
     private val copyStore: CopyStore,
     private val policyStore: CirculationPolicyStore,
     private val outboxEventStore: ReservationOutboxEventStore,
+    private val notificationOutboxEventStore: NotificationIntentOutboxEventStore,
     private val identifierGenerator: IdentifierGenerator,
     private val copyEventService: CopyEventService,
 ) {
@@ -118,6 +121,18 @@ class ReservationQueueService(
                 eventType = "circulation.reservation.ready",
                 occurredAt = now,
                 actorFingerprint = actorFingerprint,
+            ),
+        )
+        notificationOutboxEventStore.append(
+            NotificationIntentOutboxEvent(
+                id = identifierGenerator.next(),
+                memberId = ready.memberId.value,
+                sourceType = "circulation.reservation.ready.v1",
+                category = "HOLD_READY",
+                subject = "Reserved title ready",
+                body = "Your reserved title is ready for collection.",
+                channels = setOf("IN_APP", "EMAIL"),
+                occurredAt = now,
             ),
         )
     }

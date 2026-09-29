@@ -20,6 +20,14 @@ class OutboxDeliveryPropertiesTest {
         assertThat(properties(kafka = unsafeKafka).isSafeConfiguration).isFalse()
     }
 
+    @Test
+    fun `notification destination identifiers are validated`() {
+        assertThat(properties().copy(notificationTopic = "invalid topic").isSafeConfiguration)
+            .isFalse()
+        assertThat(properties().copy(notificationSchemaSubject = "").isSafeConfiguration)
+            .isFalse()
+    }
+
     private fun properties(
         leaseDuration: Duration = Duration.ofSeconds(30),
         kafka: OutboxDeliveryProperties.KafkaProperties = kafka(),
@@ -29,6 +37,8 @@ class OutboxDeliveryPropertiesTest {
             instanceId = "test-instance",
             topic = "mundia.circulation.events.v1",
             schemaSubject = "mundia.circulation.v1.CirculationEvent",
+            notificationTopic = "mundia.notification.intents.v1",
+            notificationSchemaSubject = "mundia.notification.v1.NotificationIntent",
             pollInterval = Duration.ofMillis(500),
             leaseDuration = leaseDuration,
             batchSize = 2,

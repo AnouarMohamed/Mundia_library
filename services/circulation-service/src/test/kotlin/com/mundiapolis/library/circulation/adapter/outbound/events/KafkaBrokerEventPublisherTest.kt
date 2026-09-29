@@ -3,7 +3,6 @@ package com.mundiapolis.library.circulation.adapter.outbound.events
 import com.mundiapolis.library.circulation.application.model.BrokerPublishException
 import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
-import com.mundiapolis.library.circulation.config.OutboxDeliveryProperties
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.time.Instant
@@ -34,7 +33,7 @@ class KafkaBrokerEventPublisherTest {
                 StringSerializer(),
                 ByteArraySerializer(),
             )
-        val publisher = KafkaBrokerEventPublisher(producer, properties())
+        val publisher = KafkaBrokerEventPublisher(producer, Duration.ofSeconds(5))
         val event = event()
 
         val acknowledgement = publisher.publish(event)
@@ -55,6 +54,16 @@ class KafkaBrokerEventPublisherTest {
     }
 
     @Test
+    fun `routes each encoded contract to its declared topic`() {
+        val producer = MockProducer<String, ByteArray>(true, null, StringSerializer(), ByteArraySerializer())
+        val publisher = KafkaBrokerEventPublisher(producer, Duration.ofSeconds(5))
+
+        publisher.publish(event().copy(topic = "mundia.notification.intents.v1"))
+
+        assertThat(producer.history().single().topic()).isEqualTo("mundia.notification.intents.v1")
+    }
+
+    @Test
     fun `sanitizes broker authentication failures into a bounded failure code`() {
         @Suppress("UNCHECKED_CAST")
         val producer = mock(Producer::class.java) as Producer<String, ByteArray>
@@ -66,7 +75,7 @@ class KafkaBrokerEventPublisherTest {
             ),
         )
         `when`(producer.send(any<ProducerRecord<String, ByteArray>>())).thenReturn(failedPublish)
-        val publisher = KafkaBrokerEventPublisher(producer, properties())
+        val publisher = KafkaBrokerEventPublisher(producer, Duration.ofSeconds(5))
 
         val failure = assertThrows<BrokerPublishException> { publisher.publish(event()) }
 
@@ -79,6 +88,7 @@ class KafkaBrokerEventPublisherTest {
         val aggregateId = UUID.randomUUID()
         return EncodedOutboxEvent(
             eventId = UUID.randomUUID(),
+            topic = "mundia.circulation.events.v1",
             key = aggregateId.toString(),
             eventType = "LoanRequested",
             eventVersion = 1,
@@ -91,41 +101,6 @@ class KafkaBrokerEventPublisherTest {
             payload = byteArrayOf(1, 2, 3),
         )
     }
-
-    private fun properties(): OutboxDeliveryProperties =
-        OutboxDeliveryProperties(
-            enabled = true,
-            instanceId = "test-instance",
-            topic = "mundia.circulation.events.v1",
-            schemaSubject = "mundia.circulation.v1.CirculationEvent",
-            pollInterval = Duration.ofMillis(500),
-            leaseDuration = Duration.ofSeconds(30),
-            batchSize = 2,
-            maximumAttempts = 20,
-            retryBaseDelay = Duration.ofSeconds(1),
-            retryMaximumDelay = Duration.ofMinutes(5),
-            publishedRetention = Duration.ofDays(30),
-            cleanupInterval = Duration.ofHours(1),
-            cleanupBatchSize = 1_000,
-            maximumEventBytes = 262_144,
-            maximumPendingAge = Duration.ofMinutes(5),
-            kafka =
-                OutboxDeliveryProperties.KafkaProperties(
-                    bootstrapServers = listOf("broker:9092"),
-                    securityProtocol = "PLAINTEXT",
-                    allowInsecureTransport = true,
-                    saslMechanism = null,
-                    saslJaasConfig = null,
-                    truststoreLocation = null,
-                    truststorePassword = null,
-                    keystoreLocation = null,
-                    keystorePassword = null,
-                    keyPassword = null,
-                    deliveryTimeout = Duration.ofSeconds(5),
-                    requestTimeout = Duration.ofSeconds(3),
-                    maximumBlock = Duration.ofSeconds(1),
-                ),
-        )
 
     private fun org.apache.kafka.common.header.Header.text(): String =
         String(value(), StandardCharsets.UTF_8)

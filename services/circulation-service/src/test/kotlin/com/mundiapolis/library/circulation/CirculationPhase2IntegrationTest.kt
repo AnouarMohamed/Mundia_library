@@ -1643,6 +1643,19 @@ class CirculationPhase2IntegrationTest {
         val first = placeReservation.place(firstCommand)
         assertThat(first.result.status).isEqualTo(ReservationStatus.READY)
         assertThat(first.result.copyId?.value).isEqualTo(copyId)
+        val firstIntent = requireNotNull(
+            dsl.selectFrom(OUTBOX_EVENT)
+                .where(OUTBOX_EVENT.EVENT_STREAM.eq("NOTIFICATION"))
+                .fetchOne(),
+        )
+        val firstIntentPayload = objectMapper.readTree(requireNotNull(firstIntent.payload).data())
+        assertThat(firstIntent.eventType).isEqualTo("notification.intent.requested")
+        assertThat(firstIntent.aggregateType).isEqualTo("notification-intent")
+        assertThat(firstIntent.aggregateId).isEqualTo(firstIntent.id)
+        assertThat(firstIntentPayload["memberId"].stringValue()).isEqualTo(firstMember.value.toString())
+        assertThat(firstIntentPayload["sourceType"].stringValue())
+            .isEqualTo("circulation.reservation.placed.v1")
+        assertThat(firstIntentPayload["category"].stringValue()).isEqualTo("HOLD_READY")
 
         val secondCommand = PlaceReservationCommand(
             secondMember,
@@ -1687,6 +1700,9 @@ class CirculationPhase2IntegrationTest {
         assertThat(promoted.status).isEqualTo("READY")
         assertThat(promoted.copyId).isEqualTo(copyId)
         assertThat(
+            dsl.fetchCount(OUTBOX_EVENT, OUTBOX_EVENT.EVENT_STREAM.eq("NOTIFICATION")),
+        ).isEqualTo(2)
+        assertThat(
             dsl.select(CIRCULATION_COPY.STATUS)
                 .from(CIRCULATION_COPY)
                 .where(CIRCULATION_COPY.ID.eq(copyId))
@@ -1697,6 +1713,9 @@ class CirculationPhase2IntegrationTest {
         assertThat(replay.replayed).isTrue()
         assertThat(replay.result.status).isEqualTo(ReservationStatus.WAITING)
         assertThat(replay.result.version).isZero()
+        assertThat(
+            dsl.fetchCount(OUTBOX_EVENT, OUTBOX_EVENT.EVENT_STREAM.eq("NOTIFICATION")),
+        ).isEqualTo(2)
 
         fulfillReservation.fulfill(
             FulfillReservationCommand(

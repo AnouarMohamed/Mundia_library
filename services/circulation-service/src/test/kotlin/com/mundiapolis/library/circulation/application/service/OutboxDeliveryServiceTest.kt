@@ -8,6 +8,7 @@ import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
+import com.mundiapolis.library.circulation.application.model.OutboxEventStream
 import com.mundiapolis.library.circulation.application.port.outbound.BrokerEventPublisher
 import com.mundiapolis.library.circulation.application.port.outbound.EventContractEncoder
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
@@ -119,6 +120,7 @@ class OutboxDeliveryServiceTest {
     private fun event(deliveryAttempt: Int = 1): ClaimedOutboxEvent =
         ClaimedOutboxEvent(
             id = UUID.randomUUID(),
+            stream = OutboxEventStream.DOMAIN,
             aggregateType = "loan",
             aggregateId = UUID.randomUUID(),
             aggregateVersion = 1,
@@ -135,6 +137,7 @@ class OutboxDeliveryServiceTest {
     private fun encoded(event: ClaimedOutboxEvent): EncodedOutboxEvent =
         EncodedOutboxEvent(
             eventId = event.id,
+            topic = properties.topic,
             key = event.aggregateId.toString(),
             eventType = event.eventType,
             eventVersion = event.eventVersion,
@@ -153,6 +156,8 @@ class OutboxDeliveryServiceTest {
             instanceId = "test-instance",
             topic = "mundia.circulation.events.v1",
             schemaSubject = "mundia.circulation.v1.CirculationEvent",
+            notificationTopic = "mundia.notification.intents.v1",
+            notificationSchemaSubject = "mundia.notification.v1.NotificationIntent",
             pollInterval = Duration.ofMillis(500),
             leaseDuration = Duration.ofSeconds(30),
             batchSize = 2,

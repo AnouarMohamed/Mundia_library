@@ -127,8 +127,19 @@ val verifyMembershipEventContract = tasks.register("verifyMembershipEventContrac
     }
 }
 
+val verifyNotificationIntentContract = tasks.register("verifyNotificationIntentContract") {
+    val producerContract = file("src/main/proto/mundia/notification/v1/notification_intents.proto")
+    val consumerContract = file("../notification-service/src/main/proto/mundia/notification/v1/notification_intents.proto")
+    inputs.files(producerContract, consumerContract)
+    doLast {
+        check(producerContract.readBytes().contentEquals(consumerContract.readBytes())) {
+            "Circulation's Notification Protobuf contract must exactly match the consumer contract"
+        }
+    }
+}
+
 tasks.named("generateProto") {
-    dependsOn(verifyMembershipEventContract)
+    dependsOn(verifyMembershipEventContract, verifyNotificationIntentContract)
 }
 
 tasks.withType<KotlinCompile>().configureEach {

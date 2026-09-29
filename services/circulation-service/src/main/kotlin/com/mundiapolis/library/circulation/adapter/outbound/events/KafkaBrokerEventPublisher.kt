@@ -5,8 +5,8 @@ import com.mundiapolis.library.circulation.application.model.BrokerPublishExcept
 import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.port.outbound.BrokerEventPublisher
-import com.mundiapolis.library.circulation.config.OutboxDeliveryProperties
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.producer.Producer
 import org.apache.kafka.clients.producer.ProducerRecord
@@ -17,10 +17,10 @@ import org.apache.kafka.common.errors.TimeoutException
 
 class KafkaBrokerEventPublisher(
     private val producer: Producer<String, ByteArray>,
-    private val properties: OutboxDeliveryProperties,
+    private val deliveryTimeout: Duration,
 ) : BrokerEventPublisher {
     override fun publish(event: EncodedOutboxEvent): BrokerPublishAcknowledgement {
-        val record = ProducerRecord(properties.topic, event.key, event.payload)
+        val record = ProducerRecord(event.topic, event.key, event.payload)
         record.header("content-type", "application/x-protobuf")
         record.header("event-id", event.eventId.toString())
         record.header("event-type", event.eventType)
@@ -31,7 +31,7 @@ class KafkaBrokerEventPublisher(
         return try {
             val metadata =
                 producer.send(record).get(
-                    properties.kafka.deliveryTimeout.toMillis(),
+                    deliveryTimeout.toMillis(),
                     TimeUnit.MILLISECONDS,
                 )
             BrokerPublishAcknowledgement(

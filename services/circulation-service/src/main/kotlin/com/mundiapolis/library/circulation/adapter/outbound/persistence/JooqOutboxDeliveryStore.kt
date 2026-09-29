@@ -5,6 +5,7 @@ import com.mundiapolis.library.circulation.application.model.ClaimedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
+import com.mundiapolis.library.circulation.application.model.OutboxEventStream
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
@@ -39,7 +40,8 @@ class JooqOutboxDeliveryStore(
                   AND NOT EXISTS (
                       SELECT 1
                       FROM outbox_event AS earlier
-                      WHERE earlier.aggregate_type = candidate.aggregate_type
+                      WHERE earlier.event_stream = candidate.event_stream
+                        AND earlier.aggregate_type = candidate.aggregate_type
                         AND earlier.aggregate_id = candidate.aggregate_id
                         AND earlier.aggregate_version < candidate.aggregate_version
                         AND earlier.published_at IS NULL
@@ -58,6 +60,7 @@ class JooqOutboxDeliveryStore(
             WHERE event.id = candidates.id
             RETURNING
                 event.id,
+                event.event_stream,
                 event.aggregate_type,
                 event.aggregate_id,
                 event.aggregate_version,
@@ -82,6 +85,9 @@ class JooqOutboxDeliveryStore(
         return records.map { record ->
             ClaimedOutboxEvent(
                 id = requireNotNull(record.get("id", UUID::class.java)),
+                stream = OutboxEventStream.valueOf(
+                    requireNotNull(record.get("event_stream", String::class.java)),
+                ),
                 aggregateType = requireNotNull(record.get("aggregate_type", String::class.java)),
                 aggregateId = requireNotNull(record.get("aggregate_id", UUID::class.java)),
                 aggregateVersion =

@@ -13,6 +13,7 @@ import com.mundiapolis.library.circulation.application.model.InventoryCommandRes
 import com.mundiapolis.library.circulation.application.model.InventoryAuditEntry
 import com.mundiapolis.library.circulation.application.model.InventoryOperation
 import com.mundiapolis.library.circulation.application.model.InventoryOutboxEvent
+import com.mundiapolis.library.circulation.application.model.NotificationIntentOutboxEvent
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
@@ -265,6 +266,10 @@ fun interface ReservationOutboxEventStore {
 
 fun interface PolicyOutboxEventStore {
     fun append(event: PolicyOutboxEvent)
+}
+
+fun interface NotificationIntentOutboxEventStore {
+    fun append(event: NotificationIntentOutboxEvent)
 }
 
 fun interface InventoryAuditStore {

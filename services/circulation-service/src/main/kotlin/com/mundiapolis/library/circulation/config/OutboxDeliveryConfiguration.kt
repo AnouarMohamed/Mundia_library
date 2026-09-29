@@ -74,7 +74,7 @@ class OutboxDeliveryConfiguration {
     fun brokerEventPublisher(
         producer: Producer<String, ByteArray>,
         properties: OutboxDeliveryProperties,
-    ): BrokerEventPublisher = KafkaBrokerEventPublisher(producer, properties)
+    ): BrokerEventPublisher = KafkaBrokerEventPublisher(producer, properties.kafka.deliveryTimeout)
 
     @Bean
     fun outboxDeliveryService(

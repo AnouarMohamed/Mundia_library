@@ -3,6 +3,7 @@ package com.mundiapolis.library.circulation.adapter.outbound.events
 import com.google.protobuf.Timestamp
 import com.mundiapolis.library.circulation.application.model.ClaimedOutboxEvent
 import com.mundiapolis.library.circulation.application.model.EncodedOutboxEvent
+import com.mundiapolis.library.circulation.application.model.OutboxEventStream
 import com.mundiapolis.library.circulation.application.port.outbound.EventContractEncoder
 import com.mundiapolis.library.circulation.config.OutboxDeliveryProperties
 import com.mundiapolis.library.circulation.contract.v1.CirculationEvent
@@ -16,6 +17,9 @@ import com.mundiapolis.library.circulation.contract.v1.LoanStatus
 import com.mundiapolis.library.circulation.contract.v1.PolicyEvent
 import com.mundiapolis.library.circulation.contract.v1.ReservationEvent
 import com.mundiapolis.library.circulation.contract.v1.ReservationStatus
+import com.mundiapolis.library.notification.contract.v1.DeliveryChannel
+import com.mundiapolis.library.notification.contract.v1.NotificationCategory as ContractNotificationCategory
+import com.mundiapolis.library.notification.contract.v1.NotificationIntent
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.time.DateTimeException
@@ -28,6 +32,10 @@ class ProtobufOutboxEventEncoder(
     private val properties: OutboxDeliveryProperties,
 ) : EventContractEncoder {
     override fun encode(event: ClaimedOutboxEvent): EncodedOutboxEvent {
+        if (event.stream == OutboxEventStream.NOTIFICATION) {
+            return encodeNotificationIntent(event)
+        }
+        requireContract(event.stream == OutboxEventStream.DOMAIN)
         requireContract(event.eventVersion == CONTRACT_VERSION)
         requireContract(event.aggregateVersion >= 0)
         requireContract(event.eventType in EVENT_TYPES)
@@ -62,6 +70,7 @@ class ProtobufOutboxEventEncoder(
 
         return EncodedOutboxEvent(
             eventId = event.id,
+            topic = properties.topic,
             key = event.aggregateId.toString(),
             eventType = event.eventType,
             eventVersion = event.eventVersion,
@@ -70,6 +79,56 @@ class ProtobufOutboxEventEncoder(
             aggregateVersion = event.aggregateVersion,
             occurredAt = event.occurredAt,
             schemaSubject = properties.schemaSubject,
+            schemaVersion = CONTRACT_VERSION,
+            payload = bytes,
+        )
+    }
+
+    private fun encodeNotificationIntent(event: ClaimedOutboxEvent): EncodedOutboxEvent {
+        requireContract(event.eventVersion == CONTRACT_VERSION)
+        requireContract(event.aggregateType == NOTIFICATION_INTENT_AGGREGATE)
+        requireContract(event.aggregateId == event.id)
+        requireContract(event.aggregateVersion == 0L)
+        requireContract(event.eventType == NOTIFICATION_INTENT_EVENT_TYPE)
+        requireContract(event.traceId == null || TRACE_ID.matches(event.traceId))
+        val payload = parsePayload(event.payloadJson)
+        requireContract(payload.isObject)
+        requireContract(payload.propertyNames().all(NOTIFICATION_PAYLOAD_FIELDS::contains))
+        requireContract(payload.propertyNames().toSet() == NOTIFICATION_PAYLOAD_FIELDS)
+
+        val memberId = payload.requiredUuid("memberId")
+        val sourceType = payload.requiredNotificationText("sourceType", 100)
+        requireContract(NOTIFICATION_SOURCE_TYPE.matches(sourceType))
+        val subject = payload.requiredNotificationText("subject", 160)
+        val body = payload.requiredNotificationText("body", 2_000, allowFormatting = true)
+        val category = payload.requiredText("category").toNotificationCategory()
+        val channels = payload.requiredTextSet("channels")
+        requireContract(channels.isNotEmpty() && channels.size <= 2 && "IN_APP" in channels)
+
+        val envelope = NotificationIntent.newBuilder()
+            .setEventId(event.id.toString())
+            .setEventVersion(event.eventVersion)
+            .setSourceType(sourceType)
+            .setMemberId(memberId.toString())
+            .setCategory(category)
+            .setSubject(subject)
+            .setBody(body)
+            .setOccurredAt(event.occurredAt.toTimestamp())
+            .addAllChannels(channels.sorted().map { it.toDeliveryChannel() })
+            .build()
+        val bytes = envelope.toByteArray()
+        if (bytes.size > properties.maximumEventBytes) throw OutboxPayloadTooLargeException()
+        return EncodedOutboxEvent(
+            eventId = event.id,
+            topic = properties.notificationTopic,
+            key = memberId.toString(),
+            eventType = event.eventType,
+            eventVersion = event.eventVersion,
+            aggregateType = event.aggregateType,
+            aggregateId = event.aggregateId,
+            aggregateVersion = event.aggregateVersion,
+            occurredAt = event.occurredAt,
+            schemaSubject = properties.notificationSchemaSubject,
             schemaVersion = CONTRACT_VERSION,
             payload = bytes,
         )
@@ -244,6 +303,25 @@ class ProtobufOutboxEventEncoder(
         return text
     }
 
+    private fun JsonNode.requiredNotificationText(
+        field: String,
+        maximumLength: Int,
+        allowFormatting: Boolean = false,
+    ): String {
+        val value = get(field)
+        requireContract(value != null && value.isString)
+        val text = value.stringValue()
+        requireContract(text.isNotBlank() && text.length <= maximumLength && text == text.trim())
+        requireContract(
+            if (allowFormatting) {
+                text.none { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }
+            } else {
+                text.none(Char::isISOControl)
+            },
+        )
+        return text
+    }
+
     private fun JsonNode.requiredUuid(field: String): UUID {
         val raw = requiredText(field)
         val value = runCatching { UUID.fromString(raw) }.getOrNull()
@@ -289,6 +367,20 @@ class ProtobufOutboxEventEncoder(
         val value = requiredLong(field)
         requireContract(value in 0..Int.MAX_VALUE.toLong())
         return value.toInt()
+    }
+
+    private fun JsonNode.requiredTextSet(field: String): Set<String> {
+        val value = get(field) ?: throw OutboxContractException()
+        requireContract(value.isArray && value.size() in 1..2)
+        val values = (0 until value.size()).map { index ->
+            val item = value[index]
+            requireContract(item.isString)
+            item.stringValue().also {
+                requireContract(it.isNotBlank() && it.length <= 32 && it.none(Char::isISOControl))
+            }
+        }
+        requireContract(values.size == values.toSet().size)
+        return values.toSet()
     }
 
     private fun JsonNode.validateActorFingerprint() {
@@ -350,6 +442,21 @@ class ProtobufOutboxEventEncoder(
         else -> throw OutboxContractException()
     }
 
+    private fun String.toNotificationCategory(): ContractNotificationCategory = when (this) {
+        "DUE_SOON" -> ContractNotificationCategory.NOTIFICATION_CATEGORY_DUE_SOON
+        "OVERDUE" -> ContractNotificationCategory.NOTIFICATION_CATEGORY_OVERDUE
+        "HOLD_READY" -> ContractNotificationCategory.NOTIFICATION_CATEGORY_HOLD_READY
+        "ACCOUNT_STATUS" -> ContractNotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT_STATUS
+        "GENERAL" -> ContractNotificationCategory.NOTIFICATION_CATEGORY_GENERAL
+        else -> throw OutboxContractException()
+    }
+
+    private fun String.toDeliveryChannel(): DeliveryChannel = when (this) {
+        "IN_APP" -> DeliveryChannel.DELIVERY_CHANNEL_IN_APP
+        "EMAIL" -> DeliveryChannel.DELIVERY_CHANNEL_EMAIL
+        else -> throw OutboxContractException()
+    }
+
     private fun Instant.toTimestamp(): Timestamp =
         try {
             Timestamp.newBuilder()
@@ -373,11 +480,14 @@ class ProtobufOutboxEventEncoder(
         const val COPY_AGGREGATE = "copy"
         const val RESERVATION_AGGREGATE = "reservation"
         const val POLICY_AGGREGATE = "policy"
+        const val NOTIFICATION_INTENT_AGGREGATE = "notification-intent"
+        const val NOTIFICATION_INTENT_EVENT_TYPE = "notification.intent.requested"
         const val MAX_TEXT_LENGTH = 512
         val TRACE_ID = Regex("[0-9a-f]{32}")
         val ACTOR_FINGERPRINT = Regex("[0-9a-f]{64}")
         val CURRENCY = Regex("[A-Z]{3}")
         val BARCODE = Regex("[A-Za-z0-9][A-Za-z0-9._/-]{2,63}")
+        val NOTIFICATION_SOURCE_TYPE = Regex("[a-z][a-z0-9]*(?:[.-][a-z0-9]+){1,9}")
         val POLICY_AGGREGATE_ID: UUID =
             UUID.fromString("00000000-0000-0000-0000-000000000001")
         val EVENT_TYPES = mapOf(
@@ -500,6 +610,14 @@ class ProtobufOutboxEventEncoder(
             "cancelledAt",
             "reservationVersion",
             "actorFingerprint",
+        )
+        val NOTIFICATION_PAYLOAD_FIELDS = setOf(
+            "memberId",
+            "sourceType",
+            "category",
+            "subject",
+            "body",
+            "channels",
         )
         val POLICY_PAYLOAD_FIELDS = setOf(
             "revision",

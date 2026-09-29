@@ -19,6 +19,7 @@ import com.mundiapolis.library.circulation.application.model.ReservationLimitRea
 import com.mundiapolis.library.circulation.application.model.ReservationNotFoundException
 import com.mundiapolis.library.circulation.application.model.ReservationOperation
 import com.mundiapolis.library.circulation.application.model.ReservationOutboxEvent
+import com.mundiapolis.library.circulation.application.model.NotificationIntentOutboxEvent
 import com.mundiapolis.library.circulation.application.model.ReservationStateConflictException
 import com.mundiapolis.library.circulation.application.model.CirculationOutboxEvent
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
@@ -38,6 +39,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.MemberEligi
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationIdempotencyStore
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationOutboxEventStore
+import com.mundiapolis.library.circulation.application.port.outbound.NotificationIntentOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.ReservationStore
 import com.mundiapolis.library.circulation.application.port.outbound.TimeProvider
 import com.mundiapolis.library.circulation.application.port.outbound.TransactionRunner
@@ -63,6 +65,7 @@ class ReservationCommandService(
     private val policyStore: CirculationPolicyStore,
     private val idempotencyStore: ReservationIdempotencyStore,
     private val reservationOutboxEventStore: ReservationOutboxEventStore,
+    private val notificationOutboxEventStore: NotificationIntentOutboxEventStore,
     private val loanOutboxEventStore: OutboxEventStore,
     private val queueService: ReservationQueueService,
     private val copyEventService: CopyEventService,
@@ -296,6 +299,20 @@ class ReservationCommandService(
                 owner.fingerprint,
             ),
         )
+        if (result.status == ReservationStatus.READY) {
+            notificationOutboxEventStore.append(
+                NotificationIntentOutboxEvent(
+                    id = identifierGenerator.next(),
+                    memberId = result.memberId.value,
+                    sourceType = "${operation.eventType}.v1",
+                    category = "HOLD_READY",
+                    subject = "Reserved title ready",
+                    body = "Your reserved title is ready for collection.",
+                    channels = setOf("IN_APP", "EMAIL"),
+                    occurredAt = now,
+                ),
+            )
+        }
         idempotencyStore.complete(owner, key, operation, result, now)
         ReservationCommandExecution(result, replayed = false)
     }

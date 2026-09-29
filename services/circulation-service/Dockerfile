@@ -17,6 +17,8 @@ RUN --mount=type=cache,target=/root/.gradle \
 COPY circulation-service/src ./circulation-service/src
 COPY membership-service/src/main/proto/mundia/membership/v1/membership_events.proto \
     ./membership-service/src/main/proto/mundia/membership/v1/membership_events.proto
+COPY notification-service/src/main/proto/mundia/notification/v1/notification_intents.proto \
+    ./notification-service/src/main/proto/mundia/notification/v1/notification_intents.proto
 
 RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew :circulation-service:bootJar --no-daemon

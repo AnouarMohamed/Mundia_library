@@ -164,6 +164,13 @@ keystore variables defined in the service's `application.yml`. Topic, schema,
 poll, commit, retry, fetch-size, and health-silence limits have bounded defaults
 under the `NOTIFICATION_INTENT_CONSUMER_*` prefix.
 
+Circulation publishes hold-ready intents through its transactional outbox. Its
+notification destination is configured by `OUTBOX_NOTIFICATION_TOPIC` and
+`OUTBOX_NOTIFICATION_SCHEMA_SUBJECT`; these must match the Notification consumer
+topic and Protobuf subject. The Circulation producer's broker principal needs
+write ACLs for both its domain-event topic and the notification-intent topic,
+while the Notification consumer principal needs read access only to the latter.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

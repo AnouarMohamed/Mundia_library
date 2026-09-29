@@ -12,6 +12,8 @@ data class OutboxDeliveryProperties(
     val instanceId: String,
     val topic: String,
     val schemaSubject: String,
+    val notificationTopic: String,
+    val notificationSchemaSubject: String,
     val pollInterval: Duration,
     val leaseDuration: Duration,
     val batchSize: Int,
@@ -35,6 +37,8 @@ data class OutboxDeliveryProperties(
                 !INSTANCE_ID.matches(instanceId) ||
                 !TOPIC.matches(topic) ||
                 !SCHEMA_SUBJECT.matches(schemaSubject) ||
+                !TOPIC.matches(notificationTopic) ||
+                !SCHEMA_SUBJECT.matches(notificationSchemaSubject) ||
                 pollInterval !in MIN_POLL_INTERVAL..MAX_POLL_INTERVAL ||
                 batchSize !in 1..MAX_BATCH_SIZE ||
                 maximumAttempts !in 1..MAXIMUM_DELIVERY_ATTEMPTS ||

@@ -1,10 +1,14 @@
 package com.mundiapolis.library.circulation.adapter.outbound.events
 
 import com.mundiapolis.library.circulation.application.model.ClaimedOutboxEvent
+import com.mundiapolis.library.circulation.application.model.OutboxEventStream
 import com.mundiapolis.library.circulation.config.OutboxDeliveryProperties
 import com.mundiapolis.library.circulation.contract.v1.CirculationEvent
 import com.mundiapolis.library.circulation.contract.v1.CopyStatus
 import com.mundiapolis.library.circulation.contract.v1.FineStatus
+import com.mundiapolis.library.notification.contract.v1.DeliveryChannel
+import com.mundiapolis.library.notification.contract.v1.NotificationCategory
+import com.mundiapolis.library.notification.contract.v1.NotificationIntent
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -130,6 +134,53 @@ class ProtobufOutboxEventEncoderTest {
             .isInstanceOf(OutboxContractException::class.java)
     }
 
+    @Test
+    fun `notification intent is encoded for the dedicated topic and member key`() {
+        val eventId = UUID.randomUUID()
+        val memberId = UUID.randomUUID()
+        val occurredAt = Instant.parse("2026-08-03T12:00:00Z")
+        val body = "Collection details:\n" + "A".repeat(600)
+        val event = ClaimedOutboxEvent(
+            id = eventId,
+            stream = OutboxEventStream.NOTIFICATION,
+            aggregateType = "notification-intent",
+            aggregateId = eventId,
+            aggregateVersion = 0,
+            eventType = "notification.intent.requested",
+            eventVersion = 1,
+            occurredAt = occurredAt,
+            traceId = null,
+            payloadJson = ObjectMapper().writeValueAsString(
+                mapOf(
+                    "memberId" to memberId.toString(),
+                    "sourceType" to "circulation.reservation.ready.v1",
+                    "category" to "HOLD_READY",
+                    "subject" to "Reserved title ready",
+                    "body" to body,
+                    "channels" to listOf("IN_APP", "EMAIL"),
+                ),
+            ),
+            createdAt = occurredAt,
+            deliveryAttempt = 1,
+            leaseToken = UUID.randomUUID(),
+        )
+
+        val encoded = encoder.encode(event)
+        val envelope = NotificationIntent.parseFrom(encoded.payload)
+
+        assertThat(encoded.topic).isEqualTo("mundia.notification.intents.v1")
+        assertThat(encoded.key).isEqualTo(memberId.toString())
+        assertThat(encoded.schemaSubject).isEqualTo("mundia.notification.v1.NotificationIntent")
+        assertThat(envelope.eventId).isEqualTo(eventId.toString())
+        assertThat(envelope.memberId).isEqualTo(memberId.toString())
+        assertThat(envelope.body).isEqualTo(body)
+        assertThat(envelope.category).isEqualTo(NotificationCategory.NOTIFICATION_CATEGORY_HOLD_READY)
+        assertThat(envelope.channelsList).containsExactlyInAnyOrder(
+            DeliveryChannel.DELIVERY_CHANNEL_IN_APP,
+            DeliveryChannel.DELIVERY_CHANNEL_EMAIL,
+        )
+    }
+
     private fun claimed(
         aggregateType: String,
         aggregateId: UUID,
@@ -140,6 +191,7 @@ class ProtobufOutboxEventEncoderTest {
         val occurredAt = Instant.parse("2026-08-03T12:00:00Z")
         return ClaimedOutboxEvent(
             id = UUID.randomUUID(),
+            stream = OutboxEventStream.DOMAIN,
             aggregateType = aggregateType,
             aggregateId = aggregateId,
             aggregateVersion = aggregateVersion,
@@ -159,6 +211,8 @@ class ProtobufOutboxEventEncoderTest {
         instanceId = "test-instance",
         topic = "mundia.circulation.events.v1",
         schemaSubject = "mundia.circulation.v1.CirculationEvent",
+        notificationTopic = "mundia.notification.intents.v1",
+        notificationSchemaSubject = "mundia.notification.v1.NotificationIntent",
         pollInterval = Duration.ofMillis(500),
         leaseDuration = Duration.ofSeconds(30),
         batchSize = 10,

@@ -67,6 +67,8 @@ app:
     instance-id: ${OUTBOX_INSTANCE_ID:${HOSTNAME:local}}
     topic: ${OUTBOX_TOPIC:mundia.circulation.events.v1}
     schema-subject: ${OUTBOX_SCHEMA_SUBJECT:mundia.circulation.v1.CirculationEvent}
+    notification-topic: ${OUTBOX_NOTIFICATION_TOPIC:mundia.notification.intents.v1}
+    notification-schema-subject: ${OUTBOX_NOTIFICATION_SCHEMA_SUBJECT:mundia.notification.v1.NotificationIntent}
     poll-interval: ${OUTBOX_POLL_INTERVAL:PT0.5S}
     lease-duration: ${OUTBOX_LEASE_DURATION:PT1M30S}
     batch-size: ${OUTBOX_BATCH_SIZE:10}
