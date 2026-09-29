@@ -1,6 +1,13 @@
 package com.mundiapolis.library.notification
 
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
+import com.mundiapolis.library.notification.dto.NotificationCategory
+import com.mundiapolis.library.notification.dto.NotificationChannel
+import com.mundiapolis.library.notification.dto.NotificationIntentCommand
+import com.mundiapolis.library.notification.dto.NotificationIntentConflictException
+import com.mundiapolis.library.notification.service.NotificationIntentHandler
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -22,7 +29,11 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -30,13 +41,87 @@ import java.util.UUID
 class NotificationServiceIntegrationTest {
     @Autowired lateinit var mockMvc: MockMvc
     @Autowired lateinit var dsl: DSLContext
+    @Autowired lateinit var intentHandler: NotificationIntentHandler
 
     @BeforeEach
     fun seed() {
+        dsl.deleteFrom(NOTIFICATION_INTENT_RECEIPT).execute()
+        dsl.deleteFrom(NOTIFICATION_DELIVERY).execute()
         dsl.deleteFrom(NOTIFICATION_INBOX).execute()
         insert(FIRST_ID, MEMBER_ID, NOW, null)
         insert(SECOND_ID, MEMBER_ID, NOW.minusMinutes(1), NOW)
         insert(OTHER_ID, OTHER_MEMBER_ID, NOW.plusMinutes(1), null)
+    }
+
+    @Test
+    fun `intent ingestion creates inbox deliveries and one durable receipt atomically`() {
+        val command = intentCommand()
+
+        val created = intentHandler.apply(command)
+        val replay = intentHandler.apply(command.copy(offset = command.offset + 1))
+
+        org.assertj.core.api.Assertions.assertThat(created.replayed).isFalse()
+        org.assertj.core.api.Assertions.assertThat(replay.replayed).isTrue()
+        org.assertj.core.api.Assertions.assertThat(replay.notificationId).isEqualTo(created.notificationId)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.fetchCount(NOTIFICATION_INBOX, NOTIFICATION_INBOX.SOURCE_EVENT_ID.eq(command.eventId)),
+        ).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.fetchCount(NOTIFICATION_DELIVERY, NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(created.notificationId)),
+        ).isEqualTo(2)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.fetchCount(NOTIFICATION_INTENT_RECEIPT, NOTIFICATION_INTENT_RECEIPT.EVENT_ID.eq(command.eventId)),
+        ).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.STATUS).from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(created.notificationId))
+                .fetchSet(NOTIFICATION_DELIVERY.STATUS),
+        ).containsExactlyInAnyOrder("DELIVERED", "PENDING")
+    }
+
+    @Test
+    fun `intent replay with different bytes is rejected without a duplicate effect`() {
+        val command = intentCommand()
+        val created = intentHandler.apply(command)
+
+        org.assertj.core.api.Assertions.assertThatThrownBy {
+            intentHandler.apply(command.copy(payloadSha256 = "b".repeat(64), offset = 20))
+        }.isInstanceOf(NotificationIntentConflictException::class.java)
+
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.fetchCount(NOTIFICATION_INBOX, NOTIFICATION_INBOX.SOURCE_EVENT_ID.eq(command.eventId)),
+        ).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.fetchCount(NOTIFICATION_DELIVERY, NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(created.notificationId)),
+        ).isEqualTo(2)
+    }
+
+    @Test
+    fun `concurrent exact intent deliveries create one notification`() {
+        val command = intentCommand()
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(8)
+        try {
+            val attempts = (0 until 8).map { index ->
+                executor.submit<com.mundiapolis.library.notification.dto.NotificationIntentExecution> {
+                    start.await(5, TimeUnit.SECONDS)
+                    intentHandler.apply(command.copy(offset = index.toLong()))
+                }
+            }
+            start.countDown()
+            val results = attempts.map { it.get(10, TimeUnit.SECONDS) }
+
+            org.assertj.core.api.Assertions.assertThat(results.count { !it.replayed }).isEqualTo(1)
+            org.assertj.core.api.Assertions.assertThat(results.map { it.notificationId }.toSet()).hasSize(1)
+            org.assertj.core.api.Assertions.assertThat(
+                dsl.fetchCount(NOTIFICATION_INBOX, NOTIFICATION_INBOX.SOURCE_EVENT_ID.eq(command.eventId)),
+            ).isEqualTo(1)
+            org.assertj.core.api.Assertions.assertThat(
+                dsl.fetchCount(NOTIFICATION_INTENT_RECEIPT, NOTIFICATION_INTENT_RECEIPT.EVENT_ID.eq(command.eventId)),
+            ).isEqualTo(1)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -102,6 +187,21 @@ class NotificationServiceIntegrationTest {
             .set(NOTIFICATION_INBOX.READ_AT, readAt)
             .execute()
     }
+
+    private fun intentCommand() = NotificationIntentCommand(
+        eventId = UUID.randomUUID(),
+        memberId = MEMBER_ID,
+        sourceType = "circulation.loan.due-soon.v1",
+        category = NotificationCategory.DUE_SOON,
+        subject = "Loan due soon",
+        body = "A borrowed title is due soon.",
+        occurredAt = Instant.now().minusSeconds(1),
+        channels = setOf(NotificationChannel.IN_APP, NotificationChannel.EMAIL),
+        payloadSha256 = "a".repeat(64),
+        topic = "mundia.notification.intents.v1",
+        partition = 0,
+        offset = 10,
+    )
 
     private fun memberJwt(memberId: UUID, scope: String) = jwt()
         .jwt { it.claim("membership_id", memberId.toString()) }

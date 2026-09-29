@@ -1,7 +1,11 @@
 package com.mundiapolis.library.notification.adapter.outbound.persistence
 
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
+import com.mundiapolis.library.notification.dto.NotificationChannel
 import com.mundiapolis.library.notification.dto.NotificationCategory
+import com.mundiapolis.library.notification.dto.NotificationIntentCommand
 import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
 import com.mundiapolis.library.notification.dto.NotificationReadStatus
@@ -18,6 +22,75 @@ import java.util.UUID
 
 @Repository
 class JooqNotificationRepository(private val dsl: DSLContext) {
+    fun insertIntentInbox(intent: NotificationIntentCommand, notificationId: UUID, createdAt: Instant): Boolean {
+        val timestamp = createdAt.atOffset(ZoneOffset.UTC)
+        return dsl.insertInto(NOTIFICATION_INBOX)
+            .set(NOTIFICATION_INBOX.NOTIFICATION_ID, notificationId)
+            .set(NOTIFICATION_INBOX.MEMBER_ID, intent.memberId)
+            .set(NOTIFICATION_INBOX.SOURCE_EVENT_ID, intent.eventId)
+            .set(NOTIFICATION_INBOX.SOURCE_TYPE, intent.sourceType)
+            .set(NOTIFICATION_INBOX.CATEGORY, intent.category.name)
+            .set(NOTIFICATION_INBOX.SUBJECT, intent.subject)
+            .set(NOTIFICATION_INBOX.BODY, intent.body)
+            .set(NOTIFICATION_INBOX.OCCURRED_AT, intent.occurredAt.atOffset(ZoneOffset.UTC))
+            .set(NOTIFICATION_INBOX.CREATED_AT, timestamp)
+            .onConflict(NOTIFICATION_INBOX.SOURCE_EVENT_ID)
+            .doNothing()
+            .execute() == 1
+    }
+
+    fun insertDelivery(
+        notificationId: UUID,
+        channel: NotificationChannel,
+        createdAt: Instant,
+    ) {
+        val timestamp = createdAt.atOffset(ZoneOffset.UTC)
+        val inApp = channel == NotificationChannel.IN_APP
+        dsl.insertInto(NOTIFICATION_DELIVERY)
+            .set(NOTIFICATION_DELIVERY.DELIVERY_ID, UUID.randomUUID())
+            .set(NOTIFICATION_DELIVERY.NOTIFICATION_ID, notificationId)
+            .set(NOTIFICATION_DELIVERY.CHANNEL, channel.name)
+            .set(NOTIFICATION_DELIVERY.STATUS, if (inApp) "DELIVERED" else "PENDING")
+            .set(NOTIFICATION_DELIVERY.ATTEMPT_COUNT, 0)
+            .set(NOTIFICATION_DELIVERY.NEXT_ATTEMPT_AT, if (inApp) null else timestamp)
+            .set(NOTIFICATION_DELIVERY.DELIVERED_AT, if (inApp) timestamp else null)
+            .set(NOTIFICATION_DELIVERY.CREATED_AT, timestamp)
+            .set(NOTIFICATION_DELIVERY.UPDATED_AT, timestamp)
+            .execute()
+    }
+
+    fun insertIntentReceipt(
+        intent: NotificationIntentCommand,
+        notificationId: UUID,
+        processedAt: Instant,
+    ) {
+        val timestamp = processedAt.atOffset(ZoneOffset.UTC)
+        dsl.insertInto(NOTIFICATION_INTENT_RECEIPT)
+            .set(NOTIFICATION_INTENT_RECEIPT.EVENT_ID, intent.eventId)
+            .set(NOTIFICATION_INTENT_RECEIPT.NOTIFICATION_ID, notificationId)
+            .set(NOTIFICATION_INTENT_RECEIPT.PAYLOAD_SHA256, intent.payloadSha256)
+            .set(NOTIFICATION_INTENT_RECEIPT.TOPIC, intent.topic)
+            .set(NOTIFICATION_INTENT_RECEIPT.SOURCE_PARTITION, intent.partition)
+            .set(NOTIFICATION_INTENT_RECEIPT.SOURCE_OFFSET, intent.offset)
+            .set(NOTIFICATION_INTENT_RECEIPT.RECEIVED_AT, timestamp)
+            .set(NOTIFICATION_INTENT_RECEIPT.PROCESSED_AT, timestamp)
+            .execute()
+    }
+
+    fun findIntentReceipt(eventId: UUID): NotificationIntentReceipt? =
+        dsl.select(
+            NOTIFICATION_INTENT_RECEIPT.NOTIFICATION_ID,
+            NOTIFICATION_INTENT_RECEIPT.PAYLOAD_SHA256,
+        )
+            .from(NOTIFICATION_INTENT_RECEIPT)
+            .where(NOTIFICATION_INTENT_RECEIPT.EVENT_ID.eq(eventId))
+            .fetchOne { record ->
+                NotificationIntentReceipt(
+                    notificationId = requireNotNull(record[NOTIFICATION_INTENT_RECEIPT.NOTIFICATION_ID]),
+                    payloadSha256 = requireNotNull(record[NOTIFICATION_INTENT_RECEIPT.PAYLOAD_SHA256]),
+                )
+            }
+
     fun findPage(
         memberId: UUID,
         status: NotificationReadStatus,
@@ -115,3 +188,8 @@ class JooqNotificationRepository(private val dsl: DSLContext) {
         const val MAX_CURSOR_LENGTH = 128
     }
 }
+
+data class NotificationIntentReceipt(
+    val notificationId: UUID,
+    val payloadSha256: String,
+)

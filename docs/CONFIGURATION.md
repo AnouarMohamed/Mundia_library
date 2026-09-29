@@ -147,6 +147,23 @@ The app intentionally fails fast for some missing production settings and degrad
 | Resend   | Fallback email send fails when token is missing.                                                                   |
 | OIDC     | Staging/production startup fails; local development keeps only the admitted local credentials path.                |
 
+## Notification Intent Consumer
+
+The Kotlin Notification service keeps Kafka ingestion disabled until
+`NOTIFICATION_INTENT_CONSUMER_ENABLED=true`. Enabling it requires a valid
+broker configuration. Protected environments default to `SASL_SSL` and reject
+missing SASL credentials; `PLAINTEXT` is accepted only when
+`NOTIFICATION_INTENT_KAFKA_ALLOW_INSECURE_TRANSPORT=true` is explicitly set for
+an isolated local environment.
+
+The principal settings are `NOTIFICATION_INTENT_KAFKA_BOOTSTRAP_SERVERS`,
+`NOTIFICATION_INTENT_KAFKA_SECURITY_PROTOCOL`,
+`NOTIFICATION_INTENT_KAFKA_SASL_MECHANISM`,
+`NOTIFICATION_INTENT_KAFKA_SASL_JAAS_CONFIG`, and the optional truststore and
+keystore variables defined in the service's `application.yml`. Topic, schema,
+poll, commit, retry, fetch-size, and health-silence limits have bounded defaults
+under the `NOTIFICATION_INTENT_CONSUMER_*` prefix.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package mundia.notification.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.mundiapolis.library.notification.contract.v1";
+
+// Immutable v1 command delivered at least once. Consumers deduplicate by
+// event_id and reject an event_id that is replayed with different bytes.
+message NotificationIntent {
+  string event_id = 1;
+  int32 event_version = 2;
+  string source_type = 3;
+  string member_id = 4;
+  NotificationCategory category = 5;
+  string subject = 6;
+  string body = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+  repeated DeliveryChannel channels = 9;
+}
+
+enum NotificationCategory {
+  NOTIFICATION_CATEGORY_UNSPECIFIED = 0;
+  NOTIFICATION_CATEGORY_DUE_SOON = 1;
+  NOTIFICATION_CATEGORY_OVERDUE = 2;
+  NOTIFICATION_CATEGORY_HOLD_READY = 3;
+  NOTIFICATION_CATEGORY_ACCOUNT_STATUS = 4;
+  NOTIFICATION_CATEGORY_GENERAL = 5;
+}
+
+enum DeliveryChannel {
+  DELIVERY_CHANNEL_UNSPECIFIED = 0;
+  DELIVERY_CHANNEL_IN_APP = 1;
+  DELIVERY_CHANNEL_EMAIL = 2;
+}
