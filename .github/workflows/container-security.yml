@@ -67,6 +67,16 @@ jobs:
             dockerfile: ./services/catalog-service/Dockerfile
             image: mundia-catalog-service:security-scan
             build_args: ""
+          - name: notification
+            context: ./services
+            dockerfile: ./services/notification-service/Dockerfile
+            image: mundia-notification-service:security-scan
+            build_args: ""
+          - name: web-bff
+            context: ./services
+            dockerfile: ./services/web-bff/Dockerfile
+            image: mundia-web-bff:security-scan
+            build_args: ""
 
     steps:
       - name: Checkout

@@ -57,6 +57,7 @@ contracts: ## Validate committed OpenAPI JSON contracts and patch hygiene
 	@jq empty services/catalog-service/src/main/resources/static/openapi/catalog-v1.json
 	@jq empty services/circulation-service/src/main/resources/static/openapi/circulation-v1.json
 	@jq empty services/membership-service/src/main/resources/static/openapi/membership-v1.json
+	@jq empty services/notification-service/src/main/resources/static/openapi/notification-v1.json
 	@jq empty services/web-bff/src/main/resources/static/openapi/web-bff-v1.json
 	@git diff --check
 
@@ -111,6 +112,7 @@ images: toolchain ## Build every image produced by push CI
 	@docker build --pull --file services/circulation-service/Dockerfile --tag mundia-circulation-service:local services
 	@docker build --pull --file services/membership-service/Dockerfile --tag mundia-membership-service:local services
 	@docker build --pull --file services/catalog-service/Dockerfile --tag mundia-catalog-service:local services
+	@docker build --pull --file services/notification-service/Dockerfile --tag mundia-notification-service:local services
 	@docker build --pull --file services/web-bff/Dockerfile --tag mundia-web-bff:local services
 
 ci-fast: contracts services-ci web-ci-fast ## Run the primary code-quality gates without provisioning or image builds

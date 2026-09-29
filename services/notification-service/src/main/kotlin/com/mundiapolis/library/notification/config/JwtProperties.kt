@@ -1,0 +1,31 @@
+package com.mundiapolis.library.notification.config
+
+import jakarta.validation.constraints.AssertTrue
+import jakarta.validation.constraints.NotBlank
+import org.springframework.boot.context.properties.ConfigurationProperties
+import org.springframework.validation.annotation.Validated
+import java.net.URI
+
+@Validated
+@ConfigurationProperties("app.security.jwt")
+data class JwtProperties(
+    @field:NotBlank val issuer: String,
+    @field:NotBlank val jwkSetUri: String,
+    @field:NotBlank val audience: String,
+) {
+    @get:AssertTrue(message = "JWT issuer and JWK set URI must be exact HTTPS URLs on the same trusted origin")
+    val trustedEndpoints: Boolean
+        get() {
+            val issuerUri = issuer.strictHttpsUri() ?: return false
+            val jwksUri = jwkSetUri.strictHttpsUri() ?: return false
+            return issuerUri.host.equals(jwksUri.host, ignoreCase = true) &&
+                issuerUri.effectivePort() == jwksUri.effectivePort()
+        }
+
+    private fun String.strictHttpsUri(): URI? = runCatching { URI(this) }.getOrNull()?.takeIf {
+        it.scheme == "https" && !it.host.isNullOrBlank() && it.rawUserInfo == null &&
+            it.rawQuery == null && it.rawFragment == null && trim() == this
+    }
+
+    private fun URI.effectivePort(): Int = if (port == -1) 443 else port
+}

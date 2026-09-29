@@ -16,7 +16,7 @@ cd services
 ./gradlew clean check
 ```
 
-All three services generate jOOQ sources from their Flyway migrations before
+All four domain services generate jOOQ sources from their Flyway migrations before
 compilation. Integration tests start isolated
 PostgreSQL containers and verify that Flyway, the persistence adapters, HTTP
 authorization, and published contracts work together.
@@ -30,7 +30,7 @@ local convenience is not part of the container runtime contract.
 Start PostgreSQL:
 
 ```bash
-docker compose up -d circulation-db membership-db catalog-db
+docker compose up -d circulation-db membership-db catalog-db notification-db
 ```
 
 Run the service with a real development OIDC issuer and JWK set:
@@ -59,6 +59,15 @@ export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
 export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
 export AUTH_AUDIENCE=catalog-api
 ./gradlew :catalog-service:bootRun
+```
+
+Run Notification against its local database:
+
+```bash
+export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
+export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
+export AUTH_AUDIENCE=notification-api
+./gradlew :notification-service:bootRun
 ```
 
 The local database defaults are defined in `compose.yaml`. Production must
@@ -202,6 +211,29 @@ acknowledgements, retention cleanup, health/metrics, and the immutable
 broker TLS/SASL settings and enable `OUTBOX_DELIVERY_ENABLED=true` only after
 the topic, ACLs, and consumer contract are provisioned.
 
+## Notification inbox API
+
+The Notification service owns member preferences, in-app notifications, and
+provider-delivery state. The first slice exposes only caller-bound inbox
+operations; it never accepts a member identifier from the request.
+
+| Operation | Endpoint | Required scope |
+|---|---|---|
+| List own inbox | `GET /api/v1/notifications/me` | `notification.inbox.read` |
+| Mark own item read | `PATCH /api/v1/notifications/{notificationId}/read` | `notification.inbox.write` |
+
+Inbox pages use a maximum of 100 items and an opaque canonical keyset cursor,
+with deterministic timestamp and UUID ordering. Read-state updates include the
+token's canonical `membership_id` in the SQL predicate, return the same 404 for
+missing and cross-member records, and preserve the first read timestamp on
+replay. Responses are non-cacheable. The immutable contract is public at
+`GET /openapi/notification-v1.json`.
+
+Kafka intent consumers, preference writes, provider delivery workers,
+suppression, retry/DLQ handling, and BFF routing remain Phase 5 work. Until
+those gates pass, the service image is buildable and publishable but is not
+production-routed.
+
 ## Circulation command API
 
 The first authoritative slice exposes:
@@ -331,4 +363,5 @@ Use `services` as the build context:
 docker build -f circulation-service/Dockerfile -t mundia/circulation-service:dev .
 docker build -f membership-service/Dockerfile -t mundia/membership-service:dev .
 docker build -f catalog-service/Dockerfile -t mundia/catalog-service:dev .
+docker build -f notification-service/Dockerfile -t mundia/notification-service:dev .
 ```

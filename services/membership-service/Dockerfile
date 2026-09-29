@@ -8,6 +8,7 @@ COPY gradle ./gradle
 COPY circulation-service/build.gradle.kts circulation-service/gradle.lockfile ./circulation-service/
 COPY catalog-service/build.gradle.kts catalog-service/gradle.lockfile ./catalog-service/
 COPY membership-service/build.gradle.kts membership-service/gradle.lockfile ./membership-service/
+COPY notification-service/build.gradle.kts notification-service/gradle.lockfile ./notification-service/
 COPY web-bff/build.gradle.kts web-bff/gradle.lockfile ./web-bff/
 
 RUN --mount=type=cache,target=/root/.gradle \

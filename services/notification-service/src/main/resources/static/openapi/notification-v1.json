@@ -1,0 +1,75 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mundia Notification API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/notifications/me": {
+      "get": {
+        "operationId": "listOwnNotifications",
+        "x-required-scopes": ["notification.inbox.read"],
+        "parameters": [
+          {"name": "status", "in": "query", "schema": {"$ref": "#/components/schemas/NotificationReadStatus"}},
+          {"name": "limit", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+          {"name": "cursor", "in": "query", "schema": {"type": "string", "maxLength": 128}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Caller-bound notification page",
+            "headers": {"Cache-Control": {"schema": {"type": "string"}}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationPage"}}}
+          },
+          "400": {"description": "Invalid bounded query"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Required scope or canonical membership claim missing"}
+        }
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "patch": {
+        "operationId": "markOwnNotificationRead",
+        "x-required-scopes": ["notification.inbox.write"],
+        "parameters": [
+          {"name": "notificationId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "responses": {
+          "200": {"description": "Idempotently marked read", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NotificationItem"}}}},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Required scope or canonical membership claim missing"},
+          "404": {"description": "Notification absent or not owned by caller"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "NotificationReadStatus": {"type": "string", "enum": ["ALL", "READ", "UNREAD"], "default": "ALL"},
+      "NotificationCategory": {"type": "string", "enum": ["DUE_SOON", "OVERDUE", "HOLD_READY", "ACCOUNT_STATUS", "GENERAL"]},
+      "NotificationItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["notificationId", "category", "subject", "body", "occurredAt", "createdAt"],
+        "properties": {
+          "notificationId": {"type": "string", "format": "uuid"},
+          "category": {"$ref": "#/components/schemas/NotificationCategory"},
+          "subject": {"type": "string", "maxLength": 160},
+          "body": {"type": "string", "maxLength": 2000},
+          "occurredAt": {"type": "string", "format": "date-time"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "readAt": {"type": ["string", "null"], "format": "date-time"}
+        }
+      },
+      "NotificationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "items"],
+        "properties": {
+          "memberId": {"type": "string", "format": "uuid"},
+          "items": {"type": "array", "maxItems": 100, "items": {"$ref": "#/components/schemas/NotificationItem"}},
+          "nextCursor": {"type": ["string", "null"], "maxLength": 128}
+        }
+      }
+    }
+  }
+}

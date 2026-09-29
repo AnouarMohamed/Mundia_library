@@ -342,6 +342,18 @@ retention/deletion workflows pass.
 - Build OpenSearch projections for catalog, availability, and recommendations.
 - Make every read model disposable and rebuildable from events/snapshots.
 
+Implementation checkpoint (2026-09-29): the Kotlin Notification service now
+owns its PostgreSQL/Flyway schema for member preferences, in-app inbox items,
+and channel-delivery state. Its first caller-bound API provides bounded,
+deterministic keyset pages, read-state filtering, and idempotent mark-read
+behavior using only the canonical delegated `membership_id` claim. Exact JWT
+issuer, audience, type, and scope checks, machine-checked OpenAPI, real
+PostgreSQL integration tests, a hardened OCI image, container scanning, and
+GHCR publication are wired into CI. Kafka intent ingestion, atomic inbox
+deduplication, preference commands, provider workers, retry/DLQ and
+suppression behavior, callbacks, BFF routing, and Kubernetes values remain
+required before this service is production-routed.
+
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.
 

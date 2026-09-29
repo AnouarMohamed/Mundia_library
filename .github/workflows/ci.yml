@@ -409,6 +409,17 @@ jobs:
           cache-from: type=gha,scope=catalog
           cache-to: type=gha,mode=max,scope=catalog
 
+      - name: Build notification service image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./services
+          file: ./services/notification-service/Dockerfile
+          pull: true
+          push: false
+          tags: mundia-notification-service:ci
+          cache-from: type=gha,scope=notification
+          cache-to: type=gha,mode=max,scope=notification
+
   publish-containers:
     name: Publish ${{ matrix.name }} to GHCR
     if: >-
@@ -455,6 +466,11 @@ jobs:
             context: ./services
             dockerfile: ./services/web-bff/Dockerfile
             cache_scope: publish-web-bff
+          - name: notification
+            image: mundia-notification-service
+            context: ./services
+            dockerfile: ./services/notification-service/Dockerfile
+            cache_scope: publish-notification
 
     steps:
       - name: Checkout verified source

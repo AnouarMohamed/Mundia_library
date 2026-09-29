@@ -72,5 +72,7 @@ in step 2:
 
 The deployment is not production-routed. Institutional IdP client
 registration with token exchange, Redis failover testing, circulation admin
-routes, Kubernetes values, edge routing, and the React shell remain required
-before a UI slice moves.
+routes, Notification BFF routing, Kubernetes values, edge routing, and the
+React shell remain required before a UI slice moves. A Kotlin Notification
+service boundary now exists for caller-bound inbox reads and mark-read state,
+but its event ingestion and provider-delivery pipeline are still Phase 5 work.
