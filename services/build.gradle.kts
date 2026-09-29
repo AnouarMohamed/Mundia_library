@@ -22,6 +22,13 @@ subprojects {
                 useVersion("11.0.25")
                 because("Tomcat 11.0.24 and earlier contain critical authentication and access-control vulnerabilities")
             }
+            if (
+                requested.group == "tools.jackson.core" &&
+                requested.name == "jackson-databind"
+            ) {
+                useVersion("3.1.6")
+                because("Jackson 3.1.5 is affected by CVE-2026-68497")
+            }
         }
     }
 }
