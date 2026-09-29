@@ -17,10 +17,18 @@ Implemented in this slice:
   replay deduplication and conflicting-replay rejection;
 - bounded broker fetches, `read_committed` isolation, TLS/SASL validation,
   consumer health, and Prometheus processing/replay/failure metrics;
+- a provider-neutral email worker core with PostgreSQL `SKIP LOCKED` leases,
+  bounded exponential backoff and deterministic jitter, attempt budgets,
+  terminal dead-letter state, provider idempotency keys, call timeouts, backlog
+  metrics, and lease-fenced acknowledgements;
 - exact issuer, audience, JWT type, and OAuth scope enforcement;
 - OpenAPI/controller parity tests and real PostgreSQL integration tests;
 - OCI image, dependency updates, CI build, security scan, and GHCR publication.
 
+The worker is disabled by default and intentionally has no cross-service
+database access. Enabling it fails startup until a service-authenticated
+Membership recipient resolver and an email-provider adapter are installed.
 The service is not production-routed yet. Scheduled due/overdue and legitimate
-catalog-triggered intent producers, provider workers, retry/DLQ behavior,
-provider callbacks, BFF routing, and Kubernetes values remain Phase 5 work.
+catalog-triggered intent producers, those two outbound adapters, signed provider
+callbacks, dead-letter replay tooling, BFF routing, and Kubernetes values remain
+Phase 5 work.

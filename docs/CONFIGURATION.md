@@ -181,6 +181,22 @@ return `409`, and exact retries converge without another version increment.
 In-app delivery cannot be disabled; email and category preferences suppress
 provider delivery while preserving an auditable delivery row.
 
+## Notification Email Worker
+
+`NOTIFICATION_EMAIL_WORKER_ENABLED` defaults to `false`. When enabled, the
+Notification service claims due email deliveries with database leases and uses
+bounded attempts, exponential retry with deterministic jitter, provider
+idempotency keys, and terminal dead-letter state. Polling, lease, batch, attempt,
+timeout, retry, and backlog-objective bounds are configured by the
+`NOTIFICATION_EMAIL_WORKER_*` variables in the service's `application.yml`.
+
+Enabling the worker without both a service-authenticated Membership recipient
+resolver and an email-provider sender bean fails application startup. This is
+intentional: member email addresses remain owned by Membership and are never
+copied into Kafka events or read through another service's database. Keep the
+worker disabled until workload identity/client credentials, provider secrets,
+sender verification, egress policy, and provider timeouts are configured.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

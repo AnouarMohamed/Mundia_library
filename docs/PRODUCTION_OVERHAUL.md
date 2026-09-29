@@ -368,9 +368,15 @@ configured consumer durably creates the inbox/delivery state before committing
 the offset. Caller-bound preference reads and strongly versioned updates now
 enforce mandatory in-app delivery, converge exact concurrent retries, reject
 stale conflicting writes, and record disabled email/category deliveries as
-`SUPPRESSED`. Scheduled due/overdue and legitimate catalog-triggered intents,
-provider workers, retry/DLQ behavior, callbacks, BFF routing, and Kubernetes
-values remain required before this service is production-routed.
+`SUPPRESSED`. The provider-neutral email worker core now uses PostgreSQL
+`SKIP LOCKED` leases, lease-fenced acknowledgements, provider idempotency keys,
+bounded call timeouts, exponential retry with deterministic jitter, terminal
+dead-letter state, and backlog/lease metrics. It remains disabled and fails
+closed without its two required outbound ports: an OAuth service-identity
+Membership recipient resolver and a provider-specific sender. Scheduled
+due/overdue and legitimate catalog-triggered intents, those adapters, signed
+callbacks and dead-letter replay tooling, BFF routing, and Kubernetes values
+remain required before this service is production-routed.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

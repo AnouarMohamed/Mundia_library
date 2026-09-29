@@ -14,7 +14,9 @@ import com.mundiapolis.library.notification.dto.NotificationIntentCommand
 import com.mundiapolis.library.notification.dto.NotificationIntentConflictException
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import com.mundiapolis.library.notification.service.NotificationIntentHandler
+import com.mundiapolis.library.notification.service.EmailDeliveryStore
 import com.mundiapolis.library.notification.service.NotificationService
+import com.mundiapolis.library.notification.dto.EmailProviderReceipt
 import org.jooq.DSLContext
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -60,6 +62,7 @@ class NotificationServiceIntegrationTest {
     @Autowired lateinit var intentHandler: NotificationIntentHandler
     @Autowired lateinit var intentConsumer: NotificationIntentKafkaConsumer
     @Autowired lateinit var notificationService: NotificationService
+    @Autowired lateinit var emailDeliveryStore: EmailDeliveryStore
 
     @BeforeEach
     fun seed() {
@@ -96,6 +99,135 @@ class NotificationServiceIntegrationTest {
                 .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(created.notificationId))
                 .fetchSet(NOTIFICATION_DELIVERY.STATUS),
         ).containsExactlyInAnyOrder("DELIVERED", "PENDING")
+    }
+
+    @Test
+    fun `email delivery claims are exclusive and acknowledgements require lease ownership`() {
+        val notificationId = intentHandler.apply(intentCommand()).notificationId
+        val claimedAt = Instant.now().plusSeconds(1)
+        val firstToken = UUID.randomUUID()
+        val claimed = emailDeliveryStore.claimBatch(
+            "worker-1",
+            firstToken,
+            claimedAt,
+            claimedAt.plusSeconds(60),
+            10,
+            8,
+        )
+
+        org.assertj.core.api.Assertions.assertThat(claimed).hasSize(1)
+        org.assertj.core.api.Assertions.assertThat(claimed.single().notificationId).isEqualTo(notificationId)
+        org.assertj.core.api.Assertions.assertThat(claimed.single().attempt).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.claimBatch(
+                "worker-2",
+                UUID.randomUUID(),
+                claimedAt,
+                claimedAt.plusSeconds(60),
+                10,
+                8,
+            ),
+        ).isEmpty()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "wrong-worker",
+                claimed.single(),
+                EmailProviderReceipt("brevo", "provider-message-1"),
+                claimedAt.plusSeconds(1),
+            ),
+        ).isFalse()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-1",
+                claimed.single(),
+                EmailProviderReceipt("brevo", "provider-message-1"),
+                claimedAt.plusSeconds(1),
+            ),
+        ).isTrue()
+
+        val record = dsl.selectFrom(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(notificationId))
+            .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
+            .fetchSingle()
+        org.assertj.core.api.Assertions.assertThat(record.status).isEqualTo("DELIVERED")
+        org.assertj.core.api.Assertions.assertThat(record.provider).isEqualTo("brevo")
+        org.assertj.core.api.Assertions.assertThat(record.providerMessageRef).isEqualTo("provider-message-1")
+        org.assertj.core.api.Assertions.assertThat(record.leaseToken).isNull()
+    }
+
+    @Test
+    fun `expired email lease is reclaimed and fences the previous owner`() {
+        intentHandler.apply(intentCommand())
+        val firstClaimAt = Instant.now().plusSeconds(1)
+        val first = emailDeliveryStore.claimBatch(
+            "worker-1",
+            UUID.randomUUID(),
+            firstClaimAt,
+            firstClaimAt.plusSeconds(1),
+            1,
+            8,
+        ).single()
+        val secondClaimAt = firstClaimAt.plusSeconds(2)
+        val second = emailDeliveryStore.claimBatch(
+            "worker-2",
+            UUID.randomUUID(),
+            secondClaimAt,
+            secondClaimAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+
+        org.assertj.core.api.Assertions.assertThat(second.deliveryId).isEqualTo(first.deliveryId)
+        org.assertj.core.api.Assertions.assertThat(second.attempt).isEqualTo(2)
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-1",
+                first,
+                EmailProviderReceipt("brevo", "stale-message"),
+                secondClaimAt,
+            ),
+        ).isFalse()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-2",
+                second,
+                EmailProviderReceipt("brevo", "accepted-message"),
+                secondClaimAt,
+            ),
+        ).isTrue()
+    }
+
+    @Test
+    fun `expired final attempt is moved to dead letter state`() {
+        val notificationId = intentHandler.apply(intentCommand()).notificationId
+        val firstClaimAt = Instant.now().plusSeconds(1)
+        emailDeliveryStore.claimBatch(
+            "worker-1",
+            UUID.randomUUID(),
+            firstClaimAt,
+            firstClaimAt.plusSeconds(1),
+            1,
+            1,
+        ).single()
+
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.claimBatch(
+                "worker-2",
+                UUID.randomUUID(),
+                firstClaimAt.plusSeconds(2),
+                firstClaimAt.plusSeconds(60),
+                1,
+                1,
+            ),
+        ).isEmpty()
+        val record = dsl.selectFrom(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(notificationId))
+            .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
+            .fetchSingle()
+        org.assertj.core.api.Assertions.assertThat(record.status).isEqualTo("DEAD_LETTERED")
+        org.assertj.core.api.Assertions.assertThat(record.lastErrorCode).isEqualTo("LEASE_EXPIRED")
+        org.assertj.core.api.Assertions.assertThat(record.deadLetteredAt).isNotNull()
+        org.assertj.core.api.Assertions.assertThat(record.leaseToken).isNull()
     }
 
     @Test

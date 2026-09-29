@@ -75,4 +75,7 @@ registration with token exchange, Redis failover testing, circulation admin
 routes, Notification BFF routing, Kubernetes values, edge routing, and the
 React shell remain required before a UI slice moves. A Kotlin Notification
 service boundary now exists for caller-bound inbox reads and mark-read state,
-but its event ingestion and provider-delivery pipeline are still Phase 5 work.
+with production-shaped Kafka ingestion and a lease/retry/dead-letter email
+worker core. The service-authenticated Membership recipient resolver,
+provider-specific sender and callbacks, and browser routing are still Phase 5
+work.
