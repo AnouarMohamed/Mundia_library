@@ -19,20 +19,30 @@ Implemented in this slice:
   consumer health, and Prometheus processing/replay/failure metrics;
 - a provider-neutral email worker core with PostgreSQL `SKIP LOCKED` leases,
   bounded exponential backoff and deterministic jitter, attempt budgets,
-  terminal dead-letter state, provider idempotency keys, call timeouts, backlog
+  terminal dead-letter state, stable delivery correlation IDs, call timeouts, backlog
   metrics, and lease-fenced acknowledgements;
 - a bounded OAuth 2.0 client-credentials recipient resolver that requests only
   `membership.profile.read.any`, caches short-lived service tokens, verifies the
   returned member identity, and keeps addresses out of broker events;
+- an AWS SES v2 adapter with bounded SDK timeouts, explicit error
+  classification, configuration-set event routing, delivery correlation headers
+  and tags, and the AWS default credential chain for EKS Pod Identity or IRSA;
 - exact issuer, audience, JWT type, and OAuth scope enforcement;
 - OpenAPI/controller parity tests and real PostgreSQL integration tests;
 - OCI image, dependency updates, CI build, security scan, and GHCR publication.
 
 The worker is disabled by default and intentionally has no cross-service
 database access. Enabling it requires the Membership service URL, audience,
-token endpoint, client ID, and client secret, and still fails startup until an
-email-provider adapter is installed.
+token endpoint, client ID and client secret, plus a verified SES sender and
+configuration set. Placeholder SES values fail startup validation. Production
+uses pod workload identity; never inject static AWS access keys into the pod.
+
+SES v2 `SendEmail` has no idempotency token. The durable delivery UUID is
+attached as `X-Mundia-Delivery-Id` and the `delivery_id` SES message tag for
+correlation, but an ambiguous network failure can still result in a duplicate
+send. Delivery is therefore at least once until signed SES events and
+reconciliation close that operational loop.
 The service is not production-routed yet. Scheduled due/overdue and legitimate
-catalog-triggered intent producers, the provider adapter, signed provider
+catalog-triggered intent producers, signed provider
 callbacks, dead-letter replay tooling, BFF routing, and Kubernetes values remain
 Phase 5 work.

@@ -38,6 +38,8 @@ dependencies {
     implementation("com.google.protobuf:protobuf-java:${libs.versions.protobuf.java.get()}")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.apache.kafka:kafka-clients")
+    implementation("aws.sdk.kotlin:sesv2:${libs.versions.aws.sdk.kotlin.get()}")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql:42.7.12")

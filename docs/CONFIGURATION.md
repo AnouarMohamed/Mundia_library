@@ -185,8 +185,8 @@ provider delivery while preserving an auditable delivery row.
 
 `NOTIFICATION_EMAIL_WORKER_ENABLED` defaults to `false`. When enabled, the
 Notification service claims due email deliveries with database leases and uses
-bounded attempts, exponential retry with deterministic jitter, provider
-idempotency keys, and terminal dead-letter state. Polling, lease, batch, attempt,
+bounded attempts, exponential retry with deterministic jitter, stable delivery
+correlation IDs, and terminal dead-letter state. Polling, lease, batch, attempt,
 timeout, retry, and backlog-objective bounds are configured by the
 `NOTIFICATION_EMAIL_WORKER_*` variables in the service's `application.yml`.
 
@@ -200,10 +200,26 @@ explicitly set for an isolated local environment. Connect, read, and response
 size limits are bounded by the remaining `NOTIFICATION_MEMBERSHIP_*` settings.
 
 Member email addresses remain owned by Membership and are never copied into
-Kafka events or read through another service's database. Enabling the worker
-without an email-provider sender bean fails application startup. Keep it
-disabled until workload identity/client credentials, provider secrets, sender
-verification, egress policy, and provider timeouts are configured.
+Kafka events or read through another service's database.
+
+The email provider is AWS SES v2. Set `AWS_REGION`,
+`NOTIFICATION_SES_FROM_ADDRESS`, and `NOTIFICATION_SES_CONFIGURATION_SET`;
+the sender identity and configuration set must already exist in that region.
+`NOTIFICATION_SES_CALL_TIMEOUT` and `NOTIFICATION_SES_ATTEMPT_TIMEOUT` default
+to eight and seven seconds and are validated against safe bounds. The SDK's own
+request retry is disabled because SES `SendEmail` has no idempotency token; the
+durable worker owns bounded retries. The delivery UUID is sent as both
+`X-Mundia-Delivery-Id` and the `delivery_id` SES message tag, so SES events can
+be reconciled without including member data in tags.
+
+On EKS, grant only `ses:SendEmail` for the verified identity and configuration
+set through EKS Pod Identity or IRSA. The SDK uses its default credential chain;
+do not set `AWS_ACCESS_KEY_ID` or `AWS_SECRET_ACCESS_KEY` in Kubernetes. Keep the
+worker disabled until workload identity, Membership client credentials, SES
+production access, sender verification, configuration-set event publishing,
+egress policy, and provider timeouts are configured. Delivery is at least once:
+an ambiguous network failure after SES accepts a message may cause a duplicate,
+so signed SES event ingestion and reconciliation remain a production gate.
 
 ## Secrets Handling
 

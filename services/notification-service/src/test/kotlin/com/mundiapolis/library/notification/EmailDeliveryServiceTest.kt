@@ -28,11 +28,11 @@ class EmailDeliveryServiceTest {
     fun closeExecutor() = executor.close()
 
     @Test
-    fun `successful delivery uses durable delivery id as provider idempotency key`() {
+    fun `successful delivery passes the durable delivery id to the provider`() {
         val store = FakeStore()
         var providerKey: UUID? = null
-        val service = service(store) { _, _, _, idempotencyKey ->
-            providerKey = idempotencyKey
+        val service = service(store) { _, _, _, deliveryId ->
+            providerKey = deliveryId
             EmailProviderReceipt("brevo", "message-123")
         }
 

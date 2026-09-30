@@ -53,6 +53,13 @@ app:
     retry-maximum-delay: ${NOTIFICATION_EMAIL_WORKER_RETRY_MAXIMUM_DELAY:PT1H}
     operation-timeout: ${NOTIFICATION_EMAIL_WORKER_OPERATION_TIMEOUT:PT10S}
     maximum-pending-age: ${NOTIFICATION_EMAIL_WORKER_MAXIMUM_PENDING_AGE:PT5M}
+    ses:
+      enabled: ${NOTIFICATION_EMAIL_WORKER_ENABLED:false}
+      region: ${AWS_REGION:eu-west-1}
+      from-address: ${NOTIFICATION_SES_FROM_ADDRESS:disabled@example.invalid}
+      configuration-set-name: ${NOTIFICATION_SES_CONFIGURATION_SET:disabled}
+      call-timeout: ${NOTIFICATION_SES_CALL_TIMEOUT:PT8S}
+      attempt-timeout: ${NOTIFICATION_SES_ATTEMPT_TIMEOUT:PT7S}
     membership-client:
       enabled: ${NOTIFICATION_EMAIL_WORKER_ENABLED:false}
       base-url: ${NOTIFICATION_MEMBERSHIP_URL:http://127.0.0.1:8081}

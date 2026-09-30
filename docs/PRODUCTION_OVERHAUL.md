@@ -369,16 +369,21 @@ the offset. Caller-bound preference reads and strongly versioned updates now
 enforce mandatory in-app delivery, converge exact concurrent retries, reject
 stale conflicting writes, and record disabled email/category deliveries as
 `SUPPRESSED`. The provider-neutral email worker core now uses PostgreSQL
-`SKIP LOCKED` leases, lease-fenced acknowledgements, provider idempotency keys,
+`SKIP LOCKED` leases, lease-fenced acknowledgements, stable correlation IDs,
 bounded call timeouts, exponential retry with deterministic jitter, terminal
 dead-letter state, and backlog/lease metrics. Its bounded OAuth client-credentials
 resolver now requests only `membership.profile.read.any`, validates the exact
 Membership audience and returned member identity, caches short-lived tokens,
-and never places email addresses on Kafka. The worker remains disabled and
-fails closed without a provider-specific sender. Scheduled due/overdue and
-legitimate catalog-triggered intents, that adapter, signed
-callbacks and dead-letter replay tooling, BFF routing, and Kubernetes values
-remain required before this service is production-routed.
+and never places email addresses on Kafka. The AWS SES v2 sender now uses
+bounded SDK timeouts, no hidden SDK retries, fail-closed sender/configuration-set
+validation, explicit retry/permanent error classification, and the default AWS
+credential chain for EKS workload identity. Every request carries its durable
+delivery UUID as a custom header and SES tag. Because SES `SendEmail` has no
+idempotency token, ambiguous outcomes retain at-least-once semantics rather than
+claiming exactly-once provider delivery. Scheduled due/overdue and legitimate
+catalog-triggered intents, signed SES event ingestion and reconciliation,
+dead-letter replay tooling, BFF routing, and Kubernetes values remain required
+before this service is production-routed.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

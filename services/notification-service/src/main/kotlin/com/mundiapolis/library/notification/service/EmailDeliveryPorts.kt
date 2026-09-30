@@ -46,6 +46,6 @@ fun interface EmailProvider {
         recipient: EmailRecipient,
         subject: String,
         body: String,
-        idempotencyKey: UUID,
+        deliveryId: UUID,
     ): EmailProviderReceipt
 }

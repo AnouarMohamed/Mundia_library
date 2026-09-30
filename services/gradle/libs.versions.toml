@@ -5,6 +5,7 @@ jooq = "3.21.5"
 protobuf-java = "4.35.1"
 protobuf-gradle-plugin = "0.9.6"
 grpc-java = "1.80.0"
+aws-sdk-kotlin = "1.8.31"
 
 [plugins]
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
