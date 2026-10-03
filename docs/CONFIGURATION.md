@@ -190,6 +190,18 @@ correlation IDs, and terminal dead-letter state. Polling, lease, batch, attempt,
 timeout, retry, and backlog-objective bounds are configured by the
 `NOTIFICATION_EMAIL_WORKER_*` variables in the service's `application.yml`.
 
+Dead-letter replay is deliberately delivery-specific; there is no bulk replay
+endpoint. Reserve `notification.dead-letter.replay` for a trusted operations
+client or explicit operator role. Each call requires a unique UUID
+`Idempotency-Key` and a 20-to-500 character non-PII justification. A successful
+replay snapshots the previous attempts, failure code, and dead-letter timestamp
+in `notification_email_dead_letter_replay_audit`, increments `replay_count`, and
+starts one fresh bounded attempt cycle. A delivery has a hard lifetime ceiling
+of three manual replay cycles. Suppressed recipients and deliveries
+outside `DEAD_LETTERED` fail closed. Ambiguous `LEASE_EXPIRED` and `INTERNAL`
+failures cannot be manually replayed because the provider may already have
+accepted the message.
+
 The recipient resolver uses OAuth 2.0 client credentials with only the
 `membership.profile.read.any` scope. Configure `NOTIFICATION_MEMBERSHIP_URL`,
 `NOTIFICATION_MEMBERSHIP_TOKEN_URI`, `NOTIFICATION_MEMBERSHIP_CLIENT_ID`,

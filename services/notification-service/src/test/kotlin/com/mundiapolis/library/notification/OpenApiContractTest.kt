@@ -4,7 +4,9 @@ import com.mundiapolis.library.notification.adapter.`in`.web.NotificationControl
 import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
 import com.mundiapolis.library.notification.dto.NotificationPreference
+import com.mundiapolis.library.notification.dto.DeadLetterReplay
 import com.mundiapolis.library.notification.dto.EmailSuppressionRemoval
+import com.mundiapolis.library.notification.dto.ReplayDeadLetterRequest
 import com.mundiapolis.library.notification.dto.RemoveEmailSuppressionRequest
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import org.assertj.core.api.Assertions.assertThat
@@ -39,7 +41,9 @@ class OpenApiContractTest {
         assertSchemaFields("NotificationItem", NotificationItem::class.java)
         assertSchemaFields("NotificationPage", NotificationPage::class.java)
         assertSchemaFields("NotificationPreference", NotificationPreference::class.java)
+        assertSchemaFields("DeadLetterReplay", DeadLetterReplay::class.java)
         assertSchemaFields("EmailSuppressionRemoval", EmailSuppressionRemoval::class.java)
+        assertSchemaFields("ReplayDeadLetterRequest", ReplayDeadLetterRequest::class.java)
         assertSchemaFields("RemoveEmailSuppressionRequest", RemoveEmailSuppressionRequest::class.java)
         assertSchemaFields("UpdateNotificationPreferenceRequest", UpdateNotificationPreferenceRequest::class.java)
     }

@@ -4,10 +4,13 @@ import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
 import com.mundiapolis.library.notification.dto.NotificationPreference
 import com.mundiapolis.library.notification.dto.NotificationReadStatus
+import com.mundiapolis.library.notification.dto.DeadLetterReplay
 import com.mundiapolis.library.notification.dto.EmailSuppressionRemoval
+import com.mundiapolis.library.notification.dto.ReplayDeadLetterRequest
 import com.mundiapolis.library.notification.dto.RemoveEmailSuppressionRequest
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import com.mundiapolis.library.notification.service.EmailSuppressionService
+import com.mundiapolis.library.notification.service.DeadLetterReplayService
 import com.mundiapolis.library.notification.service.NotificationPreferencePreconditionRequiredException
 import com.mundiapolis.library.notification.service.NotificationService
 import jakarta.validation.Valid
@@ -39,6 +42,7 @@ import java.util.UUID
 class NotificationController(
     private val service: NotificationService,
     private val emailSuppressionService: EmailSuppressionService,
+    private val deadLetterReplayService: DeadLetterReplayService,
 ) {
     @GetMapping("/me")
     @PreAuthorize("hasAuthority('SCOPE_notification.inbox.read')")
@@ -100,6 +104,24 @@ class NotificationController(
             emailSuppressionService.remove(
                 requestId,
                 memberId,
+                requiredActorSubject(authentication),
+                request.justification,
+            ),
+        )
+
+    @PostMapping("/email-deliveries/{deliveryId}/dead-letter-replay")
+    @PreAuthorize("hasAuthority('SCOPE_notification.dead-letter.replay')")
+    fun replayDeadLetter(
+        authentication: JwtAuthenticationToken,
+        @PathVariable deliveryId: UUID,
+        @RequestHeader(name = "Idempotency-Key") requestId: UUID,
+        @Valid @RequestBody request: ReplayDeadLetterRequest,
+    ): ResponseEntity<DeadLetterReplay> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(
+            deadLetterReplayService.replay(
+                requestId,
+                deliveryId,
                 requiredActorSubject(authentication),
                 request.justification,
             ),

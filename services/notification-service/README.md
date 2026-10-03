@@ -36,6 +36,9 @@ Implemented in this slice:
 - a least-privilege `notification.suppression.write` removal operation with a
   mandatory operator justification, idempotency key, member-scoped race lock,
   and durable before-state audit; removal affects only future email work;
+- a delivery-specific `notification.dead-letter.replay` operation with bounded
+  operator justification, exact-retry convergence, previous-failure audit,
+  lifetime replay counts, refreshed attempt budgets, and suppression fencing;
 - exact issuer, audience, JWT type, and OAuth scope enforcement;
 - OpenAPI/controller parity tests and real PostgreSQL integration tests;
 - OCI image, dependency updates, CI build, security scan, and GHCR publication.
@@ -52,5 +55,5 @@ correlation, but an ambiguous network failure can still result in a duplicate
 send. Signed feedback reconciliation makes provider outcomes observable and
 idempotent, while send initiation itself remains honestly at least once.
 The service is not production-routed yet. Scheduled due/overdue and legitimate
-catalog-triggered intent producers, dead-letter replay tooling, BFF routing,
-and Kubernetes values remain Phase 5 work.
+catalog-triggered intent producers, BFF routing, and Kubernetes values remain
+Phase 5 work.

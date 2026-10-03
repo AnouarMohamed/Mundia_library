@@ -4,6 +4,7 @@ import com.google.protobuf.Timestamp
 import com.mundiapolis.library.notification.adapter.`in`.events.NotificationIntentKafkaConsumer
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_FEEDBACK_RECEIPT
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_DEAD_LETTER_REPLAY_AUDIT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_SUPPRESSION
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
@@ -19,8 +20,10 @@ import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequ
 import com.mundiapolis.library.notification.service.NotificationIntentHandler
 import com.mundiapolis.library.notification.service.EmailDeliveryStore
 import com.mundiapolis.library.notification.service.EmailSuppressionService
+import com.mundiapolis.library.notification.service.DeadLetterReplayService
 import com.mundiapolis.library.notification.service.NotificationService
 import com.mundiapolis.library.notification.dto.EmailProviderReceipt
+import com.mundiapolis.library.notification.dto.EmailDeliveryFailureCode
 import com.mundiapolis.library.notification.dto.EmailSuppressionReason
 import com.mundiapolis.library.notification.dto.SesFeedbackEvent
 import com.mundiapolis.library.notification.dto.SesFeedbackType
@@ -75,10 +78,12 @@ class NotificationServiceIntegrationTest {
     @Autowired lateinit var notificationService: NotificationService
     @Autowired lateinit var emailDeliveryStore: EmailDeliveryStore
     @Autowired lateinit var emailSuppressionService: EmailSuppressionService
+    @Autowired lateinit var deadLetterReplayService: DeadLetterReplayService
     @Autowired lateinit var sesFeedbackStore: SesFeedbackStore
 
     @BeforeEach
     fun seed() {
+        dsl.deleteFrom(NOTIFICATION_EMAIL_DEAD_LETTER_REPLAY_AUDIT).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_SUPPRESSION).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT).execute()
@@ -560,6 +565,225 @@ class NotificationServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT)).isEqualTo(1)
     }
 
+    @Test
+    fun `authorized dead letter replay is audited idempotent and resets the attempt budget`() {
+        val deliveryId = deadLetterDelivery()
+        val requestId = UUID.randomUUID()
+        val requestBody = """{"justification":"Provider configuration repaired under incident INC-2042"}"""
+        val first = mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/$deliveryId/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.requestId").value(requestId.toString()))
+            .andExpect(jsonPath("$.deliveryId").value(deliveryId.toString()))
+            .andExpect(jsonPath("$.replayCount").value(1))
+            .andReturn()
+
+        mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/$deliveryId/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.queuedAt").value(
+                tools.jackson.databind.ObjectMapper().readTree(first.response.contentAsString)["queuedAt"].stringValue(),
+            ))
+        mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/$deliveryId/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content("""{"justification":"Different sufficiently detailed replay justification"}"""),
+        ).andExpect(status().isConflict)
+
+        val delivery = dsl.selectFrom(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(deliveryId))
+            .fetchSingle()
+        org.assertj.core.api.Assertions.assertThat(delivery.status).isEqualTo("PENDING")
+        org.assertj.core.api.Assertions.assertThat(delivery.attemptCount).isZero()
+        org.assertj.core.api.Assertions.assertThat(delivery.replayCount).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(delivery.deadLetteredAt).isNull()
+        org.assertj.core.api.Assertions.assertThat(delivery.lastErrorCode).isNull()
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_DEAD_LETTER_REPLAY_AUDIT)).isEqualTo(1)
+    }
+
+    @Test
+    fun `dead letter replay rejects missing scope non-dead-lettered state and suppressed recipients`() {
+        val deliveryId = deadLetterDelivery()
+        val endpoint = "/api/v1/notifications/email-deliveries/$deliveryId/dead-letter-replay"
+        val requestBody = """{"justification":"Provider configuration repaired under incident INC-2042"}"""
+        mockMvc.perform(
+            post(endpoint)
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(WRITE_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isForbidden)
+
+        val replayLimitedDeliveryId = deadLetterDelivery()
+        dsl.update(NOTIFICATION_DELIVERY)
+            .set(NOTIFICATION_DELIVERY.REPLAY_COUNT, 3)
+            .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(replayLimitedDeliveryId))
+            .execute()
+        mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/$replayLimitedDeliveryId/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isConflict)
+
+        val acceptedAt = Instant.now().plusSeconds(10).truncatedTo(ChronoUnit.MICROS)
+        intentHandler.apply(intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "6".repeat(64), offset = 130))
+        val delivered = emailDeliveryStore.claimBatch(
+            "worker-suppression",
+            UUID.randomUUID(),
+            acceptedAt,
+            acceptedAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-suppression",
+                delivered,
+                EmailProviderReceipt("aws-ses", "ses-message-123"),
+                acceptedAt,
+            ),
+        ).isTrue()
+        sesFeedbackStore.apply(
+            feedback(
+                "50000000-0000-4000-8000-000000000030",
+                delivered.deliveryId,
+                SesFeedbackType.COMPLAINT,
+                acceptedAt.plusSeconds(1),
+                "5".repeat(64),
+                EmailSuppressionReason.COMPLAINT,
+            ),
+            acceptedAt.plusSeconds(2),
+        )
+        mockMvc.perform(
+            post(endpoint)
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isConflict)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.STATUS).from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(deliveryId))
+                .fetchSingle(NOTIFICATION_DELIVERY.STATUS),
+        ).isEqualTo("DEAD_LETTERED")
+
+        val pendingId = intentHandler.apply(
+            intentCommand().copy(
+                memberId = OTHER_MEMBER_ID,
+                eventId = UUID.randomUUID(),
+                payloadSha256 = "4".repeat(64),
+                offset = 131,
+            ),
+        ).notificationId
+        val pendingDeliveryId = dsl.select(NOTIFICATION_DELIVERY.DELIVERY_ID)
+            .from(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(pendingId))
+            .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
+            .fetchSingle(NOTIFICATION_DELIVERY.DELIVERY_ID)
+        mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/$pendingDeliveryId/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isConflict)
+    }
+
+    @Test
+    fun `concurrent exact dead letter replays create one audit record`() {
+        val deliveryId = deadLetterDelivery()
+        val requestId = UUID.randomUUID()
+        val start = CountDownLatch(1)
+        val results = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            (1..16).map {
+                executor.submit(Callable {
+                    start.await()
+                    deadLetterReplayService.replay(
+                        requestId,
+                        deliveryId,
+                        "operator-42",
+                        "Provider configuration repaired under incident INC-2042",
+                    )
+                })
+            }.also { start.countDown() }.map { it.get(10, TimeUnit.SECONDS) }
+        }
+        org.assertj.core.api.Assertions.assertThat(results.map { it.replayCount }.toSet()).containsExactly(1)
+        org.assertj.core.api.Assertions.assertThat(results.map { it.queuedAt }.toSet()).hasSize(1)
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_DEAD_LETTER_REPLAY_AUDIT)).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.REPLAY_COUNT).from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(deliveryId))
+                .fetchSingle(NOTIFICATION_DELIVERY.REPLAY_COUNT),
+        ).isEqualTo(1)
+    }
+
+    @Test
+    fun `ambiguous lease expiry dead letters cannot be replayed`() {
+        intentHandler.apply(intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "2".repeat(64), offset = 132))
+        val firstClaimAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS)
+        val delivery = emailDeliveryStore.claimBatch(
+            "worker-ambiguous",
+            UUID.randomUUID(),
+            firstClaimAt,
+            firstClaimAt.plusSeconds(1),
+            1,
+            1,
+        ).single()
+        emailDeliveryStore.claimBatch(
+            "worker-sweeper",
+            UUID.randomUUID(),
+            firstClaimAt.plusSeconds(2),
+            firstClaimAt.plusSeconds(60),
+            1,
+            1,
+        )
+        mockMvc.perform(
+            post("/api/v1/notifications/email-deliveries/${delivery.deliveryId}/dead-letter-replay")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(DEAD_LETTER_REPLAY_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content("""{"justification":"Provider state reviewed under incident INC-2043"}"""),
+        ).andExpect(status().isConflict)
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_DEAD_LETTER_REPLAY_AUDIT)).isZero()
+    }
+
+    private fun deadLetterDelivery(): UUID {
+        intentHandler.apply(intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "3".repeat(64), offset = 129))
+        val firstClaimAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS)
+        val claimed = emailDeliveryStore.claimBatch(
+            "worker-dead-letter",
+            UUID.randomUUID(),
+            firstClaimAt,
+            firstClaimAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.recordFailure(
+                "worker-dead-letter",
+                claimed,
+                EmailDeliveryFailureCode.PROVIDER_REJECTED,
+                firstClaimAt.plusSeconds(1),
+                null,
+                true,
+            ),
+        ).isTrue()
+        return claimed.deliveryId
+    }
+
     private fun feedback(
         snsMessageId: String,
         deliveryId: UUID,
@@ -919,6 +1143,7 @@ class NotificationServiceIntegrationTest {
         const val PREFERENCE_READ_SCOPE = "SCOPE_notification.preferences.read"
         const val PREFERENCE_WRITE_SCOPE = "SCOPE_notification.preferences.write"
         const val SUPPRESSION_WRITE_SCOPE = "SCOPE_notification.suppression.write"
+        const val DEAD_LETTER_REPLAY_SCOPE = "SCOPE_notification.dead-letter.replay"
         const val TOPIC = "mundia.notification.intents.v1"
         const val SCHEMA_SUBJECT = "mundia.notification.v1.NotificationIntent"
 

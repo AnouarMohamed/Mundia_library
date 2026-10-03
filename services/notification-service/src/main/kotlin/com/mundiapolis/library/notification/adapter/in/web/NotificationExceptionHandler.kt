@@ -2,6 +2,12 @@ package com.mundiapolis.library.notification.adapter.`in`.web
 
 import com.mundiapolis.library.notification.service.NotificationNotFoundException
 import com.mundiapolis.library.notification.service.EmailSuppressionRemovalConflictException
+import com.mundiapolis.library.notification.service.DeadLetterDeliveryNotFoundException
+import com.mundiapolis.library.notification.service.DeadLetterDeliveryStateConflictException
+import com.mundiapolis.library.notification.service.DeadLetterRecipientSuppressedException
+import com.mundiapolis.library.notification.service.DeadLetterReplayIdempotencyConflictException
+import com.mundiapolis.library.notification.service.DeadLetterReplayUnsafeFailureException
+import com.mundiapolis.library.notification.service.DeadLetterReplayLimitExceededException
 import com.mundiapolis.library.notification.service.NotificationPreferencePreconditionRequiredException
 import com.mundiapolis.library.notification.service.NotificationPreferenceVersionConflictException
 import jakarta.validation.ConstraintViolationException
@@ -39,6 +45,20 @@ class NotificationExceptionHandler {
     @ExceptionHandler(EmailSuppressionRemovalConflictException::class)
     fun suppressionRemovalConflict(exception: EmailSuppressionRemovalConflictException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "suppression_removal_idempotency_conflict", requireNotNull(exception.message))
+
+    @ExceptionHandler(DeadLetterDeliveryNotFoundException::class)
+    fun deadLetterNotFound(exception: DeadLetterDeliveryNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "email_delivery_not_found", requireNotNull(exception.message))
+
+    @ExceptionHandler(
+        DeadLetterDeliveryStateConflictException::class,
+        DeadLetterRecipientSuppressedException::class,
+        DeadLetterReplayIdempotencyConflictException::class,
+        DeadLetterReplayUnsafeFailureException::class,
+        DeadLetterReplayLimitExceededException::class,
+    )
+    fun deadLetterReplayConflict(exception: RuntimeException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "dead_letter_replay_conflict", requireNotNull(exception.message))
 
     private fun problem(status: HttpStatus, code: String, detail: String): ProblemDetail =
         ProblemDetail.forStatusAndDetail(status, detail).apply {

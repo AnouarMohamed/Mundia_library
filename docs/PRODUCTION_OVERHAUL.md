@@ -407,9 +407,12 @@ without suppressing delivery. Controlled removal now requires a dedicated
 least-privilege scope, a canonical idempotency key and meaningful operator
 justification; it serializes against intent/feedback races, snapshots the prior
 state into a durable audit row, and restores only future eligible email work.
-Scheduled due/overdue and legitimate catalog-triggered intents, dead-letter
-replay tooling, BFF routing, and Kubernetes/Terraform values remain required
-before production routing. The engineering collection and first-party authorized-file
+Dead-letter replay is now delivery-specific and least-privilege, records the
+prior terminal failure and operator justification, converges concurrent exact
+requests, rejects suppressed recipients, and starts only one fresh bounded
+attempt cycle. Scheduled due/overdue and legitimate catalog-triggered intents,
+BFF routing, and Kubernetes/Terraform values remain required before production
+routing. The engineering collection and first-party authorized-file
 download slice is deliberately sequenced after those controls and the core
 OpenSearch projection, not on the current notification critical path.
 

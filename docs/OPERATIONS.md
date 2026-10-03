@@ -227,6 +227,28 @@ while reuse for different request content returns `409`. Confirm the row in
 `notification_email_suppression_removal_audit`. The operation enables only
 future eligible email intents and never requeues previously suppressed work.
 
+### Notification Email Is Dead-Lettered
+
+Investigate and correct the recorded `last_error_code` and provider incident
+before replay. Never replay an ambiguous delivery that may have reached the
+provider, and never bulk-requeue the table. For one confirmed-safe delivery, a
+trusted operator holding `notification.dead-letter.replay` may call:
+
+```bash
+curl --fail-with-body \
+  -X POST "$NOTIFICATION_SERVICE_URL/api/v1/notifications/email-deliveries/$DELIVERY_ID/dead-letter-replay" \
+  -H "Authorization: Bearer $OPERATOR_ACCESS_TOKEN" \
+  -H "Idempotency-Key: $REQUEST_ID" \
+  -H "Content-Type: application/json" \
+  --data '{"justification":"Provider configuration repaired under incident INC-2042"}'
+```
+
+Confirm the immutable snapshot in
+`notification_email_dead_letter_replay_audit`, the incremented delivery
+`replay_count`, and a single subsequent worker claim. Exact retries with the
+same request return the original result. Reuse for different content, active
+recipient suppression, and non-dead-lettered states return `409`.
+
 ### Image Uploads Fail
 
 Check:

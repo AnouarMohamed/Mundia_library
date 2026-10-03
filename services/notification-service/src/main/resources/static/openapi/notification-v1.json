@@ -109,6 +109,32 @@
           "409": {"description": "Idempotency key was already used for a different request"}
         }
       }
+    },
+    "/api/v1/notifications/email-deliveries/{deliveryId}/dead-letter-replay": {
+      "post": {
+        "operationId": "replayDeadLetteredEmailDelivery",
+        "x-required-scopes": ["notification.dead-letter.replay"],
+        "parameters": [
+          {"name": "deliveryId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+          {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReplayDeadLetterRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Dead-lettered email delivery was safely requeued or an exact request replayed",
+            "headers": {"Cache-Control": {"schema": {"type": "string"}}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeadLetterReplay"}}}
+          },
+          "400": {"description": "Malformed idempotency key, delivery identifier, actor subject, or justification"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Dead-letter replay scope missing"},
+          "404": {"description": "Email delivery not found"},
+          "409": {"description": "Delivery is not replayable, recipient is suppressed, or idempotency conflict"}
+        }
+      }
     }
   },
   "components": {
@@ -184,6 +210,25 @@
           "removed": {"type": "boolean"},
           "previousReason": {"type": ["string", "null"], "enum": ["PERMANENT_BOUNCE", "COMPLAINT", null]},
           "performedAt": {"type": "string", "format": "date-time"}
+        }
+      },
+      "ReplayDeadLetterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["justification"],
+        "properties": {
+          "justification": {"type": "string", "minLength": 20, "maxLength": 500}
+        }
+      },
+      "DeadLetterReplay": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestId", "deliveryId", "replayCount", "queuedAt"],
+        "properties": {
+          "requestId": {"type": "string", "format": "uuid"},
+          "deliveryId": {"type": "string", "format": "uuid"},
+          "replayCount": {"type": "integer", "format": "int32", "minimum": 1, "maximum": 3},
+          "queuedAt": {"type": "string", "format": "date-time"}
         }
       }
     }
