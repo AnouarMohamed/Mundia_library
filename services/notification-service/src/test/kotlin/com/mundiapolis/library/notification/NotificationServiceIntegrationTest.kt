@@ -3,6 +3,7 @@ package com.mundiapolis.library.notification
 import com.google.protobuf.Timestamp
 import com.mundiapolis.library.notification.adapter.`in`.events.NotificationIntentKafkaConsumer
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_FEEDBACK_RECEIPT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_PREFERENCE
@@ -17,6 +18,9 @@ import com.mundiapolis.library.notification.service.NotificationIntentHandler
 import com.mundiapolis.library.notification.service.EmailDeliveryStore
 import com.mundiapolis.library.notification.service.NotificationService
 import com.mundiapolis.library.notification.dto.EmailProviderReceipt
+import com.mundiapolis.library.notification.dto.SesFeedbackEvent
+import com.mundiapolis.library.notification.dto.SesFeedbackType
+import com.mundiapolis.library.notification.service.SesFeedbackStore
 import org.jooq.DSLContext
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -48,6 +52,7 @@ import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -63,9 +68,11 @@ class NotificationServiceIntegrationTest {
     @Autowired lateinit var intentConsumer: NotificationIntentKafkaConsumer
     @Autowired lateinit var notificationService: NotificationService
     @Autowired lateinit var emailDeliveryStore: EmailDeliveryStore
+    @Autowired lateinit var sesFeedbackStore: SesFeedbackStore
 
     @BeforeEach
     fun seed() {
+        dsl.deleteFrom(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_INTENT_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_DELIVERY).execute()
         dsl.deleteFrom(NOTIFICATION_INBOX).execute()
@@ -229,6 +236,99 @@ class NotificationServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(record.deadLetteredAt).isNotNull()
         org.assertj.core.api.Assertions.assertThat(record.leaseToken).isNull()
     }
+
+    @Test
+    fun `SES feedback is idempotent and terminal outcomes cannot regress`() {
+        intentHandler.apply(intentCommand())
+        val acceptedAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS)
+        val delivery = emailDeliveryStore.claimBatch(
+            "worker-1",
+            UUID.randomUUID(),
+            acceptedAt,
+            acceptedAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-1",
+                delivery,
+                EmailProviderReceipt("aws-ses", "ses-message-123"),
+                acceptedAt,
+            ),
+        ).isTrue()
+
+        val delivered = feedback(
+            "50000000-0000-4000-8000-000000000001",
+            delivery.deliveryId,
+            SesFeedbackType.DELIVERY,
+            acceptedAt.plusSeconds(2),
+            "a".repeat(64),
+        )
+        val replayResults = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            (1..8).map { offset ->
+                executor.submit<Boolean> {
+                    sesFeedbackStore.apply(delivered, acceptedAt.plusSeconds(2L + offset)).replayed
+                }
+            }.map { it.get(10, TimeUnit.SECONDS) }
+        }
+        org.assertj.core.api.Assertions.assertThat(replayResults.count { !it }).isEqualTo(1)
+        org.assertj.core.api.Assertions.assertThat(replayResults.count { it }).isEqualTo(7)
+
+        sesFeedbackStore.apply(
+            feedback(
+                "50000000-0000-4000-8000-000000000002",
+                delivery.deliveryId,
+                SesFeedbackType.BOUNCE,
+                acceptedAt.plusSeconds(5),
+                "b".repeat(64),
+            ),
+            acceptedAt.plusSeconds(6),
+        )
+        sesFeedbackStore.apply(
+            feedback(
+                "50000000-0000-4000-8000-000000000003",
+                delivery.deliveryId,
+                SesFeedbackType.DELIVERY,
+                acceptedAt.plusSeconds(7),
+                "c".repeat(64),
+            ),
+            acceptedAt.plusSeconds(8),
+        )
+        sesFeedbackStore.apply(
+            feedback(
+                "50000000-0000-4000-8000-000000000004",
+                delivery.deliveryId,
+                SesFeedbackType.COMPLAINT,
+                acceptedAt.plusSeconds(9),
+                "d".repeat(64),
+            ),
+            acceptedAt.plusSeconds(10),
+        )
+
+        val record = dsl.selectFrom(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(delivery.deliveryId))
+            .fetchSingle()
+        org.assertj.core.api.Assertions.assertThat(record.providerOutcome).isEqualTo("COMPLAINED")
+        org.assertj.core.api.Assertions.assertThat(record.providerEventAt.toInstant())
+            .isEqualTo(acceptedAt.plusSeconds(9))
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT)).isEqualTo(4)
+    }
+
+    private fun feedback(
+        snsMessageId: String,
+        deliveryId: UUID,
+        type: SesFeedbackType,
+        eventAt: Instant,
+        digest: String,
+    ) = SesFeedbackEvent(
+        UUID.fromString(snsMessageId),
+        deliveryId,
+        "ses-message-123",
+        type,
+        eventAt,
+        digest,
+    )
 
     @Test
     fun `configured Kafka consumer durably ingests and commits a real broker record`() {

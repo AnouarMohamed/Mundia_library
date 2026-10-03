@@ -39,6 +39,7 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.apache.kafka:kafka-clients")
     implementation("aws.sdk.kotlin:sesv2:${libs.versions.aws.sdk.kotlin.get()}")
+    implementation("aws.sdk.kotlin:sqs:${libs.versions.aws.sdk.kotlin.get()}")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 
     runtimeOnly("org.flywaydb:flyway-database-postgresql")

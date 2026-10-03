@@ -27,6 +27,9 @@ Implemented in this slice:
 - an AWS SES v2 adapter with bounded SDK timeouts, explicit error
   classification, configuration-set event routing, delivery correlation headers
   and tags, and the AWS default credential chain for EKS Pod Identity or IRSA;
+- a horizontally scalable SES feedback consumer using SNS-to-SQS fanout,
+  mandatory SNS Signature Version 2 verification, SSRF-safe bounded certificate
+  retrieval, transactional replay receipts, and monotonic delivery outcomes;
 - exact issuer, audience, JWT type, and OAuth scope enforcement;
 - OpenAPI/controller parity tests and real PostgreSQL integration tests;
 - OCI image, dependency updates, CI build, security scan, and GHCR publication.
@@ -40,9 +43,9 @@ uses pod workload identity; never inject static AWS access keys into the pod.
 SES v2 `SendEmail` has no idempotency token. The durable delivery UUID is
 attached as `X-Mundia-Delivery-Id` and the `delivery_id` SES message tag for
 correlation, but an ambiguous network failure can still result in a duplicate
-send. Delivery is therefore at least once until signed SES events and
-reconciliation close that operational loop.
+send. Signed feedback reconciliation makes provider outcomes observable and
+idempotent, while send initiation itself remains honestly at least once.
 The service is not production-routed yet. Scheduled due/overdue and legitimate
-catalog-triggered intent producers, signed provider
-callbacks, dead-letter replay tooling, BFF routing, and Kubernetes values remain
+catalog-triggered intent producers, automatic bounce/complaint suppression,
+dead-letter replay tooling, BFF routing, and Kubernetes values remain
 Phase 5 work.

@@ -219,7 +219,36 @@ worker disabled until workload identity, Membership client credentials, SES
 production access, sender verification, configuration-set event publishing,
 egress policy, and provider timeouts are configured. Delivery is at least once:
 an ambiguous network failure after SES accepts a message may cause a duplicate,
-so signed SES event ingestion and reconciliation remain a production gate.
+so the send path remains at least once even after feedback reconciliation.
+
+### SES feedback reconciliation
+
+Set `NOTIFICATION_SES_FEEDBACK_ENABLED=true` only after provisioning an encrypted
+standard SQS queue subscribed to the SES configuration set's standard SNS topic.
+Raw message delivery must remain disabled so the signed SNS envelope reaches the
+consumer. Configure the topic's `SignatureVersion` attribute as `2` (SHA-256),
+then set `NOTIFICATION_SES_FEEDBACK_QUEUE_URL` and
+`NOTIFICATION_SES_FEEDBACK_TOPIC_ARN` to their exact regional values. Placeholder,
+cross-region, non-HTTPS, oversized, stale, and future-dated inputs fail closed.
+
+The SNS topic policy must allow `ses.amazonaws.com` to publish only when both
+`AWS:SourceAccount` and `AWS:SourceArn` match the owning account and exact SES
+configuration set. The SQS queue policy must allow `sqs:SendMessage` only from
+the exact SNS topic ARN. Configure server-side encryption, a redrive policy and
+a separate encrypted DLQ; invalid or uncorrelated events are deliberately not
+deleted and are quarantined by that policy. The pod role needs only
+`sqs:ReceiveMessage` and `sqs:DeleteMessage` on the feedback queue, plus
+`kms:Decrypt` when a customer-managed KMS key is used.
+
+The consumer verifies the exact topic, a fresh Signature Version 2 envelope,
+and an HTTPS signing certificate from the exact regional SNS hostname before
+parsing SES data. Certificate downloads reject redirects and enforce connect,
+read, and response-size bounds. Reconciliation requires both the durable
+`delivery_id` tag and SES message ID to match one accepted send. Only hashes and
+non-PII correlation metadata are retained. Multiple pods can poll the standard
+queue safely: a PostgreSQL receipt keyed by SNS message ID deduplicates replays,
+and outcome precedence prevents late events from regressing complaints or
+bounces back to delivered.
 
 ## Secrets Handling
 

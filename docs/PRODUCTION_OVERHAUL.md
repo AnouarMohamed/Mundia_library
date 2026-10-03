@@ -380,10 +380,15 @@ validation, explicit retry/permanent error classification, and the default AWS
 credential chain for EKS workload identity. Every request carries its durable
 delivery UUID as a custom header and SES tag. Because SES `SendEmail` has no
 idempotency token, ambiguous outcomes retain at-least-once semantics rather than
-claiming exactly-once provider delivery. Scheduled due/overdue and legitimate
-catalog-triggered intents, signed SES event ingestion and reconciliation,
-dead-letter replay tooling, BFF routing, and Kubernetes values remain required
-before this service is production-routed.
+claiming exactly-once provider delivery. Signed SES event ingestion now consumes
+non-raw SNS envelopes from an encrypted SQS queue, requires SHA-256 signatures
+from the exact regional SNS certificate host and topic ARN, and bounds message,
+age, network, and certificate resources. Transactional receipts deduplicate
+standard-queue replay while monotonic provider outcomes prevent late events from
+regressing complaints or bounces. No recipient address or raw feedback payload
+is persisted. Scheduled due/overdue and legitimate catalog-triggered intents,
+automatic suppression, controlled dead-letter replay, BFF routing, and
+Kubernetes/Terraform values remain required before production routing.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

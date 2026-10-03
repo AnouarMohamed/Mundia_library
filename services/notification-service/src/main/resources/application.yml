@@ -42,6 +42,26 @@ spring:
     sql-dialect: postgres
 
 app:
+  ses-feedback:
+    enabled: ${NOTIFICATION_SES_FEEDBACK_ENABLED:false}
+    region: ${AWS_REGION:eu-west-1}
+    queue-url: ${NOTIFICATION_SES_FEEDBACK_QUEUE_URL:https://sqs.eu-west-1.amazonaws.com/000000000000/disabled}
+    topic-arn: ${NOTIFICATION_SES_FEEDBACK_TOPIC_ARN:arn:aws:sns:eu-west-1:000000000000:disabled}
+    wait-time: ${NOTIFICATION_SES_FEEDBACK_WAIT_TIME:PT20S}
+    visibility-timeout: ${NOTIFICATION_SES_FEEDBACK_VISIBILITY_TIMEOUT:PT1M}
+    maximum-message-bytes: ${NOTIFICATION_SES_FEEDBACK_MAXIMUM_MESSAGE_BYTES:262144}
+    maximum-message-age: ${NOTIFICATION_SES_FEEDBACK_MAXIMUM_MESSAGE_AGE:P14D}
+    maximum-future-skew: ${NOTIFICATION_SES_FEEDBACK_MAXIMUM_FUTURE_SKEW:PT2M}
+    maximum-poll-silence: ${NOTIFICATION_SES_FEEDBACK_MAXIMUM_POLL_SILENCE:PT1M}
+    startup-grace-period: ${NOTIFICATION_SES_FEEDBACK_STARTUP_GRACE:PT30S}
+    retry-backoff: ${NOTIFICATION_SES_FEEDBACK_RETRY_BACKOFF:PT1S}
+    maximum-consecutive-failures: ${NOTIFICATION_SES_FEEDBACK_MAXIMUM_CONSECUTIVE_FAILURES:5}
+    call-timeout: ${NOTIFICATION_SES_FEEDBACK_CALL_TIMEOUT:PT25S}
+    attempt-timeout: ${NOTIFICATION_SES_FEEDBACK_ATTEMPT_TIMEOUT:PT23S}
+    certificate-connect-timeout: ${NOTIFICATION_SES_CERTIFICATE_CONNECT_TIMEOUT:PT2S}
+    certificate-read-timeout: ${NOTIFICATION_SES_CERTIFICATE_READ_TIMEOUT:PT5S}
+    certificate-cache-duration: ${NOTIFICATION_SES_CERTIFICATE_CACHE_DURATION:PT1H}
+    maximum-certificate-bytes: ${NOTIFICATION_SES_MAXIMUM_CERTIFICATE_BYTES:32768}
   email-worker:
     enabled: ${NOTIFICATION_EMAIL_WORKER_ENABLED:false}
     instance-id: ${NOTIFICATION_EMAIL_WORKER_INSTANCE_ID:${HOSTNAME:local}}
@@ -117,7 +137,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db,notificationIntentConsumer,emailDelivery
+          include: readinessState,db,notificationIntentConsumer,emailDelivery,sesFeedback
   health:
     livenessstate:
       enabled: true
