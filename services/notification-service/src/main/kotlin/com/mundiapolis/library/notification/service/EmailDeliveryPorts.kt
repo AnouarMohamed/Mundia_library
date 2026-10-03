@@ -25,6 +25,12 @@ interface EmailDeliveryStore {
         deliveredAt: Instant,
     ): Boolean
 
+    fun suppressClaimIfRecipientSuppressed(
+        owner: String,
+        delivery: ClaimedEmailDelivery,
+        suppressedAt: Instant,
+    ): Boolean
+
     fun recordFailure(
         owner: String,
         delivery: ClaimedEmailDelivery,

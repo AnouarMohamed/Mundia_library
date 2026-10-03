@@ -15,6 +15,11 @@ enum class SesFeedbackType(val providerOutcome: String, val precedence: Int) {
     COMPLAINT("COMPLAINED", 60),
 }
 
+enum class EmailSuppressionReason(val precedence: Int) {
+    PERMANENT_BOUNCE(10),
+    COMPLAINT(20),
+}
+
 data class SesFeedbackEvent(
     val snsMessageId: UUID,
     val deliveryId: UUID,
@@ -22,6 +27,7 @@ data class SesFeedbackEvent(
     val type: SesFeedbackType,
     val eventAt: Instant,
     val payloadSha256: String,
+    val suppressionReason: EmailSuppressionReason? = null,
 )
 
 data class SesFeedbackExecution(val replayed: Boolean)

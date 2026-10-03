@@ -31,6 +31,7 @@ class NotificationIntentService(
                 throw NotificationIntentClockSkewException()
             }
             val normalized = intent.copy(occurredAt = occurredAt)
+            repository.lockMemberNotificationState(normalized.memberId)
             val notificationId = UUID.randomUUID()
             val createdAt = laterOf(now, occurredAt)
             if (!repository.insertIntentInbox(normalized, notificationId, createdAt)) {
@@ -42,9 +43,10 @@ class NotificationIntentService(
                 return@execute NotificationIntentExecution(receipt.notificationId, replayed = true)
             }
             val preference = repository.findPreference(normalized.memberId)
+            val emailSuppressed = repository.isEmailSuppressed(normalized.memberId)
             normalized.channels.sortedBy { it.name }.forEach {
                 val suppressed = it == NotificationChannel.EMAIL &&
-                    preference?.allowsEmail(normalized.category) == false
+                    (emailSuppressed || preference?.allowsEmail(normalized.category) == false)
                 repository.insertDelivery(notificationId, it, createdAt, suppressed)
             }
             repository.insertIntentReceipt(normalized, notificationId, now)

@@ -248,7 +248,13 @@ read, and response-size bounds. Reconciliation requires both the durable
 non-PII correlation metadata are retained. Multiple pods can poll the standard
 queue safely: a PostgreSQL receipt keyed by SNS message ID deduplicates replays,
 and outcome precedence prevents late events from regressing complaints or
-bounces back to delivered.
+bounces back to delivered. Signed complaints and permanent bounces atomically
+create a member-scoped email suppression record and suppress queued or future
+email delivery while preserving mandatory in-app notifications. Transient and
+undetermined bounces remain observable but do not suppress the member. No email
+address or raw provider payload is retained in the suppression record. Keep
+suppression removal an authenticated, audited operational action; do not delete
+rows directly in routine operation.
 
 ## Secrets Handling
 

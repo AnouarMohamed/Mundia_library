@@ -26,6 +26,13 @@ import java.util.UUID
 
 @Repository
 class JooqNotificationRepository(private val dsl: DSLContext) {
+    fun lockMemberNotificationState(memberId: UUID) {
+        dsl.fetchValue(
+            "SELECT pg_advisory_xact_lock(hashtextextended(CAST(? AS TEXT), 0))",
+            memberId,
+        )
+    }
+
     fun insertIntentInbox(intent: NotificationIntentCommand, notificationId: UUID, createdAt: Instant): Boolean {
         val timestamp = createdAt.atOffset(ZoneOffset.UTC)
         return dsl.insertInto(NOTIFICATION_INBOX)
@@ -73,6 +80,12 @@ class JooqNotificationRepository(private val dsl: DSLContext) {
         dsl.selectFrom(NOTIFICATION_PREFERENCE)
             .where(NOTIFICATION_PREFERENCE.MEMBER_ID.eq(memberId))
             .fetchOne { it.toPreference() }
+
+    fun isEmailSuppressed(memberId: UUID): Boolean = dsl.fetchExists(
+        DSL.selectOne()
+            .from(DSL.table(DSL.name("notification_email_suppression")))
+            .where(DSL.field(DSL.name("member_id"), UUID::class.java).eq(memberId)),
+    )
 
     fun insertPreference(
         memberId: UUID,

@@ -194,6 +194,25 @@ Actions:
 - Process urgent circulation tasks manually in admin.
 - Re-enable after one successful test.
 
+### Notification Email Is Automatically Suppressed
+
+The Kotlin Notification service suppresses email after a signed SES complaint
+or permanent bounce. In-app delivery remains enabled.
+
+Check:
+
+- `notification_email_suppression` for the member-scoped reason and source
+  correlation identifiers.
+- `notification_email_feedback_receipt` for the immutable signed-event receipt.
+- `notification_delivery.provider_outcome` and the SES configuration-set event
+  destination.
+
+Do not remove suppression because a user asks through an unauthenticated
+channel, and do not delete provider feedback receipts. Confirm the Membership
+address was corrected, verify the requester, and use the controlled audited
+removal workflow once that Phase 5 operation is available. Until then, retain
+suppression and use the mandatory in-app channel.
+
 ### Image Uploads Fail
 
 Check:

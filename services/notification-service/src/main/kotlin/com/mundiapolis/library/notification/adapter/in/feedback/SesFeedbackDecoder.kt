@@ -1,6 +1,7 @@
 package com.mundiapolis.library.notification.adapter.`in`.feedback
 
 import com.mundiapolis.library.notification.config.SesFeedbackProperties
+import com.mundiapolis.library.notification.dto.EmailSuppressionReason
 import com.mundiapolis.library.notification.dto.SesFeedbackContractException
 import com.mundiapolis.library.notification.dto.SesFeedbackEvent
 import com.mundiapolis.library.notification.dto.SesFeedbackType
@@ -37,6 +38,7 @@ class SesFeedbackDecoder(
         contract(deliveryTags != null && deliveryTags.isArray && deliveryTags.size() == 1, "SES delivery tag is invalid")
         val deliveryId = canonicalUuid(deliveryTags[0].takeIf { it.isString }?.stringValue(), "SES delivery identifier")
         val eventAt = event.eventTimestamp(type, mail)
+        val suppressionReason = event.suppressionReason(type)
         val envelopeAt = envelope.requiredInstant("Timestamp")
         contract(!eventAt.isBefore(envelopeAt.minus(properties.maximumMessageAge)), "SES event timestamp is too old")
         contract(!eventAt.isAfter(envelopeAt.plus(properties.maximumFutureSkew)), "SES event timestamp is in the future")
@@ -47,6 +49,7 @@ class SesFeedbackDecoder(
             type,
             eventAt,
             HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+            suppressionReason,
         )
     }
 
@@ -70,6 +73,16 @@ class SesFeedbackDecoder(
             else -> null
         }
         return (container ?: mail).requiredInstant("timestamp")
+    }
+
+    private fun JsonNode.suppressionReason(type: SesFeedbackType): EmailSuppressionReason? = when (type) {
+        SesFeedbackType.COMPLAINT -> EmailSuppressionReason.COMPLAINT
+        SesFeedbackType.BOUNCE -> when (requiredObject("bounce").requiredText("bounceType", 32)) {
+            "Permanent" -> EmailSuppressionReason.PERMANENT_BOUNCE
+            "Transient", "Undetermined" -> null
+            else -> throw SesFeedbackContractException("SES bounce type is unsupported")
+        }
+        else -> null
     }
 
     private fun String.toFeedbackType(): SesFeedbackType = when (this) {

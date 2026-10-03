@@ -346,7 +346,7 @@ retention/deletion workflows pass.
 - Build OpenSearch projections for catalog, availability, and recommendations.
 - Make every read model disposable and rebuildable from events/snapshots.
 
-Implementation checkpoint (2026-09-29): the Kotlin Notification service now
+Implementation checkpoint (2026-10-03): the Kotlin Notification service now
 owns its PostgreSQL/Flyway schema for member preferences, in-app inbox items,
 and channel-delivery state. Its first caller-bound API provides bounded,
 deterministic keyset pages, read-state filtering, and idempotent mark-read
@@ -386,9 +386,14 @@ from the exact regional SNS certificate host and topic ARN, and bounds message,
 age, network, and certificate resources. Transactional receipts deduplicate
 standard-queue replay while monotonic provider outcomes prevent late events from
 regressing complaints or bounces. No recipient address or raw feedback payload
-is persisted. Scheduled due/overdue and legitimate catalog-triggered intents,
-automatic suppression, controlled dead-letter replay, BFF routing, and
-Kubernetes/Terraform values remain required before production routing.
+is persisted. Signed complaints and permanent bounces now atomically create
+privacy-preserving member suppressions, cancel queued work, fence claimed work
+before recipient resolution, and suppress future email intents while mandatory
+in-app delivery continues. Transient and undetermined bounces remain observable
+without suppressing delivery. Scheduled due/overdue and legitimate
+catalog-triggered intents, controlled suppression removal and dead-letter
+replay, BFF routing, and Kubernetes/Terraform values remain required before
+production routing.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

@@ -23,6 +23,7 @@ data class EmailProviderReceipt(
 data class EmailDeliveryCycle(
     val claimed: Int,
     val delivered: Int,
+    val suppressed: Int,
     val retryScheduled: Int,
     val deadLettered: Int,
     val claimLost: Int,

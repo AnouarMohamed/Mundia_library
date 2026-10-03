@@ -27,6 +27,26 @@ class JooqEmailDeliveryStore(private val dsl: DSLContext) : EmailDeliveryStore {
         val timestamp = now.utc()
         dsl.execute(
             """
+            UPDATE notification_delivery d
+               SET status = 'SUPPRESSED',
+                   last_error_code = 'RECIPIENT_SUPPRESSED',
+                   lease_owner = NULL,
+                   lease_token = NULL,
+                   lease_expires_at = NULL,
+                   next_attempt_at = NULL,
+                   updated_at = CAST(? AS TIMESTAMPTZ)
+              FROM notification_inbox i
+              JOIN notification_email_suppression s ON s.member_id = i.member_id
+             WHERE i.notification_id = d.notification_id
+               AND d.channel = 'EMAIL'
+               AND d.status = 'DELIVERING'
+               AND d.lease_expires_at <= CAST(? AS TIMESTAMPTZ)
+            """.trimIndent(),
+            timestamp,
+            timestamp,
+        )
+        dsl.execute(
+            """
             UPDATE notification_delivery
                SET status = 'DEAD_LETTERED',
                    last_error_code = ?,
@@ -54,6 +74,12 @@ class JooqEmailDeliveryStore(private val dsl: DSLContext) : EmailDeliveryStore {
                   FROM notification_delivery
                  WHERE channel = 'EMAIL'
                    AND attempt_count < ?
+                   AND NOT EXISTS (
+                       SELECT 1
+                         FROM notification_inbox i
+                         JOIN notification_email_suppression s ON s.member_id = i.member_id
+                        WHERE i.notification_id = notification_delivery.notification_id
+                   )
                    AND (
                        (status IN ('PENDING', 'FAILED') AND next_attempt_at <= CAST(? AS TIMESTAMPTZ))
                        OR (status = 'DELIVERING' AND lease_expires_at <= CAST(? AS TIMESTAMPTZ))
@@ -120,6 +146,29 @@ class JooqEmailDeliveryStore(private val dsl: DSLContext) : EmailDeliveryStore {
         """.trimIndent(),
         deliveredAt.utc(), receipt.provider, receipt.messageReference, deliveredAt.utc(),
         delivery.deliveryId, owner, delivery.leaseToken,
+    ) == 1
+
+    override fun suppressClaimIfRecipientSuppressed(
+        owner: String,
+        delivery: ClaimedEmailDelivery,
+        suppressedAt: Instant,
+    ): Boolean = dsl.execute(
+        """
+        UPDATE notification_delivery d
+           SET status = 'SUPPRESSED',
+               lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+               next_attempt_at = NULL, last_error_code = 'RECIPIENT_SUPPRESSED',
+               updated_at = CAST(? AS TIMESTAMPTZ)
+          FROM notification_inbox i
+          JOIN notification_email_suppression s ON s.member_id = i.member_id
+         WHERE i.notification_id = d.notification_id
+           AND d.delivery_id = ? AND d.status = 'DELIVERING'
+           AND d.lease_owner = ? AND d.lease_token = ?
+        """.trimIndent(),
+        suppressedAt.utc(),
+        delivery.deliveryId,
+        owner,
+        delivery.leaseToken,
     ) == 1
 
     override fun recordFailure(

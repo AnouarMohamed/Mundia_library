@@ -20,6 +20,7 @@ class EmailDeliveryWorker(
     private val clock: Clock,
 ) {
     private val delivered = counter(meterRegistry, "delivered")
+    private val suppressed = counter(meterRegistry, "suppressed")
     private val retryScheduled = counter(meterRegistry, "retry_scheduled")
     private val deadLettered = counter(meterRegistry, "dead_lettered")
     private val claimLost = counter(meterRegistry, "claim_lost")
@@ -39,6 +40,7 @@ class EmailDeliveryWorker(
         try {
             val cycle = service.deliverBatch()
             delivered.increment(cycle.delivered.toDouble())
+            suppressed.increment(cycle.suppressed.toDouble())
             retryScheduled.increment(cycle.retryScheduled.toDouble())
             deadLettered.increment(cycle.deadLettered.toDouble())
             claimLost.increment(cycle.claimLost.toDouble())

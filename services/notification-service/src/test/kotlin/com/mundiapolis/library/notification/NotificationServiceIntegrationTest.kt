@@ -4,6 +4,7 @@ import com.google.protobuf.Timestamp
 import com.mundiapolis.library.notification.adapter.`in`.events.NotificationIntentKafkaConsumer
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_FEEDBACK_RECEIPT
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_SUPPRESSION
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_PREFERENCE
@@ -18,6 +19,7 @@ import com.mundiapolis.library.notification.service.NotificationIntentHandler
 import com.mundiapolis.library.notification.service.EmailDeliveryStore
 import com.mundiapolis.library.notification.service.NotificationService
 import com.mundiapolis.library.notification.dto.EmailProviderReceipt
+import com.mundiapolis.library.notification.dto.EmailSuppressionReason
 import com.mundiapolis.library.notification.dto.SesFeedbackEvent
 import com.mundiapolis.library.notification.dto.SesFeedbackType
 import com.mundiapolis.library.notification.service.SesFeedbackStore
@@ -72,6 +74,7 @@ class NotificationServiceIntegrationTest {
 
     @BeforeEach
     fun seed() {
+        dsl.deleteFrom(NOTIFICATION_EMAIL_SUPPRESSION).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_INTENT_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_DELIVERY).execute()
@@ -151,7 +154,6 @@ class NotificationServiceIntegrationTest {
                 claimedAt.plusSeconds(1),
             ),
         ).isTrue()
-
         val record = dsl.selectFrom(NOTIFICATION_DELIVERY)
             .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(notificationId))
             .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
@@ -257,6 +259,23 @@ class NotificationServiceIntegrationTest {
                 acceptedAt,
             ),
         ).isTrue()
+        val queuedNotifications = setOf(
+            intentHandler.apply(
+            intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "f".repeat(64), offset = 98),
+            ).notificationId,
+            intentHandler.apply(
+                intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "1".repeat(64), offset = 99),
+            ).notificationId,
+        )
+        val claimedForSuppression = emailDeliveryStore.claimBatch(
+            "worker-2",
+            UUID.randomUUID(),
+            acceptedAt.plusSeconds(1),
+            acceptedAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        val queuedNotification = (queuedNotifications - claimedForSuppression.notificationId).single()
 
         val delivered = feedback(
             "50000000-0000-4000-8000-000000000001",
@@ -282,9 +301,30 @@ class NotificationServiceIntegrationTest {
                 SesFeedbackType.BOUNCE,
                 acceptedAt.plusSeconds(5),
                 "b".repeat(64),
+                EmailSuppressionReason.PERMANENT_BOUNCE,
             ),
             acceptedAt.plusSeconds(6),
         )
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.STATUS)
+                .from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(queuedNotification))
+                .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
+                .fetchSingle(NOTIFICATION_DELIVERY.STATUS),
+        ).isEqualTo("SUPPRESSED")
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.suppressClaimIfRecipientSuppressed(
+                "worker-2",
+                claimedForSuppression,
+                acceptedAt.plusSeconds(6),
+            ),
+        ).isTrue()
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.STATUS)
+                .from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.DELIVERY_ID.eq(claimedForSuppression.deliveryId))
+                .fetchSingle(NOTIFICATION_DELIVERY.STATUS),
+        ).isEqualTo("SUPPRESSED")
         sesFeedbackStore.apply(
             feedback(
                 "50000000-0000-4000-8000-000000000003",
@@ -302,6 +342,7 @@ class NotificationServiceIntegrationTest {
                 SesFeedbackType.COMPLAINT,
                 acceptedAt.plusSeconds(9),
                 "d".repeat(64),
+                EmailSuppressionReason.COMPLAINT,
             ),
             acceptedAt.plusSeconds(10),
         )
@@ -313,6 +354,82 @@ class NotificationServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(record.providerEventAt.toInstant())
             .isEqualTo(acceptedAt.plusSeconds(9))
         org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT)).isEqualTo(4)
+        val suppression = dsl.selectFrom(NOTIFICATION_EMAIL_SUPPRESSION)
+            .where(NOTIFICATION_EMAIL_SUPPRESSION.MEMBER_ID.eq(MEMBER_ID))
+            .fetchSingle()
+        org.assertj.core.api.Assertions.assertThat(suppression.reason).isEqualTo("COMPLAINT")
+
+        val suppressedNotification = intentHandler.apply(
+            intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "e".repeat(64), offset = 100),
+        ).notificationId
+        val deliveries = dsl.selectFrom(NOTIFICATION_DELIVERY)
+            .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(suppressedNotification))
+            .fetchMap(NOTIFICATION_DELIVERY.CHANNEL)
+        org.assertj.core.api.Assertions.assertThat(deliveries.getValue("IN_APP").status).isEqualTo("DELIVERED")
+        org.assertj.core.api.Assertions.assertThat(deliveries.getValue("EMAIL").status).isEqualTo("SUPPRESSED")
+    }
+
+    @Test
+    fun `concurrent intents cannot escape permanent suppression`() {
+        intentHandler.apply(intentCommand())
+        val acceptedAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS)
+        val delivered = emailDeliveryStore.claimBatch(
+            "worker-1",
+            UUID.randomUUID(),
+            acceptedAt,
+            acceptedAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-1",
+                delivered,
+                EmailProviderReceipt("aws-ses", "ses-message-123"),
+                acceptedAt,
+            ),
+        ).isTrue()
+
+        val start = CountDownLatch(1)
+        Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            val intents = (1..24).map { index ->
+                executor.submit {
+                    start.await()
+                    intentHandler.apply(
+                        intentCommand().copy(
+                            eventId = UUID.randomUUID(),
+                            payloadSha256 = index.toString(16).padStart(64, '0'),
+                            offset = 100L + index,
+                        ),
+                    )
+                }
+            }
+            val suppression = executor.submit {
+                start.await()
+                sesFeedbackStore.apply(
+                    feedback(
+                        "50000000-0000-4000-8000-000000000010",
+                        delivered.deliveryId,
+                        SesFeedbackType.COMPLAINT,
+                        acceptedAt.plusSeconds(1),
+                        "9".repeat(64),
+                        EmailSuppressionReason.COMPLAINT,
+                    ),
+                    acceptedAt.plusSeconds(2),
+                )
+            }
+            start.countDown()
+            intents.forEach { it.get(20, TimeUnit.SECONDS) }
+            suppression.get(20, TimeUnit.SECONDS)
+        }
+
+        val escaped = dsl.fetchCount(
+            NOTIFICATION_DELIVERY,
+            NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL")
+                .and(NOTIFICATION_DELIVERY.DELIVERY_ID.ne(delivered.deliveryId))
+                .and(NOTIFICATION_DELIVERY.STATUS.ne("SUPPRESSED")),
+        )
+        org.assertj.core.api.Assertions.assertThat(escaped).isZero()
     }
 
     private fun feedback(
@@ -321,6 +438,7 @@ class NotificationServiceIntegrationTest {
         type: SesFeedbackType,
         eventAt: Instant,
         digest: String,
+        suppressionReason: EmailSuppressionReason? = null,
     ) = SesFeedbackEvent(
         UUID.fromString(snsMessageId),
         deliveryId,
@@ -328,6 +446,7 @@ class NotificationServiceIntegrationTest {
         type,
         eventAt,
         digest,
+        suppressionReason,
     )
 
     @Test

@@ -5,6 +5,7 @@ import com.mundiapolis.library.notification.adapter.`in`.feedback.SnsSignatureVe
 import com.mundiapolis.library.notification.config.SesFeedbackProperties
 import com.mundiapolis.library.notification.dto.SesFeedbackContractException
 import com.mundiapolis.library.notification.dto.SesFeedbackType
+import com.mundiapolis.library.notification.dto.EmailSuppressionReason
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -49,6 +50,23 @@ class SesFeedbackDecoderTest {
     }
 
     @Test
+    fun `only permanent bounces and complaints request recipient suppression`() {
+        val permanent = decoder.decode(
+            envelope(event("Bounce", "bounce", NOW.minusSeconds(2).toString(), "Permanent")),
+        )
+        val transient = decoder.decode(
+            envelope(event("Bounce", "bounce", NOW.minusSeconds(2).toString(), "Transient"), ANOTHER_MESSAGE_ID),
+        )
+        val complaint = decoder.decode(
+            envelope(event("Complaint", "complaint", NOW.minusSeconds(2).toString()), THIRD_MESSAGE_ID),
+        )
+
+        assertThat(permanent.suppressionReason).isEqualTo(EmailSuppressionReason.PERMANENT_BOUNCE)
+        assertThat(transient.suppressionReason).isNull()
+        assertThat(complaint.suppressionReason).isEqualTo(EmailSuppressionReason.COMPLAINT)
+    }
+
+    @Test
     fun `certificate URL cannot escape the regional AWS SNS host`() {
         var keyRequested = false
         val guardedVerifier = SnsSignatureVerifier(
@@ -60,7 +78,10 @@ class SesFeedbackDecoderTest {
 
         assertThatThrownBy {
             guardedDecoder.decode(
-                envelope(event("Bounce", "bounce", NOW.toString()), "https://attacker.example/cert.pem"),
+                envelope(
+                    event("Bounce", "bounce", NOW.toString()),
+                    certificateUrl = "https://attacker.example/cert.pem",
+                ),
             )
         }.isInstanceOf(SesFeedbackContractException::class.java)
         assertThat(keyRequested).isFalse()
@@ -75,7 +96,12 @@ class SesFeedbackDecoderTest {
         assertThat(properties().isSafeConfiguration).isTrue()
     }
 
-    private fun event(type: String, detailName: String, timestamp: String): String = mapper.writeValueAsString(
+    private fun event(
+        type: String,
+        detailName: String,
+        timestamp: String,
+        bounceType: String? = null,
+    ): String = mapper.writeValueAsString(
         mapOf(
             "eventType" to type,
             "mail" to mapOf(
@@ -83,17 +109,21 @@ class SesFeedbackDecoderTest {
                 "messageId" to "ses-message-123",
                 "tags" to mapOf("delivery_id" to listOf(DELIVERY_ID.toString())),
             ),
-            detailName to mapOf("timestamp" to timestamp),
+            detailName to buildMap {
+                put("timestamp", timestamp)
+                bounceType?.let { put("bounceType", it) }
+            },
         ),
     )
 
     private fun envelope(
         message: String,
+        messageId: UUID = SNS_MESSAGE_ID,
         certificateUrl: String = "https://sns.eu-west-1.amazonaws.com/SimpleNotificationService-0123456789abcdef.pem",
     ): String {
         val canonical = buildString {
             append("Message\n").append(message).append('\n')
-            append("MessageId\n").append(SNS_MESSAGE_ID).append('\n')
+            append("MessageId\n").append(messageId).append('\n')
             append("Timestamp\n").append(NOW).append('\n')
             append("TopicArn\n").append(TOPIC_ARN).append('\n')
             append("Type\nNotification\n")
@@ -104,7 +134,7 @@ class SesFeedbackDecoderTest {
         return mapper.writeValueAsString(
             mapOf(
                 "Type" to "Notification",
-                "MessageId" to SNS_MESSAGE_ID.toString(),
+                "MessageId" to messageId.toString(),
                 "TopicArn" to TOPIC_ARN,
                 "Message" to message,
                 "Timestamp" to NOW.toString(),
@@ -145,6 +175,8 @@ class SesFeedbackDecoderTest {
     private companion object {
         val NOW: Instant = Instant.parse("2026-10-03T10:00:00Z")
         val SNS_MESSAGE_ID: UUID = UUID.fromString("10000000-0000-4000-8000-000000000001")
+        val ANOTHER_MESSAGE_ID: UUID = UUID.fromString("10000000-0000-4000-8000-000000000002")
+        val THIRD_MESSAGE_ID: UUID = UUID.fromString("10000000-0000-4000-8000-000000000003")
         val DELIVERY_ID: UUID = UUID.fromString("20000000-0000-4000-8000-000000000001")
         const val TOPIC_ARN = "arn:aws:sns:eu-west-1:111122223333:mundia-ses-feedback"
     }

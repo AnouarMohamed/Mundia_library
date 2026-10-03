@@ -30,6 +30,9 @@ Implemented in this slice:
 - a horizontally scalable SES feedback consumer using SNS-to-SQS fanout,
   mandatory SNS Signature Version 2 verification, SSRF-safe bounded certificate
   retrieval, transactional replay receipts, and monotonic delivery outcomes;
+- privacy-preserving automatic email suppression for complaints and permanent
+  bounces, with transactional evidence, queued-work cancellation, claimed-work
+  fencing, and mandatory in-app delivery retained;
 - exact issuer, audience, JWT type, and OAuth scope enforcement;
 - OpenAPI/controller parity tests and real PostgreSQL integration tests;
 - OCI image, dependency updates, CI build, security scan, and GHCR publication.
@@ -46,6 +49,6 @@ correlation, but an ambiguous network failure can still result in a duplicate
 send. Signed feedback reconciliation makes provider outcomes observable and
 idempotent, while send initiation itself remains honestly at least once.
 The service is not production-routed yet. Scheduled due/overdue and legitimate
-catalog-triggered intent producers, automatic bounce/complaint suppression,
-dead-letter replay tooling, BFF routing, and Kubernetes values remain
-Phase 5 work.
+catalog-triggered intent producers, controlled suppression removal and
+dead-letter replay tooling, BFF routing, and Kubernetes values remain Phase 5
+work.

@@ -33,6 +33,7 @@ class EmailDeliveryService(
             properties.maximumAttempts,
         )
         var delivered = 0
+        var suppressed = 0
         var retryScheduled = 0
         var deadLettered = 0
         var claimLost = 0
@@ -40,16 +41,20 @@ class EmailDeliveryService(
             val outcome = deliverOne(delivery)
             when (outcome) {
                 Outcome.DELIVERED -> delivered++
+                Outcome.SUPPRESSED -> suppressed++
                 Outcome.RETRY_SCHEDULED -> retryScheduled++
                 Outcome.DEAD_LETTERED -> deadLettered++
                 Outcome.CLAIM_LOST -> claimLost++
             }
         }
-        return EmailDeliveryCycle(deliveries.size, delivered, retryScheduled, deadLettered, claimLost)
+        return EmailDeliveryCycle(deliveries.size, delivered, suppressed, retryScheduled, deadLettered, claimLost)
     }
 
     private fun deliverOne(delivery: ClaimedEmailDelivery): Outcome {
         return try {
+            if (store.suppressClaimIfRecipientSuppressed(properties.instanceId, delivery, clock.instant())) {
+                return Outcome.SUPPRESSED
+            }
             val future = executor.submit<EmailProviderReceipt> {
                 val recipient = recipientResolver.resolve(delivery.memberId)
                 validateRecipient(recipient.address)
@@ -127,7 +132,7 @@ class EmailDeliveryService(
         }
     }
 
-    private enum class Outcome { DELIVERED, RETRY_SCHEDULED, DEAD_LETTERED, CLAIM_LOST }
+    private enum class Outcome { DELIVERED, SUPPRESSED, RETRY_SCHEDULED, DEAD_LETTERED, CLAIM_LOST }
 
     private companion object {
         val PROVIDER = Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,31}")

@@ -96,6 +96,20 @@ class EmailDeliveryServiceTest {
     }
 
     @Test
+    fun `suppressed recipient is fenced before resolution and provider delivery`() {
+        val store = FakeStore(suppressClaim = true)
+        var providerCalled = false
+        val result = service(store) { _, _, _, _ ->
+            providerCalled = true
+            EmailProviderReceipt("aws-ses", "message-123")
+        }.deliverBatch()
+
+        assertThat(result.suppressed).isEqualTo(1)
+        assertThat(result.delivered).isZero()
+        assertThat(providerCalled).isFalse()
+    }
+
+    @Test
     fun `unsafe enabled configuration is rejected`() {
         assertThat(properties(leaseDuration = Duration.ofSeconds(30)).isSafeConfiguration).isFalse()
         assertThat(properties().isSafeConfiguration).isTrue()
@@ -129,6 +143,7 @@ class EmailDeliveryServiceTest {
     private class FakeStore(
         private val claimed: ClaimedEmailDelivery = DELIVERY,
         private val markDelivered: Boolean = true,
+        private val suppressClaim: Boolean = false,
     ) : EmailDeliveryStore {
         var deliveredReceipt: EmailProviderReceipt? = null
         var failure: Failure? = null
@@ -151,6 +166,12 @@ class EmailDeliveryServiceTest {
             deliveredReceipt = receipt
             return markDelivered
         }
+
+        override fun suppressClaimIfRecipientSuppressed(
+            owner: String,
+            delivery: ClaimedEmailDelivery,
+            suppressedAt: Instant,
+        ): Boolean = suppressClaim
 
         override fun recordFailure(
             owner: String,
