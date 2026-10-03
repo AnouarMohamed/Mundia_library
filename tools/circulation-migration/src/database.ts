@@ -491,6 +491,7 @@ const TARGET_PHASE2_COLUMNS = [
   "outbox_event.delivery_attempts:integer:true",
   "outbox_event.event_type:character varying(160):true",
   "outbox_event.event_version:integer:true",
+  "outbox_event.event_stream:character varying(32):true",
   "outbox_event.headers:jsonb:true",
   "outbox_event.id:uuid:true",
   "outbox_event.last_attempt_at:timestamp with time zone:false",
@@ -576,6 +577,7 @@ const REQUIRED_TARGET_CONSTRAINTS = new Set([
   "ck_outbox_delivery_publication",
   "ck_outbox_delivery_blocked",
   "ck_outbox_delivery_error_code",
+  "ck_outbox_event_stream",
   "circulation_consumer_inbox_pkey",
   "uq_circulation_consumer_inbox_aggregate_version",
   "ck_circulation_consumer_inbox_consumer_name",
@@ -607,6 +609,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   -1_841_717_286,
   2_036_232_323,
   1_333_630_244,
+  1_275_141_948,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -638,7 +641,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 13",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 14",
     );
   }
 

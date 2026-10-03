@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-.NOTPARALLEL: ci ci-fast
+.NOTPARALLEL: ci ci-fast security-ci images-scan
 
 DATABASE_URL ?= postgresql://postgres:rootpassword@127.0.0.1:5432/library_management
 MIGRATION_DATABASE_NAME ?= circulation_migration_ci
@@ -11,8 +11,10 @@ MIGRATION_DATABASE_PASSWORD ?= rootpassword
 NODE := node
 NPM := npm
 GRADLE := ./gradlew
+TRIVY_IMAGE := aquasec/trivy:0.72.0
+TRIVY_CACHE_VOLUME := mundia-library-trivy-cache
 
-.PHONY: help toolchain bootstrap contracts database-ci web-ci-fast web-ci services-ci migration-tool-ci platform-ci images ci-fast ci
+.PHONY: help toolchain bootstrap contracts database-ci web-ci-fast web-ci services-ci migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
 
 WEB_CI_ENV := \
 	APP_ENV=development \
@@ -115,6 +117,49 @@ images: toolchain ## Build every image produced by push CI
 	@docker build --pull --file services/notification-service/Dockerfile --tag mundia-notification-service:local services
 	@docker build --pull --file services/web-bff/Dockerfile --tag mundia-web-bff:local services
 
+security-fs: toolchain ## Match the blocking hosted dependency, IaC, and secret scan
+	@docker run --rm \
+		--volume "$(CURDIR):/workspace:ro" \
+		--volume "$(TRIVY_CACHE_VOLUME):/root/.cache/trivy" \
+		--workdir /workspace \
+		$(TRIVY_IMAGE) fs \
+		--scanners vuln,misconfig,secret \
+		--skip-dirs node_modules \
+		--skip-dirs .next \
+		--skip-dirs services/.gradle \
+		--skip-dirs services/catalog-service/build \
+		--skip-dirs services/circulation-service/build \
+		--skip-dirs services/membership-service/build \
+		--skip-dirs services/notification-service/build \
+		--skip-dirs services/web-bff/build \
+		--skip-dirs tools/circulation-migration/node_modules \
+		--severity CRITICAL,HIGH \
+		--exit-code 1 \
+		--format table \
+		.
+
+images-scan: images ## Match the blocking hosted Trivy scan for every deployable image
+	@set -euo pipefail; \
+	for image in \
+		mundia-library:local \
+		mundia-circulation-service:local \
+		mundia-membership-service:local \
+		mundia-catalog-service:local \
+		mundia-notification-service:local \
+		mundia-web-bff:local; do \
+		docker run --rm \
+			--volume /var/run/docker.sock:/var/run/docker.sock \
+			--volume "$(TRIVY_CACHE_VOLUME):/root/.cache/trivy" \
+			$(TRIVY_IMAGE) image \
+			--pkg-types os,library \
+			--severity CRITICAL,HIGH \
+			--exit-code 1 \
+			--format table \
+			"$$image"; \
+	done
+
+security-ci: bootstrap security-fs images-scan ## Run all blocking dependency and container security gates locally
+
 ci-fast: contracts services-ci web-ci-fast ## Run the primary code-quality gates without provisioning or image builds
 
-ci: bootstrap database-ci contracts services-ci migration-tool-ci platform-ci web-ci images ## Mirror primary push CI locally; hosted security workflows still run on GitHub
+ci: bootstrap database-ci contracts services-ci migration-tool-ci platform-ci web-ci security-fs images-scan ## Mirror blocking push CI and security scans locally

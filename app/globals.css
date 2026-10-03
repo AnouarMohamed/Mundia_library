@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../tailwind.config.ts";
+@import "tailwindcss";
 
 @layer base {
   :root {
@@ -87,7 +86,7 @@
 
 @layer components {
   .form-btn {
-    @apply inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-base transition-colors duration-200 !important;
+    @apply inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-base transition-colors duration-200;
     color: var(--mundia-paper);
     background: var(--mundia-navy);
     box-shadow: none;
@@ -98,7 +97,7 @@
   }
 
   .form-input {
-    @apply w-full min-h-12 rounded-lg border px-4 text-base font-normal transition-all !important;
+    @apply w-full min-h-12 rounded-lg border px-4 text-base font-normal transition-all;
     border-color: var(--mundia-line);
     background: oklch(98% 0.006 218);
     color: var(--mundia-ink);
@@ -287,7 +286,12 @@
 
   /* Borrowed Book */
   .borrowed-book {
-    @apply gradient-vertical p-5 rounded-lg xs:w-min w-full relative;
+    @apply p-5 rounded-lg xs:w-min w-full relative;
+    background: linear-gradient(
+      180deg,
+      oklch(22% 0.04 225 / 0.94) 0%,
+      oklch(16% 0.025 225 / 0.92) 100%
+    );
   }
 
   .borrowed-book_cover {
@@ -440,7 +444,7 @@
   }
 
   .book-overview_btn {
-    @apply mt-4 min-h-12 w-fit rounded-lg hover:opacity-95 max-md:w-full !important;
+    @apply mt-4 min-h-12 w-fit rounded-lg hover:opacity-95 max-md:w-full;
     background: var(--mundia-navy);
     color: var(--mundia-paper);
     box-shadow: none;
@@ -467,12 +471,12 @@
   }
 
   .search-input {
-    @apply w-full border-none bg-transparent font-medium placeholder:font-normal text-white placeholder:text-light-100/70 focus-visible:ring-0 focus-visible:shadow-none !important;
+    @apply w-full border-none bg-transparent font-medium placeholder:font-normal text-white placeholder:text-light-100/70 focus-visible:ring-0 focus-visible:shadow-none;
   }
 
   /* Book Receipt */
   .book-receipt_admin-btn {
-    @apply bg-light-300 rounded-md text-primary-admin font-semibold hover:bg-light-300/80 !important;
+    @apply bg-light-300 rounded-md text-primary-admin font-semibold hover:bg-light-300/80;
   }
 
   /* Book Ticket */
@@ -520,7 +524,7 @@
   }
 
   .not-found-btn {
-    @apply bg-primary min-w-[360px] mt-6 text-light-100 text-base font-semibold hover:opacity-90 min-h-12 !important;
+    @apply bg-primary min-w-[360px] mt-6 text-light-100 text-base font-semibold hover:opacity-90 min-h-12;
   }
 
   /* Pagination */
@@ -529,11 +533,11 @@
   }
 
   .pagination-btn_light {
-    @apply bg-light-300 text-dark-300 hover:bg-light-300/70 !important;
+    @apply bg-light-300 text-dark-300 hover:bg-light-300/70;
   }
 
   .pagination-btn_dark {
-    @apply bg-dark-300 hover:bg-dark-100 !important;
+    @apply bg-dark-300 hover:bg-dark-100;
   }
 
   #pagination p {
@@ -542,15 +546,15 @@
 
   /* Sort */
   .select-trigger {
-    @apply w-40 h-10 px-4 bg-dark-300 text-light-100 border-dark-100 !important;
+    @apply w-40 h-10 px-4 bg-dark-300 text-light-100 border-dark-100;
   }
 
   .select-content {
-    @apply bg-dark-300 text-light-100 border-dark-100 !important;
+    @apply bg-dark-300 text-light-100 border-dark-100;
   }
 
   .select-item {
-    @apply focus:bg-dark-600 focus:text-light-100 !important;
+    @apply focus:bg-dark-600 focus:text-light-100;
   }
 }
 

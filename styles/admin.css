@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@reference "../app/globals.css";
 
 @layer base {
   .admin-theme {
@@ -34,7 +32,7 @@
   }
 
   .back-btn {
-    @apply mb-10 w-fit border text-xs font-medium shadow-none !important;
+    @apply mb-10 w-fit border text-xs font-medium shadow-none;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
     color: var(--mundia-ink);
@@ -42,21 +40,21 @@
 
   /* Confirmation Dialog */
   .confirm-trigger {
-    @apply font-semibold text-sm shadow-none hover:bg-opacity-70 w-full !important;
+    @apply font-semibold text-sm shadow-none hover:opacity-70 w-full;
   }
 
   .confirm-approve {
-    @apply text-white hover:opacity-95 !important;
+    @apply text-white hover:opacity-95;
     background: var(--mundia-success);
   }
 
   .confirm-reject {
-    @apply text-white hover:opacity-95 !important;
+    @apply text-white hover:opacity-95;
     background: var(--mundia-danger);
   }
 
   .confirm-content {
-    @apply sm:max-w-md flex flex-col items-center justify-center p-4 sm:p-6 !important;
+    @apply sm:max-w-md flex flex-col items-center justify-center p-4 sm:p-6;
   }
 
   .confirm-illustration {
@@ -68,25 +66,25 @@
   }
 
   .confirm-btn {
-    @apply w-full min-h-14 rounded-lg font-bold text-base text-light-800 !important;
+    @apply w-full min-h-14 rounded-lg font-bold text-base text-light-800;
   }
 
   /* Book Form */
   .book-form_input {
-    @apply min-h-14 border p-4 text-base font-semibold placeholder:font-normal !important;
+    @apply min-h-14 border p-4 text-base font-semibold placeholder:font-normal;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
     color: var(--mundia-ink);
   }
 
   .book-form_btn {
-    @apply min-h-14 w-full text-white hover:opacity-95 !important;
+    @apply min-h-14 w-full text-white hover:opacity-95;
     background: var(--mundia-navy);
   }
 
   /* Home Page */
   .view-btn {
-    @apply rounded-md border font-semibold shadow-none !important;
+    @apply rounded-md border font-semibold shadow-none;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
     color: var(--mundia-ink);
@@ -226,7 +224,7 @@
   }
 
   .admin-search_input {
-    @apply w-full border-0 shadow-none bg-transparent outline-none focus:outline-none focus:ring-0 focus:border-0 !important;
+    @apply w-full border-0 shadow-none bg-transparent outline-none focus:outline-none focus:ring-0 focus:border-0;
   }
 
   /* Sidebar */
