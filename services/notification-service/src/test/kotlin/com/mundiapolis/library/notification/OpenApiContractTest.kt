@@ -4,6 +4,8 @@ import com.mundiapolis.library.notification.adapter.`in`.web.NotificationControl
 import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
 import com.mundiapolis.library.notification.dto.NotificationPreference
+import com.mundiapolis.library.notification.dto.EmailSuppressionRemoval
+import com.mundiapolis.library.notification.dto.RemoveEmailSuppressionRequest
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import tools.jackson.core.StreamReadFeature
@@ -36,6 +39,8 @@ class OpenApiContractTest {
         assertSchemaFields("NotificationItem", NotificationItem::class.java)
         assertSchemaFields("NotificationPage", NotificationPage::class.java)
         assertSchemaFields("NotificationPreference", NotificationPreference::class.java)
+        assertSchemaFields("EmailSuppressionRemoval", EmailSuppressionRemoval::class.java)
+        assertSchemaFields("RemoveEmailSuppressionRequest", RemoveEmailSuppressionRequest::class.java)
         assertSchemaFields("UpdateNotificationPreferenceRequest", UpdateNotificationPreferenceRequest::class.java)
     }
 
@@ -63,11 +68,13 @@ class OpenApiContractTest {
         return NotificationController::class.java.declaredMethods.mapNotNull { method ->
             val path = method.getAnnotation(GetMapping::class.java)?.value?.singleOrNull()
                 ?: method.getAnnotation(PatchMapping::class.java)?.value?.singleOrNull()
+                ?: method.getAnnotation(PostMapping::class.java)?.value?.singleOrNull()
                 ?: method.getAnnotation(PutMapping::class.java)?.value?.singleOrNull()
                 ?: return@mapNotNull null
             val verb = when {
                 method.isAnnotationPresent(GetMapping::class.java) -> "get"
                 method.isAnnotationPresent(PatchMapping::class.java) -> "patch"
+                method.isAnnotationPresent(PostMapping::class.java) -> "post"
                 else -> "put"
             }
             val scopes = SCOPE_PATTERN.findAll(requireNotNull(method.getAnnotation(PreAuthorize::class.java)).value)

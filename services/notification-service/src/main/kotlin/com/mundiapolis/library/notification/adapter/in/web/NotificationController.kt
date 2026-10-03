@@ -4,7 +4,10 @@ import com.mundiapolis.library.notification.dto.NotificationItem
 import com.mundiapolis.library.notification.dto.NotificationPage
 import com.mundiapolis.library.notification.dto.NotificationPreference
 import com.mundiapolis.library.notification.dto.NotificationReadStatus
+import com.mundiapolis.library.notification.dto.EmailSuppressionRemoval
+import com.mundiapolis.library.notification.dto.RemoveEmailSuppressionRequest
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
+import com.mundiapolis.library.notification.service.EmailSuppressionService
 import com.mundiapolis.library.notification.service.NotificationPreferencePreconditionRequiredException
 import com.mundiapolis.library.notification.service.NotificationService
 import jakarta.validation.Valid
@@ -21,6 +24,7 @@ import org.springframework.validation.annotation.Validated
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -32,7 +36,10 @@ import java.util.UUID
 @Validated
 @RestController
 @RequestMapping("/api/v1/notifications")
-class NotificationController(private val service: NotificationService) {
+class NotificationController(
+    private val service: NotificationService,
+    private val emailSuppressionService: EmailSuppressionService,
+) {
     @GetMapping("/me")
     @PreAuthorize("hasAuthority('SCOPE_notification.inbox.read')")
     fun list(
@@ -80,6 +87,24 @@ class NotificationController(private val service: NotificationService) {
             .body(preference)
     }
 
+    @PostMapping("/email-suppressions/{memberId}/removal")
+    @PreAuthorize("hasAuthority('SCOPE_notification.suppression.write')")
+    fun removeEmailSuppression(
+        authentication: JwtAuthenticationToken,
+        @PathVariable memberId: UUID,
+        @RequestHeader(name = "Idempotency-Key") requestId: UUID,
+        @Valid @RequestBody request: RemoveEmailSuppressionRequest,
+    ): ResponseEntity<EmailSuppressionRemoval> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(
+            emailSuppressionService.remove(
+                requestId,
+                memberId,
+                requiredActorSubject(authentication),
+                request.justification,
+            ),
+        )
+
     private fun requiredMemberId(authentication: JwtAuthenticationToken): UUID {
         val claim = authentication.token.getClaimAsString("membership_id")
             ?: throw AccessDeniedException("The membership_id claim is required")
@@ -96,6 +121,9 @@ class NotificationController(private val service: NotificationService) {
             ?: throw IllegalArgumentException("If-Match must contain one strong preference version")
         return raw.toLongOrNull() ?: throw IllegalArgumentException("If-Match preference version is invalid")
     }
+
+    private fun requiredActorSubject(authentication: JwtAuthenticationToken): String =
+        authentication.token.subject ?: throw AccessDeniedException("The sub claim is required")
 
     private fun NotificationPreference.strongEtag(): String = "\"$version\""
 

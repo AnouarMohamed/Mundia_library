@@ -84,6 +84,31 @@
           "404": {"description": "Notification absent or not owned by caller"}
         }
       }
+    },
+    "/api/v1/notifications/email-suppressions/{memberId}/removal": {
+      "post": {
+        "operationId": "removeMemberEmailSuppression",
+        "x-required-scopes": ["notification.suppression.write"],
+        "parameters": [
+          {"name": "memberId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}},
+          {"name": "Idempotency-Key", "in": "header", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RemoveEmailSuppressionRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Suppression removal was durably audited; removed is false when no suppression existed",
+            "headers": {"Cache-Control": {"schema": {"type": "string"}}},
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EmailSuppressionRemoval"}}}
+          },
+          "400": {"description": "Malformed idempotency key, member identifier, actor subject, or justification"},
+          "401": {"description": "Authentication required"},
+          "403": {"description": "Suppression-management scope missing"},
+          "409": {"description": "Idempotency key was already used for a different request"}
+        }
+      }
     }
   },
   "components": {
@@ -139,6 +164,26 @@
           "overdueEnabled": {"type": "boolean"},
           "holdReadyEnabled": {"type": "boolean"},
           "accountStatusEnabled": {"type": "boolean"}
+        }
+      },
+      "RemoveEmailSuppressionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["justification"],
+        "properties": {
+          "justification": {"type": "string", "minLength": 20, "maxLength": 500}
+        }
+      },
+      "EmailSuppressionRemoval": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestId", "memberId", "removed", "performedAt"],
+        "properties": {
+          "requestId": {"type": "string", "format": "uuid"},
+          "memberId": {"type": "string", "format": "uuid"},
+          "removed": {"type": "boolean"},
+          "previousReason": {"type": ["string", "null"], "enum": ["PERMANENT_BOUNCE", "COMPLAINT", null]},
+          "performedAt": {"type": "string", "format": "date-time"}
         }
       }
     }

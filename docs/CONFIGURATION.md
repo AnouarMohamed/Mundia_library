@@ -254,7 +254,12 @@ email delivery while preserving mandatory in-app notifications. Transient and
 undetermined bounces remain observable but do not suppress the member. No email
 address or raw provider payload is retained in the suppression record. Keep
 suppression removal an authenticated, audited operational action; do not delete
-rows directly in routine operation.
+rows directly in routine operation. The authorization server must reserve
+`notification.suppression.write` for the trusted operations client or explicit
+operator role. Calls require a unique UUID `Idempotency-Key` and a 20-to-500
+character non-PII justification; the service snapshots the prior suppression
+into `notification_email_suppression_removal_audit` before deletion. Removal
+does not requeue previously suppressed deliveries.
 
 ## Secrets Handling
 

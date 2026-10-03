@@ -209,9 +209,23 @@ Check:
 
 Do not remove suppression because a user asks through an unauthenticated
 channel, and do not delete provider feedback receipts. Confirm the Membership
-address was corrected, verify the requester, and use the controlled audited
-removal workflow once that Phase 5 operation is available. Until then, retain
-suppression and use the mandatory in-app channel.
+address was corrected and verify the requester through the approved support
+process. A trusted operator holding only the required
+`notification.suppression.write` scope may then call:
+
+```bash
+curl --fail-with-body \
+  -X POST "$NOTIFICATION_SERVICE_URL/api/v1/notifications/email-suppressions/$MEMBER_ID/removal" \
+  -H "Authorization: Bearer $OPERATOR_ACCESS_TOKEN" \
+  -H "Idempotency-Key: $REQUEST_ID" \
+  -H "Content-Type: application/json" \
+  --data '{"justification":"Verified address correction under support ticket SEC-2041"}'
+```
+
+Use a new UUID for `REQUEST_ID`; an exact retry returns the original result,
+while reuse for different request content returns `409`. Confirm the row in
+`notification_email_suppression_removal_audit`. The operation enables only
+future eligible email intents and never requeues previously suppressed work.
 
 ### Image Uploads Fail
 

@@ -345,6 +345,19 @@ retention/deletion workflows pass.
   preference, and delivery observability.
 - Build OpenSearch projections for catalog, availability, and recommendations.
 - Make every read model disposable and rebuildable from events/snapshots.
+- After notification operational controls and the core search projection are
+  complete, add a rights-aware engineering collection ingestion slice. Seed
+  curated, institutionally credible open textbooks from OpenStax, the Open
+  Textbook Library, OAPEN/DOAB, and Project Gutenberg before importing the
+  broader Open Library metadata dumps or using Google Books enrichment.
+- Serve authorized open-access and public-domain files through the Mundia web
+  download endpoint backed by private S3 and CloudFront, so the product exposes
+  one first-party Download action. Persist source, immutable object digest,
+  license, territorial constraints, attribution, and last rights verification;
+  malware-scan and quarantine every imported object; use short-lived signed
+  delivery; and never ingest or proxy a work without redistribution rights.
+  Copyrighted titles remain discoverable as preview, external-loan, purchase,
+  or metadata-only records rather than being misrepresented as downloads.
 
 Implementation checkpoint (2026-10-03): the Kotlin Notification service now
 owns its PostgreSQL/Flyway schema for member preferences, in-app inbox items,
@@ -390,10 +403,15 @@ is persisted. Signed complaints and permanent bounces now atomically create
 privacy-preserving member suppressions, cancel queued work, fence claimed work
 before recipient resolution, and suppress future email intents while mandatory
 in-app delivery continues. Transient and undetermined bounces remain observable
-without suppressing delivery. Scheduled due/overdue and legitimate
-catalog-triggered intents, controlled suppression removal and dead-letter
-replay, BFF routing, and Kubernetes/Terraform values remain required before
-production routing.
+without suppressing delivery. Controlled removal now requires a dedicated
+least-privilege scope, a canonical idempotency key and meaningful operator
+justification; it serializes against intent/feedback races, snapshots the prior
+state into a durable audit row, and restores only future eligible email work.
+Scheduled due/overdue and legitimate catalog-triggered intents, dead-letter
+replay tooling, BFF routing, and Kubernetes/Terraform values remain required
+before production routing. The engineering collection and first-party authorized-file
+download slice is deliberately sequenced after those controls and the core
+OpenSearch projection, not on the current notification critical path.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

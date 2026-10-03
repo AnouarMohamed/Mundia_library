@@ -1,6 +1,7 @@
 package com.mundiapolis.library.notification.adapter.`in`.web
 
 import com.mundiapolis.library.notification.service.NotificationNotFoundException
+import com.mundiapolis.library.notification.service.EmailSuppressionRemovalConflictException
 import com.mundiapolis.library.notification.service.NotificationPreferencePreconditionRequiredException
 import com.mundiapolis.library.notification.service.NotificationPreferenceVersionConflictException
 import jakarta.validation.ConstraintViolationException
@@ -34,6 +35,10 @@ class NotificationExceptionHandler {
     @ExceptionHandler(NotificationPreferenceVersionConflictException::class)
     fun versionConflict(exception: NotificationPreferenceVersionConflictException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "preference_version_conflict", requireNotNull(exception.message))
+
+    @ExceptionHandler(EmailSuppressionRemovalConflictException::class)
+    fun suppressionRemovalConflict(exception: EmailSuppressionRemovalConflictException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "suppression_removal_idempotency_conflict", requireNotNull(exception.message))
 
     private fun problem(status: HttpStatus, code: String, detail: String): ProblemDetail =
         ProblemDetail.forStatusAndDetail(status, detail).apply {

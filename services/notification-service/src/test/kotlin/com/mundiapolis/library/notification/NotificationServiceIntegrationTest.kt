@@ -5,6 +5,7 @@ import com.mundiapolis.library.notification.adapter.`in`.events.NotificationInte
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_DELIVERY
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_FEEDBACK_RECEIPT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_SUPPRESSION
+import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INBOX
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_INTENT_RECEIPT
 import com.mundiapolis.library.notification.adapter.outbound.persistence.jooq.generated.Tables.NOTIFICATION_PREFERENCE
@@ -17,6 +18,7 @@ import com.mundiapolis.library.notification.dto.NotificationIntentConflictExcept
 import com.mundiapolis.library.notification.dto.UpdateNotificationPreferenceRequest
 import com.mundiapolis.library.notification.service.NotificationIntentHandler
 import com.mundiapolis.library.notification.service.EmailDeliveryStore
+import com.mundiapolis.library.notification.service.EmailSuppressionService
 import com.mundiapolis.library.notification.service.NotificationService
 import com.mundiapolis.library.notification.dto.EmailProviderReceipt
 import com.mundiapolis.library.notification.dto.EmailSuppressionReason
@@ -41,6 +43,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
@@ -56,6 +59,7 @@ import java.time.ZoneOffset
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
+import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -70,10 +74,12 @@ class NotificationServiceIntegrationTest {
     @Autowired lateinit var intentConsumer: NotificationIntentKafkaConsumer
     @Autowired lateinit var notificationService: NotificationService
     @Autowired lateinit var emailDeliveryStore: EmailDeliveryStore
+    @Autowired lateinit var emailSuppressionService: EmailSuppressionService
     @Autowired lateinit var sesFeedbackStore: SesFeedbackStore
 
     @BeforeEach
     fun seed() {
+        dsl.deleteFrom(NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_SUPPRESSION).execute()
         dsl.deleteFrom(NOTIFICATION_EMAIL_FEEDBACK_RECEIPT).execute()
         dsl.deleteFrom(NOTIFICATION_INTENT_RECEIPT).execute()
@@ -430,6 +436,128 @@ class NotificationServiceIntegrationTest {
                 .and(NOTIFICATION_DELIVERY.STATUS.ne("SUPPRESSED")),
         )
         org.assertj.core.api.Assertions.assertThat(escaped).isZero()
+    }
+
+    @Test
+    fun `authorized suppression removal is audited idempotent and restores only future email`() {
+        intentHandler.apply(intentCommand())
+        val acceptedAt = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.MICROS)
+        val delivered = emailDeliveryStore.claimBatch(
+            "worker-1",
+            UUID.randomUUID(),
+            acceptedAt,
+            acceptedAt.plusSeconds(60),
+            1,
+            8,
+        ).single()
+        org.assertj.core.api.Assertions.assertThat(
+            emailDeliveryStore.markDelivered(
+                "worker-1",
+                delivered,
+                EmailProviderReceipt("aws-ses", "ses-message-123"),
+                acceptedAt,
+            ),
+        ).isTrue()
+        sesFeedbackStore.apply(
+            feedback(
+                "50000000-0000-4000-8000-000000000020",
+                delivered.deliveryId,
+                SesFeedbackType.COMPLAINT,
+                acceptedAt.plusSeconds(1),
+                "8".repeat(64),
+                EmailSuppressionReason.COMPLAINT,
+            ),
+            acceptedAt.plusSeconds(2),
+        )
+
+        val requestId = UUID.randomUUID()
+        val requestBody = """{"justification":"Address ownership re-verified by support ticket SEC-2041"}"""
+        val first = mockMvc.perform(
+            post("/api/v1/notifications/email-suppressions/$MEMBER_ID/removal")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(SUPPRESSION_WRITE_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.requestId").value(requestId.toString()))
+            .andExpect(jsonPath("$.memberId").value(MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.removed").value(true))
+            .andExpect(jsonPath("$.previousReason").value("COMPLAINT"))
+            .andReturn()
+
+        mockMvc.perform(
+            post("/api/v1/notifications/email-suppressions/$MEMBER_ID/removal")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(SUPPRESSION_WRITE_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content(requestBody),
+        ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.performedAt").value(
+                tools.jackson.databind.ObjectMapper().readTree(first.response.contentAsString)["performedAt"].stringValue(),
+            ))
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_SUPPRESSION)).isZero()
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT)).isEqualTo(1)
+
+        mockMvc.perform(
+            post("/api/v1/notifications/email-suppressions/$MEMBER_ID/removal")
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(SUPPRESSION_WRITE_SCOPE)))
+                .header("Idempotency-Key", requestId)
+                .contentType("application/json")
+                .content("""{"justification":"A different sufficiently long operational justification"}"""),
+        ).andExpect(status().isConflict)
+
+        val futureNotification = intentHandler.apply(
+            intentCommand().copy(eventId = UUID.randomUUID(), payloadSha256 = "7".repeat(64), offset = 121),
+        ).notificationId
+        org.assertj.core.api.Assertions.assertThat(
+            dsl.select(NOTIFICATION_DELIVERY.STATUS)
+                .from(NOTIFICATION_DELIVERY)
+                .where(NOTIFICATION_DELIVERY.NOTIFICATION_ID.eq(futureNotification))
+                .and(NOTIFICATION_DELIVERY.CHANNEL.eq("EMAIL"))
+                .fetchSingle(NOTIFICATION_DELIVERY.STATUS),
+        ).isEqualTo("PENDING")
+    }
+
+    @Test
+    fun `suppression removal requires its dedicated scope and meaningful justification`() {
+        val endpoint = "/api/v1/notifications/email-suppressions/$MEMBER_ID/removal"
+        mockMvc.perform(
+            post(endpoint)
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(WRITE_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content("""{"justification":"Address ownership was independently verified"}"""),
+        ).andExpect(status().isForbidden)
+        mockMvc.perform(
+            post(endpoint)
+                .with(jwt().jwt { it.subject("operator-42") }.authorities(SimpleGrantedAuthority(SUPPRESSION_WRITE_SCOPE)))
+                .header("Idempotency-Key", UUID.randomUUID())
+                .contentType("application/json")
+                .content("""{"justification":"too short"}"""),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `concurrent exact suppression removal requests create one audit record`() {
+        val requestId = UUID.randomUUID()
+        val start = CountDownLatch(1)
+        val results = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            (1..16).map {
+                executor.submit(Callable {
+                    start.await()
+                    emailSuppressionService.remove(
+                        requestId,
+                        MEMBER_ID,
+                        "operator-42",
+                        "Address ownership re-verified by support ticket SEC-2041",
+                    )
+                })
+            }.also { start.countDown() }.map { it.get(10, TimeUnit.SECONDS) }
+        }
+        org.assertj.core.api.Assertions.assertThat(results).allMatch { !it.removed }
+        org.assertj.core.api.Assertions.assertThat(results.map { it.performedAt }.toSet()).hasSize(1)
+        org.assertj.core.api.Assertions.assertThat(dsl.fetchCount(NOTIFICATION_EMAIL_SUPPRESSION_REMOVAL_AUDIT)).isEqualTo(1)
     }
 
     private fun feedback(
@@ -790,6 +918,7 @@ class NotificationServiceIntegrationTest {
         const val WRITE_SCOPE = "SCOPE_notification.inbox.write"
         const val PREFERENCE_READ_SCOPE = "SCOPE_notification.preferences.read"
         const val PREFERENCE_WRITE_SCOPE = "SCOPE_notification.preferences.write"
+        const val SUPPRESSION_WRITE_SCOPE = "SCOPE_notification.suppression.write"
         const val TOPIC = "mundia.notification.intents.v1"
         const val SCHEMA_SUBJECT = "mundia.notification.v1.NotificationIntent"
 
