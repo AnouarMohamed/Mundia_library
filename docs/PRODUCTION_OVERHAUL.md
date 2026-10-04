@@ -133,12 +133,14 @@ flowchart LR
     BFF --> Catalog["Catalog service"]
     BFF --> Circulation["Circulation service"]
     BFF --> Notifications["Notification service"]
+    BFF --> DigitalContent["Digital Content service"]
     BFF --> Discovery["Discovery service"]
 
     Membership --> MembershipDb[("Membership PostgreSQL")]
     Catalog --> CatalogDb[("Catalog PostgreSQL")]
     Circulation --> CirculationDb[("Circulation PostgreSQL")]
     Notifications --> NotificationDb[("Notification PostgreSQL")]
+    DigitalContent --> DigitalContentDb[("Digital Content PostgreSQL")]
     Discovery --> Search[("OpenSearch")]
 
     Membership --> Broker["Kafka-compatible broker"]
@@ -414,11 +416,18 @@ attempt cycle. Circulation now schedules due-soon and overdue intents in bounded
 `SKIP LOCKED` batches, revalidates active loans under a row lock, and atomically
 persists each intent with a receipt keyed by loan, observed due date, and reminder type. This
 makes concurrent replicas converge while renewed due dates remain eligible for
-a fresh reminder. Legitimate catalog-triggered intents, BFF routing, and
-Kubernetes/Terraform values remain required before production routing. The
-engineering collection and first-party authorized-file
-download slice is deliberately sequenced after those controls and the core
-OpenSearch projection, not on the current notification critical path.
+a fresh reminder. Legitimate catalog-triggered intents and Kubernetes/Terraform
+values remain required before production routing. Caller-bound inbox, mark-read,
+and strongly versioned preference routes now pass through the Kotlin BFF using
+RFC 8693 token exchange, strict downstream response validation, CSRF protection,
+bounded request/response bodies, no-store responses, and delegated-token
+eviction. The Digital Content service has started as a separate Kotlin ownership
+boundary with its own PostgreSQL/Flyway schema and machine-readable contract.
+Its first read slice returns only globally authorized, unexpired, malware-clean,
+published PDF/EPUB availability and never exposes private object keys or
+provenance URLs. The authorization/signing command, quarantine ingestion worker,
+BFF/UI Download action, and core OpenSearch projection remain pending; the
+service therefore does not issue file URLs or bytes yet.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

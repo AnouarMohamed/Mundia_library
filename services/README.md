@@ -16,7 +16,7 @@ cd services
 ./gradlew clean check
 ```
 
-All four domain services generate jOOQ sources from their Flyway migrations before
+All five domain services generate jOOQ sources from their Flyway migrations before
 compilation. Integration tests start isolated
 PostgreSQL containers and verify that Flyway, the persistence adapters, HTTP
 authorization, and published contracts work together.
@@ -30,7 +30,7 @@ local convenience is not part of the container runtime contract.
 Start PostgreSQL:
 
 ```bash
-docker compose up -d circulation-db membership-db catalog-db notification-db
+docker compose up -d circulation-db membership-db catalog-db notification-db digital-content-db
 ```
 
 Run the service with a real development OIDC issuer and JWK set:
@@ -69,6 +69,32 @@ export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/ope
 export AUTH_AUDIENCE=notification-api
 ./gradlew :notification-service:bootRun
 ```
+
+Run Digital Content against its local database:
+
+```bash
+export AUTH_ISSUER_URI=https://identity.example.test/realms/mundia
+export AUTH_JWK_SET_URI=https://identity.example.test/realms/mundia/protocol/openid-connect/certs
+export AUTH_AUDIENCE=digital-content-api
+./gradlew :digital-content-service:bootRun
+```
+
+## Digital content availability API
+
+Digital Content owns downloadable-file rights, immutable digests, private
+object manifests, malware-scan state, and publication state. Its first slice is
+`GET /api/v1/digital-content/editions/{editionId}/availability`, requiring
+`digital-content.availability.read`. It returns formats only when rights are
+verified and current, territory is global, the object scan is clean, and the
+asset is published. Missing or ineligible content returns a uniform empty
+availability result; private object keys and provenance URLs never leave the
+service. The immutable contract is available at
+`GET /openapi/digital-content-v1.json`.
+
+The download-authorization command, short-lived CloudFront signing, quarantined
+ingestion worker, trusted territory signal, and BFF/UI Download action are the
+next slice. Until those controls exist, this service intentionally does not
+issue or proxy file bytes.
 
 The local database defaults are defined in `compose.yaml`. Production must
 provide all database and identity settings through its secret/configuration
@@ -229,10 +255,11 @@ missing and cross-member records, and preserve the first read timestamp on
 replay. Responses are non-cacheable. The immutable contract is public at
 `GET /openapi/notification-v1.json`.
 
-Kafka intent consumers, preference writes, provider delivery workers,
-suppression, retry/DLQ handling, and BFF routing remain Phase 5 work. Until
-those gates pass, the service image is buildable and publishable but is not
-production-routed.
+Kafka intent consumption, preference writes, provider delivery, suppression,
+retry/DLQ controls, and caller-bound Kotlin BFF routing are implemented and
+covered by their service suites. Catalog-triggered intents, production broker/
+provider provisioning, and Kubernetes/Terraform values remain Phase 5 gates;
+the service is not production-routed yet.
 
 ## Circulation command API
 
@@ -381,4 +408,6 @@ docker build -f circulation-service/Dockerfile -t mundia/circulation-service:dev
 docker build -f membership-service/Dockerfile -t mundia/membership-service:dev .
 docker build -f catalog-service/Dockerfile -t mundia/catalog-service:dev .
 docker build -f notification-service/Dockerfile -t mundia/notification-service:dev .
+docker build -f digital-content-service/Dockerfile -t mundia/digital-content-service:dev .
+docker build -f web-bff/Dockerfile -t mundia/web-bff:dev .
 ```

@@ -303,6 +303,83 @@
           "504": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "getOwnNotifications",
+        "summary": "List the authenticated member's notification inbox",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ALL", "READ", "UNREAD"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Caller-bound notification page",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationPage" } } }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read": {
+      "patch": {
+        "operationId": "markOwnNotificationReadThroughBff",
+        "summary": "Idempotently mark an owned notification as read",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "notificationId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Notification marked read", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationItem" } } } },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/notifications/preferences": {
+      "get": {
+        "operationId": "getOwnNotificationPreferenceThroughBff",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Caller-bound notification preference",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "ETag": { "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationPreference" } } }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      },
+      "put": {
+        "operationId": "updateOwnNotificationPreferenceThroughBff",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "If-Match", "in": "header", "required": true, "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateNotificationPreference" } } } },
+        "responses": {
+          "200": { "description": "Preference updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationPreference" } } } },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "428": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -530,6 +607,57 @@
           "memberId": { "type": "string", "format": "uuid" },
           "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/ReservationCommand" } },
           "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        },
+        "additionalProperties": false
+      },
+      "NotificationItem": {
+        "type": "object",
+        "required": ["notificationId", "category", "subject", "body", "occurredAt", "createdAt", "readAt"],
+        "properties": {
+          "notificationId": { "type": "string", "format": "uuid" },
+          "category": { "type": "string", "enum": ["DUE_SOON", "OVERDUE", "HOLD_READY", "ACCOUNT_STATUS", "GENERAL"] },
+          "subject": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "body": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "readAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "NotificationPage": {
+        "type": "object",
+        "required": ["memberId", "items", "nextCursor"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/NotificationItem" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 128, "pattern": "^[A-Za-z0-9_-]+$" }
+        },
+        "additionalProperties": false
+      },
+      "NotificationPreference": {
+        "type": "object",
+        "required": ["memberId", "emailEnabled", "dueSoonEnabled", "overdueEnabled", "holdReadyEnabled", "accountStatusEnabled", "version", "updatedAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "emailEnabled": { "type": "boolean" },
+          "dueSoonEnabled": { "type": "boolean" },
+          "overdueEnabled": { "type": "boolean" },
+          "holdReadyEnabled": { "type": "boolean" },
+          "accountStatusEnabled": { "type": "boolean" },
+          "version": { "type": "integer", "format": "int64", "minimum": 0 },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "UpdateNotificationPreference": {
+        "type": "object",
+        "required": ["emailEnabled", "dueSoonEnabled", "overdueEnabled", "holdReadyEnabled", "accountStatusEnabled"],
+        "properties": {
+          "emailEnabled": { "type": "boolean" },
+          "dueSoonEnabled": { "type": "boolean" },
+          "overdueEnabled": { "type": "boolean" },
+          "holdReadyEnabled": { "type": "boolean" },
+          "accountStatusEnabled": { "type": "boolean" }
         },
         "additionalProperties": false
       },

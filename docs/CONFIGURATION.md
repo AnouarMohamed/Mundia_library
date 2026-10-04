@@ -284,6 +284,22 @@ character non-PII justification; the service snapshots the prior suppression
 into `notification_email_suppression_removal_audit` before deletion. Removal
 does not requeue previously suppressed deliveries.
 
+## Digital Content service
+
+The Digital Content service uses `DATABASE_URL`, `DATABASE_USERNAME`, and
+`DATABASE_PASSWORD` for its runtime-owned PostgreSQL database and the standard
+`AUTH_ISSUER_URI`, `AUTH_JWK_SET_URI`, and `AUTH_AUDIENCE` settings. Its audience
+defaults to `digital-content-api`; callers need the narrow
+`digital-content.availability.read` scope for the availability endpoint. Flyway
+is disabled in packaged runtime images and enabled by `bootRun` for local-only
+development, matching the other domain services.
+
+This first slice intentionally has no S3 or CloudFront credentials. Add those
+only with the download-authorization slice, using EKS workload identity and a
+dedicated signing secret/KMS policy rather than static AWS credentials. Object
+storage must remain private, block public access, require encryption, and emit
+scan completion before an asset can become `CLEAN` and `PUBLISHED`.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

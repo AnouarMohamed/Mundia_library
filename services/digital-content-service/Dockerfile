@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+FROM eclipse-temurin:25-jdk-noble@sha256:735baf2edc6cd6485240144a84fa4db142b9a6f47b4eb4080f31058d200f9813 AS builder
+WORKDIR /workspace
+
+COPY gradlew gradlew.bat settings.gradle.kts settings-gradle.lockfile build.gradle.kts gradle.properties ./
+COPY gradle ./gradle
+COPY circulation-service/build.gradle.kts circulation-service/gradle.lockfile ./circulation-service/
+COPY catalog-service/build.gradle.kts catalog-service/gradle.lockfile ./catalog-service/
+COPY digital-content-service/build.gradle.kts digital-content-service/gradle.lockfile ./digital-content-service/
+COPY membership-service/build.gradle.kts membership-service/gradle.lockfile ./membership-service/
+COPY notification-service/build.gradle.kts notification-service/gradle.lockfile ./notification-service/
+COPY web-bff/build.gradle.kts web-bff/gradle.lockfile ./web-bff/
+
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew --quiet :digital-content-service:dependencies --no-daemon
+
+COPY digital-content-service/src ./digital-content-service/src
+
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew :digital-content-service:bootJar --no-daemon
+
+FROM eclipse-temurin:25-jre-alpine@sha256:2ca9adf44f5c29d28ecd26cf92d75cc0c66b7f32bfd839a4439e363a8b428af8 AS runtime
+WORKDIR /app
+
+RUN apk add --no-cache --upgrade libexpat \
+    && addgroup -S -g 10001 app \
+    && adduser -S -D -H -u 10001 -G app app \
+    && rm -f /bin/ash /bin/sh /sbin/apk /bin/busybox
+
+COPY --from=builder --chown=10001:10001 \
+    /workspace/digital-content-service/build/libs/digital-content-service.jar \
+    /app/digital-content-service.jar
+
+USER 10001:10001
+EXPOSE 8080
+
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+
+ENTRYPOINT ["java", "-jar", "/app/digital-content-service.jar"]

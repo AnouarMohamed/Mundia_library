@@ -1,4 +1,4 @@
-package com.mundiapolis.library.bff.circulation
+package com.mundiapolis.library.bff.security
 
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ReadListener
@@ -18,9 +18,9 @@ import java.nio.charset.StandardCharsets
 
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
-class CirculationRequestBodyLimitFilter : OncePerRequestFilter() {
+class ApiRequestBodyLimitFilter : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
-        request.method !in BODY_METHODS || !request.requestURI.startsWith(CIRCULATION_PREFIX)
+        request.method !in BODY_METHODS || !request.requestURI.startsWith(API_PREFIX)
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -44,7 +44,7 @@ class CirculationRequestBodyLimitFilter : OncePerRequestFilter() {
         response.characterEncoding = StandardCharsets.UTF_8.name()
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
         response.writer.write(
-            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"Circulation request body exceeds 16384 bytes","code":"payload_too_large"}""",
+            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"API request body exceeds 16384 bytes","code":"payload_too_large"}""",
         )
     }
 
@@ -62,10 +62,12 @@ class CirculationRequestBodyLimitFilter : OncePerRequestFilter() {
         private val delegate = ByteArrayInputStream(body)
 
         override fun read(): Int = delegate.read()
+
         override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
             delegate.read(buffer, offset, length)
 
         override fun isFinished(): Boolean = delegate.available() == 0
+
         override fun isReady(): Boolean = true
 
         override fun setReadListener(listener: ReadListener) {
@@ -74,7 +76,7 @@ class CirculationRequestBodyLimitFilter : OncePerRequestFilter() {
     }
 
     private companion object {
-        const val CIRCULATION_PREFIX = "/api/v1/circulation/"
+        const val API_PREFIX = "/api/v1/"
         const val MAXIMUM_BODY_BYTES = 16 * 1024
         val BODY_METHODS = setOf("POST", "PUT", "PATCH")
     }

@@ -72,6 +72,11 @@ jobs:
             dockerfile: ./services/notification-service/Dockerfile
             image: mundia-notification-service:security-scan
             build_args: ""
+          - name: digital-content
+            context: ./services
+            dockerfile: ./services/digital-content-service/Dockerfile
+            image: mundia-digital-content-service:security-scan
+            build_args: ""
           - name: web-bff
             context: ./services
             dockerfile: ./services/web-bff/Dockerfile

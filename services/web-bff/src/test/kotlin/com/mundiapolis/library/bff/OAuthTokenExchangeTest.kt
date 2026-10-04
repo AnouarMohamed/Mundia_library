@@ -2,6 +2,7 @@ package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.config.CirculationClientProperties
 import com.mundiapolis.library.bff.config.MembershipClientProperties
+import com.mundiapolis.library.bff.config.NotificationClientProperties
 import com.mundiapolis.library.bff.config.OAuthClientConfiguration
 import com.mundiapolis.library.bff.config.withOAuthTokenProtocolSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -34,6 +35,7 @@ class OAuthTokenExchangeTest {
             builder.build(),
             properties(),
             circulationProperties(),
+            notificationProperties(),
         )
         val now = Instant.now()
         val source = OAuth2AccessToken(
@@ -81,6 +83,7 @@ class OAuthTokenExchangeTest {
             builder.build(),
             properties(),
             circulationProperties(),
+            notificationProperties(),
         )
         val now = Instant.now()
         val source = OAuth2AccessToken(
@@ -175,6 +178,15 @@ class OAuthTokenExchangeTest {
         connectTimeout = Duration.ofSeconds(1),
         readTimeout = Duration.ofSeconds(3),
         maximumResponseBytes = 64 * 1024,
+        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
+    )
+
+    private fun notificationProperties() = NotificationClientProperties(
+        baseUrl = URI("https://notification.internal"),
+        audience = "notification-api",
+        connectTimeout = Duration.ofSeconds(1),
+        readTimeout = Duration.ofSeconds(3),
+        maximumResponseBytes = 256 * 1024,
         maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
     )
 }

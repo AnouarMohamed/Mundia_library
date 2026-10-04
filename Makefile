@@ -58,6 +58,7 @@ bootstrap: toolchain ## Install reproducible root and migration-tool dependencie
 contracts: ## Validate committed OpenAPI JSON contracts and patch hygiene
 	@jq empty services/catalog-service/src/main/resources/static/openapi/catalog-v1.json
 	@jq empty services/circulation-service/src/main/resources/static/openapi/circulation-v1.json
+	@jq empty services/digital-content-service/src/main/resources/static/openapi/digital-content-v1.json
 	@jq empty services/membership-service/src/main/resources/static/openapi/membership-v1.json
 	@jq empty services/notification-service/src/main/resources/static/openapi/notification-v1.json
 	@jq empty services/web-bff/src/main/resources/static/openapi/web-bff-v1.json
@@ -114,6 +115,7 @@ images: toolchain ## Build every image produced by push CI
 	@docker build --pull --file services/circulation-service/Dockerfile --tag mundia-circulation-service:local services
 	@docker build --pull --file services/membership-service/Dockerfile --tag mundia-membership-service:local services
 	@docker build --pull --file services/catalog-service/Dockerfile --tag mundia-catalog-service:local services
+	@docker build --pull --file services/digital-content-service/Dockerfile --tag mundia-digital-content-service:local services
 	@docker build --pull --file services/notification-service/Dockerfile --tag mundia-notification-service:local services
 	@docker build --pull --file services/web-bff/Dockerfile --tag mundia-web-bff:local services
 
@@ -129,6 +131,7 @@ security-fs: toolchain ## Match the blocking hosted dependency, IaC, and secret 
 		--skip-dirs services/.gradle \
 		--skip-dirs services/catalog-service/build \
 		--skip-dirs services/circulation-service/build \
+		--skip-dirs services/digital-content-service/build \
 		--skip-dirs services/membership-service/build \
 		--skip-dirs services/notification-service/build \
 		--skip-dirs services/web-bff/build \
@@ -145,6 +148,7 @@ images-scan: images ## Match the blocking hosted Trivy scan for every deployable
 		mundia-circulation-service:local \
 		mundia-membership-service:local \
 		mundia-catalog-service:local \
+		mundia-digital-content-service:local \
 		mundia-notification-service:local \
 		mundia-web-bff:local; do \
 		docker run --rm \

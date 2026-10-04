@@ -420,6 +420,17 @@ jobs:
           cache-from: type=gha,scope=notification
           cache-to: type=gha,mode=max,scope=notification
 
+      - name: Build digital content service image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: ./services
+          file: ./services/digital-content-service/Dockerfile
+          pull: true
+          push: false
+          tags: mundia-digital-content-service:ci
+          cache-from: type=gha,scope=digital-content
+          cache-to: type=gha,mode=max,scope=digital-content
+
   publish-containers:
     name: Publish ${{ matrix.name }} to GHCR
     if: >-
@@ -471,6 +482,11 @@ jobs:
             context: ./services
             dockerfile: ./services/notification-service/Dockerfile
             cache_scope: publish-notification
+          - name: digital-content
+            image: mundia-digital-content-service
+            context: ./services
+            dockerfile: ./services/digital-content-service/Dockerfile
+            cache_scope: publish-digital-content
 
     steps:
       - name: Checkout verified source

@@ -55,7 +55,7 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln,misconfig,secret
-          skip-dirs: node_modules,services/.gradle,services/circulation-service/build,tools/circulation-migration/node_modules
+          skip-dirs: node_modules,services/.gradle,services/catalog-service/build,services/circulation-service/build,services/digital-content-service/build,services/membership-service/build,services/notification-service/build,services/web-bff/build,tools/circulation-migration/node_modules
           severity: CRITICAL,HIGH
           limit-severities-for-sarif: true
           format: sarif
@@ -75,7 +75,7 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln,misconfig,secret
-          skip-dirs: node_modules,services/.gradle,services/circulation-service/build,tools/circulation-migration/node_modules
+          skip-dirs: node_modules,services/.gradle,services/catalog-service/build,services/circulation-service/build,services/digital-content-service/build,services/membership-service/build,services/notification-service/build,services/web-bff/build,tools/circulation-migration/node_modules
           severity: CRITICAL,HIGH
           format: table
           exit-code: "1"

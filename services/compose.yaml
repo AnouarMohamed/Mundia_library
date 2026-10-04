@@ -65,6 +65,22 @@ services:
     volumes:
       - notification_db_data:/var/lib/postgresql
 
+  digital-content-db:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      POSTGRES_DB: digital_content
+      POSTGRES_USER: digital_content
+      POSTGRES_PASSWORD: digital-content-local-only
+    ports:
+      - "127.0.0.1:55436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U digital_content -d digital_content"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - digital_content_db_data:/var/lib/postgresql
+
   session-redis:
     image: redis:8.2-alpine@sha256:b51665e66f00759be7c3152ad5ac3c66fb2f619c13ef62dea7cc1f9914524635
     command: ["redis-server", "--save", "", "--appendonly", "no"]
@@ -81,3 +97,4 @@ volumes:
   membership_db_data:
   catalog_db_data:
   notification_db_data:
+  digital_content_db_data:

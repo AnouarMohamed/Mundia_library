@@ -66,6 +66,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: circulation.eligibility.read,circulation.loan.read,circulation.loan.request,circulation.loan.cancel,circulation.loan.renew,circulation.reservation.read,circulation.reservation.place,circulation.reservation.cancel
+          notification-service:
+            provider: institutional
+            client-id: ${NOTIFICATION_CLIENT_ID}
+            client-secret: ${NOTIFICATION_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: notification.inbox.read,notification.inbox.write,notification.preferences.read,notification.preferences.write
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}
@@ -105,6 +112,13 @@ app:
       read-timeout: ${CIRCULATION_READ_TIMEOUT:PT5S}
       maximum-response-bytes: ${CIRCULATION_MAXIMUM_RESPONSE_BYTES:65536}
       maximum-delegated-token-lifetime: ${CIRCULATION_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
+    notification:
+      base-url: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+      audience: ${NOTIFICATION_AUDIENCE:notification-api}
+      connect-timeout: ${NOTIFICATION_CONNECT_TIMEOUT:PT1S}
+      read-timeout: ${NOTIFICATION_READ_TIMEOUT:PT5S}
+      maximum-response-bytes: ${NOTIFICATION_MAXIMUM_RESPONSE_BYTES:262144}
+      maximum-delegated-token-lifetime: ${NOTIFICATION_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
 
 management:
   endpoints:

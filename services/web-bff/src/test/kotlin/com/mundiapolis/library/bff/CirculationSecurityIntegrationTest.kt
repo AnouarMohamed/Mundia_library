@@ -3,7 +3,7 @@ package com.mundiapolis.library.bff
 import com.mundiapolis.library.bff.circulation.CirculationController
 import com.mundiapolis.library.bff.circulation.CirculationEligibilityView
 import com.mundiapolis.library.bff.circulation.CirculationSelfServiceUseCase
-import com.mundiapolis.library.bff.circulation.CirculationRequestBodyLimitFilter
+import com.mundiapolis.library.bff.security.ApiRequestBodyLimitFilter
 import com.mundiapolis.library.bff.circulation.EligibilityStatusView
 import com.mundiapolis.library.bff.circulation.LoanCommandView
 import com.mundiapolis.library.bff.circulation.LoanMutationResult
@@ -53,7 +53,7 @@ import java.util.UUID
 @EnableConfigurationProperties(BffProperties::class)
 @Import(
     SecurityConfiguration::class,
-    CirculationRequestBodyLimitFilter::class,
+    ApiRequestBodyLimitFilter::class,
     CirculationSecurityIntegrationTest.CirculationTestConfiguration::class,
     BffSecurityIntegrationTest.ClientRegistrationTestConfiguration::class,
 )

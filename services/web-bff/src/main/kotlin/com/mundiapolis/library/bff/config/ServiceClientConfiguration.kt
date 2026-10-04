@@ -93,4 +93,28 @@ class ServiceClientConfiguration {
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build()
     }
+
+    @Bean
+    fun notificationRestClient(
+        observationRegistry: ObservationRegistry,
+        notification: NotificationClientProperties,
+        bff: BffProperties,
+    ): RestClient {
+        require(notification.isSafeFor(bff.deploymentTier)) {
+            "Notification service transport must use HTTPS outside local development"
+        }
+        val httpClient = HttpClient.newBuilder()
+            .connectTimeout(notification.connectTimeout)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
+            setReadTimeout(notification.readTimeout)
+        }
+        return RestClient.builder()
+            .baseUrl(notification.baseUrl.toASCIIString())
+            .requestFactory(requestFactory)
+            .observationRegistry(observationRegistry)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+            .build()
+    }
 }

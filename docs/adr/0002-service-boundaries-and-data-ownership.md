@@ -12,6 +12,8 @@ The initial service boundaries are:
 - Circulation: physical copies, requests, reservations, loans, renewals,
   circulation policy, and fine ledger.
 - Notifications: preferences, templates, in-app notifications, and deliveries.
+- Digital Content: file provenance, redistribution rights, immutable object
+  manifests, quarantine/scan state, and download authorization.
 - Discovery: disposable search, availability, and recommendation projections.
 
 Authentication credentials, MFA, and sessions belong to the managed identity
