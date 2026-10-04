@@ -21,6 +21,9 @@ const requiredTables = [
   "books",
   "borrow_records",
   "federated_identities",
+  "learning_resource_import_runs",
+  "learning_resource_reviews",
+  "learning_resources",
   "notifications",
   "rate_limit_buckets",
   "renewal_requests",
@@ -48,6 +51,20 @@ const requiredConstraints = [
   "federated_identities_issuer_length",
   "federated_identities_issuer_user_unique",
   "federated_identities_subject_length",
+  "learning_resource_import_runs_batch_valid",
+  "learning_resource_import_runs_counts_valid",
+  "learning_resource_import_runs_status_valid",
+  "learning_resource_reviews_decision_valid",
+  "learning_resource_reviews_reason_valid",
+  "learning_resources_content_hash_valid",
+  "learning_resources_optional_urls_https",
+  "learning_resources_source_name_valid",
+  "learning_resources_source_record_key_valid",
+  "learning_resources_source_url_https",
+  "learning_resources_status_valid",
+  "learning_resources_timestamps_valid",
+  "learning_resources_verified_license_valid",
+  "learning_resources_verified_timestamp_valid",
   "rate_limit_buckets_identifier_hash_valid",
   "rate_limit_buckets_request_count_positive",
   "rate_limit_buckets_window_valid",
@@ -60,6 +77,11 @@ const requiredIndexes = [
   "book_reviews_one_per_user_book_idx",
   "borrow_records_one_active_per_user_book_idx",
   "federated_identities_user_idx",
+  "learning_resource_import_runs_source_idx",
+  "learning_resource_reviews_resource_idx",
+  "learning_resources_public_category_idx",
+  "learning_resources_review_queue_idx",
+  "learning_resources_search_idx",
   "notifications_user_read_created_idx",
   "rate_limit_buckets_expiry_idx",
   "renewal_requests_one_pending_per_loan_idx",
@@ -154,6 +176,18 @@ try {
       "admin_capability_assignments_reject_truncate",
     ],
     "admin capability triggers",
+  );
+
+  const learningReviewTriggers = await pool.query(
+    `select tgname
+       from pg_trigger
+      where tgrelid = 'public.learning_resource_reviews'::regclass
+        and not tgisinternal`,
+  );
+  assertContainsAll(
+    new Set(learningReviewTriggers.rows.map((row) => row.tgname)),
+    ["learning_resource_reviews_protect_rows"],
+    "learning resource review triggers",
   );
 
   const borrowStatuses = await pool.query(

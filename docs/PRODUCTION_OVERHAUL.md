@@ -438,6 +438,18 @@ evidence atomically, acknowledges only after commit, and treats every result
 except `NO_THREATS_FOUND` as rejection. Safe object promotion, lifecycle/IaC,
 the SPA Download action, and the core OpenSearch projection remain pending.
 
+While the full Kotlin Digital Content boundary is being completed, the Vercel
+application provides a deliberately narrow learning-resource catalog. It stores
+metadata only, imports at most 250 records per idempotent batch from an exact
+EbookFoundation Git revision, and publishes only records with evidence for
+CC BY, CC BY-SA, CC0, or public-domain rights. Everything else is quarantined
+for an append-only, audited admin decision. Public queries are backed by
+PostgreSQL full-text/category indexes, and downloads are authenticated 303
+redirects to the verified official HTTPS source; the application does not proxy
+or host files. Open Library, Internet Archive, Gutenberg, OpenStax, DOAB, and
+arXiv adapters remain pending, as does migration of this temporary read slice
+to the Kotlin catalog/digital-content services before monolith retirement.
+
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.
 

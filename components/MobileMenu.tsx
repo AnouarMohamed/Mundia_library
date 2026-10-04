@@ -149,6 +149,9 @@ const MobileMenu = ({
           </div>
 
           <nav className="flex-1 px-3 py-4" aria-label="Account navigation">
+            <Link href="/resources" onClick={closeMenu} className={navLinkClass}>
+              Open learning resources
+            </Link>
             <Link href="/my-profile" onClick={closeMenu} className={navLinkClass}>
               Account and borrowing history
             </Link>
@@ -181,6 +184,13 @@ const MobileMenu = ({
                   className={navLinkClass}
                 >
                   Catalog management
+                </Link>
+                <Link
+                  href="/admin/learning-resources"
+                  onClick={closeMenu}
+                  className={navLinkClass}
+                >
+                  Learning resource review
                 </Link>
               </div>
             )}

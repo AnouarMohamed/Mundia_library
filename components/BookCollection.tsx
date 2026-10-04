@@ -69,6 +69,17 @@ const BookCollection = ({
   return (
     <div className="mx-auto w-full max-w-[1500px] py-1 sm:py-3">
       <header className="mb-4 border-b border-[var(--mundia-line)] pb-5 sm:mb-6 sm:pb-7">
+        <nav className="mb-5 flex gap-6 text-sm" aria-label="Catalog sections">
+          <span className="min-h-11 border-b-2 border-[var(--mundia-navy)] py-3 font-semibold text-[var(--mundia-navy)]">
+            Library books
+          </span>
+          <Link
+            href="/resources"
+            className="min-h-11 border-b-2 border-transparent py-3 font-medium text-[var(--mundia-muted)] hover:text-[var(--mundia-ink)]"
+          >
+            Open learning
+          </Link>
+        </nav>
         <p className="text-sm text-[var(--mundia-muted)]">Explore the catalog</p>
         <h1 className="mt-1 font-serif text-3xl font-normal tracking-tight text-[var(--mundia-ink)] sm:text-4xl">
           Book collection

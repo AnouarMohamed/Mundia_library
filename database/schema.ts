@@ -580,3 +580,195 @@ export const notifications = pgTable("notifications", {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * Metadata-only learning resources imported from rights-reviewed open catalogs.
+ * Files remain at their authoritative source unless a separate, explicit
+ * hosting workflow proves redistribution rights and storage eligibility.
+ */
+export const learningResources = pgTable(
+  "learning_resources",
+  {
+    id: uuid("id").notNull().primaryKey().defaultRandom(),
+    sourceName: varchar("source_name", { length: 64 }).notNull(),
+    sourceRecordKey: varchar("source_record_key", { length: 512 }).notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    author: varchar("author", { length: 500 }),
+    category: varchar("category", { length: 128 }).notNull(),
+    language: varchar("language", { length: 16 }).notNull(),
+    licenseExpression: varchar("license_expression", { length: 64 }),
+    licenseUrl: text("license_url"),
+    sourceUrl: text("source_url").notNull(),
+    downloadUrl: text("download_url"),
+    readUrl: text("read_url"),
+    verificationStatus: varchar("verification_status", { length: 16 })
+      .notNull()
+      .default("QUARANTINED"),
+    verificationReason: varchar("verification_reason", { length: 500 })
+      .notNull(),
+    verificationEvidenceUrl: text("verification_evidence_url"),
+    contentHash: varchar("content_hash", { length: 64 }).notNull(),
+    sourceRevision: varchar("source_revision", { length: 128 }).notNull(),
+    verifiedAt: timestamp("verified_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+    verifiedBy: uuid("verified_by").references(() => users.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (resource) => [
+    unique("learning_resources_source_record_unique").on(
+      resource.sourceName,
+      resource.sourceRecordKey,
+    ),
+    index("learning_resources_public_category_idx").on(
+      resource.verificationStatus,
+      resource.category,
+      resource.title,
+      resource.id,
+    ),
+    index("learning_resources_review_queue_idx").on(
+      resource.verificationStatus,
+      resource.updatedAt,
+      resource.id,
+    ),
+    index("learning_resources_search_idx").using(
+      "gin",
+      sql`to_tsvector('simple', coalesce(${resource.title}, '') || ' ' || coalesce(${resource.author}, '') || ' ' || coalesce(${resource.category}, ''))`,
+    ),
+    check(
+      "learning_resources_source_name_valid",
+      sql`char_length(btrim(${resource.sourceName})) between 2 and 64`,
+    ),
+    check(
+      "learning_resources_source_record_key_valid",
+      sql`char_length(btrim(${resource.sourceRecordKey})) between 1 and 512`,
+    ),
+    check(
+      "learning_resources_status_valid",
+      sql`${resource.verificationStatus} in ('QUARANTINED', 'VERIFIED', 'REJECTED')`,
+    ),
+    check(
+      "learning_resources_content_hash_valid",
+      sql`${resource.contentHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "learning_resources_source_url_https",
+      sql`${resource.sourceUrl} ~ '^https://'`,
+    ),
+    check(
+      "learning_resources_optional_urls_https",
+      sql`(${resource.licenseUrl} is null or ${resource.licenseUrl} ~ '^https://') and (${resource.downloadUrl} is null or ${resource.downloadUrl} ~ '^https://') and (${resource.readUrl} is null or ${resource.readUrl} ~ '^https://') and (${resource.verificationEvidenceUrl} is null or ${resource.verificationEvidenceUrl} ~ '^https://')`,
+    ),
+    check(
+      "learning_resources_verified_license_valid",
+      sql`${resource.verificationStatus} <> 'VERIFIED' or ${resource.licenseExpression} in ('CC-BY', 'CC-BY-SA', 'CC0', 'PUBLIC-DOMAIN')`,
+    ),
+    check(
+      "learning_resources_verified_timestamp_valid",
+      sql`(${resource.verificationStatus} = 'VERIFIED' and ${resource.verifiedAt} is not null and ${resource.verificationEvidenceUrl} is not null) or (${resource.verificationStatus} <> 'VERIFIED')`,
+    ),
+    check(
+      "learning_resources_timestamps_valid",
+      sql`${resource.updatedAt} >= ${resource.createdAt}`,
+    ),
+  ],
+);
+
+/** Append-only evidence for human decisions on quarantined resources. */
+export const learningResourceReviews = pgTable(
+  "learning_resource_reviews",
+  {
+    id: uuid("id").notNull().primaryKey().defaultRandom(),
+    resourceId: uuid("resource_id")
+      .notNull()
+      .references(() => learningResources.id, { onDelete: "restrict" }),
+    reviewerId: uuid("reviewer_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    decision: varchar("decision", { length: 16 }).notNull(),
+    reason: varchar("reason", { length: 1000 }).notNull(),
+    reviewedAt: timestamp("reviewed_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (review) => [
+    index("learning_resource_reviews_resource_idx").on(
+      review.resourceId,
+      review.reviewedAt,
+    ),
+    check(
+      "learning_resource_reviews_decision_valid",
+      sql`${review.decision} in ('APPROVED', 'REJECTED')`,
+    ),
+    check(
+      "learning_resource_reviews_reason_valid",
+      sql`char_length(btrim(${review.reason})) between 10 and 1000`,
+    ),
+  ],
+);
+
+/** Bounded import execution history used for resumability and operations. */
+export const learningResourceImportRuns = pgTable(
+  "learning_resource_import_runs",
+  {
+    id: uuid("id").notNull().primaryKey().defaultRandom(),
+    batchKey: varchar("batch_key", { length: 64 }).notNull().unique(),
+    sourceName: varchar("source_name", { length: 64 }).notNull(),
+    sourceRevision: varchar("source_revision", { length: 128 }).notNull(),
+    batchOffset: integer("batch_offset").notNull(),
+    batchLimit: integer("batch_limit").notNull(),
+    status: varchar("status", { length: 16 }).notNull(),
+    seenCount: integer("seen_count").notNull().default(0),
+    insertedCount: integer("inserted_count").notNull().default(0),
+    updatedCount: integer("updated_count").notNull().default(0),
+    unchangedCount: integer("unchanged_count").notNull().default(0),
+    quarantinedCount: integer("quarantined_count").notNull().default(0),
+    verifiedCount: integer("verified_count").notNull().default(0),
+    errorCode: varchar("error_code", { length: 64 }),
+    startedAt: timestamp("started_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", {
+      mode: "date",
+      withTimezone: true,
+    }),
+  },
+  (run) => [
+    index("learning_resource_import_runs_source_idx").on(
+      run.sourceName,
+      run.startedAt,
+    ),
+    check(
+      "learning_resource_import_runs_batch_valid",
+      sql`${run.batchOffset} >= 0 and ${run.batchLimit} between 1 and 250`,
+    ),
+    check(
+      "learning_resource_import_runs_status_valid",
+      sql`${run.status} in ('RUNNING', 'COMPLETED', 'FAILED')`,
+    ),
+    check(
+      "learning_resource_import_runs_counts_valid",
+      sql`${run.seenCount} >= 0 and ${run.insertedCount} >= 0 and ${run.updatedCount} >= 0 and ${run.unchangedCount} >= 0 and ${run.quarantinedCount} >= 0 and ${run.verifiedCount} >= 0`,
+    ),
+  ],
+);

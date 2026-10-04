@@ -42,6 +42,7 @@
     "fix-borrow-sync": "tsx scripts/fix-borrow-sync.ts",
     "fix-overcorrection": "tsx scripts/fix-overcorrection.ts",
     "find-missing-borrow": "tsx scripts/find-missing-borrow.ts",
+    "import:learning-resources": "tsx scripts/import-learning-resources.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },

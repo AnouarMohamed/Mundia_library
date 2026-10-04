@@ -46,6 +46,7 @@ const Header = async ({ session }: HeaderProps) => {
   const navLinks = [
     { href: "/library", label: "Library" },
     { href: "/all-books", label: "Catalog" },
+    { href: "/resources", label: "Open learning" },
     { href: "/my-profile", label: "My account" },
   ];
 

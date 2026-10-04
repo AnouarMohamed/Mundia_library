@@ -85,6 +85,13 @@
       "when": 1791072001000,
       "tag": "0015_bootstrap_super_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791145000000,
+      "tag": "0016_add_learning_resources",
+      "breakpoints": true
     }
   ]
 }

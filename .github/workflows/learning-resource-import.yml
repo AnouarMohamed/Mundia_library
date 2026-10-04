@@ -1,0 +1,103 @@
+name: Learning Resource Import
+
+on:
+  workflow_dispatch:
+    inputs:
+      offset:
+        description: Zero-based source offset
+        required: true
+        default: "0"
+        type: string
+      limit:
+        description: Batch size (1-250)
+        required: true
+        default: "100"
+        type: string
+      revision:
+        description: main for dry-run; exact 40-character Git SHA for apply
+        required: true
+        default: "main"
+        type: string
+      apply:
+        description: Persist the batch to production
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-resource-import
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    name: Validate source batch
+    if: ${{ !inputs.apply }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      IMPORT_OFFSET: ${{ inputs.offset }}
+      IMPORT_LIMIT: ${{ inputs.limit }}
+      SOURCE_REVISION: ${{ inputs.revision }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24.17.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Parse and validate batch without database writes
+        run: >-
+          npm run import:learning-resources --
+          --offset "$IMPORT_OFFSET"
+          --limit "$IMPORT_LIMIT"
+          --revision "$SOURCE_REVISION"
+
+  apply:
+    name: Import production batch
+    if: ${{ inputs.apply }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      IMPORT_OFFSET: ${{ inputs.offset }}
+      IMPORT_LIMIT: ${{ inputs.limit }}
+      SOURCE_REVISION: ${{ inputs.revision }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24.17.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Require configured production database
+        run: test -n "$DATABASE_URL"
+
+      - name: Import one bounded, idempotent batch
+        run: >-
+          npm run import:learning-resources --
+          --offset "$IMPORT_OFFSET"
+          --limit "$IMPORT_LIMIT"
+          --revision "$SOURCE_REVISION"
+          --apply

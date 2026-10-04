@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, LibraryBig, UserRound } from "lucide-react";
+import { BookOpen, GraduationCap, LibraryBig, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/library", label: "Library", icon: LibraryBig },
   { href: "/all-books", label: "Catalog", icon: BookOpen },
+  { href: "/resources", label: "Learning", icon: GraduationCap },
   { href: "/my-profile", label: "My account", icon: UserRound },
 ];
 
@@ -18,12 +19,13 @@ const MobileBottomNav = () => {
       className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Primary navigation"
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-3">
+      <ul className="mx-auto grid max-w-lg grid-cols-4">
         {items.map(({ href, label, icon: Icon }) => {
           const isCurrent =
             pathname === href ||
             (href === "/library" && pathname.startsWith("/library/")) ||
-            (href === "/all-books" && pathname.startsWith("/books/"));
+            (href === "/all-books" && pathname.startsWith("/books/")) ||
+            (href === "/resources" && pathname.startsWith("/resources/"));
 
           return (
             <li key={href}>
