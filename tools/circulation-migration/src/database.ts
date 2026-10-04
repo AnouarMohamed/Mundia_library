@@ -610,6 +610,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   2_036_232_323,
   1_333_630_244,
   1_275_141_948,
+  330_978_745,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -641,7 +642,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 14",
+      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 15",
     );
   }
 

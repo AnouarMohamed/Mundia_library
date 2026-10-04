@@ -15,6 +15,9 @@ import com.mundiapolis.library.circulation.application.model.InventoryOperation
 import com.mundiapolis.library.circulation.application.model.InventoryOutboxEvent
 import com.mundiapolis.library.circulation.application.model.NotificationIntentOutboxEvent
 import com.mundiapolis.library.circulation.application.model.LoanCommandResult
+import com.mundiapolis.library.circulation.application.model.LoanReminderCandidate
+import com.mundiapolis.library.circulation.application.model.LoanReminderReceipt
+import com.mundiapolis.library.circulation.application.model.LoanReminderType
 import com.mundiapolis.library.circulation.application.model.OutboxDeliveryStatistics
 import com.mundiapolis.library.circulation.application.model.OutboxFailureCode
 import com.mundiapolis.library.circulation.application.model.OutboxFailureDisposition
@@ -55,6 +58,17 @@ interface LoanStore {
     fun update(loan: Loan, expectedVersion: Long, now: Instant): Boolean
 
     fun hasOpenForMemberEdition(memberId: MemberId, editionId: EditionId): Boolean
+}
+
+interface LoanReminderStore {
+    fun lockCandidates(
+        type: LoanReminderType,
+        now: Instant,
+        dueSoonCutoff: Instant,
+        batchSize: Int,
+    ): List<LoanReminderCandidate>
+
+    fun claim(receipt: LoanReminderReceipt): Boolean
 }
 
 interface CopyStore {

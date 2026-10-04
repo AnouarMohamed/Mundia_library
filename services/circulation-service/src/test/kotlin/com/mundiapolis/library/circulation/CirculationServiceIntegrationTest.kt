@@ -111,6 +111,7 @@ class CirculationServiceIntegrationTest {
                     outbox_event,
                     circulation_idempotency,
                     circulation_inventory_idempotency,
+                    circulation_loan_notification_reminder,
                     circulation_loan,
                     circulation_copy
                 """.trimIndent(),

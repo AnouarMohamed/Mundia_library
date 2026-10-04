@@ -16,6 +16,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.InventoryAu
 import com.mundiapolis.library.circulation.application.port.outbound.InventoryIdempotencyStore
 import com.mundiapolis.library.circulation.application.port.outbound.InventoryOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.LoanStore
+import com.mundiapolis.library.circulation.application.port.outbound.LoanReminderStore
 import com.mundiapolis.library.circulation.application.port.outbound.MemberEligibilityStore
 import com.mundiapolis.library.circulation.application.port.outbound.NotificationIntentOutboxEventStore
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxEventStore
@@ -33,6 +34,7 @@ import com.mundiapolis.library.circulation.application.service.GetCirculationPol
 import com.mundiapolis.library.circulation.application.service.GetCirculationStatusService
 import com.mundiapolis.library.circulation.application.service.InventoryCommandService
 import com.mundiapolis.library.circulation.application.service.MembershipEligibilityService
+import com.mundiapolis.library.circulation.application.service.LoanReminderService
 import com.mundiapolis.library.circulation.application.service.PolicyCommandService
 import com.mundiapolis.library.circulation.application.service.ReservationCommandService
 import com.mundiapolis.library.circulation.application.service.ReservationQueueService
@@ -45,6 +47,23 @@ import java.util.UUID
 
 @Configuration(proxyBeanMethods = false)
 class ApplicationConfiguration {
+    @Bean
+    fun loanReminderService(
+        transactionRunner: TransactionRunner,
+        loanStore: LoanStore,
+        loanReminderStore: LoanReminderStore,
+        notificationIntentOutboxEventStore: NotificationIntentOutboxEventStore,
+        timeProvider: TimeProvider,
+        identifierGenerator: IdentifierGenerator,
+    ): LoanReminderService = LoanReminderService(
+        transactionRunner,
+        loanStore,
+        loanReminderStore,
+        notificationIntentOutboxEventStore,
+        timeProvider,
+        identifierGenerator,
+    )
+
     @Bean
     fun getCirculationPolicyQuery(
         policyStore: CirculationPolicyStore,

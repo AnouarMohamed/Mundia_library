@@ -171,6 +171,17 @@ topic and Protobuf subject. The Circulation producer's broker principal needs
 write ACLs for both its domain-event topic and the notification-intent topic,
 while the Notification consumer principal needs read access only to the latter.
 
+Scheduled loan reminders are fail-safe disabled until
+`LOAN_REMINDER_ENABLED=true`. `LOAN_REMINDER_DUE_SOON_LEAD_TIME` controls the
+bounded due-soon window (default `P3D`), while `LOAN_REMINDER_POLL_INTERVAL` and
+`LOAN_REMINDER_BATCH_SIZE` bound database work. Every due-soon or overdue
+batch uses `FOR UPDATE SKIP LOCKED`, and every decision and its notification
+outbox row commit atomically. A durable receipt
+keyed by loan, observed due date, and reminder type makes concurrent scheduler
+replicas converge; renewing a loan creates a new due-date identity rather than
+silently suppressing the new reminder. Enable the scheduler only with outbox
+delivery and the Notification consumer configured, monitored, and authorized.
+
 ## Notification Preferences
 
 The Notification API exposes caller-bound preference reads and updates under

@@ -337,6 +337,23 @@ skip an eligibility version gap because doing so could authorize borrowing from
 an incomplete state. Production enablement therefore requires a tested
 Membership snapshot/full-replay procedure and broker-retention evidence.
 
+## Scheduled loan reminders
+
+When `LOAN_REMINDER_ENABLED=true`, Circulation scans bounded batches of active
+loans for due-soon and overdue deadlines with `FOR UPDATE SKIP LOCKED` and writes
+notification intents through the same transactional outbox used by hold
+readiness. Each intent is paired in
+the transaction with a durable receipt keyed by loan ID, observed due date, and
+reminder type. Multiple service replicas can therefore race safely without
+creating duplicate intents, while a changed due date after renewal remains a
+new, eligible reminder cycle. Returned loans and stale candidate snapshots are
+rechecked under a row lock and skipped.
+
+The scheduler is disabled by default. Configure its lead time, interval, and
+batch bounds with `LOAN_REMINDER_DUE_SOON_LEAD_TIME`,
+`LOAN_REMINDER_POLL_INTERVAL`, and `LOAN_REMINDER_BATCH_SIZE`; enable it only
+when the outbox producer and Notification consumer are also operational.
+
 ## Outbox delivery
 
 When `OUTBOX_DELIVERY_ENABLED=true`, the service leases unpublished rows with

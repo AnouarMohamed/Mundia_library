@@ -60,6 +60,11 @@ app:
     enabled: ${RESERVATION_EXPIRY_ENABLED:true}
     poll-interval: ${RESERVATION_EXPIRY_POLL_INTERVAL:PT30S}
     batch-size: ${RESERVATION_EXPIRY_BATCH_SIZE:100}
+  loan-reminder:
+    enabled: ${LOAN_REMINDER_ENABLED:false}
+    poll-interval: ${LOAN_REMINDER_POLL_INTERVAL:PT1M}
+    due-soon-lead-time: ${LOAN_REMINDER_DUE_SOON_LEAD_TIME:P3D}
+    batch-size: ${LOAN_REMINDER_BATCH_SIZE:100}
   circulation:
     idempotency-retention: ${IDEMPOTENCY_RETENTION:P1D}
   outbox:

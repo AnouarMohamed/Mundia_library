@@ -410,9 +410,13 @@ state into a durable audit row, and restores only future eligible email work.
 Dead-letter replay is now delivery-specific and least-privilege, records the
 prior terminal failure and operator justification, converges concurrent exact
 requests, rejects suppressed recipients, and starts only one fresh bounded
-attempt cycle. Scheduled due/overdue and legitimate catalog-triggered intents,
-BFF routing, and Kubernetes/Terraform values remain required before production
-routing. The engineering collection and first-party authorized-file
+attempt cycle. Circulation now schedules due-soon and overdue intents in bounded
+`SKIP LOCKED` batches, revalidates active loans under a row lock, and atomically
+persists each intent with a receipt keyed by loan, observed due date, and reminder type. This
+makes concurrent replicas converge while renewed due dates remain eligible for
+a fresh reminder. Legitimate catalog-triggered intents, BFF routing, and
+Kubernetes/Terraform values remain required before production routing. The
+engineering collection and first-party authorized-file
 download slice is deliberately sequenced after those controls and the core
 OpenSearch projection, not on the current notification critical path.
 

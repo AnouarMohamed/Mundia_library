@@ -8,6 +8,7 @@ import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.gen
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_IDEMPOTENCY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_INVENTORY_AUDIT_ENTRY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN
+import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_LOAN_NOTIFICATION_REMINDER
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_MEMBER_ELIGIBILITY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_RESERVATION
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.OUTBOX_EVENT
@@ -22,6 +23,7 @@ import com.mundiapolis.library.circulation.application.model.IdempotencyKey
 import com.mundiapolis.library.circulation.application.model.InvalidFineCurrencyException
 import com.mundiapolis.library.circulation.application.model.IdempotencyOwner
 import com.mundiapolis.library.circulation.application.model.LoanOverdueException
+import com.mundiapolis.library.circulation.application.model.LoanReminderType
 import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
 import com.mundiapolis.library.circulation.application.model.MemberNotEligibleException
 import com.mundiapolis.library.circulation.application.model.MembershipEligibilityEvent
@@ -66,6 +68,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.Transaction
 import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliveryStore
 import com.mundiapolis.library.circulation.application.port.outbound.RateLimitStore
 import com.mundiapolis.library.circulation.application.service.ReservationExpiryService
+import com.mundiapolis.library.circulation.application.service.LoanReminderService
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import com.mundiapolis.library.circulation.domain.model.EligibilityReasonCode
 import com.mundiapolis.library.circulation.domain.model.BranchId
@@ -201,6 +204,9 @@ class CirculationPhase2IntegrationTest {
     @Autowired
     private lateinit var reservationExpiryService: ReservationExpiryService
 
+    @Autowired
+    private lateinit var loanReminderService: LoanReminderService
+
     @BeforeEach
     fun cleanCommandData() {
         dsl.execute(
@@ -227,6 +233,7 @@ class CirculationPhase2IntegrationTest {
                     outbox_event,
                     circulation_idempotency,
                     circulation_inventory_idempotency,
+                    circulation_loan_notification_reminder,
                     circulation_loan,
                     circulation_copy
                 """.trimIndent(),
@@ -2113,6 +2120,93 @@ class CirculationPhase2IntegrationTest {
             ),
         ).isEqualTo(1)
     }
+
+    @Test
+    fun `loan reminders converge across workers and follow renewed due dates`() {
+        val memberId = MemberId(UUID.randomUUID())
+        val loanId = createActiveLoan(memberId)
+        val firstDueAt = Instant.now().plus(Duration.ofDays(2)).truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+        dsl.update(CIRCULATION_LOAN)
+            .set(CIRCULATION_LOAN.DUE_AT, firstDueAt.atOffset(ZoneOffset.UTC))
+            .where(CIRCULATION_LOAN.ID.eq(loanId.value))
+            .execute()
+
+        val concurrentResults = runConcurrently(8) {
+            loanReminderService.emitEligible(
+                LoanReminderType.DUE_SOON,
+                Duration.ofDays(3),
+                10,
+            )
+        }
+        assertThat(concurrentResults).allMatch(Result<Int>::isSuccess)
+        assertThat(concurrentResults.sumOf { it.getOrThrow() }).isEqualTo(1)
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN_NOTIFICATION_REMINDER)).isEqualTo(1)
+        assertThat(notificationEventsFor(loanId).size).isEqualTo(1)
+
+        val firstPayload = objectMapper.readTree(notificationEventsFor(loanId).single().payload!!.data())
+        assertThat(firstPayload["memberId"].stringValue()).isEqualTo(memberId.value.toString())
+        assertThat(firstPayload["sourceType"].stringValue()).isEqualTo("circulation.loan.due-soon.v1")
+        assertThat(firstPayload["category"].stringValue()).isEqualTo("DUE_SOON")
+        assertThat(firstPayload["channels"].toString()).isEqualTo("[\"EMAIL\",\"IN_APP\"]")
+        assertThat(
+            loanReminderService.emitEligible(
+                LoanReminderType.DUE_SOON,
+                Duration.ofDays(3),
+                10,
+            ),
+        ).isZero()
+
+        val renewedDueAt = Instant.now().plus(Duration.ofDays(1)).truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+        dsl.update(CIRCULATION_LOAN)
+            .set(CIRCULATION_LOAN.DUE_AT, renewedDueAt.atOffset(ZoneOffset.UTC))
+            .where(CIRCULATION_LOAN.ID.eq(loanId.value))
+            .execute()
+        assertThat(
+            loanReminderService.emitEligible(
+                LoanReminderType.DUE_SOON,
+                Duration.ofDays(3),
+                10,
+            ),
+        ).isEqualTo(1)
+
+        val overdueAt = Instant.now().minus(Duration.ofHours(1)).truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+        dsl.update(CIRCULATION_LOAN)
+            .set(
+                CIRCULATION_LOAN.CHECKED_OUT_AT,
+                overdueAt.minus(Duration.ofHours(1)).atOffset(ZoneOffset.UTC),
+            )
+            .set(CIRCULATION_LOAN.DUE_AT, overdueAt.atOffset(ZoneOffset.UTC))
+            .where(CIRCULATION_LOAN.ID.eq(loanId.value))
+            .execute()
+        assertThat(
+            loanReminderService.emitEligible(
+                LoanReminderType.OVERDUE,
+                Duration.ofDays(3),
+                10,
+            ),
+        ).isEqualTo(1)
+
+        assertThat(dsl.fetchCount(CIRCULATION_LOAN_NOTIFICATION_REMINDER)).isEqualTo(3)
+        val categories = notificationEventsFor(loanId).map { event ->
+            objectMapper.readTree(event.payload!!.data())["category"].stringValue()
+        }
+        assertThat(categories).containsExactlyInAnyOrder("DUE_SOON", "DUE_SOON", "OVERDUE")
+    }
+
+    private fun notificationEventsFor(loanId: LoanId) =
+        dsl.selectFrom(OUTBOX_EVENT)
+            .where(
+                OUTBOX_EVENT.EVENT_STREAM.eq("NOTIFICATION")
+                    .and(
+                        OUTBOX_EVENT.ID.`in`(
+                            dsl.select(CIRCULATION_LOAN_NOTIFICATION_REMINDER.NOTIFICATION_EVENT_ID)
+                                .from(CIRCULATION_LOAN_NOTIFICATION_REMINDER)
+                                .where(CIRCULATION_LOAN_NOTIFICATION_REMINDER.LOAN_ID.eq(loanId.value)),
+                        ),
+                    ),
+            )
+            .orderBy(OUTBOX_EVENT.CREATED_AT.asc())
+            .fetch()
 
     private fun createActiveLoan(memberId: MemberId): LoanId {
         val editionId = EditionId(UUID.randomUUID())
