@@ -543,7 +543,7 @@ jobs:
 
           build_args=""
           if [[ "$COMPONENT_NAME" == "web" ]]; then
-            api_endpoint="${CONFIGURED_API_ENDPOINT:-https://mundia-library.vercel.app}"
+            api_endpoint="${CONFIGURED_API_ENDPOINT:-https://mundialibrary.tech}"
             prod_api_endpoint="${CONFIGURED_PROD_API_ENDPOINT:-$api_endpoint}"
             imagekit_endpoint="${CONFIGURED_IMAGEKIT_ENDPOINT:-}"
             build_args="NEXT_PUBLIC_API_ENDPOINT=${api_endpoint}"
