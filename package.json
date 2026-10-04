@@ -44,6 +44,7 @@
     "find-missing-borrow": "tsx scripts/find-missing-borrow.ts",
     "import:learning-resources": "tsx scripts/import-learning-resources.ts",
     "import:learning-resources:doab": "tsx scripts/import-doab-learning-resources.ts",
+    "import:learning-resources:otl": "tsx scripts/import-open-textbook-library.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },

@@ -38,16 +38,18 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
             Access
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--mundia-muted)]">
-            Mundia verified the licence evidence but does not host this file.
-            The action below resolves to the authoritative source.
+            This file is downloaded from a verified third-party university or
+            open publisher. Mundia checks the licence and official source, but
+            does not host the file.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             {resource.downloadUrl && (
               <a
                 href={`/api/learning-resources/${resource.id}/download`}
+                download
                 className="inline-flex min-h-12 items-center justify-center bg-[var(--mundia-navy)] px-6 text-sm font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
               >
-                Download from source
+                Download official file
               </a>
             )}
             {resource.readUrl && (
@@ -57,7 +59,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 rel="noopener noreferrer"
                 className="inline-flex min-h-12 items-center justify-center border border-[var(--mundia-navy)] px-6 text-sm font-semibold text-[var(--mundia-navy)] transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
               >
-                Read at source
+                Open official source
               </a>
             )}
           </div>

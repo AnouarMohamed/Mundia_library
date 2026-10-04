@@ -138,7 +138,7 @@ const Page = async ({
                     {resource.licenseExpression}
                   </span>
                   <span className="text-[var(--mundia-muted)]">
-                    {resource.downloadUrl ? "Download" : "Read online"}
+                    {resource.downloadUrl ? "Direct download" : "Official source"}
                   </span>
                 </div>
               </Link>
