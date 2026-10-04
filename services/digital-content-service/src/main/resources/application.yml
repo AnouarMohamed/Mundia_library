@@ -42,6 +42,28 @@ spring:
     sql-dialect: postgres
 
 app:
+  ingestion:
+    enabled: ${DIGITAL_CONTENT_INGESTION_ENABLED:false}
+    region: ${AWS_REGION:eu-west-1}
+    bucket: ${DIGITAL_CONTENT_QUARANTINE_BUCKET:disabled-quarantine-bucket}
+    expected-bucket-owner: ${AWS_ACCOUNT_ID:000000000000}
+    kms-key-id: ${DIGITAL_CONTENT_QUARANTINE_KMS_KEY_ID:disabled}
+    upload-url-lifetime: ${DIGITAL_CONTENT_UPLOAD_URL_LIFETIME:PT5M}
+    session-lifetime: ${DIGITAL_CONTENT_INGESTION_SESSION_LIFETIME:PT24H}
+    call-timeout: ${DIGITAL_CONTENT_S3_CALL_TIMEOUT:PT10S}
+    attempt-timeout: ${DIGITAL_CONTENT_S3_ATTEMPT_TIMEOUT:PT5S}
+  malware-scan:
+    enabled: ${DIGITAL_CONTENT_SCAN_ENABLED:false}
+    queue-url: ${DIGITAL_CONTENT_SCAN_QUEUE_URL:https://sqs.eu-west-1.amazonaws.com/000000000000/disabled}
+    wait-time: ${DIGITAL_CONTENT_SCAN_WAIT_TIME:PT10S}
+    visibility-timeout: ${DIGITAL_CONTENT_SCAN_VISIBILITY_TIMEOUT:PT2M}
+    maximum-message-bytes: ${DIGITAL_CONTENT_SCAN_MAXIMUM_MESSAGE_BYTES:262144}
+    maximum-message-age: ${DIGITAL_CONTENT_SCAN_MAXIMUM_MESSAGE_AGE:P14D}
+    maximum-future-skew: ${DIGITAL_CONTENT_SCAN_MAXIMUM_FUTURE_SKEW:PT5M}
+    maximum-poll-silence: ${DIGITAL_CONTENT_SCAN_MAXIMUM_POLL_SILENCE:PT2M}
+    startup-grace-period: ${DIGITAL_CONTENT_SCAN_STARTUP_GRACE_PERIOD:PT1M}
+    retry-backoff: ${DIGITAL_CONTENT_SCAN_RETRY_BACKOFF:PT1S}
+    maximum-consecutive-failures: ${DIGITAL_CONTENT_SCAN_MAXIMUM_CONSECUTIVE_FAILURES:5}
   download:
     cloudfront:
       enabled: ${DOWNLOAD_SIGNING_ENABLED:false}
@@ -67,7 +89,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db
+          include: readinessState,db,malwareScan
   health:
     livenessstate:
       enabled: true

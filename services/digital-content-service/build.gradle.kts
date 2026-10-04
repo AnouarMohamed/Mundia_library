@@ -34,6 +34,9 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("aws.sdk.kotlin:s3:${libs.versions.aws.sdk.kotlin.get()}")
+    implementation("aws.sdk.kotlin:sqs:${libs.versions.aws.sdk.kotlin.get()}")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql:42.7.12")

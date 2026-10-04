@@ -334,7 +334,10 @@ jobs:
 
       - name: Compile, test, and package
         working-directory: services
-        run: ./gradlew clean check bootJar --no-daemon
+        # Integration suites launch isolated PostgreSQL and Kafka containers.
+        # Serialize projects so a two-core hosted runner cannot starve Kafka's
+        # startup health check while Kotlin compilation is saturating the host.
+        run: ./gradlew clean check bootJar --no-daemon --no-parallel
 
   docker:
     name: Docker Image Build

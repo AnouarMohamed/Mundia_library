@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundia Digital Content API",
-    "version": "1.1.0",
-    "description": "Rights-aware availability and short-lived authorization for first-party digital content. Storage keys and provenance URLs are never exposed."
+    "version": "1.2.0",
+    "description": "Rights-aware quarantine ingestion, availability, and short-lived authorization for first-party digital content. Private keys appear only inside tightly constrained upload or download grants."
   },
   "paths": {
     "/api/v1/digital-content/editions/{editionId}/availability": {
@@ -65,6 +65,45 @@
           "503": { "$ref": "#/components/responses/SigningUnavailable" }
         }
       }
+    },
+    "/api/v1/digital-content/ingestions/{ingestionId}": {
+      "put": {
+        "operationId": "createDigitalContentIngestion",
+        "parameters": [
+          {
+            "name": "ingestionId",
+            "in": "path",
+            "required": true,
+            "description": "Client-generated idempotency identifier bound to the caller and exact manifest",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "security": [{ "oauth2": ["digital-content.ingestion.create"] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateIngestionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay with a fresh grant for the same caller and manifest",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IngestionUploadGrant" } } }
+          },
+          "201": {
+            "description": "Rights-reviewed manifest stored and checksum-bound quarantine grant issued",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IngestionUploadGrant" } } }
+          },
+          "400": { "$ref": "#/components/responses/InvalidIngestion" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/IngestionConflict" },
+          "410": { "$ref": "#/components/responses/IngestionExpired" },
+          "503": { "$ref": "#/components/responses/IngestionUnavailable" }
+        }
+      }
     }
   },
   "components": {
@@ -76,7 +115,8 @@
             "tokenUrl": "https://identity.example.invalid/oauth2/token",
             "scopes": {
               "digital-content.availability.read": "Read safe digital content availability",
-              "digital-content.download.authorize": "Authorize a short-lived first-party download"
+              "digital-content.download.authorize": "Authorize a short-lived first-party download",
+              "digital-content.ingestion.create": "Create a rights-reviewed quarantine ingestion session"
             }
           }
         }
@@ -122,6 +162,42 @@
           "expiresAt": { "type": "string", "format": "date-time" }
         }
       },
+      "CreateIngestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["editionId", "format", "sizeBytes", "sha256", "sourceProvider", "sourceUri", "licenseExpression", "attribution"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "format": { "type": "string", "enum": ["PDF", "EPUB"] },
+          "sizeBytes": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1073741824 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "sourceUri": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
+          "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 },
+          "rightsExpiresAt": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "IngestionUploadGrant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ingestionId", "state", "uploadUrl", "method", "requiredHeaders", "uploadExpiresAt", "sessionExpiresAt", "replayed"],
+        "properties": {
+          "ingestionId": { "type": "string", "format": "uuid" },
+          "state": { "type": "string", "const": "AWAITING_SCAN" },
+          "uploadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "method": { "type": "string", "const": "PUT" },
+          "requiredHeaders": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "minProperties": 1,
+            "maxProperties": 16
+          },
+          "uploadExpiresAt": { "type": "string", "format": "date-time" },
+          "sessionExpiresAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
+        }
+      },
       "Problem": {
         "type": "object",
         "additionalProperties": true,
@@ -144,6 +220,22 @@
       },
       "SigningUnavailable": {
         "description": "Download signing is unavailable",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "InvalidIngestion": {
+        "description": "The ingestion manifest is invalid",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "IngestionConflict": {
+        "description": "The ingestion identifier is already bound to another caller or manifest",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "IngestionExpired": {
+        "description": "The ingestion session has expired",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "IngestionUnavailable": {
+        "description": "Quarantine upload signing is unavailable",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     }

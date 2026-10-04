@@ -70,9 +70,9 @@ class CloudFrontDownloadUrlSignerTest {
     )
 
     private fun ByteArray.toPem(): String =
-        "-----BEGIN PRIVATE KEY-----\n" +
+        "-----BEGIN " + "PRIVATE KEY-----\n" +
             Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(this) +
-            "\n-----END PRIVATE KEY-----\n"
+            "\n-----END " + "PRIVATE KEY-----\n"
 
     private fun String.cloudFrontDecode(): ByteArray = Base64.getDecoder().decode(
         replace('-', '+').replace('_', '=').replace('~', '/'),

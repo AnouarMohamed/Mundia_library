@@ -38,5 +38,17 @@ class OpenApiContractTest {
             .path("DownloadAuthorization").path("properties")
         assertFalse(responseFields.has("objectKey"))
         assertFalse(responseFields.has("actorFingerprint"))
+
+        val ingestion = document.path("paths")
+            .path("/api/v1/digital-content/ingestions/{ingestionId}")
+            .path("put")
+        assertEquals(
+            "digital-content.ingestion.create",
+            ingestion.path("security").path(0).path("oauth2").path(0).stringValue(),
+        )
+        val grant = document.path("components").path("schemas")
+            .path("IngestionUploadGrant").path("properties")
+        assertFalse(grant.has("sourceUri"))
+        assertFalse(grant.has("actorFingerprint"))
     }
 }

@@ -309,6 +309,30 @@ require encryption, and emit scan completion before an asset can become
 `CLEAN` and `PUBLISHED`. The authorization API rechecks all gates under a row
 lock and persists only a SHA-256 actor fingerprint and timestamps.
 
+Quarantine ingestion is separately disabled by default. Enable it only with
+`DIGITAL_CONTENT_INGESTION_ENABLED=true` and set `AWS_REGION`,
+`AWS_ACCOUNT_ID`, `DIGITAL_CONTENT_QUARANTINE_BUCKET`, and
+`DIGITAL_CONTENT_QUARANTINE_KMS_KEY_ID`. Workload identity must grant only
+`s3:PutObject` on the `quarantine/digital-content/` prefix plus the minimum KMS
+encrypt permissions; no static AWS key is accepted or documented. Upload grants
+default to five minutes and are capped at fifteen minutes. They sign the exact
+content length, media type, base64 SHA-256 checksum, expected bucket owner,
+SSE-KMS key, and `If-None-Match: *`, making each opaque key create-only.
+
+Set `DIGITAL_CONTENT_SCAN_ENABLED=true` and
+`DIGITAL_CONTENT_SCAN_QUEUE_URL` only after the private, versioned quarantine
+bucket is protected by GuardDuty Malware Protection for S3 and an EventBridge
+rule sends only object-scan results to an encrypted SQS standard queue with a
+DLQ. The queue policy must restrict `sqs:SendMessage` to the exact EventBridge
+rule; the pod role needs only receive/delete/change-visibility on that queue.
+The consumer verifies the exact AWS account, region, bucket, event type,
+resource type, protected key shape, timestamp, object version, ETag, and result.
+It deletes a message only after the receipt and state transition commit.
+`NO_THREATS_FOUND` is the only result that becomes `CLEAN`; every other accepted
+result becomes `REJECTED`, and malformed/conflicting events redrive rather than
+fail open. Promotion to the delivery prefix is intentionally a separate,
+still-pending command.
+
 ## Secrets Handling
 
 - Never paste secrets into Markdown docs, GitHub issues, PR descriptions, or screenshots.

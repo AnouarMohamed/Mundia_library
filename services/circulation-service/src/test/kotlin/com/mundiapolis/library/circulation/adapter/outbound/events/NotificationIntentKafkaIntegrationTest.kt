@@ -146,5 +146,7 @@ class NotificationIntentKafkaIntegrationTest {
     private companion object {
         @Container @JvmStatic
         val kafka = KafkaContainer("apache/kafka-native:4.2.0")
+            .withStartupAttempts(3)
+            .withStartupTimeout(Duration.ofMinutes(2))
     }
 }

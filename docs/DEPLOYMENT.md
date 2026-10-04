@@ -232,6 +232,8 @@ After all CI gates pass on `main`, GitHub Actions publishes these OCI images:
 | Catalog Service | `ghcr.io/anouarmohamed/mundia-catalog-service` |
 | Circulation Service | `ghcr.io/anouarmohamed/mundia-circulation-service` |
 | Membership Service | `ghcr.io/anouarmohamed/mundia-membership-service` |
+| Notification Service | `ghcr.io/anouarmohamed/mundia-notification-service` |
+| Digital Content Service | `ghcr.io/anouarmohamed/mundia-digital-content-service` |
 
 Every build publishes `linux/amd64` and `linux/arm64` manifests, BuildKit
 provenance, and an SPDX SBOM. Main builds receive `main` and

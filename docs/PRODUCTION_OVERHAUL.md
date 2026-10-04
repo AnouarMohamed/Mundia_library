@@ -429,7 +429,13 @@ provenance URLs. Download authorization now locks and rechecks those gates,
 records a privacy-minimized audit, and produces an RSA/SHA-256 CloudFront URL
 bounded to five minutes and one exact object. The Kotlin BFF routes both calls
 through token exchange and rejects unexpected origins, paths, signing parameters,
-asset identities, or expiries. Quarantine ingestion, S3 scan-event integration,
+asset identities, or expiries. A caller-bound ingestion command now persists a
+rights-reviewed manifest and issues only short-lived, create-only S3 quarantine
+grants bound to exact size, media type, SHA-256 checksum, expected account, and
+KMS key. A production-shaped SQS consumer strictly validates GuardDuty
+EventBridge results, commits idempotency receipts and immutable object-version
+evidence atomically, acknowledges only after commit, and treats every result
+except `NO_THREATS_FOUND` as rejection. Safe object promotion, lifecycle/IaC,
 the SPA Download action, and the core OpenSearch projection remain pending.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;

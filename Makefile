@@ -79,7 +79,7 @@ web-ci: toolchain ## Run every legacy web gate against the prepared CI database
 	@$(WEB_CI_ENV) $(E2E_CI_ENV) $(NPM) run ci:quality
 
 services-ci: toolchain contracts ## Compile, test, and package all Kotlin services
-	@cd services && $(GRADLE) clean check bootJar --no-daemon
+	@cd services && $(GRADLE) clean check bootJar --no-daemon --no-parallel
 
 migration-tool-ci: toolchain ## Rehearse the circulation migration tool against PostgreSQL 18
 	@docker compose up -d --wait db

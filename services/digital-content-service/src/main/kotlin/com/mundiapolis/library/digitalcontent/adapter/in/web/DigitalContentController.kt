@@ -2,13 +2,19 @@ package com.mundiapolis.library.digitalcontent.adapter.`in`.web
 
 import com.mundiapolis.library.digitalcontent.dto.EditionDownloadAvailability
 import com.mundiapolis.library.digitalcontent.dto.DownloadAuthorization
+import com.mundiapolis.library.digitalcontent.dto.CreateIngestionRequest
+import com.mundiapolis.library.digitalcontent.dto.IngestionUploadGrant
 import com.mundiapolis.library.digitalcontent.service.DigitalContentService
+import com.mundiapolis.library.digitalcontent.service.IngestionService
+import jakarta.validation.Valid
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -22,6 +28,7 @@ import java.util.HexFormat
 @RequestMapping("/api/v1/digital-content")
 class DigitalContentController(
     private val service: DigitalContentService,
+    private val ingestionService: IngestionService,
 ) {
     @GetMapping("/editions/{editionId}/availability")
     @PreAuthorize("hasAuthority('SCOPE_digital-content.availability.read')")
@@ -39,6 +46,19 @@ class DigitalContentController(
     ): ResponseEntity<DownloadAuthorization> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .body(service.authorize(assetId, authentication.actorFingerprint()))
+
+    @PutMapping("/ingestions/{ingestionId}")
+    @PreAuthorize("hasAuthority('SCOPE_digital-content.ingestion.create')")
+    fun createIngestion(
+        authentication: JwtAuthenticationToken,
+        @PathVariable ingestionId: UUID,
+        @Valid @RequestBody request: CreateIngestionRequest,
+    ): ResponseEntity<IngestionUploadGrant> {
+        val grant = ingestionService.create(ingestionId, request, authentication.actorFingerprint())
+        return ResponseEntity.status(if (grant.replayed) 200 else 201)
+            .cacheControl(CacheControl.noStore())
+            .body(grant)
+    }
 
     private fun JwtAuthenticationToken.actorFingerprint(): String {
         val issuer = token.issuer?.toString().orEmpty()

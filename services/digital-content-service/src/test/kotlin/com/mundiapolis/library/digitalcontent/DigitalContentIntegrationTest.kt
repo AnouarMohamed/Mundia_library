@@ -2,7 +2,14 @@ package com.mundiapolis.library.digitalcontent
 
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_ASSET
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_INGESTION
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_SCAN_RECEIPT
 import com.mundiapolis.library.digitalcontent.service.DownloadUrlSigner
+import com.mundiapolis.library.digitalcontent.service.QuarantineUploadAuthorizer
+import com.mundiapolis.library.digitalcontent.service.SignedUpload
+import com.mundiapolis.library.digitalcontent.service.MalwareScanEvent
+import com.mundiapolis.library.digitalcontent.service.MalwareScanResult
+import com.mundiapolis.library.digitalcontent.service.MalwareScanService
 import com.mundiapolis.library.digitalcontent.service.SignedDownload
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
@@ -21,6 +28,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -28,6 +36,7 @@ import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.OffsetDateTime
+import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -42,9 +51,14 @@ class DigitalContentIntegrationTest {
     @Autowired
     private lateinit var dsl: DSLContext
 
+    @Autowired
+    private lateinit var malwareScanService: MalwareScanService
+
     @BeforeEach
     fun seedAssets() {
         dsl.deleteFrom(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT).execute()
+        dsl.deleteFrom(DIGITAL_CONTENT_SCAN_RECEIPT).execute()
+        dsl.deleteFrom(DIGITAL_CONTENT_INGESTION).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_ASSET).execute()
         insertAsset(
             editionId = AVAILABLE_EDITION_ID,
@@ -162,6 +176,97 @@ class DigitalContentIntegrationTest {
         mockMvc.perform(post(path).with(readScope())).andExpect(status().isForbidden)
     }
 
+    @Test
+    fun `ingestion command is caller bound idempotent and issues a constrained grant`() {
+        val path = "/api/v1/digital-content/ingestions/$INGESTION_ID"
+        mockMvc.perform(
+            put(path)
+                .with(ingestionScope())
+                .contentType("application/json")
+                .content(INGESTION_BODY),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.ingestionId").value(INGESTION_ID.toString()))
+            .andExpect(jsonPath("$.state").value("AWAITING_SCAN"))
+            .andExpect(jsonPath("$.method").value("PUT"))
+            .andExpect(jsonPath("$.requiredHeaders.x-amz-checksum-sha256").value("checksum"))
+            .andExpect(jsonPath("$.replayed").value(false))
+
+        mockMvc.perform(
+            put(path)
+                .with(ingestionScope())
+                .contentType("application/json")
+                .content(INGESTION_BODY),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        val record = dsl.selectFrom(DIGITAL_CONTENT_INGESTION).fetchSingle()
+        org.junit.jupiter.api.Assertions.assertEquals("AWAITING_SCAN", record.state)
+        org.junit.jupiter.api.Assertions.assertEquals(DIGEST, record.sha256)
+        org.junit.jupiter.api.Assertions.assertTrue(
+            requireNotNull(record.quarantineObjectKey).startsWith("quarantine/digital-content/aa/$INGESTION_ID/"),
+        )
+        org.junit.jupiter.api.Assertions.assertFalse(record.actorFingerprint.contains("ingestion-operator"))
+    }
+
+    @Test
+    fun `ingestion rejects identifier reuse by a different caller and requires least privilege`() {
+        val path = "/api/v1/digital-content/ingestions/$INGESTION_ID"
+        mockMvc.perform(put(path).contentType("application/json").content(INGESTION_BODY))
+            .andExpect(status().isUnauthorized)
+        mockMvc.perform(put(path).with(readScope()).contentType("application/json").content(INGESTION_BODY))
+            .andExpect(status().isForbidden)
+
+        mockMvc.perform(
+            put(path).with(ingestionScope("operator-one")).contentType("application/json").content(INGESTION_BODY),
+        ).andExpect(status().isCreated)
+        mockMvc.perform(
+            put(path).with(ingestionScope("operator-two")).contentType("application/json").content(INGESTION_BODY),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("ingestion_id_conflict"))
+    }
+
+    @Test
+    fun `scan receipts are idempotent and any later adverse result fails closed`() {
+        mockMvc.perform(
+            put("/api/v1/digital-content/ingestions/$INGESTION_ID")
+                .with(ingestionScope())
+                .contentType("application/json")
+                .content(INGESTION_BODY),
+        ).andExpect(status().isCreated)
+        val key = dsl.select(DIGITAL_CONTENT_INGESTION.QUARANTINE_OBJECT_KEY)
+            .from(DIGITAL_CONTENT_INGESTION)
+            .fetchSingle(DIGITAL_CONTENT_INGESTION.QUARANTINE_OBJECT_KEY)
+        val event = MalwareScanEvent(
+            eventId = SCAN_EVENT_ID,
+            objectKey = requireNotNull(key),
+            objectVersionId = "version-1",
+            objectEtag = "etag-1",
+            result = MalwareScanResult.NO_THREATS_FOUND,
+            eventAt = Instant.now().minusSeconds(1),
+            payloadDigest = "b".repeat(64),
+        )
+        org.junit.jupiter.api.Assertions.assertEquals("CLEAN", malwareScanService.apply(event).state)
+        org.junit.jupiter.api.Assertions.assertTrue(malwareScanService.apply(event).replayed)
+
+        val adverse = event.copy(
+            eventId = UUID.fromString("14000000-0000-0000-0000-000000000002"),
+            result = MalwareScanResult.THREATS_FOUND,
+            payloadDigest = "c".repeat(64),
+        )
+        org.junit.jupiter.api.Assertions.assertEquals("REJECTED", malwareScanService.apply(adverse).state)
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "REJECTED",
+            dsl.select(DIGITAL_CONTENT_INGESTION.STATE)
+                .from(DIGITAL_CONTENT_INGESTION)
+                .fetchSingle(DIGITAL_CONTENT_INGESTION.STATE),
+        )
+        org.junit.jupiter.api.Assertions.assertEquals(2, dsl.fetchCount(DIGITAL_CONTENT_SCAN_RECEIPT))
+    }
+
     private fun insertAsset(
         editionId: UUID,
         format: String,
@@ -213,12 +318,29 @@ class DigitalContentIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority("SCOPE_digital-content.download.authorize"))
 
+    private fun ingestionScope(subject: String = "ingestion-operator") = jwt()
+        .jwt { token ->
+            token.issuer("https://identity.example.test")
+            token.subject(subject)
+        }
+        .authorities(SimpleGrantedAuthority("SCOPE_digital-content.ingestion.create"))
+
     @TestConfiguration(proxyBeanMethods = false)
     class DownloadSignerTestConfiguration {
         @Bean
         @Primary
         fun testDownloadUrlSigner() = DownloadUrlSigner { _, issuedAt ->
             SignedDownload("https://downloads.example.test/signed", issuedAt.plusSeconds(60))
+        }
+
+        @Bean
+        @Primary
+        fun testQuarantineUploadAuthorizer() = QuarantineUploadAuthorizer { _, issuedAt ->
+            SignedUpload(
+                "https://quarantine.example.test/upload",
+                mapOf("x-amz-checksum-sha256" to "checksum"),
+                issuedAt.plusSeconds(300),
+            )
         }
     }
 
@@ -247,7 +369,22 @@ class DigitalContentIntegrationTest {
         val EXPIRED_EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000004")
         val AVAILABLE_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000001")
         val BLOCKED_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000002")
+        val INGESTION_ID: UUID = UUID.fromString("13000000-0000-0000-0000-000000000001")
+        val SCAN_EVENT_ID: UUID = UUID.fromString("14000000-0000-0000-0000-000000000001")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 10, 4, 12, 0, 0, 0, ZoneOffset.UTC)
         const val DIGEST = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val INGESTION_BODY = """
+            {
+              "editionId": "$AVAILABLE_EDITION_ID",
+              "format": "PDF",
+              "sizeBytes": 4096,
+              "sha256": "$DIGEST",
+              "sourceProvider": "OpenStax",
+              "sourceUri": "https://openstax.org/details/books/example",
+              "licenseExpression": "CC-BY-4.0",
+              "attribution": "Example Engineering Text, OpenStax",
+              "rightsExpiresAt": null
+            }
+        """.trimIndent()
     }
 }

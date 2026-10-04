@@ -1153,6 +1153,8 @@ class NotificationServiceIntegrationTest {
 
         @Container @JvmStatic
         val kafka = KafkaContainer("apache/kafka-native:4.2.0")
+            .withStartupAttempts(3)
+            .withStartupTimeout(Duration.ofMinutes(2))
 
         @DynamicPropertySource @JvmStatic
         fun properties(registry: DynamicPropertyRegistry) {
