@@ -20,7 +20,8 @@ The Next.js product is live while a measured strangler migration moves domain ow
 
 - **Version**: `0.2.1`
 - **Node Baseline**: Node.js 24 LTS (`>=24.17.0 <25`)
-- **Production URL**: [https://mundia-library.vercel.app](https://mundia-library.vercel.app)
+- **Production URL**: [https://mundialibrary.tech](https://mundialibrary.tech)
+- **Vercel fallback**: [https://mundia-library.vercel.app](https://mundia-library.vercel.app)
 - **Release Assets**: [GitHub Release v0.2.1](https://github.com/AnouarMohamed/Mundia_library/releases/tag/v0.2.1)
 
 ---

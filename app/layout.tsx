@@ -17,6 +17,12 @@ import { connection } from "next/server";
 import { ReactNode } from "react";
 import SessionProviderWrapper from "./SessionProviderWrapper";
 
+const siteUrl =
+  process.env.NEXTAUTH_URL ??
+  process.env.NEXT_PUBLIC_PROD_API_ENDPOINT ??
+  process.env.NEXT_PUBLIC_API_ENDPOINT ??
+  "http://127.0.0.1:3000";
+
 // Local fonts for consistent typography across the app.
 // IBM Plex Sans for primary body text and UI elements.
 const ibmPlexSans = localFont({
@@ -41,19 +47,14 @@ const bebasNeue = localFont({
  * Configures title, description, keywords, and OpenGraph properties.
  */
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_PROD_API_ENDPOINT || "http://localhost:3000"
-  ),
+  metadataBase: new URL(siteUrl),
   title: "Mundiapolis Library | University Library Management",
   description:
     "Mundiapolis University Library - A modern library management solution for borrowing, tracking, and discovering books. Your gateway to knowledge at Mundiapolis.",
-  authors: [
-    {
-      name: "Arnob Mahmud",
-      url: "https://arnob-mahmud.vercel.app/",
-    },
-    { name: "arnob_t78@yahoo.com" },
-  ],
+  authors: [{ name: "Mundiapolis University" }],
+  alternates: {
+    canonical: "/",
+  },
   keywords: [
     "Mundiapolis",
     "library",
@@ -61,7 +62,6 @@ export const metadata: Metadata = {
     "book borrowing",
     "library management",
     "student portal",
-    "Arnob Mahmud",
     "Next.js",
     "TypeScript",
     "Drizzle ORM",
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     title: "Mundiapolis Library | University Library Management",
     description:
       "Mundiapolis University Library - A modern library management solution for borrowing, tracking, and discovering books. Your gateway to knowledge at Mundiapolis.",
-    url: "https://arnob-mahmud.vercel.app/",
+    url: "/",
     siteName: "Mundiapolis Library",
     images: [
       {

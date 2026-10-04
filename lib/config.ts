@@ -89,9 +89,9 @@ const envSchema = z.object({
   authMode: z.enum(["oidc", "local"]).optional(),
 
   /** Base URL for the API (used in client-side requests). */
-  apiEndpoint: z.string().url().default("http://localhost:3000"),
+  apiEndpoint: z.string().url().default("http://127.0.0.1:3000"),
   /** Production-grade API endpoint (often the same as apiEndpoint). */
-  prodApiEndpoint: z.string().url().default("http://localhost:3000"),
+  prodApiEndpoint: z.string().url().default("http://127.0.0.1:3000"),
 
   /** ImageKit configuration for image hosting and optimization. */
   imagekit: z.object({

@@ -74,8 +74,8 @@ release flow is available for staging and future EKS deployment:
 Production verification:
 
 ```bash
-curl -fsS "https://mundia-library.vercel.app/api/books?limit=1"
-curl -fsS "https://mundia-library.vercel.app/api/books/genres"
+curl -fsS "https://mundialibrary.tech/api/books?limit=1"
+curl -fsS "https://mundialibrary.tech/api/books/genres"
 ```
 
 Manual verification:

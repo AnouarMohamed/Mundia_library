@@ -13,7 +13,7 @@ http://localhost:3000
 Production base URL:
 
 ```text
-https://mundia-library.vercel.app
+https://mundialibrary.tech
 ```
 
 Common JSON envelope:

@@ -116,7 +116,7 @@ Run after every production deployment.
 ### Public Read Smoke
 
 ```bash
-BASE_URL=https://mundia-library.vercel.app
+BASE_URL=https://mundialibrary.tech
 curl -fsS "$BASE_URL/api/books?limit=1"
 curl -fsS "$BASE_URL/api/books/genres"
 curl -fsS "$BASE_URL/api/books/recommendations?limit=3"
