@@ -74,6 +74,35 @@ describe("EbookFoundation importer", () => {
     expect(fetcher.mock.calls[0]?.[0].toString()).toContain(`ref=${REVISION}`);
   });
 
+  it("resolves main to the latest commit touching the catalog", async () => {
+    const content = "### Programming\n* [Book](https://example.test) (CC0)";
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ sha: REVISION }]), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            type: "file",
+            encoding: "base64",
+            sha: "b".repeat(40),
+            size: Buffer.byteLength(content),
+            content: Buffer.from(content).toString("base64"),
+          }),
+          { status: 200 },
+        ),
+      );
+
+    await expect(fetchEbookFoundationSnapshot({ fetcher })).resolves.toEqual({
+      revision: REVISION,
+      content,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]?.[0].toString()).toContain("commits?");
+    expect(fetcher.mock.calls[1]?.[0].toString()).toContain(`ref=${REVISION}`);
+  });
+
   it("rejects an unsafe source ref before making a request", async () => {
     const fetcher = vi.fn();
 

@@ -8,6 +8,9 @@ import type {
 const SOURCE_NAME = "EbookFoundation/free-programming-books";
 const CONTENTS_ENDPOINT =
   "https://api.github.com/repos/EbookFoundation/free-programming-books/contents/books/free-programming-books-subjects.md";
+const COMMITS_ENDPOINT =
+  "https://api.github.com/repos/EbookFoundation/free-programming-books/commits";
+const CATALOG_PATH = "books/free-programming-books-subjects.md";
 const MAX_SOURCE_BYTES = 1_000_000;
 
 interface GitHubContentsResponse {
@@ -18,6 +21,10 @@ interface GitHubContentsResponse {
   type?: unknown;
 }
 
+interface GitHubCommitResponse {
+  sha?: unknown;
+}
+
 export async function fetchEbookFoundationSnapshot(
   options: { revision?: string; fetcher?: typeof fetch } = {},
 ): Promise<LearningResourceSourceSnapshot> {
@@ -25,9 +32,12 @@ export async function fetchEbookFoundationSnapshot(
   if (revision !== "main" && !/^[0-9a-f]{40}$/.test(revision)) {
     throw new Error("EBOOK_FOUNDATION_INVALID_REVISION");
   }
+  const fetcher = options.fetcher ?? fetch;
+  const pinnedRevision =
+    revision === "main" ? await resolveLatestRevision(fetcher) : revision;
   const endpoint = new URL(CONTENTS_ENDPOINT);
-  endpoint.searchParams.set("ref", revision);
-  const response = await (options.fetcher ?? fetch)(endpoint, {
+  endpoint.searchParams.set("ref", pinnedRevision);
+  const response = await fetcher(endpoint, {
     headers: {
       Accept: "application/vnd.github+json",
       "User-Agent": "Mundia-Library/0.2 (+https://mundialibrary.tech)",
@@ -65,7 +75,39 @@ export async function fetchEbookFoundationSnapshot(
   if (Buffer.byteLength(content, "utf8") !== payload.size) {
     throw new Error("EBOOK_FOUNDATION_SIZE_MISMATCH");
   }
-  return { revision: payload.sha, content };
+  return { revision: pinnedRevision, content };
+}
+
+async function resolveLatestRevision(fetcher: typeof fetch) {
+  const endpoint = new URL(COMMITS_ENDPOINT);
+  endpoint.searchParams.set("path", CATALOG_PATH);
+  endpoint.searchParams.set("sha", "main");
+  endpoint.searchParams.set("per_page", "1");
+  const response = await fetcher(endpoint, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "Mundia-Library/0.2 (+https://mundialibrary.tech)",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`EBOOK_FOUNDATION_REVISION_HTTP_${response.status}`);
+  }
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+  if (declaredLength > 100_000) {
+    throw new Error("EBOOK_FOUNDATION_REVISION_RESPONSE_TOO_LARGE");
+  }
+  const payload: unknown = await response.json();
+  if (!Array.isArray(payload) || payload.length !== 1) {
+    throw new Error("EBOOK_FOUNDATION_INVALID_REVISION_RESPONSE");
+  }
+  const sha = (payload[0] as GitHubCommitResponse | undefined)?.sha;
+  if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha)) {
+    throw new Error("EBOOK_FOUNDATION_INVALID_REVISION_RESPONSE");
+  }
+  return sha;
 }
 
 export function parseEbookFoundationCatalog(

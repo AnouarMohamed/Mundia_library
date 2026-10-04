@@ -47,17 +47,22 @@ async function main() {
     throw new Error("DATABASE_URL is required for --apply");
   }
 
-  const { importLearningResourceBatch } = await import(
-    "../lib/learning-resources/import-service"
-  );
-  const result = await importLearningResourceBatch({
-    sourceName: SOURCE_NAME,
-    sourceRevision: snapshot.revision,
-    offset: args.offset,
-    limit: args.limit,
-    candidates,
-  });
-  console.log(JSON.stringify({ mode: "applied", ...summary, result }));
+  const [{ importLearningResourceBatch }, { closeDb }] = await Promise.all([
+    import("../lib/learning-resources/import-service"),
+    import("../database/drizzle"),
+  ]);
+  try {
+    const result = await importLearningResourceBatch({
+      sourceName: SOURCE_NAME,
+      sourceRevision: snapshot.revision,
+      offset: args.offset,
+      limit: args.limit,
+      candidates,
+    });
+    console.log(JSON.stringify({ mode: "applied", ...summary, result }));
+  } finally {
+    await closeDb();
+  }
 }
 
 function parseArguments(values: string[]): Arguments {
