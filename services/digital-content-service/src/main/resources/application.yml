@@ -42,6 +42,13 @@ spring:
     sql-dialect: postgres
 
 app:
+  download:
+    cloudfront:
+      enabled: ${DOWNLOAD_SIGNING_ENABLED:false}
+      base-url: ${DOWNLOAD_CLOUDFRONT_BASE_URL:}
+      key-pair-id: ${DOWNLOAD_CLOUDFRONT_KEY_PAIR_ID:}
+      private-key-path: ${DOWNLOAD_CLOUDFRONT_PRIVATE_KEY_PATH:}
+      url-lifetime: ${DOWNLOAD_URL_LIFETIME:PT1M}
   security:
     jwt:
       issuer: ${AUTH_ISSUER_URI}

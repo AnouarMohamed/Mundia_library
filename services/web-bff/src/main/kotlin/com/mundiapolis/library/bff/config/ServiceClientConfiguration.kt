@@ -11,9 +11,13 @@ import org.springframework.security.oauth2.client.web.client.OAuth2ClientHttpReq
 import org.springframework.security.oauth2.client.web.client.RequestAttributePrincipalResolver
 import org.springframework.web.client.RestClient
 import java.net.http.HttpClient
+import java.time.Clock
 
 @Configuration(proxyBeanMethods = false)
 class ServiceClientConfiguration {
+    @Bean
+    fun systemClock(): Clock = Clock.systemUTC()
+
     @Bean
     fun catalogRestClient(
         authorizedClientManager: OAuth2AuthorizedClientManager,
@@ -112,6 +116,30 @@ class ServiceClientConfiguration {
         }
         return RestClient.builder()
             .baseUrl(notification.baseUrl.toASCIIString())
+            .requestFactory(requestFactory)
+            .observationRegistry(observationRegistry)
+            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+            .build()
+    }
+
+    @Bean
+    fun digitalContentRestClient(
+        observationRegistry: ObservationRegistry,
+        digitalContent: DigitalContentClientProperties,
+        bff: BffProperties,
+    ): RestClient {
+        require(digitalContent.isSafeFor(bff.deploymentTier)) {
+            "Digital Content service transport must use HTTPS outside local development"
+        }
+        val httpClient = HttpClient.newBuilder()
+            .connectTimeout(digitalContent.connectTimeout)
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
+        val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
+            setReadTimeout(digitalContent.readTimeout)
+        }
+        return RestClient.builder()
+            .baseUrl(digitalContent.baseUrl.toASCIIString())
             .requestFactory(requestFactory)
             .observationRegistry(observationRegistry)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)

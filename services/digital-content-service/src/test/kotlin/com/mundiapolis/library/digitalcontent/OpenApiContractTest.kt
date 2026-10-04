@@ -26,5 +26,17 @@ class OpenApiContractTest {
             .path("DownloadableFormat").path("properties")
         assertFalse(fields.has("objectKey"))
         assertFalse(fields.has("sourceUri"))
+
+        val authorization = document.path("paths")
+            .path("/api/v1/digital-content/assets/{assetId}/authorizations")
+            .path("post")
+        assertEquals(
+            "digital-content.download.authorize",
+            authorization.path("security").path(0).path("oauth2").path(0).stringValue(),
+        )
+        val responseFields = document.path("components").path("schemas")
+            .path("DownloadAuthorization").path("properties")
+        assertFalse(responseFields.has("objectKey"))
+        assertFalse(responseFields.has("actorFingerprint"))
     }
 }

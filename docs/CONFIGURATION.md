@@ -294,11 +294,20 @@ defaults to `digital-content-api`; callers need the narrow
 is disabled in packaged runtime images and enabled by `bootRun` for local-only
 development, matching the other domain services.
 
-This first slice intentionally has no S3 or CloudFront credentials. Add those
-only with the download-authorization slice, using EKS workload identity and a
-dedicated signing secret/KMS policy rather than static AWS credentials. Object
-storage must remain private, block public access, require encryption, and emit
-scan completion before an asset can become `CLEAN` and `PUBLISHED`.
+CloudFront signing is disabled by default. Production requires
+`DOWNLOAD_SIGNING_ENABLED=true`, an exact HTTPS
+`DOWNLOAD_CLOUDFRONT_BASE_URL`, `DOWNLOAD_CLOUDFRONT_KEY_PAIR_ID`, and an
+absolute `DOWNLOAD_CLOUDFRONT_PRIVATE_KEY_PATH` pointing to an unencrypted
+PKCS#8 RSA key of at least 2048 bits. `DOWNLOAD_URL_LIFETIME` defaults to one
+minute and cannot exceed five minutes. Mount the signing key from the managed
+secret store; never put PEM contents in an environment variable. The BFF must
+use the same base URL and a maximum lifetime no greater than the service value.
+
+The signer is local and needs no AWS API credentials. Object storage must
+remain private behind CloudFront Origin Access Control, block public access,
+require encryption, and emit scan completion before an asset can become
+`CLEAN` and `PUBLISHED`. The authorization API rechecks all gates under a row
+lock and persists only a SHA-256 actor fingerprint and timestamps.
 
 ## Secrets Handling
 

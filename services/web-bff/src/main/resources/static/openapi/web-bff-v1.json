@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Library Web BFF API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
   },
   "servers": [{ "url": "/" }],
@@ -380,6 +380,45 @@
           "504": { "$ref": "#/components/responses/Problem" }
         }
       }
+    },
+    "/api/v1/digital-content/editions/{editionId}/availability": {
+      "get": {
+        "operationId": "getDownloadAvailabilityThroughBff",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "Rights-safe downloadable formats",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EditionDownloadAvailability" } } }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/digital-content/assets/{assetId}/authorizations": {
+      "post": {
+        "operationId": "authorizeDownloadThroughBff",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "assetId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "Short-lived first-party download authorization",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DownloadAuthorization" } } }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
     }
   },
   "components": {
@@ -388,6 +427,41 @@
       "csrfHeader": { "type": "apiKey", "in": "header", "name": "X-XSRF-TOKEN" }
     },
     "responses": {
+      "EditionDownloadAvailability": {
+        "type": "object",
+        "required": ["editionId", "downloadable", "formats"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "downloadable": { "type": "boolean" },
+          "formats": { "type": "array", "maxItems": 2, "items": { "$ref": "#/components/schemas/DownloadableFormat" } }
+        },
+        "additionalProperties": false
+      },
+      "DownloadableFormat": {
+        "type": "object",
+        "required": ["assetId", "format", "mediaType", "sizeBytes", "sha256", "licenseExpression", "attribution"],
+        "properties": {
+          "assetId": { "type": "string", "format": "uuid" },
+          "format": { "type": "string", "enum": ["PDF", "EPUB"] },
+          "mediaType": { "type": "string", "enum": ["application/pdf", "application/epub+zip"] },
+          "sizeBytes": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1073741824 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "licenseExpression": { "type": "string", "minLength": 2, "maxLength": 128 },
+          "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 }
+        },
+        "additionalProperties": false
+      },
+      "DownloadAuthorization": {
+        "type": "object",
+        "required": ["authorizationId", "assetId", "downloadUrl", "expiresAt"],
+        "properties": {
+          "authorizationId": { "type": "string", "format": "uuid" },
+          "assetId": { "type": "string", "format": "uuid" },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
       "Problem": {
         "description": "Stable non-sensitive error response",
         "content": {

@@ -111,6 +111,7 @@ class BffRedisSessionIntegrationTest {
             registry.add("MEMBERSHIP_SERVICE_URL") { "https://membership.example.test" }
             registry.add("CIRCULATION_SERVICE_URL") { "https://circulation.example.test" }
             registry.add("NOTIFICATION_SERVICE_URL") { "https://notification.example.test" }
+            registry.add("DIGITAL_CONTENT_SERVICE_URL") { "https://digital-content.example.test" }
             registry.add("DEPLOYMENT_TIER") { "production" }
             registry.add("BFF_PUBLIC_BASE_URL") { "https://library.example.test" }
             registry.add("BFF_SECURE_COOKIES") { "true" }

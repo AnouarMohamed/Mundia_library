@@ -1,16 +1,16 @@
-package com.mundiapolis.library.digitalcontent.dto
+package com.mundiapolis.library.bff.digitalcontent
 
-import java.util.UUID
 import java.time.Instant
+import java.util.UUID
 
-enum class DigitalFormat {
+enum class DigitalFormatView {
     PDF,
     EPUB,
 }
 
-data class DownloadableFormat(
+data class DownloadableFormatView(
     val assetId: UUID,
-    val format: DigitalFormat,
+    val format: DigitalFormatView,
     val mediaType: String,
     val sizeBytes: Long,
     val sha256: String,
@@ -18,13 +18,13 @@ data class DownloadableFormat(
     val attribution: String,
 )
 
-data class EditionDownloadAvailability(
+data class EditionDownloadAvailabilityView(
     val editionId: UUID,
     val downloadable: Boolean,
-    val formats: List<DownloadableFormat>,
+    val formats: List<DownloadableFormatView>,
 )
 
-data class DownloadAuthorization(
+data class DownloadAuthorizationView(
     val authorizationId: UUID,
     val assetId: UUID,
     val downloadUrl: String,

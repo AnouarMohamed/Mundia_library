@@ -92,6 +92,7 @@ class OAuthClientConfiguration {
         membership: MembershipClientProperties,
         circulation: CirculationClientProperties,
         notification: NotificationClientProperties,
+        digitalContent: DigitalContentClientProperties,
     ): OAuth2AccessTokenResponseClient<TokenExchangeGrantRequest> =
         RestClientTokenExchangeTokenResponseClient().apply {
             setRestClient(oauthTokenRestClient)
@@ -101,6 +102,7 @@ class OAuthClientConfiguration {
                         MEMBERSHIP_REGISTRATION -> add("audience", membership.audience)
                         CIRCULATION_REGISTRATION -> add("audience", circulation.audience)
                         NOTIFICATION_REGISTRATION -> add("audience", notification.audience)
+                        DIGITAL_CONTENT_REGISTRATION -> add("audience", digitalContent.audience)
                     }
                 }
             }
@@ -185,6 +187,7 @@ class OAuthClientConfiguration {
         const val MEMBERSHIP_REGISTRATION = "membership-service"
         const val CIRCULATION_REGISTRATION = "circulation-service"
         const val NOTIFICATION_REGISTRATION = "notification-service"
+        const val DIGITAL_CONTENT_REGISTRATION = "digital-content-service"
         const val SUBJECT_TOKEN_ATTRIBUTE = "mundia.delegation.subject-token"
         private val TOKEN_CLOCK_SKEW: Duration = Duration.ofSeconds(10)
         private val KNOWN_REGISTRATIONS = listOf(
@@ -193,6 +196,7 @@ class OAuthClientConfiguration {
             MEMBERSHIP_REGISTRATION,
             CIRCULATION_REGISTRATION,
             NOTIFICATION_REGISTRATION,
+            DIGITAL_CONTENT_REGISTRATION,
         )
     }
 }

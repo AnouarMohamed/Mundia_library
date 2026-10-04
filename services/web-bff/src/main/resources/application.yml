@@ -73,6 +73,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: notification.inbox.read,notification.inbox.write,notification.preferences.read,notification.preferences.write
+          digital-content-service:
+            provider: institutional
+            client-id: ${DIGITAL_CONTENT_CLIENT_ID}
+            client-secret: ${DIGITAL_CONTENT_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: digital-content.availability.read,digital-content.download.authorize
           institutional:
             provider: institutional
             client-id: ${OIDC_CLIENT_ID}
@@ -119,6 +126,15 @@ app:
       read-timeout: ${NOTIFICATION_READ_TIMEOUT:PT5S}
       maximum-response-bytes: ${NOTIFICATION_MAXIMUM_RESPONSE_BYTES:262144}
       maximum-delegated-token-lifetime: ${NOTIFICATION_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
+    digital-content:
+      base-url: ${DIGITAL_CONTENT_SERVICE_URL:http://localhost:8085}
+      audience: ${DIGITAL_CONTENT_AUDIENCE:digital-content-api}
+      download-base-url: ${DOWNLOAD_CLOUDFRONT_BASE_URL:https://downloads.example.test}
+      connect-timeout: ${DIGITAL_CONTENT_CONNECT_TIMEOUT:PT1S}
+      read-timeout: ${DIGITAL_CONTENT_READ_TIMEOUT:PT5S}
+      maximum-response-bytes: ${DIGITAL_CONTENT_MAXIMUM_RESPONSE_BYTES:65536}
+      maximum-delegated-token-lifetime: ${DIGITAL_CONTENT_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
+      maximum-signed-url-lifetime: ${DOWNLOAD_MAXIMUM_SIGNED_URL_LIFETIME:PT5M}
 
 management:
   endpoints:

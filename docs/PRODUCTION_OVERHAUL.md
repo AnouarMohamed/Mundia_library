@@ -425,9 +425,12 @@ eviction. The Digital Content service has started as a separate Kotlin ownership
 boundary with its own PostgreSQL/Flyway schema and machine-readable contract.
 Its first read slice returns only globally authorized, unexpired, malware-clean,
 published PDF/EPUB availability and never exposes private object keys or
-provenance URLs. The authorization/signing command, quarantine ingestion worker,
-BFF/UI Download action, and core OpenSearch projection remain pending; the
-service therefore does not issue file URLs or bytes yet.
+provenance URLs. Download authorization now locks and rechecks those gates,
+records a privacy-minimized audit, and produces an RSA/SHA-256 CloudFront URL
+bounded to five minutes and one exact object. The Kotlin BFF routes both calls
+through token exchange and rejects unexpected origins, paths, signing parameters,
+asset identities, or expiries. Quarantine ingestion, S3 scan-event integration,
+the SPA Download action, and the core OpenSearch projection remain pending.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

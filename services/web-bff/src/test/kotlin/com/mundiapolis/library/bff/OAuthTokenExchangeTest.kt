@@ -1,6 +1,7 @@
 package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.config.CirculationClientProperties
+import com.mundiapolis.library.bff.config.DigitalContentClientProperties
 import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.config.NotificationClientProperties
 import com.mundiapolis.library.bff.config.OAuthClientConfiguration
@@ -36,6 +37,7 @@ class OAuthTokenExchangeTest {
             properties(),
             circulationProperties(),
             notificationProperties(),
+            digitalContentProperties(),
         )
         val now = Instant.now()
         val source = OAuth2AccessToken(
@@ -84,6 +86,7 @@ class OAuthTokenExchangeTest {
             properties(),
             circulationProperties(),
             notificationProperties(),
+            digitalContentProperties(),
         )
         val now = Instant.now()
         val source = OAuth2AccessToken(
@@ -149,6 +152,57 @@ class OAuthTokenExchangeTest {
         server.verify()
     }
 
+    @Test
+    fun `digital content token exchange requests its audience and download scopes`() {
+        val builder = RestClient.builder().withOAuthTokenProtocolSupport()
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
+            builder.build(),
+            properties(),
+            circulationProperties(),
+            notificationProperties(),
+            digitalContentProperties(),
+        )
+        val now = Instant.now()
+        val source = OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER,
+            "source-user-token",
+            now,
+            now.plusSeconds(300),
+        )
+        server.expect(requestTo("https://issuer.example.test/oauth2/token"))
+            .andExpect(content().string(containsString("audience=digital-content-api")))
+            .andExpect(content().string(containsString("digital-content.availability.read")))
+            .andExpect(content().string(containsString("digital-content.download.authorize")))
+            .andRespond(
+                withSuccess(
+                    """
+                        {
+                          "access_token": "delegated-digital-content-token",
+                          "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+                          "token_type": "Bearer",
+                          "expires_in": 120,
+                          "scope": "digital-content.availability.read digital-content.download.authorize"
+                        }
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        val registration = registration(
+            registrationId = "digital-content-service",
+            clientId = "web-bff-digital-content",
+            scopes = arrayOf(
+                "digital-content.availability.read",
+                "digital-content.download.authorize",
+            ),
+        )
+
+        val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))
+
+        assertThat(response.accessToken.tokenValue).isEqualTo("delegated-digital-content-token")
+        server.verify()
+    }
+
     private fun registration(
         registrationId: String = "membership-service",
         clientId: String = "web-bff-membership",
@@ -188,5 +242,16 @@ class OAuthTokenExchangeTest {
         readTimeout = Duration.ofSeconds(3),
         maximumResponseBytes = 256 * 1024,
         maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
+    )
+
+    private fun digitalContentProperties() = DigitalContentClientProperties(
+        baseUrl = URI("https://digital-content.internal"),
+        audience = "digital-content-api",
+        downloadBaseUrl = URI("https://downloads.example.test"),
+        connectTimeout = Duration.ofSeconds(1),
+        readTimeout = Duration.ofSeconds(3),
+        maximumResponseBytes = 64 * 1024,
+        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
+        maximumSignedUrlLifetime = Duration.ofMinutes(5),
     )
 }

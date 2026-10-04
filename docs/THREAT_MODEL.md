@@ -31,7 +31,7 @@ In scope:
   backend-for-frontend (BFF).
 - Current credential authentication and the migration to managed institutional
   OpenID Connect (OIDC).
-- Membership, catalog, circulation, notifications, discovery, reviews,
+- Membership, catalog, circulation, notifications, digital downloads, discovery, reviews,
   recommendations, fines, exports, and administrative workflows.
 - PostgreSQL, Redis, the event broker, search index, object storage, email
   providers, workflow/webhook providers, and the append-only audit archive.
@@ -74,18 +74,21 @@ using [SECURITY_VERIFICATION.md](./SECURITY_VERIFICATION.md).
 flowchart LR
     Browser["Patron or staff browser"]
     Edge["CDN / WAF / ingress"]
-    BFF["Next.js BFF"]
+    BFF["Kotlin/Spring BFF"]
     IdP["Managed institutional OIDC"]
     Membership["Membership service"]
     Catalog["Catalog service"]
     Circulation["Circulation service"]
     Notifications["Notification service"]
+    DigitalContent["Digital Content service"]
     Discovery["Discovery service"]
+    CloudFront["CloudFront signed delivery"]
     ObjectStore[("Private object storage")]
     MemberDb[("Membership PostgreSQL")]
     CatalogDb[("Catalog PostgreSQL")]
     CirculationDb[("Circulation PostgreSQL")]
     NotificationDb[("Notification PostgreSQL")]
+    DigitalContentDb[("Digital Content PostgreSQL")]
     Redis[("Redis")]
     Broker["Managed event broker"]
     Search[("OpenSearch read model")]
@@ -100,13 +103,17 @@ flowchart LR
     BFF -->|Audience-scoped service token| Catalog
     BFF -->|Audience-scoped service token| Circulation
     BFF -->|Audience-scoped service token| Notifications
+    BFF -->|Audience-scoped service token| DigitalContent
     BFF --> Discovery
+    Browser -->|Short-lived signed URL| CloudFront
+    CloudFront --> ObjectStore
 
     Membership --> MemberDb
     Membership -->|Brokered upload/read| ObjectStore
     Catalog --> CatalogDb
     Circulation --> CirculationDb
     Notifications --> NotificationDb
+    DigitalContent --> DigitalContentDb
     Discovery --> Search
     BFF --> Redis
 
@@ -122,6 +129,7 @@ flowchart LR
     KMS -.-> Catalog
     KMS -.-> Circulation
     KMS -.-> Notifications
+    KMS -.-> DigitalContent
 ```
 
 The diagram shows logical flows, not permission to create arbitrary network
@@ -188,6 +196,7 @@ The product prioritizes:
 | Service credentials, database credentials, KMS permissions                      | Restricted control-plane material     | Lateral movement, bulk compromise                      | Cloud IAM and secret manager              |
 | Copy/barcode, loan state, reservations, policy, fine calculation inputs         | Restricted integrity data             | Lost inventory, unfair denial, financial errors        | Circulation                               |
 | Notification templates, preferences, delivery and suppression records           | Confidential                          | Spam, phishing, preference violation                   | Notifications                             |
+| Licensed digital files, rights evidence, object manifests, and signing keys      | Internal to restricted                | Copyright breach, malware delivery, unauthorized access | Digital Content and secret manager        |
 | Audit events, security alerts, traces, access-review evidence                   | Restricted security records           | Repudiation, attacker evasion, sensitive metadata leak | Security logging pipeline/archive         |
 | Events, inbox/outbox records, dead-letter messages                              | Confidential to restricted            | Forged state, replay, data exposure                    | Producer/consumer owners and platform     |
 | Search and recommendation projections                                           | Confidential when personalized        | Behavioral inference and stale authorization           | Discovery                                 |

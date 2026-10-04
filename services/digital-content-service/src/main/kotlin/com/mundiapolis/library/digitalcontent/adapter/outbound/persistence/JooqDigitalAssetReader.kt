@@ -1,10 +1,12 @@
 package com.mundiapolis.library.digitalcontent.adapter.outbound.persistence
 
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_ASSET
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT
 import com.mundiapolis.library.digitalcontent.dto.DigitalFormat
 import com.mundiapolis.library.digitalcontent.dto.DownloadableFormat
 import com.mundiapolis.library.digitalcontent.dto.EditionDownloadAvailability
 import com.mundiapolis.library.digitalcontent.service.DigitalAssetReader
+import com.mundiapolis.library.digitalcontent.service.AuthorizableAsset
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
 import java.time.Instant
@@ -54,5 +56,53 @@ class JooqDigitalAssetReader(
                 )
             }
         return EditionDownloadAvailability(editionId, formats.isNotEmpty(), formats)
+    }
+
+    override fun lockAuthorizable(assetId: UUID, now: Instant): AuthorizableAsset? {
+        val timestamp = OffsetDateTime.ofInstant(now, ZoneOffset.UTC)
+        return dsl.select(
+            DIGITAL_CONTENT_ASSET.ASSET_ID,
+            DIGITAL_CONTENT_ASSET.OBJECT_KEY,
+        )
+            .from(DIGITAL_CONTENT_ASSET)
+            .where(DIGITAL_CONTENT_ASSET.ASSET_ID.eq(assetId))
+            .and(DIGITAL_CONTENT_ASSET.RIGHTS_STATUS.eq("VERIFIED"))
+            .and(DIGITAL_CONTENT_ASSET.RIGHTS_VERIFIED_AT.le(timestamp))
+            .and(
+                DIGITAL_CONTENT_ASSET.RIGHTS_EXPIRES_AT.isNull
+                    .or(DIGITAL_CONTENT_ASSET.RIGHTS_EXPIRES_AT.gt(timestamp)),
+            )
+            .and(DIGITAL_CONTENT_ASSET.TERRITORY_SCOPE.eq("GLOBAL"))
+            .and(DIGITAL_CONTENT_ASSET.MALWARE_SCAN_STATUS.eq("CLEAN"))
+            .and(DIGITAL_CONTENT_ASSET.PUBLICATION_STATUS.eq("PUBLISHED"))
+            .forShare()
+            .fetchOne { record ->
+                AuthorizableAsset(
+                    requireNotNull(record[DIGITAL_CONTENT_ASSET.ASSET_ID]),
+                    requireNotNull(record[DIGITAL_CONTENT_ASSET.OBJECT_KEY]),
+                )
+            }
+    }
+
+    override fun recordAuthorization(
+        authorizationId: UUID,
+        assetId: UUID,
+        actorFingerprint: String,
+        issuedAt: Instant,
+        expiresAt: Instant,
+    ) {
+        dsl.insertInto(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT)
+            .set(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT.AUTHORIZATION_ID, authorizationId)
+            .set(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT.ASSET_ID, assetId)
+            .set(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT.ACTOR_FINGERPRINT, actorFingerprint)
+            .set(
+                DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT.ISSUED_AT,
+                OffsetDateTime.ofInstant(issuedAt, ZoneOffset.UTC),
+            )
+            .set(
+                DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT.EXPIRES_AT,
+                OffsetDateTime.ofInstant(expiresAt, ZoneOffset.UTC),
+            )
+            .execute()
     }
 }

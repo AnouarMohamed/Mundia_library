@@ -91,10 +91,19 @@ availability result; private object keys and provenance URLs never leave the
 service. The immutable contract is available at
 `GET /openapi/digital-content-v1.json`.
 
-The download-authorization command, short-lived CloudFront signing, quarantined
-ingestion worker, trusted territory signal, and BFF/UI Download action are the
-next slice. Until those controls exist, this service intentionally does not
-issue or proxy file bytes.
+`POST /api/v1/digital-content/assets/{assetId}/authorizations` requires the
+dedicated `digital-content.download.authorize` scope, locks and rechecks the
+asset, records a privacy-minimized authorization audit, and returns a one-minute
+CloudFront URL signed with RSA/SHA-256. The Kotlin BFF exposes the same
+caller-bound operation with CSRF protection and validates the exact download
+origin, path, query shape, asset identity, and expiry before returning it. The
+service never proxies file bytes and neither signed URLs nor member identifiers
+are persisted.
+
+The quarantined ingestion worker, S3 malware-scan event integration, trusted
+territory signal, and SPA Download action are the next slice. Keep signing
+disabled until the private S3 origin, CloudFront trusted key group, and mounted
+PKCS#8 key are provisioned.
 
 The local database defaults are defined in `compose.yaml`. Production must
 provide all database and identity settings through its secret/configuration

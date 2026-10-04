@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundia Digital Content API",
-    "version": "1.0.0",
-    "description": "Rights-aware availability contract for first-party digital content. Storage keys and provenance URLs are never exposed."
+    "version": "1.1.0",
+    "description": "Rights-aware availability and short-lived authorization for first-party digital content. Storage keys and provenance URLs are never exposed."
   },
   "paths": {
     "/api/v1/digital-content/editions/{editionId}/availability": {
@@ -34,6 +34,37 @@
           "403": { "$ref": "#/components/responses/Forbidden" }
         }
       }
+    },
+    "/api/v1/digital-content/assets/{assetId}/authorizations": {
+      "post": {
+        "operationId": "authorizeDownload",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "security": [{ "oauth2": ["digital-content.download.authorize"] }],
+        "responses": {
+          "200": {
+            "description": "A newly authorized, short-lived first-party download URL",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DownloadAuthorization" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/DownloadUnavailable" },
+          "503": { "$ref": "#/components/responses/SigningUnavailable" }
+        }
+      }
     }
   },
   "components": {
@@ -44,7 +75,8 @@
           "clientCredentials": {
             "tokenUrl": "https://identity.example.invalid/oauth2/token",
             "scopes": {
-              "digital-content.availability.read": "Read safe digital content availability"
+              "digital-content.availability.read": "Read safe digital content availability",
+              "digital-content.download.authorize": "Authorize a short-lived first-party download"
             }
           }
         }
@@ -79,6 +111,17 @@
           "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 }
         }
       },
+      "DownloadAuthorization": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorizationId", "assetId", "downloadUrl", "expiresAt"],
+        "properties": {
+          "authorizationId": { "type": "string", "format": "uuid" },
+          "assetId": { "type": "string", "format": "uuid" },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
       "Problem": {
         "type": "object",
         "additionalProperties": true,
@@ -93,6 +136,14 @@
       },
       "Forbidden": {
         "description": "Required scope is missing",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "DownloadUnavailable": {
+        "description": "The asset is absent or is not currently authorized, clean, global, and published",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "SigningUnavailable": {
+        "description": "Download signing is unavailable",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     }

@@ -1,18 +1,26 @@
 package com.mundiapolis.library.digitalcontent
 
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_ASSET
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT
+import com.mundiapolis.library.digitalcontent.service.DownloadUrlSigner
+import com.mundiapolis.library.digitalcontent.service.SignedDownload
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -26,6 +34,7 @@ import java.util.UUID
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
+@Import(DigitalContentIntegrationTest.DownloadSignerTestConfiguration::class)
 class DigitalContentIntegrationTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
@@ -35,6 +44,7 @@ class DigitalContentIntegrationTest {
 
     @BeforeEach
     fun seedAssets() {
+        dsl.deleteFrom(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_ASSET).execute()
         insertAsset(
             editionId = AVAILABLE_EDITION_ID,
@@ -120,6 +130,38 @@ class DigitalContentIntegrationTest {
         mockMvc.perform(get(path).with(jwt())).andExpect(status().isForbidden)
     }
 
+    @Test
+    fun `authorization rechecks eligibility and records only a privacy safe audit`() {
+        val path = "/api/v1/digital-content/assets/$AVAILABLE_ASSET_ID/authorizations"
+        mockMvc.perform(post(path).with(downloadScope()))
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.assetId").value(AVAILABLE_ASSET_ID.toString()))
+            .andExpect(jsonPath("$.downloadUrl").value("https://downloads.example.test/signed"))
+            .andExpect(jsonPath("$.expiresAt").exists())
+
+        val audit = dsl.selectFrom(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT).fetchSingle()
+        org.junit.jupiter.api.Assertions.assertEquals(AVAILABLE_ASSET_ID, audit.assetId)
+        org.junit.jupiter.api.Assertions.assertTrue(
+            requireNotNull(audit.actorFingerprint).matches(Regex("^[0-9a-f]{64}$")),
+        )
+        org.junit.jupiter.api.Assertions.assertFalse(audit.actorFingerprint.contains("member-test"))
+
+        mockMvc.perform(
+            post("/api/v1/digital-content/assets/$BLOCKED_ASSET_ID/authorizations")
+                .with(downloadScope()),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("download_not_available"))
+    }
+
+    @Test
+    fun `authorization requires authentication and its dedicated scope`() {
+        val path = "/api/v1/digital-content/assets/$AVAILABLE_ASSET_ID/authorizations"
+        mockMvc.perform(post(path)).andExpect(status().isUnauthorized)
+        mockMvc.perform(post(path).with(readScope())).andExpect(status().isForbidden)
+    }
+
     private fun insertAsset(
         editionId: UUID,
         format: String,
@@ -130,7 +172,11 @@ class DigitalContentIntegrationTest {
         scanStatus: String,
         publicationStatus: String,
     ) {
-        val assetId = UUID.randomUUID()
+        val assetId = when (editionId) {
+            AVAILABLE_EDITION_ID -> AVAILABLE_ASSET_ID
+            BLOCKED_EDITION_ID -> BLOCKED_ASSET_ID
+            else -> UUID.randomUUID()
+        }
         val extension = format.lowercase()
         dsl.insertInto(DIGITAL_CONTENT_ASSET)
             .set(DIGITAL_CONTENT_ASSET.ASSET_ID, assetId)
@@ -160,6 +206,22 @@ class DigitalContentIntegrationTest {
         SimpleGrantedAuthority("SCOPE_digital-content.availability.read"),
     )
 
+    private fun downloadScope() = jwt()
+        .jwt { token ->
+            token.issuer("https://identity.example.test")
+            token.subject("member-test")
+        }
+        .authorities(SimpleGrantedAuthority("SCOPE_digital-content.download.authorize"))
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class DownloadSignerTestConfiguration {
+        @Bean
+        @Primary
+        fun testDownloadUrlSigner() = DownloadUrlSigner { _, issuedAt ->
+            SignedDownload("https://downloads.example.test/signed", issuedAt.plusSeconds(60))
+        }
+    }
+
     companion object {
         @Container
         @JvmStatic
@@ -183,6 +245,8 @@ class DigitalContentIntegrationTest {
         val BLOCKED_EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000002")
         val RESTRICTED_EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000003")
         val EXPIRED_EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000004")
+        val AVAILABLE_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000001")
+        val BLOCKED_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000002")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 10, 4, 12, 0, 0, 0, ZoneOffset.UTC)
         const val DIGEST = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
