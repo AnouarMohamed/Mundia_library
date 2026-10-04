@@ -24,4 +24,15 @@ describe("learning resource import batches", () => {
       createBatchKey({ ...base, offset: 100 }),
     );
   });
+
+  it("supports content-addressed snapshots used by non-Git catalogs", () => {
+    expect(
+      createBatchKey({
+        sourceName: "DOAB",
+        sourceRevision: "b".repeat(64),
+        offset: 0,
+        limit: 250,
+      }),
+    ).toHaveLength(64);
+  });
 });

@@ -446,9 +446,12 @@ CC BY, CC BY-SA, CC0, or public-domain rights. Everything else is quarantined
 for an append-only, audited admin decision. Public queries are backed by
 PostgreSQL full-text/category indexes, and downloads are authenticated 303
 redirects to the verified official HTTPS source; the application does not proxy
-or host files. Open Library, Internet Archive, Gutenberg, OpenStax, DOAB, and
-arXiv adapters remain pending, as does migration of this temporary read slice
-to the Kotlin catalog/digital-content services before monolith retirement.
+or host files. A second adapter consumes bounded DOAB OAI-PMH pages, validates
+XML with entity processing disabled, filters for engineering disciplines, and
+uses the per-file licence URI as evidence. Open Library, Internet Archive,
+Gutenberg, OpenStax, and arXiv adapters remain pending, as does migration of
+this temporary read slice to the Kotlin catalog/digital-content services before
+monolith retirement.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

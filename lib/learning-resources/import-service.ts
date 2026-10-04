@@ -191,7 +191,7 @@ function validateBatch(input: {
     input.limit < 1 ||
     input.limit > MAX_BATCH_SIZE ||
     input.candidates.length > input.limit ||
-    !/^[0-9a-f]{40}$/.test(input.sourceRevision) ||
+    !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(input.sourceRevision) ||
     input.sourceName.length < 2 ||
     input.sourceName.length > 64 ||
     input.candidates.some(

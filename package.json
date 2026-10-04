@@ -43,6 +43,7 @@
     "fix-overcorrection": "tsx scripts/fix-overcorrection.ts",
     "find-missing-borrow": "tsx scripts/find-missing-borrow.ts",
     "import:learning-resources": "tsx scripts/import-learning-resources.ts",
+    "import:learning-resources:doab": "tsx scripts/import-doab-learning-resources.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },
@@ -74,6 +75,7 @@
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.2",
+    "fast-xml-parser": "5.11.2",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^0.577.0",
     "next": "^15.5.26",
