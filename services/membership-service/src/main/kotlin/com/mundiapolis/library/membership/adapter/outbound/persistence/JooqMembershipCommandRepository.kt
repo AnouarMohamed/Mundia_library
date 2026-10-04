@@ -55,13 +55,13 @@ class JooqMembershipCommandRepository(
                 throw MembershipCommandConflictException("Member already has the requested status")
             }
             if (
-                member.membershipRole == "ADMIN" &&
+                member.membershipRole in setOf("ADMIN", "SUPER_ADMIN") &&
                 previousStatus == AccountStatus.APPROVED &&
                 command.status != AccountStatus.APPROVED
             ) {
                 val approvedAdministrators = tx.fetchCount(
                     MEMBERSHIP_MEMBER,
-                    MEMBERSHIP_MEMBER.MEMBERSHIP_ROLE.eq("ADMIN")
+                    MEMBERSHIP_MEMBER.MEMBERSHIP_ROLE.`in`("ADMIN", "SUPER_ADMIN")
                         .and(MEMBERSHIP_MEMBER.ACCOUNT_STATUS.eq(AccountStatus.APPROVED.name)),
                 )
                 if (approvedAdministrators <= 1) {

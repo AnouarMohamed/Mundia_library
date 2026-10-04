@@ -278,7 +278,7 @@ async function seedUsers() {
             password: row.password, // Already hashed from NeonDB
             universityCard: row.university_card,
             status: row.status as "PENDING" | "APPROVED" | "REJECTED",
-            role: row.role as "USER" | "ADMIN",
+            role: row.role as "USER" | "ADMIN" | "SUPER_ADMIN",
             lastActivityDate: formatDateForPostgres(
               parseDate(row.last_activity_date)
             ), // Convert to YYYY-MM-DD format for date column
@@ -297,7 +297,8 @@ async function seedUsers() {
           universityCard: row.university_card,
           status:
             (row.status as "PENDING" | "APPROVED" | "REJECTED") || "PENDING",
-          role: (row.role as "USER" | "ADMIN") || "USER",
+          role:
+            (row.role as "USER" | "ADMIN" | "SUPER_ADMIN") || "USER",
           lastActivityDate: formatDateForPostgres(
             parseDate(row.last_activity_date)
           ),

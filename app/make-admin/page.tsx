@@ -74,7 +74,7 @@ const Page = async ({
                         <div className="mt-1.5 text-xs text-green-300 sm:mt-2 sm:text-sm">
                           <p>
                             Your admin request has been sent to the
-                            administrators for review. You will be notified once
+                            super administrators for review. You will be notified once
                             it&apos;s approved or rejected.
                           </p>
                         </div>
@@ -124,7 +124,7 @@ const Page = async ({
                 <div className="text-center">
                   <p className="mb-3 text-xs text-light-200/80 sm:mb-4 sm:text-sm">
                     Submit a request to become an administrator. Your request
-                    will be reviewed by existing administrators before approval.
+                    will be reviewed by a super administrator before approval.
                   </p>
 
                   <div className="mb-3 rounded-lg border border-gray-600 bg-gray-800/20 p-3 sm:mb-4 sm:p-4">

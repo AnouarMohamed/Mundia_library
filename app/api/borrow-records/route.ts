@@ -114,7 +114,8 @@ export async function GET(request: NextRequest) {
       ? 50
       : Math.min(100, Math.max(1, limitParam));
 
-    const isAdmin = guard.user.role === "ADMIN";
+    const isAdmin =
+      guard.user.role === "ADMIN" || guard.user.role === "SUPER_ADMIN";
 
     // UUID Validation for relational IDs.
     if (userId && !isUuid(userId)) {

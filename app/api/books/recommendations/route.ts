@@ -171,7 +171,11 @@ export async function GET(request: NextRequest) {
         return guardToResponse(guard);
       }
 
-      if (guard.user.role !== "ADMIN" && guard.user.id !== userId) {
+      if (
+        guard.user.role !== "ADMIN" &&
+        guard.user.role !== "SUPER_ADMIN" &&
+        guard.user.id !== userId
+      ) {
         return forbiddenResponse("You can only access your own recommendations");
       }
 

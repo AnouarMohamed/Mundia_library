@@ -36,7 +36,8 @@ interface HeaderProps {
  */
 const Header = async ({ session }: HeaderProps) => {
   // Extract user details and roles from the session
-  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+  const role = (session.user as { role?: string }).role;
+  const isAdmin = role === "ADMIN" || role === "SUPER_ADMIN";
   const fullName = session.user?.name || "User";
   const email = session.user?.email || "";
   const universityId = (session.user as { universityId?: number }).universityId;

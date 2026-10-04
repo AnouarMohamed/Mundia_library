@@ -77,7 +77,7 @@ Important columns:
 | `password` | Salted password hash. |
 | `university_card` | Uploaded card reference. |
 | `status` | Account approval state. |
-| `role` | `USER` or `ADMIN`. |
+| `role` | `USER`, operational `ADMIN`, or governance-scoped `SUPER_ADMIN`. |
 | `last_activity_date` | Activity tracking. |
 | `last_login` | Last successful sign-in timestamp. |
 | `created_at` | Record creation timestamp. |

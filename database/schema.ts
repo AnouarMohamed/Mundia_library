@@ -31,9 +31,10 @@ export const userStatusEnum = pgEnum("status", [
 /**
  * Enumeration of user roles within the system.
  * - USER: Standard student access (borrow, return, review).
- * - ADMIN: Administrative access (approve requests, manage catalog, analytics).
+ * - ADMIN: Operational access (catalog, circulation, analytics).
+ * - SUPER_ADMIN: Security governance access (administrator lifecycle).
  */
-export const userRoleEnum = pgEnum("role", ["USER", "ADMIN"]);
+export const userRoleEnum = pgEnum("role", ["USER", "ADMIN", "SUPER_ADMIN"]);
 
 /**
  * High-risk administrative capabilities enforced in addition to the ADMIN

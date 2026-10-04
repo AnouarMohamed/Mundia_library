@@ -21,7 +21,7 @@ export type FederatedLocalUser = User & {
   id: string;
   email: string;
   name: string;
-  role: "USER" | "ADMIN";
+  role: "USER" | "ADMIN" | "SUPER_ADMIN";
   status: "APPROVED";
   universityId: number;
   /** Opaque revocation handle, not an IdP token or provider identifier. */

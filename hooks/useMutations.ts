@@ -236,7 +236,7 @@ export const useDeleteBook = () => {
 };
 
 /**
- * Hook to update a user's role (USER or ADMIN).
+ * Hook to update a user's role.
  * Automatically invalidates related queries and shows success/error toasts.
  *
  * @returns React Query mutation object with mutate function and loading/error states
@@ -268,7 +268,7 @@ export const useUpdateUserRole = () => {
       role,
     }: {
       userId: string;
-      role: "USER" | "ADMIN";
+      role: "USER" | "ADMIN" | "SUPER_ADMIN";
       userName?: string; // Optional, for toast message
     }) => {
       const result = await updateUserRole(userId, role);
@@ -282,11 +282,16 @@ export const useUpdateUserRole = () => {
       invalidateAfterUserChange(queryClient);
 
       // Show success toast
-      const roleText = data.role === "ADMIN" ? "admin" : "regular user";
+      const roleText =
+        data.role === "SUPER_ADMIN"
+          ? "super admin"
+          : data.role === "ADMIN"
+            ? "admin"
+            : "student";
       const userName = variables.userName || "User";
       showToast.success(
         "Role Updated",
-        `${userName} has been ${data.role === "ADMIN" ? "promoted to" : "demoted from"} ${roleText}.`
+        `${userName} is now a ${roleText}.`
       );
     },
     onError: (error: Error, variables) => {

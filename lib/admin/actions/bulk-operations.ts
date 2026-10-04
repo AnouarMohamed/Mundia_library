@@ -9,6 +9,7 @@ import {
 import {
   requireAdminCapabilities,
   requireAdminCapability,
+  requireSuperAdminCapabilities,
 } from "@/lib/security/admin-capabilities";
 import { logAdminAction } from "@/lib/admin/audit";
 import { approveBorrowRequest, rejectBorrowRequest } from "@/lib/admin/actions/borrow";
@@ -230,7 +231,7 @@ export async function bulkRejectUsers(userIds: string[]) {
  * Bulk grant admin role to users.
  */
 export async function bulkMakeAdminUsers(userIds: string[]) {
-  const guard = await requireAdminCapabilities([
+  const guard = await requireSuperAdminCapabilities([
     "bulk.execute",
     "roles.manage_admin",
   ]);
@@ -260,7 +261,7 @@ export async function bulkMakeAdminUsers(userIds: string[]) {
  * Bulk remove admin role from users.
  */
 export async function bulkRemoveAdminUsers(userIds: string[]) {
-  const guard = await requireAdminCapabilities([
+  const guard = await requireSuperAdminCapabilities([
     "bulk.execute",
     "roles.manage_admin",
   ]);

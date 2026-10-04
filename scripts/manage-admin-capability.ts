@@ -142,8 +142,8 @@ const manageCapability = async () => {
       .where(eq(users.id, input.actorUserId))
       .limit(1)
       .for("update");
-    if (!actor || actor.role !== "ADMIN" || actor.status !== "APPROVED") {
-      throw new Error("Actor must be an existing approved administrator");
+    if (!actor || actor.role !== "SUPER_ADMIN" || actor.status !== "APPROVED") {
+      throw new Error("Actor must be an existing approved super admin");
     }
 
     const [target] = await tx
@@ -152,7 +152,11 @@ const manageCapability = async () => {
       .where(eq(users.id, input.targetUserId))
       .limit(1)
       .for("update");
-    if (!target || target.role !== "ADMIN" || target.status !== "APPROVED") {
+    if (
+      !target ||
+      (target.role !== "ADMIN" && target.role !== "SUPER_ADMIN") ||
+      target.status !== "APPROVED"
+    ) {
       throw new Error("Target must be an existing approved administrator");
     }
 
@@ -247,7 +251,7 @@ const manageCapability = async () => {
           users,
           and(
             eq(users.id, adminCapabilityAssignments.userId),
-            eq(users.role, "ADMIN"),
+            eq(users.role, "SUPER_ADMIN"),
             eq(users.status, "APPROVED"),
           ),
         )

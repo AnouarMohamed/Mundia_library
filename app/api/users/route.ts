@@ -30,7 +30,7 @@ export const runtime = "nodejs";
  * Expected Query Parameters:
  * - search (string): Search term for name, email, or university ID.
  * - status (PENDING|APPROVED|REJECTED|all): Filter by account status.
- * - role (USER|ADMIN|all): Filter by user role.
+ * - role (USER|ADMIN|SUPER_ADMIN|all): Filter by user role.
  * - sort (name|email|created|status): Sort field.
  * - page (number): Page index (starts at 1).
  * - limit (number): Results per page (max 100).
@@ -91,7 +91,13 @@ export async function GET(request: NextRequest) {
       "APPROVED",
       "REJECTED",
     ]);
-    const allowedRoles = new Set(["", "all", "USER", "ADMIN"]);
+    const allowedRoles = new Set([
+      "",
+      "all",
+      "USER",
+      "ADMIN",
+      "SUPER_ADMIN",
+    ]);
     const allowedSorts = new Set([
       "name",
       "email",
@@ -131,7 +137,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (role && role !== "all") {
-      whereConditions.push(eq(users.role, role as "USER" | "ADMIN"));
+      whereConditions.push(
+        eq(users.role, role as "USER" | "ADMIN" | "SUPER_ADMIN"),
+      );
     }
 
     // Define sort order.

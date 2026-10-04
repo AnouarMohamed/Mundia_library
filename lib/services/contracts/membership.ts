@@ -7,7 +7,7 @@
  */
 
 export type AccountStatus = "PENDING" | "APPROVED" | "REJECTED";
-export type MembershipRole = "USER" | "ADMIN";
+export type MembershipRole = "USER" | "ADMIN" | "SUPER_ADMIN";
 
 export interface MemberProfile {
   memberId: string;

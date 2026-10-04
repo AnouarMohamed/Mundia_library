@@ -28,7 +28,7 @@ import { logWarn } from "@/lib/security/logger";
 import { NextResponse } from "next/server";
 
 /** Valid roles for users within the application. */
-export type AppRole = "USER" | "ADMIN";
+export type AppRole = "USER" | "ADMIN" | "SUPER_ADMIN";
 /** Valid account lifecycle statuses. */
 export type AccountStatus = "PENDING" | "APPROVED" | "REJECTED";
 type SessionAuthenticationMethod =
@@ -218,7 +218,7 @@ export const requireApprovedUser = async (): Promise<AuthGuardResult> => {
 };
 
 /**
- * Administrative guard. Restricts access to users with the 'ADMIN' role.
+ * Administrative guard. Allows operational and super administrators.
  */
 export const requireAdmin = async (): Promise<AuthGuardResult> => {
   const guard = await requireApprovedUser();
@@ -227,13 +227,32 @@ export const requireAdmin = async (): Promise<AuthGuardResult> => {
     return guard;
   }
 
-  if (guard.user.role !== "ADMIN") {
+  if (guard.user.role !== "ADMIN" && guard.user.role !== "SUPER_ADMIN") {
     logWarn("auth.admin_denied", { userId: guard.user.id });
     return {
       ok: false,
       status: 403,
       error: "Forbidden",
       message: "Admin access required",
+    };
+  }
+
+  return guard;
+};
+
+/** Security-governance guard for administrator lifecycle operations. */
+export const requireSuperAdmin = async (): Promise<AuthGuardResult> => {
+  const guard = await requireApprovedUser();
+
+  if (!guard.ok) return guard;
+
+  if (guard.user.role !== "SUPER_ADMIN") {
+    logWarn("auth.super_admin_denied", { userId: guard.user.id });
+    return {
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      message: "Super admin access required",
     };
   }
 
@@ -255,7 +274,11 @@ export const requireSelfOrAdmin = async (
     return guard;
   }
 
-  if (guard.user.role !== "ADMIN" && guard.user.id !== targetUserId) {
+  if (
+    guard.user.role !== "ADMIN" &&
+    guard.user.role !== "SUPER_ADMIN" &&
+    guard.user.id !== targetUserId
+  ) {
     logWarn("auth.self_or_admin_denied", {
       userId: guard.user.id,
       targetUserId,

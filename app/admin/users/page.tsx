@@ -10,7 +10,7 @@ import { getAllUsers } from "@/lib/admin/actions/user";
 import { getPendingAdminRequests } from "@/lib/admin/actions/admin-requests";
 import { redirect } from "next/navigation";
 import AdminUsersList from "@/components/AdminUsersList";
-import { getSession } from "@/lib/session";
+import { requireAdmin } from "@/lib/security/auth-guards";
 
 /**
  * Use Node.js runtime for server-side data fetching.
@@ -26,16 +26,19 @@ const Page = async ({
   searchParams: Promise<{ success?: string; error?: string }>;
 }) => {
   const params = await searchParams;
-  const session = await getSession();
+  const guard = await requireAdmin();
 
-  if (!session?.user?.id) {
+  if (!guard.ok) {
     redirect("/sign-in");
   }
+  const canManageRoles = guard.user.role === "SUPER_ADMIN";
 
   // Fetch all data server-side for SSR
   const [usersResult, adminRequestsResult] = await Promise.all([
     getAllUsers(),
-    getPendingAdminRequests(),
+    canManageRoles
+      ? getPendingAdminRequests()
+      : Promise.resolve({ success: true, data: [] }),
   ]);
 
   if (!usersResult.success) {
@@ -66,7 +69,8 @@ const Page = async ({
       initialAdminRequests={adminRequests}
       successMessage={params.success}
       errorMessage={params.error}
-      currentUserId={session.user.id}
+      currentUserId={guard.user.id}
+      canManageRoles={canManageRoles}
     />
   );
 };

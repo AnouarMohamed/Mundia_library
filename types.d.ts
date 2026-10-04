@@ -21,8 +21,8 @@ interface SessionUser {
   name?: string | null;
   /** Primary email address. */
   email?: string | null;
-  /** System role (USER or ADMIN) determining permission levels. */
-  role?: string;
+  /** System role determining permission levels. */
+  role?: "USER" | "ADMIN" | "SUPER_ADMIN";
   /** Account verification status. */
   status?: "PENDING" | "APPROVED" | "REJECTED";
   /** Unique university identification number. */

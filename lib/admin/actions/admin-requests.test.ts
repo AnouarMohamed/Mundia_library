@@ -6,7 +6,7 @@ import {
 } from "./admin-requests";
 
 const mocks = vi.hoisted(() => ({
-  requireAdminCapability: vi.fn(),
+  requireSuperAdminCapability: vi.fn(),
   logAdminAction: vi.fn(),
   logError: vi.fn(),
 }));
@@ -18,7 +18,7 @@ vi.mock("@/database/drizzle", () => ({
 }));
 
 vi.mock("@/lib/security/admin-capabilities", () => ({
-  requireAdminCapability: mocks.requireAdminCapability,
+  requireSuperAdminCapability: mocks.requireSuperAdminCapability,
 }));
 
 vi.mock("@/lib/security/auth-guards", () => ({
@@ -79,9 +79,9 @@ const approvedRequest = {
 describe("admin access request decisions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.requireAdminCapability.mockResolvedValue({
+    mocks.requireSuperAdminCapability.mockResolvedValue({
       ok: true,
-      user: { id: adminId, role: "ADMIN", status: "APPROVED" },
+      user: { id: adminId, role: "SUPER_ADMIN", status: "APPROVED" },
     });
   });
 

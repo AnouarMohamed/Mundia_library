@@ -699,7 +699,10 @@ export const useBorrowRequests = (
  * const { data } = usePendingAdminRequests(serverRequests);
  * ```
  */
-export const usePendingAdminRequests = (initialData?: AdminRequest[]) => {
+export const usePendingAdminRequests = (
+  initialData?: AdminRequest[],
+  enabled = true,
+) => {
   const { trackQuery } = useQueryPerformance();
 
   return useQuery({
@@ -711,6 +714,7 @@ export const usePendingAdminRequests = (initialData?: AdminRequest[]) => {
     staleTime: Infinity, // Cache forever until invalidated
     refetchOnMount: true, // Refetch if stale (after invalidation)
     initialData, // Use SSR data if provided (prevents duplicate fetch)
+    enabled,
   });
 };
 

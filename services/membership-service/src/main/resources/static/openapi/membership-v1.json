@@ -289,7 +289,7 @@
         "type": "string",
         "enum": ["PENDING", "APPROVED", "REJECTED"]
       },
-      "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN"] }
+      "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN", "SUPER_ADMIN"] }
     },
     "responses": {
       "BadRequest": {

@@ -25,9 +25,10 @@ export type UserStatus = "PENDING" | "APPROVED" | "REJECTED";
 /**
  * System roles defining access levels.
  * - USER: Standard student access (view catalog, borrow books, manage own profile).
- * - ADMIN: Administrative access (manage catalog, approve requests, view analytics).
+ * - ADMIN: Operational administrative access.
+ * - SUPER_ADMIN: Administrator and security-governance access.
  */
-export type UserRole = "USER" | "ADMIN";
+export type UserRole = "USER" | "ADMIN" | "SUPER_ADMIN";
 
 /**
  * Represents a user profile as exposed by the API.

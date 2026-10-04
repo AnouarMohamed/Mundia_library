@@ -8,7 +8,7 @@ import {
   guardToActionError,
   requireSelfOrAdmin,
 } from "@/lib/security/auth-guards";
-import { requireAdminCapability } from "@/lib/security/admin-capabilities";
+import { requireSuperAdminCapability } from "@/lib/security/admin-capabilities";
 import { logAdminAction } from "@/lib/admin/audit";
 import { logError } from "@/lib/security/logger";
 import { isUuid } from "@/lib/security/api-request";
@@ -117,7 +117,7 @@ export async function createAdminRequest(
       };
     }
 
-    if (user[0].role === "ADMIN") {
+    if (user[0].role === "ADMIN" || user[0].role === "SUPER_ADMIN") {
       return {
         success: false,
         error: "You are already an admin",
@@ -175,7 +175,7 @@ export async function createAdminRequest(
  */
 export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
-    const guard = await requireAdminCapability("roles.manage_admin");
+    const guard = await requireSuperAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const requests = await db
@@ -216,7 +216,7 @@ export async function getAllAdminRequests(): Promise<GetAdminRequestsResult> {
  */
 export async function getPendingAdminRequests(): Promise<GetAdminRequestsResult> {
   try {
-    const guard = await requireAdminCapability("roles.manage_admin");
+    const guard = await requireSuperAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const requests = await db
@@ -265,7 +265,7 @@ export async function approveAdminRequest(
       return { success: false, error: "Invalid request ID" };
     }
 
-    const guard = await requireAdminCapability("roles.manage_admin");
+    const guard = await requireSuperAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const result = await db.transaction(async (tx) => {
@@ -395,7 +395,7 @@ export async function rejectAdminRequest(
       return { success: false, error: "Rejection reason is too long" };
     }
 
-    const guard = await requireAdminCapability("roles.manage_admin");
+    const guard = await requireSuperAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
     const result = await db.transaction(async (tx) => {

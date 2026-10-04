@@ -176,8 +176,8 @@ const manageIdentity = async () => {
       .where(eq(users.id, input.actorUserId))
       .limit(1)
       .for("update");
-    if (!actor || actor.role !== "ADMIN" || actor.status !== "APPROVED") {
-      throw new Error("Actor must be an existing approved administrator");
+    if (!actor || actor.role !== "SUPER_ADMIN" || actor.status !== "APPROVED") {
+      throw new Error("Actor must be an existing approved super admin");
     }
 
     const [target] = await tx

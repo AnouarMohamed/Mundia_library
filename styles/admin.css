@@ -23,12 +23,42 @@
     background: var(--mundia-paper);
     @apply text-slate-900;
   }
+
+  @media (min-width: 48rem) {
+    .admin-theme {
+      background:
+        linear-gradient(
+          to right,
+          var(--mundia-surface) 0,
+          var(--mundia-surface) 248px,
+          var(--mundia-line) 248px,
+          var(--mundia-line) 249px,
+          var(--mundia-paper) 249px,
+          var(--mundia-paper) 100%
+        );
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .admin-theme {
+      background:
+        linear-gradient(
+          to right,
+          var(--mundia-surface) 0,
+          var(--mundia-surface) 264px,
+          var(--mundia-line) 264px,
+          var(--mundia-line) 265px,
+          var(--mundia-paper) 265px,
+          var(--mundia-paper) 100%
+        );
+    }
+  }
 }
 
 @layer components {
   .admin-container {
     @apply flex min-w-0 flex-1 flex-col p-4 sm:p-6 lg:px-10 lg:py-8 xl:px-12 2xl:px-16;
-    background: var(--mundia-paper);
+    background: transparent;
   }
 
   .back-btn {
@@ -229,14 +259,13 @@
 
   /* Sidebar */
   .admin-sidebar {
-    @apply sticky top-0 z-40 hidden w-[248px] shrink-0 flex-col border-r px-5 pt-8 md:flex lg:w-[264px] lg:pt-10;
+    @apply sticky top-0 z-40 hidden w-[248px] shrink-0 flex-col px-5 pt-8 md:flex lg:w-[264px] lg:pt-10;
 
     height: 100vh;
     height: 100dvh;
     align-self: flex-start;
     padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
-    border-color: var(--mundia-line);
-    background: var(--mundia-surface);
+    background: transparent;
     box-shadow: none;
   }
 

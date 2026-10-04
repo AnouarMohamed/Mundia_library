@@ -24,7 +24,9 @@ async function verifyStatistics() {
       (u) => u.status === "APPROVED"
     ).length;
     const pendingUsers = allUsers.filter((u) => u.status === "PENDING").length;
-    const adminUsers = allUsers.filter((u) => u.role === "ADMIN").length;
+    const adminUsers = allUsers.filter(
+      (u) => u.role === "ADMIN" || u.role === "SUPER_ADMIN",
+    ).length;
 
     console.log(`Total Users: ${totalUsers}`);
     console.log(`  ✓ Approved: ${approvedUsers}`);

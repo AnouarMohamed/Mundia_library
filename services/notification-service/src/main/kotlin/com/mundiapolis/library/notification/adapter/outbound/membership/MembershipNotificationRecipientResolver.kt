@@ -99,7 +99,7 @@ class MembershipNotificationRecipientResolver(
     )
 
     private enum class AccountStatus { PENDING, APPROVED, REJECTED }
-    private enum class MembershipRole { USER, ADMIN }
+    private enum class MembershipRole { USER, ADMIN, SUPER_ADMIN }
 
     private companion object {
         val EMAIL = Regex("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")

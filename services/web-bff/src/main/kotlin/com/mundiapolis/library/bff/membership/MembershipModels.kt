@@ -23,4 +23,5 @@ enum class AccountStatusView {
 enum class MembershipRoleView {
     USER,
     ADMIN,
+    SUPER_ADMIN,
 }

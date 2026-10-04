@@ -60,7 +60,7 @@ const getCachedAdminDashboardStats = unstable_cache(
           pendingUsers:
             sql<number>`coalesce(sum(case when ${users.status} = 'PENDING' then 1 else 0 end), 0)`,
           adminUsers:
-            sql<number>`coalesce(sum(case when ${users.role} = 'ADMIN' then 1 else 0 end), 0)`,
+            sql<number>`coalesce(sum(case when ${users.role} in ('ADMIN', 'SUPER_ADMIN') then 1 else 0 end), 0)`,
         })
         .from(users),
       // 2. Catalog Inventory Statistics

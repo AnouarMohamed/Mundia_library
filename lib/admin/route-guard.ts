@@ -6,6 +6,7 @@ import {
 import {
   type AdminCapability,
   requireAdminCapability,
+  requireSuperAdminCapability,
 } from "@/lib/security/admin-capabilities";
 import { NextResponse } from "next/server";
 
@@ -50,4 +51,15 @@ export async function requireAdminCapabilityRouteAccess(
     ok: false,
     response: guardToResponse(guard),
   };
+}
+
+/** Require super-admin governance authority for an API route. */
+export async function requireSuperAdminCapabilityRouteAccess(
+  capability: AdminCapability,
+): Promise<AdminRouteGuardResult> {
+  const guard = await requireSuperAdminCapability(capability);
+
+  if (guard.ok) return guard;
+
+  return { ok: false, response: guardToResponse(guard) };
 }

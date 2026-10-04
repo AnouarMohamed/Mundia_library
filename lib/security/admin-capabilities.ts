@@ -9,6 +9,7 @@ import {
   type AuthGuardFailure,
   type AuthGuardResult,
   requireAdmin,
+  requireSuperAdmin,
 } from "@/lib/security/auth-guards";
 import { logWarn } from "@/lib/security/logger";
 
@@ -26,19 +27,10 @@ const capabilityDenied = (): AuthGuardFailure => ({
   message: "Required administrative capability is not assigned",
 });
 
-/**
- * Require an approved ADMIN and a fresh, active database assignment for every
- * requested high-risk capability.
- *
- * Capability state is deliberately not copied into the session JWT or cached.
- * A revoked or expired assignment therefore takes effect on the next request.
- * Database failures propagate as request failures rather than falling back to
- * the broad ADMIN role.
- */
-export async function requireAdminCapabilities(
+async function requireCapabilitiesForGuard(
+  guard: AuthGuardResult,
   required: RequiredCapabilities,
 ): Promise<AuthGuardResult> {
-  const guard = await requireAdmin();
   if (!guard.ok) return guard;
 
   const uniqueRequired = Array.from(new Set(required));
@@ -72,6 +64,36 @@ export async function requireAdminCapabilities(
   }
 
   return guard;
+}
+
+/**
+ * Require an approved ADMIN and a fresh, active database assignment for every
+ * requested high-risk capability.
+ *
+ * Capability state is deliberately not copied into the session JWT or cached.
+ * A revoked or expired assignment therefore takes effect on the next request.
+ * Database failures propagate as request failures rather than falling back to
+ * the broad ADMIN role.
+ */
+export async function requireAdminCapabilities(
+  required: RequiredCapabilities,
+): Promise<AuthGuardResult> {
+  const guard = await requireAdmin();
+  return requireCapabilitiesForGuard(guard, required);
+}
+
+/** Require both the SUPER_ADMIN role and fresh capability assignments. */
+export async function requireSuperAdminCapabilities(
+  required: RequiredCapabilities,
+): Promise<AuthGuardResult> {
+  const guard = await requireSuperAdmin();
+  return requireCapabilitiesForGuard(guard, required);
+}
+
+export async function requireSuperAdminCapability(
+  capability: AdminCapability,
+): Promise<AuthGuardResult> {
+  return requireSuperAdminCapabilities([capability]);
 }
 
 export async function requireAdminCapability(

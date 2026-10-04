@@ -71,7 +71,7 @@ Local accounts: `test@user.com` / `12345678` (student), `test@admin.com` / `1234
 - Migrations in `migrations/postgres/`. Use `npm run db:generate` then review before committing.
 - `npm run db:migrate` = `drizzle-kit migrate`; `db:push` is disposable-local only.
 - Borrow lifecycle: `PENDING` → `BORROWED` → `RETURNED`. `books.availableCopies` must stay in sync.
-- User roles: `USER` (student) and `ADMIN`. Account statuses: `PENDING`, `APPROVED`, `REJECTED`.
+- User roles: `USER` (student), `ADMIN` (operations), and `SUPER_ADMIN` (security governance). Account statuses: `PENDING`, `APPROVED`, `REJECTED`.
 
 ## CI
 

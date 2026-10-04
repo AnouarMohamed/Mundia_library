@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 /**
  * Admin layout component.
  *
- * Uses the `requireAdmin` guard to ensure the user is authenticated and has the 'ADMIN' role.
+ * Uses the `requireAdmin` guard for approved ADMIN and SUPER_ADMIN users.
  * Redirects unauthorized users to sign-in (if unauthenticated) or the home page (if not an admin).
  *
  * @param {Object} props - Component properties

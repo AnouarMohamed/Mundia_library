@@ -575,7 +575,7 @@
           "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
           "universityId": { "type": "integer", "minimum": 1 },
           "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
-          "role": { "type": "string", "enum": ["USER", "ADMIN"] },
+          "role": { "type": "string", "enum": ["USER", "ADMIN", "SUPER_ADMIN"] },
           "createdAt": { "type": "string", "format": "date-time" },
           "updatedAt": { "type": "string", "format": "date-time" }
         },

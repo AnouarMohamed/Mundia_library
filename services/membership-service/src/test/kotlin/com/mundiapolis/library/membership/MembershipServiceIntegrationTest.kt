@@ -126,6 +126,24 @@ class MembershipServiceIntegrationTest {
     }
 
     @Test
+    fun `profile contract supports the super admin role`() {
+        insertMember(
+            SUPER_ADMIN_MEMBER_ID,
+            "APPROVED",
+            activeLoans = 0,
+            maximumLoans = 5,
+            role = "SUPER_ADMIN",
+        )
+
+        mockMvc.perform(
+            get("/api/v1/members/$SUPER_ADMIN_MEMBER_ID/profile")
+                .with(jwt().authorities(SimpleGrantedAuthority(PROFILE_ANY_SCOPE))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.role").value("SUPER_ADMIN"))
+    }
+
+    @Test
     fun `eligibility is derived fail closed from authoritative membership state`() {
         mockMvc.perform(
             get("/api/v1/members/$APPROVED_MEMBER_ID/eligibility")
@@ -377,6 +395,7 @@ class MembershipServiceIntegrationTest {
         val PENDING_MEMBER_ID: UUID = UUID.fromString("30000000-0000-0000-0000-000000000003")
         val EVIDENCE_ID: UUID = UUID.fromString("40000000-0000-0000-0000-000000000004")
         val ADMIN_MEMBER_ID: UUID = UUID.fromString("50000000-0000-0000-0000-000000000005")
+        val SUPER_ADMIN_MEMBER_ID: UUID = UUID.fromString("60000000-0000-0000-0000-000000000006")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 9, 22, 12, 0, 0, 0, ZoneOffset.UTC)
 
         const val PROFILE_SELF_SCOPE = "SCOPE_membership.profile.read"

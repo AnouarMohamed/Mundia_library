@@ -3,6 +3,7 @@ import {
   requireAdmin,
   requireApprovedUser,
   requireSelfOrAdmin,
+  requireSuperAdmin,
   requireUser,
 } from "./auth-guards";
 
@@ -45,6 +46,12 @@ const adminUser = {
   ...approvedUser,
   id: "admin-1",
   role: "ADMIN",
+};
+
+const superAdminUser = {
+  ...approvedUser,
+  id: "super-admin-1",
+  role: "SUPER_ADMIN",
 };
 
 describe("auth guards", () => {
@@ -92,6 +99,22 @@ describe("auth guards", () => {
     const result = await requireAdmin();
 
     expect(result).toMatchObject({ ok: false, status: 403 });
+  });
+
+  it("allows super admins through admin and governance guards", async () => {
+    freshUserRowsMock.mockResolvedValue([superAdminUser]);
+
+    await expect(requireAdmin()).resolves.toMatchObject({ ok: true });
+    await expect(requireSuperAdmin()).resolves.toMatchObject({ ok: true });
+  });
+
+  it("does not allow an operational admin through the super-admin guard", async () => {
+    freshUserRowsMock.mockResolvedValue([adminUser]);
+
+    await expect(requireSuperAdmin()).resolves.toMatchObject({
+      ok: false,
+      status: 403,
+    });
   });
 
   it("allows admins and owners for self-or-admin checks", async () => {

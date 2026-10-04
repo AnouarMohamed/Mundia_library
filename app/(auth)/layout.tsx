@@ -37,11 +37,11 @@ const Layout = async ({ children }: { children: ReactNode }) => {
         <div className="mx-auto w-full max-w-sm">
           {/* Brand Logo */}
           <img
-            src="/images/mundia-logo.png"
+            src="/images/mundiapolis-logo-transparent.png"
             alt="Mundiapolis"
             width={200}
             height={67}
-            className="mb-9 h-auto w-[160px] sm:mb-10 sm:w-[200px]"
+            className="mb-9 h-auto w-[180px] sm:mb-10 sm:w-[220px]"
           />
           {/* Auth form (children) */}
           {children}

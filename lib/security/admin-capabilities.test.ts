@@ -3,14 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   requireAdminCapabilities,
   requireAdminCapability,
+  requireSuperAdminCapability,
 } from "./admin-capabilities";
 
 const requireAdminMock = vi.hoisted(() => vi.fn());
+const requireSuperAdminMock = vi.hoisted(() => vi.fn());
 const assignmentRowsMock = vi.hoisted(() => vi.fn());
 const capabilityWhereMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/security/auth-guards", () => ({
   requireAdmin: requireAdminMock,
+  requireSuperAdmin: requireSuperAdminMock,
 }));
 
 vi.mock("@/database/drizzle", () => ({
@@ -41,6 +44,10 @@ describe("admin capability guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     requireAdminMock.mockResolvedValue(adminGuard);
+    requireSuperAdminMock.mockResolvedValue({
+      ...adminGuard,
+      user: { ...adminGuard.user, role: "SUPER_ADMIN" },
+    });
     capabilityWhereMock.mockImplementation(assignmentRowsMock);
     assignmentRowsMock.mockResolvedValue([]);
   });
@@ -80,6 +87,20 @@ describe("admin capability guards", () => {
     await expect(
       requireAdminCapability("identity_evidence.read"),
     ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("requires the super-admin role as well as its capability", async () => {
+    requireSuperAdminMock.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      message: "Super admin access required",
+    });
+
+    await expect(
+      requireSuperAdminCapability("roles.manage_admin"),
+    ).resolves.toMatchObject({ ok: false, status: 403 });
+    expect(capabilityWhereMock).not.toHaveBeenCalled();
   });
 
   it("requires every capability for separation of duties", async () => {

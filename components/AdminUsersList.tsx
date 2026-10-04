@@ -55,6 +55,8 @@ interface AdminUsersListProps {
   errorMessage?: string;
   /** ID of the currently logged-in administrator to prevent self-modification. */
   currentUserId?: string;
+  /** Fresh server-authorized permission to manage administrator roles. */
+  canManageRoles?: boolean;
 }
 
 /** Formats user status (e.g., "PENDING") into "Pending". */
@@ -66,7 +68,11 @@ const formatStatusLabel = (status: string | null | undefined): string =>
 
 /** Maps internal role constants to user-friendly labels. */
 const formatRoleLabel = (role: string | null | undefined): string =>
-  role === "ADMIN" ? "Admin" : "Student";
+  role === "SUPER_ADMIN"
+    ? "Super admin"
+    : role === "ADMIN"
+      ? "Admin"
+      : "Student";
 
 const AdminUsersList: React.FC<AdminUsersListProps> = ({
   initialUsers,
@@ -74,8 +80,10 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   successMessage,
   errorMessage,
   currentUserId,
+  canManageRoles = false,
 }) => {
   const { data: session } = useSession();
+  const isSuperAdmin = canManageRoles;
   const router = useRouter();
   const searchParamsHook = useSearchParams();
   const queryClient = useQueryClient();
@@ -167,7 +175,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
     isLoading: adminRequestsLoading,
     isError: adminRequestsError,
     error: adminRequestsErrorData,
-  } = usePendingAdminRequests(initialAdminRequests);
+  } = usePendingAdminRequests(initialAdminRequests, canManageRoles);
 
   // Mutations for administrative actions
   const updateUserRoleMutation = useUpdateUserRole();
@@ -249,7 +257,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
   // Action Handlers
   const handleUpdateUserRole = async (
     userId: string,
-    role: "USER" | "ADMIN",
+    role: "USER" | "ADMIN" | "SUPER_ADMIN",
   ) => {
     const user = users.find((u) => u.id === userId);
     updateUserRoleMutation.mutate({
@@ -487,6 +495,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                 <option value="all">All</option>
                 <option value="USER">Users</option>
                 <option value="ADMIN">Admins</option>
+                <option value="SUPER_ADMIN">Super admins</option>
               </select>
             </div>
           </div>
@@ -494,7 +503,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
       </div>
 
       {/* Admin Requests Section - Only shows PENDING requests */}
-      {adminRequests.length > 0 && (
+      {isSuperAdmin && adminRequests.length > 0 && (
         <div className="mt-4 sm:mt-6">
           <h3 className="mb-4 text-base font-semibold sm:text-lg">
             Pending Admin Requests ({adminRequests.length})
@@ -599,9 +608,11 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                     <td>
                       <span
                         className={`status-pill ${
-                          user.role === "ADMIN"
-                            ? "status-warning"
-                            : "status-info"
+                          user.role === "SUPER_ADMIN"
+                            ? "status-danger"
+                            : user.role === "ADMIN"
+                              ? "status-warning"
+                              : "status-info"
                         }`}
                       >
                         {formatRoleLabel(user.role)}
@@ -627,8 +638,9 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                     </td>
                     <td>
                       <div className="flex flex-col gap-1 sm:flex-row sm:gap-2">
-                        {/* Show Remove Admin for existing admins (except current user) */}
-                        {user.role === "ADMIN" &&
+                        {/* Role governance is visible only to super admins. */}
+                        {isSuperAdmin &&
+                          user.role !== "USER" &&
                           user.id !== (currentUserId || session?.user?.id) && (
                             <button
                               type="button"
@@ -638,12 +650,11 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                               }
                               disabled={removeAdminPrivilegesMutation.isPending}
                             >
-                              Remove admin
+                              Make student
                             </button>
                           )}
 
-                        {/* Show Make Admin for regular users */}
-                        {user.role === "USER" && (
+                        {isSuperAdmin && user.role === "USER" && (
                           <button
                             type="button"
                             className="min-h-9 text-left text-sm font-medium text-[var(--mundia-navy)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
@@ -656,8 +667,40 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({
                           </button>
                         )}
 
+                        {isSuperAdmin &&
+                          user.role !== "SUPER_ADMIN" &&
+                          user.status === "APPROVED" &&
+                          user.id !== (currentUserId || session?.user?.id) && (
+                            <button
+                              type="button"
+                              className="min-h-9 text-left text-sm font-medium text-[var(--mundia-danger)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() =>
+                                handleUpdateUserRole(user.id, "SUPER_ADMIN")
+                              }
+                              disabled={updateUserRoleMutation.isPending}
+                            >
+                              Make super admin
+                            </button>
+                          )}
+
+                        {isSuperAdmin &&
+                          user.role === "SUPER_ADMIN" &&
+                          user.id !== (currentUserId || session?.user?.id) && (
+                            <button
+                              type="button"
+                              className="min-h-9 text-left text-sm font-medium text-[var(--mundia-navy)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                              onClick={() =>
+                                handleUpdateUserRole(user.id, "ADMIN")
+                              }
+                              disabled={updateUserRoleMutation.isPending}
+                            >
+                              Make admin
+                            </button>
+                          )}
+
                         {/* Show Approve/Reject for pending users */}
-                        {user.status === "PENDING" && (
+                        {user.status === "PENDING" &&
+                          (user.role === "USER" || isSuperAdmin) && (
                           <>
                             <Button
                               size="sm"

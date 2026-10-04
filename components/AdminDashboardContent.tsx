@@ -95,7 +95,7 @@ const chartAxis = "var(--mundia-ink)";
 const chartBorrow = "var(--mundia-navy)";
 const chartReturn = "var(--mundia-success)";
 const chartTooltipStyle = {
-  borderRadius: "0.75rem",
+  borderRadius: "0",
   border: "1px solid var(--mundia-line)",
   background: "var(--mundia-paper)",
   color: "var(--mundia-ink)",
@@ -642,7 +642,7 @@ const AdminDashboardContent: React.FC<AdminDashboardContentProps> = ({
                   <Tooltip contentStyle={chartTooltipStyle} />
                   <Bar
                     dataKey="count"
-                    radius={[8, 8, 0, 0]}
+                    radius={[0, 0, 0, 0]}
                     fill={chartBorrow}
                   />
                 </BarChart>

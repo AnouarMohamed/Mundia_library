@@ -147,7 +147,7 @@ flowchart TD
 
 The database schema ([database/schema.ts](database/schema.ts)) is managed via Drizzle ORM and PostgreSQL. Key entities include:
 
-- **`users`**: Stores student and admin credentials, status (`PENDING`, `APPROVED`, `REJECTED`), role (`USER`, `ADMIN`), and university ID card references.
+- **`users`**: Stores credentials, status (`PENDING`, `APPROVED`, `REJECTED`), role (`USER`, `ADMIN`, `SUPER_ADMIN`), and university ID card references. `SUPER_ADMIN` is reserved for administrator and security-governance lifecycle changes.
 - **`federated_identities`**: Provisioned institutional identities for OIDC provider session bindings.
 - **`admin_capability_assignments`**: Fine-grained administrative capabilities (`fines.manage_policy`, `users.manage_status`, `bulk.execute`, etc.) with append-only grant/revocation tracking.
 - **`books`**: Book metadata, ISBN, total copies, available copies, ratings, and soft-delete toggle (`isActive`).

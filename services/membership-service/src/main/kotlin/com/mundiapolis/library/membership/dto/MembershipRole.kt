@@ -1,5 +1,7 @@
 package com.mundiapolis.library.membership.dto
 
 enum class MembershipRole {
-    USER, ADMIN
+    USER,
+    ADMIN,
+    SUPER_ADMIN,
 }

@@ -35,7 +35,7 @@ const seedGuestUsers = async (db: Db) => {
       password: guestPassword,
       universityCard: "guest-admin-card",
       status: "APPROVED" as const,
-      role: "ADMIN" as const,
+      role: "SUPER_ADMIN" as const,
     },
     {
       id: "00000000-0000-4000-8000-000000000003",

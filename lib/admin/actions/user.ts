@@ -10,7 +10,11 @@ import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import {
   guardToActionError,
 } from "@/lib/security/auth-guards";
-import { requireAdminCapability } from "@/lib/security/admin-capabilities";
+import {
+  requireAdminCapability,
+  requireSuperAdminCapability,
+} from "@/lib/security/admin-capabilities";
+import type { AppRole } from "@/lib/security/auth-guards";
 import { logError } from "@/lib/security/logger";
 import { adminUserColumns } from "@/lib/admin/user-projection";
 import { isUuid } from "@/lib/security/api-request";
@@ -20,23 +24,23 @@ import { isUuid } from "@/lib/security/api-request";
  */
 export const updateUserRole = async (
   userId: string,
-  role: "USER" | "ADMIN"
+  role: AppRole,
 ) => {
   try {
-    if (!new Set(["USER", "ADMIN"]).has(role)) {
+    if (!new Set<AppRole>(["USER", "ADMIN", "SUPER_ADMIN"]).has(role)) {
       return { success: false, error: "Invalid role" };
     }
     if (!isUuid(userId)) {
       return { success: false, error: "Invalid user ID" };
     }
 
-    const guard = await requireAdminCapability("roles.manage_admin");
+    const guard = await requireSuperAdminCapability("roles.manage_admin");
     if (!guard.ok) return guardToActionError(guard);
 
-    if (guard.user.id === userId && role !== "ADMIN") {
+    if (guard.user.id === userId) {
       return {
         success: false,
-        error: "You cannot remove your own administrator access",
+        error: "You cannot change your own administrative role",
       };
     }
 
@@ -57,25 +61,25 @@ export const updateUserRole = async (
         .for("update");
 
       if (!target) return false;
-      if (role === "ADMIN" && target.status !== "APPROVED") {
+      if (role !== "USER" && target.status !== "APPROVED") {
         throw new Error("Only approved users can be promoted");
       }
 
-      const operationalAdmins = await tx
+      const operationalSuperAdmins = await tx
         .select({ id: users.id })
         .from(users)
         .where(
-          and(eq(users.role, "ADMIN"), eq(users.status, "APPROVED")),
+          and(eq(users.role, "SUPER_ADMIN"), eq(users.status, "APPROVED")),
         )
         .for("update");
 
       if (
-        role === "USER" &&
-        target.role === "ADMIN" &&
+        role !== "SUPER_ADMIN" &&
+        target.role === "SUPER_ADMIN" &&
         target.status === "APPROVED" &&
-        operationalAdmins.length === 1
+        operationalSuperAdmins.length === 1
       ) {
-        throw new Error("The final administrator cannot be demoted");
+        throw new Error("The final super admin cannot be demoted");
       }
 
       const [changedUser] = await tx
@@ -129,7 +133,7 @@ export const updateUserRole = async (
       error:
         error instanceof Error &&
         new Set([
-          "The final administrator cannot be demoted",
+          "The final super admin cannot be demoted",
           "Only approved users can be promoted",
         ]).has(error.message)
           ? error.message
@@ -179,21 +183,25 @@ export const updateUserStatus = async (
 
       if (!target) return false;
 
-      const operationalAdmins = await tx
+      if (target.role !== "USER" && guard.user.role !== "SUPER_ADMIN") {
+        throw new Error("Only a super admin can change an administrator account");
+      }
+
+      const operationalSuperAdmins = await tx
         .select({ id: users.id })
         .from(users)
         .where(
-          and(eq(users.role, "ADMIN"), eq(users.status, "APPROVED")),
+          and(eq(users.role, "SUPER_ADMIN"), eq(users.status, "APPROVED")),
         )
         .for("update");
 
       if (
-        target.role === "ADMIN" &&
+        target.role === "SUPER_ADMIN" &&
         target.status === "APPROVED" &&
         status !== "APPROVED" &&
-        operationalAdmins.length === 1
+        operationalSuperAdmins.length === 1
       ) {
-        throw new Error("The final administrator cannot be suspended");
+        throw new Error("The final super admin cannot be suspended");
       }
 
       const [changedUser] = await tx
@@ -204,7 +212,7 @@ export const updateUserStatus = async (
 
       if (
         changedUser &&
-        target.role === "ADMIN" &&
+        target.role !== "USER" &&
         target.status === "APPROVED" &&
         status !== "APPROVED"
       ) {
@@ -233,7 +241,7 @@ export const updateUserStatus = async (
             previousStatus: target.status,
             status,
             capabilitiesRevoked:
-              target.role === "ADMIN" && status !== "APPROVED",
+              target.role !== "USER" && status !== "APPROVED",
           }),
         });
       }
@@ -252,7 +260,10 @@ export const updateUserStatus = async (
       success: false,
       error:
         error instanceof Error &&
-        error.message === "The final administrator cannot be suspended"
+        new Set([
+          "The final super admin cannot be suspended",
+          "Only a super admin can change an administrator account",
+        ]).has(error.message)
           ? error.message
           : "Failed to update user status",
     };

@@ -13,7 +13,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPendingAdminRequests } from "@/lib/admin/actions/admin-requests";
-import { requireAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
+import { requireSuperAdminCapabilityRouteAccess } from "@/lib/admin/route-guard";
 
 /**
  * Use Node.js runtime for admin actions.
@@ -28,7 +28,7 @@ export const runtime = "nodejs";
  */
 export async function GET(_request: NextRequest) {
   try {
-    const guard = await requireAdminCapabilityRouteAccess(
+    const guard = await requireSuperAdminCapabilityRouteAccess(
       "roles.manage_admin",
     );
     if (!guard.ok) {
