@@ -15,7 +15,7 @@ const AdminNavLinks = ({ onNavigate }: AdminNavLinksProps) => {
   const pathname = usePathname();
 
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col">
       {adminSideBarLinks.map((link) => {
         const isSelected =
           pathname === link.route ||
@@ -28,7 +28,7 @@ const AdminNavLinks = ({ onNavigate }: AdminNavLinksProps) => {
               onClick={onNavigate}
               aria-current={isSelected ? "page" : undefined}
               className={cn(
-                "group flex min-h-12 w-full items-center gap-3 rounded-lg border border-transparent px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-[var(--mundia-panel)] hover:text-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2",
+                "group flex min-h-11 w-full items-center gap-3 border border-transparent px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-[var(--mundia-panel)] hover:text-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2 md:min-h-12",
                 isSelected &&
                   "border-[var(--mundia-line)] bg-[var(--mundia-panel)] font-semibold text-[var(--mundia-navy)]",
               )}

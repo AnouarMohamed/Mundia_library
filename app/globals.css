@@ -232,10 +232,14 @@
 
   /* Book Card */
   .book-card-link {
-    @apply block h-full rounded-lg border p-3 transition-colors duration-200 sm:p-4;
+    @apply h-full border p-3 transition-colors duration-200 sm:p-4;
     border-color: var(--mundia-line);
     background: var(--mundia-surface);
     box-shadow: none;
+  }
+
+  .book-card-standard-link {
+    @apply grid grid-cols-[114px_minmax(0,1fr)] items-stretch gap-4 sm:block;
   }
 
   .book-card-link:hover {
@@ -244,38 +248,39 @@
   }
 
   .book-card-cover {
-    @apply flex justify-center rounded-lg border py-4;
+    @apply flex min-w-0 items-center justify-center border p-2 sm:p-4;
     border-color: var(--mundia-line);
     background: var(--mundia-paper);
   }
 
+  .book-card-meta {
+    @apply min-w-0 self-center sm:mt-4;
+  }
+
   .book-card-rating {
-    @apply inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold;
-    border-color: oklch(78% 0.105 88 / 0.38);
-    background: oklch(94% 0.055 80);
+    @apply inline-flex shrink-0 items-center gap-1 text-xs font-semibold;
     color: var(--mundia-gold-strong);
   }
 
   .book-card-copy {
-    @apply inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium;
+    @apply block border-t pt-2 text-xs font-medium sm:inline-flex sm:border sm:px-2 sm:py-1;
     border-color: var(--mundia-line);
-    background: var(--mundia-paper);
     color: var(--mundia-muted);
   }
 
   .book-title {
-    @apply mt-3 line-clamp-2 text-base font-semibold leading-tight xs:text-lg;
+    @apply mt-2 line-clamp-2 text-lg font-semibold leading-tight sm:mt-3;
     font-family: var(--font-heading);
     color: var(--mundia-ink);
   }
 
   .book-author {
-    @apply mt-2 line-clamp-1 text-sm xs:text-base;
+    @apply mt-1.5 text-sm leading-5 sm:mt-2 sm:text-base;
     color: var(--mundia-muted);
   }
 
   .book-genre {
-    @apply mt-1 line-clamp-1 text-xs font-medium xs:text-sm;
+    @apply line-clamp-1 text-xs font-medium sm:text-sm;
     color: var(--mundia-muted);
   }
 
@@ -327,7 +332,7 @@
 
   /* Book List */
   .book-list {
-    @apply mt-7 grid grid-cols-2 gap-4 sm:mt-8 sm:gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5;
+    @apply mt-6 grid grid-cols-1 gap-3 sm:mt-8 sm:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5;
   }
 
   .book-section-heading {

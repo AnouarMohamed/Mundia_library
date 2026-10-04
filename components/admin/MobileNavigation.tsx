@@ -70,7 +70,7 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
       <dialog
         ref={dialogRef}
         id="admin-mobile-navigation"
-        aria-labelledby="admin-mobile-navigation-title"
+        aria-label="Admin navigation"
         onCancel={(event) => {
           event.preventDefault();
           closeNavigation();
@@ -85,17 +85,16 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
           tabIndex={-1}
         />
 
-        <div className="relative z-10 flex h-full w-[min(88vw,22rem)] flex-col overflow-hidden border-r border-[var(--mundia-line)] bg-[var(--mundia-surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+        <div className="relative z-10 flex h-full w-[min(82vw,19rem)] flex-col overflow-hidden border-r border-[var(--mundia-line)] bg-[var(--mundia-surface)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
           <div className="flex min-h-16 shrink-0 items-center justify-between border-b border-[var(--mundia-line)] px-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--mundia-muted)]">
-                Mundiapolis Library
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--mundia-muted)]">
+                Admin workspace
               </p>
               <h2
-                id="admin-mobile-navigation-title"
-                className="mt-0.5 font-serif text-xl text-[var(--mundia-ink)]"
+                className="font-serif text-xl text-[var(--mundia-ink)]"
               >
-                Admin navigation
+                Navigation
               </h2>
             </div>
             <button
@@ -110,13 +109,13 @@ const MobileNavigation = ({ session }: MobileNavigationProps) => {
           </div>
 
           <nav
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3"
             aria-label="Admin navigation"
           >
             <AdminNavLinks onNavigate={closeNavigation} />
           </nav>
 
-          <div className="shrink-0 border-t border-[var(--mundia-line)] p-4">
+          <div className="shrink-0 border-t border-[var(--mundia-line)] p-3">
             <AdminUserCard session={session} variant="mobile" />
           </div>
         </div>

@@ -15,11 +15,11 @@ const AdminUserCard = ({ session, variant }: AdminUserCardProps) => {
     <div
       className={
         isMobile
-          ? "flex min-w-0 items-center gap-3 rounded-lg bg-[var(--mundia-paper)] p-3"
+          ? "flex min-w-0 items-center gap-2.5 border-l-2 border-[var(--mundia-gold)] px-3 py-2"
           : "user"
       }
     >
-      <Avatar className={isMobile ? "size-11" : "size-10"}>
+      <Avatar className={isMobile ? "size-9" : "size-10"}>
         <AvatarFallback className="bg-amber-100 text-sm text-[var(--mundia-ink)]">
           {getInitials(session.user?.name || "Administrator")}
         </AvatarFallback>

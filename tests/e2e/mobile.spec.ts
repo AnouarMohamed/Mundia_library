@@ -94,6 +94,12 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   await expect(catalogCovers.first()).toHaveAttribute("srcset", /\S/);
   await expect(catalogCovers.first()).toHaveAttribute("sizes", /114px/);
   await expect(catalogCovers.nth(2)).toHaveAttribute("loading", "lazy");
+  const firstCards = page.locator(".book-list > li");
+  const firstCard = await firstCards.nth(0).boundingBox();
+  const secondCard = await firstCards.nth(1).boundingBox();
+  expect(firstCard).not.toBeNull();
+  expect(secondCard).not.toBeNull();
+  expect(secondCard!.y).toBeGreaterThan(firstCard!.y + firstCard!.height - 1);
   await search.fill("Algorithms");
   await search.press("Enter");
   await expect(page).toHaveURL(/search=Algorithms/);
@@ -163,6 +169,15 @@ test("admin workspace uses a viewport-safe responsive navigation", async ({
   expect(
     await navigationDialog.evaluate((element) => element.matches(":modal")),
   ).toBe(true);
+  const drawer = navigationDialog.locator("div").first();
+  expect((await drawer.boundingBox())?.width ?? 0).toBeLessThanOrEqual(304);
+  const firstNavigationLink = navigationDialog.getByRole("link", {
+    name: "Home",
+  });
+  const firstNavigationLinkHeight =
+    (await firstNavigationLink.boundingBox())?.height ?? 0;
+  expect(firstNavigationLinkHeight).toBeGreaterThanOrEqual(44);
+  expect(firstNavigationLinkHeight).toBeLessThanOrEqual(48);
   await expect(
     navigationDialog.getByRole("link", { name: "Account Requests" }),
   ).toBeVisible();

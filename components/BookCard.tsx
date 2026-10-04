@@ -66,7 +66,9 @@ const BookCard = ({
         href={`/books/${id}`}
         className={cn(
           "book-card-link",
-          isLoanedBook && "flex w-full flex-col items-center",
+          isLoanedBook
+            ? "flex w-full flex-col items-center"
+            : "book-card-standard-link",
         )}
       >
         {/* Visual Cover Section - Uses the optimized BookCover component */}
@@ -82,8 +84,7 @@ const BookCard = ({
         {/* Metadata Section: Title, Author, Rating, Genre */}
         <div
           className={cn(
-            "mt-3 sm:mt-4",
-            !isLoanedBook && "xs:max-w-44 max-w-32",
+            isLoanedBook ? "mt-3 sm:mt-4" : "book-card-meta",
           )}
         >
           <div className="mb-2 flex items-center justify-between gap-2">
@@ -102,11 +103,11 @@ const BookCard = ({
             </span>
           </div>
           
-          <p className="book-title line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
+          <p className="book-title line-clamp-2">
             {title}
           </p>
           
-          <p className="book-author mt-1.5 line-clamp-1 text-xs sm:text-sm">
+          <p className="book-author line-clamp-2 sm:line-clamp-1">
             {author}
           </p>
 
