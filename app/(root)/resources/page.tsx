@@ -4,6 +4,7 @@ import {
   listVerifiedLearningResources,
 } from "@/lib/learning-resources/queries";
 import { LearningResourceCover } from "@/components/LearningResourceCover";
+import { decodeDisplayText } from "@/lib/learning-resources/display-text";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -125,11 +126,11 @@ const Page = async ({
           {result.items.map((resource) => (
             <li
               key={resource.id}
-              className="group grid grid-cols-[5.25rem_minmax(0,1fr)] gap-4 px-2 py-4 transition-colors hover:bg-[var(--mundia-panel)] sm:grid-cols-[5.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
+              className="group grid grid-cols-[5rem_minmax(0,1fr)] gap-x-4 gap-y-3 px-3 py-5 transition-colors hover:bg-[var(--mundia-panel)] sm:grid-cols-[7rem_minmax(0,1fr)_9.5rem] sm:gap-x-6 sm:px-5 sm:py-6"
             >
               <Link
                 href={`/resources/${resource.id}`}
-                aria-label={`View ${resource.title}`}
+                aria-label={`View ${decodeDisplayText(resource.title)}`}
                 className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
               >
                 <LearningResourceCover
@@ -141,49 +142,59 @@ const Page = async ({
                 />
               </Link>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-[var(--mundia-gold-strong)]">
-                  {resource.category}
-                </p>
-                <h2 className="mt-1 font-serif text-xl text-[var(--mundia-ink)] group-hover:text-[var(--mundia-navy)]">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <span className="font-semibold text-[var(--mundia-gold-strong)]">
+                    {resource.category}
+                  </span>
+                  <span className="text-[var(--mundia-muted)]" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className="text-[var(--mundia-muted)]">
+                    {resource.licenseExpression}
+                  </span>
+                </div>
+                <h2 className="mt-1.5 line-clamp-2 max-w-[48rem] font-serif text-xl leading-[1.25] text-[var(--mundia-ink)] group-hover:text-[var(--mundia-navy)]">
                   <Link
                     href={`/resources/${resource.id}`}
                     className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
                   >
-                    {resource.title}
+                    {decodeDisplayText(resource.title)}
                   </Link>
                 </h2>
                 <p className="mt-1 text-sm text-[var(--mundia-muted)]">
-                  {resource.author || "Author not listed"}
+                  {resource.author
+                    ? decodeDisplayText(resource.author)
+                    : "Author not listed"}
                 </p>
                 {resource.description && (
-                  <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-5 text-[var(--mundia-muted)]">
-                    {resource.description}
+                  <p className="mt-2 line-clamp-2 max-w-[65ch] text-sm leading-5 text-[var(--mundia-muted)]">
+                    {decodeDisplayText(resource.description)}
                   </p>
                 )}
+                <p className="mt-2 truncate text-xs text-[var(--mundia-muted)] sm:hidden">
+                  Source: {decodeDisplayText(resource.sourceName)}
+                </p>
               </div>
-              <div className="col-start-2 flex flex-wrap items-center gap-2 self-end text-xs sm:col-start-auto sm:max-w-44 sm:justify-end sm:self-center">
-                <span className="border border-[var(--mundia-line)] px-2.5 py-1.5 text-[var(--mundia-ink)]">
-                  {resource.licenseExpression}
-                </span>
+              <div className="col-start-2 flex items-center gap-3 self-end text-xs sm:col-start-auto sm:flex-col sm:items-stretch sm:self-center">
                 {resource.downloadUrl ? (
                   <a
                     href={`/api/learning-resources/${resource.id}/download`}
                     download
-                    className="inline-flex min-h-11 items-center justify-center bg-[var(--mundia-navy)] px-4 font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
-                    aria-label={`Download ${resource.title} from ${resource.sourceName}`}
+                    className="inline-flex min-h-10 items-center justify-center bg-[var(--mundia-navy)] px-4 text-sm font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
+                    aria-label={`Download ${decodeDisplayText(resource.title)} from ${decodeDisplayText(resource.sourceName)}`}
                   >
                     Download
                   </a>
                 ) : (
                   <Link
                     href={`/resources/${resource.id}`}
-                    className="inline-flex min-h-11 items-center justify-center border border-[var(--mundia-navy)] px-4 font-semibold text-[var(--mundia-navy)] transition-colors hover:bg-[var(--mundia-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
+                    className="inline-flex min-h-10 items-center justify-center border border-[var(--mundia-navy)] px-4 text-sm font-semibold text-[var(--mundia-navy)] transition-colors hover:bg-[var(--mundia-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
                   >
                     Read at source
                   </Link>
                 )}
-                <span className="w-full text-[var(--mundia-muted)] sm:text-right">
-                  via {resource.sourceName}
+                <span className="hidden text-center leading-4 text-[var(--mundia-muted)] sm:block">
+                  From {decodeDisplayText(resource.sourceName)}
                 </span>
               </div>
             </li>
