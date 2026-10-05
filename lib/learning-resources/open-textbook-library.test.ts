@@ -44,7 +44,11 @@ describe("Open Textbook Library importer", () => {
   });
 
   it("quarantines a licence outside the allowlist", () => {
-    const page = parseOpenTextbookPage(payload("Attribution-NonCommercial"), 3, 1);
+    const page = parseOpenTextbookPage(
+      payload("Attribution-NonCommercial"),
+      3,
+      1,
+    );
     expect(page.candidates[0]).toMatchObject({
       licenseExpression: null,
       verificationStatus: "QUARANTINED",
@@ -55,8 +59,7 @@ describe("Open Textbook Library importer", () => {
     const value = JSON.parse(payload()) as {
       data: Array<{ formats: Array<{ type: string; url: string }> }>;
     };
-    value.data[0]!.formats[0]!.url =
-      "https://github.com/example/book/releases";
+    value.data[0]!.formats[0]!.url = "https://github.com/example/book/releases";
 
     const page = parseOpenTextbookPage(JSON.stringify(value), 3, 1);
     expect(page.candidates[0]).toMatchObject({
@@ -66,12 +69,35 @@ describe("Open Textbook Library importer", () => {
     });
   });
 
+  it("recognizes explicit Pressbooks PDF downloads and useful engineering categories", () => {
+    const value = JSON.parse(payload()) as {
+      data: Array<{
+        title: string;
+        subjects?: Array<{ name: string }>;
+        formats: Array<{ type: string; url: string }>;
+      }>;
+    };
+    value.data[0]!.title = "Introduction to Industrial Engineering";
+    value.data[0]!.subjects = [{ name: "Engineering & Technology" }];
+    value.data[0]!.formats[0]!.url =
+      "https://uta.pressbooks.pub/industrial/open/download?type=pdf";
+
+    const page = parseOpenTextbookPage(JSON.stringify(value), 13, 1);
+
+    expect(page.candidates[0]).toMatchObject({
+      category: "Industrial Engineering",
+      downloadUrl:
+        "https://uta.pressbooks.pub/industrial/open/download?type=pdf",
+    });
+  });
+
   it("uses only fixed official subject endpoints and filters", async () => {
-    const fetcher = vi.fn(async () =>
-      new Response(payload(), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
+    const fetcher = vi.fn(
+      async () =>
+        new Response(payload(), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
     );
     await fetchOpenTextbookPage({ subjectId: 13, page: 2, fetcher });
 

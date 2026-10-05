@@ -45,6 +45,7 @@
     "import:learning-resources": "tsx scripts/import-learning-resources.ts",
     "import:learning-resources:doab": "tsx scripts/import-doab-learning-resources.ts",
     "import:learning-resources:otl": "tsx scripts/import-open-textbook-library.ts",
+    "import:learning-resources:otl:collection": "tsx scripts/import-open-textbook-collection.ts",
     "import:learning-resources:wikibooks": "tsx scripts/import-wikibooks.ts",
     "import:learning-resources:gutenberg": "tsx scripts/import-gutenberg.ts",
     "import:learning-resources:nist": "tsx scripts/import-nist.ts",

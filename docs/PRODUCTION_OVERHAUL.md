@@ -453,7 +453,13 @@ second adapter consumes bounded DOAB OAI-PMH pages, validates
 XML with entity processing disabled, filters for engineering disciplines, and
 uses the per-file licence URI as evidence. The Open Textbook Library adapter
 adds CC BY, CC BY-SA, and CC0 university textbooks from fixed computer science,
-engineering, and mathematics subject endpoints. Direct PDF/EPUB URLs are
+engineering, mathematics, physics, management, statistics, database,
+information-systems, programming-language, and engineering-discipline subject
+endpoints. A complete-subject runner fetches bounded pages, fingerprints the
+whole snapshot, deduplicates official record identifiers, and commits one
+revision-pinned batch. Subject metadata and conservative title rules provide
+useful Aerospace, Industrial, Civil, Mechanical, Electrical, Cloud, Security,
+and related catalog filters. Direct PDF/EPUB URLs are
 labelled as downloads; repository and publisher landing pages are explicitly
 labelled as third-party sources. A bounded Wikibooks adapter imports fixed UNIX,
 Linux, software-engineering, security, system-administration, and version-control
@@ -475,9 +481,12 @@ manifest adds official aerodynamics,
 aircraft-maintenance, avionics, UAS, aircraft-systems, and flight-engineering
 handbooks. Each FAA PDF is range/type/size checked and linked directly from its
 public-domain official source without passing the large file through Vercel.
-Open Library, Internet Archive, OpenStax, and arXiv adapters remain pending, as
-does migration of this temporary read slice to the Kotlin catalog/digital-content
-services before monolith retirement.
+Open Library, Internet Archive, and arXiv adapters remain pending. OpenStax was
+re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
+outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
+excluded unless a durable qualifying per-edition licence can be proven. Migration
+of this temporary read slice to the Kotlin catalog/digital-content services also
+remains pending before monolith retirement.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

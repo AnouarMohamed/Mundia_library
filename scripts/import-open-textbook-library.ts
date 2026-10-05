@@ -27,8 +27,8 @@ async function main() {
     verified: result.candidates.filter(
       (candidate) => candidate.verificationStatus === "VERIFIED",
     ).length,
-    directDownloads: result.candidates.filter(
-      (candidate) => Boolean(candidate.downloadUrl),
+    directDownloads: result.candidates.filter((candidate) =>
+      Boolean(candidate.downloadUrl),
     ).length,
     quarantined: result.candidates.filter(
       (candidate) => candidate.verificationStatus === "QUARANTINED",
@@ -38,9 +38,12 @@ async function main() {
     console.log(JSON.stringify({ mode: "dry-run", ...summary }));
     return;
   }
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required for --apply");
+  if (!process.env.DATABASE_URL)
+    throw new Error("DATABASE_URL is required for --apply");
   if (args.expectedRevision !== result.revision) {
-    throw new Error("OTL page changed; dry-run again and use --expected-revision");
+    throw new Error(
+      "OTL page changed; dry-run again and use --expected-revision",
+    );
   }
 
   const [{ importLearningResourceBatch }, { closeDb }] = await Promise.all([
@@ -55,7 +58,9 @@ async function main() {
       limit: 250,
       candidates: result.candidates,
     });
-    console.log(JSON.stringify({ mode: "applied", ...summary, result: imported }));
+    console.log(
+      JSON.stringify({ mode: "applied", ...summary, result: imported }),
+    );
   } finally {
     await closeDb();
   }
@@ -80,12 +85,16 @@ function parseArguments(values: string[]) {
     else throw new Error(`Unknown argument: ${value}`);
     index += 1;
   }
-  if (!Object.hasOwn(OTL_SUBJECTS, subjectId)) throw new Error("Use subject 3, 7, or 13");
-  if (!Number.isSafeInteger(page) || page < 1 || page > 1_000) throw new Error("Use page 1-1000");
+  if (!Object.hasOwn(OTL_SUBJECTS, subjectId)) {
+    throw new Error(`Use subject ${Object.keys(OTL_SUBJECTS).join(", ")}`);
+  }
+  if (!Number.isSafeInteger(page) || page < 1 || page > 1_000)
+    throw new Error("Use page 1-1000");
   if (expectedRevision && !/^[0-9a-f]{64}$/.test(expectedRevision)) {
     throw new Error("Use a 64-character --expected-revision from dry-run");
   }
-  if (apply && !expectedRevision) throw new Error("--apply requires --expected-revision");
+  if (apply && !expectedRevision)
+    throw new Error("--apply requires --expected-revision");
   return { subjectId, page, expectedRevision, apply };
 }
 
