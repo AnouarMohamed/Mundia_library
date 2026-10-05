@@ -452,7 +452,12 @@ uses the per-file licence URI as evidence. The Open Textbook Library adapter
 adds CC BY, CC BY-SA, and CC0 university textbooks from fixed computer science,
 engineering, and mathematics subject endpoints. Direct PDF/EPUB URLs are
 labelled as downloads; repository and publisher landing pages are explicitly
-labelled as third-party sources. Open Library, Internet Archive, Gutenberg,
+labelled as third-party sources. A bounded Wikibooks adapter imports fixed UNIX,
+Linux, software-engineering, security, system-administration, and version-control
+shelves only when the API returns the expected CC BY-SA 4.0 rights declaration
+and the book root has no fair-use or copyright-review flag. Its official
+Wikimedia PDF endpoint sends files as attachments, so downloads remain direct
+without consuming Vercel transfer. Open Library, Internet Archive, Gutenberg,
 OpenStax, and arXiv adapters remain pending, as does migration of this temporary
 read slice to the Kotlin catalog/digital-content services before monolith
 retirement.
