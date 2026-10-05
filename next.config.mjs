@@ -62,6 +62,12 @@ const nextConfig = {
         port: "",
         pathname: "/cache/epub/*/pg*.cover.medium.jpg",
       },
+      {
+        protocol: "https",
+        hostname: "directory.doabooks.org",
+        port: "",
+        pathname: "/bitstream/20.500.12854/*/*/*",
+      },
     ],
   },
   /*

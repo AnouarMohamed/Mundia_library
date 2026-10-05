@@ -1,5 +1,7 @@
 const GUTENBERG_COVER_PATH =
   /^\/cache\/epub\/(\d+)\/pg\1\.cover\.medium\.jpg$/u;
+const DOAB_COVER_PATH =
+  /^\/bitstream\/20\.500\.12854\/\d+\/\d+\/[A-Za-z0-9._%~-]+\.(?:jpe?g|png|webp)$/iu;
 
 /**
  * Only render cover assets whose ownership and URL shape were verified by an
@@ -12,15 +14,19 @@ export function normalizeOfficialLearningResourceCover(
   if (!value) return null;
   try {
     const url = new URL(value);
+    const approvedPath =
+      (url.hostname === "www.gutenberg.org" &&
+        GUTENBERG_COVER_PATH.test(url.pathname)) ||
+      (url.hostname === "directory.doabooks.org" &&
+        DOAB_COVER_PATH.test(url.pathname));
     if (
       url.protocol !== "https:" ||
-      url.hostname !== "www.gutenberg.org" ||
       url.username ||
       url.password ||
       url.port ||
       url.search ||
       url.hash ||
-      !GUTENBERG_COVER_PATH.test(url.pathname)
+      !approvedPath
     ) {
       return null;
     }

@@ -6,6 +6,8 @@ import type { LearningResourceCandidate } from "./types";
 const SOURCE_NAME = "Directory of Open Access Books";
 const OAI_ENDPOINT = "https://directory.doabooks.org/oai/request";
 const MAX_RESPONSE_BYTES = 5_000_000;
+const MAX_COVER_BYTES = 2_000_000;
+const ADAPTER_VERSION = "doab-v6";
 
 type XmlNode = Record<string, unknown>;
 
@@ -101,14 +103,25 @@ export function parseDoabPage(content: string): DoabPage {
       status: normalizeText(String(header?.["@_status"] ?? "")),
     };
   });
-  const revision = sha256(JSON.stringify({ recordVersions, nextToken }));
+  const revision = sha256(
+    JSON.stringify({
+      adapterVersion: ADAPTER_VERSION,
+      recordVersions,
+      nextToken,
+    }),
+  );
   const candidates = records
     .map((record) => parseRecord(record, revision))
-    .filter((candidate): candidate is LearningResourceCandidate => Boolean(candidate));
+    .filter((candidate): candidate is LearningResourceCandidate =>
+      Boolean(candidate),
+    );
   return { revision, candidates, nextToken, sourceRecords: records.length };
 }
 
-function parseRecord(record: XmlNode, revision: string): LearningResourceCandidate | null {
+function parseRecord(
+  record: XmlNode,
+  revision: string,
+): LearningResourceCandidate | null {
   const header = asNode(record.header);
   const identifier = normalizeText(String(header?.identifier ?? ""));
   const metadata = asNode(asNode(record.metadata)?.metadata);
@@ -135,13 +148,18 @@ function parseRecord(record: XmlNode, revision: string): LearningResourceCandida
   const author =
     firstField(fields, "dc.contributor.author") ??
     firstField(fields, "dc.contributor.editor");
+  const description = cleanText(firstField(fields, "dc.description"), 4_000);
   const language = normalizeLanguage(firstField(fields, "dc.language"));
   const category = classifyCategory(title, subjects);
+  const coverUrl = verified ? chooseCoverUrl(bitstreams) : null;
   const base = {
     sourceName: SOURCE_NAME,
     sourceRecordKey: identifier,
     title,
     author: author?.slice(0, 500) ?? null,
+    description,
+    coverUrl,
+    coverAlt: coverUrl ? `Official cover of ${title}`.slice(0, 300) : null,
     category,
     language,
     licenseExpression: verified ? licence.expression : null,
@@ -183,8 +201,11 @@ function collectFields(value: unknown, parent = ""): FieldValue[] {
 }
 
 interface Bitstream {
+  assetUrl: string | null;
   downloadUrl: string | null;
+  description: string | null;
   format: string | null;
+  size: number | null;
   rights: string | null;
   rightsUri: string | null;
 }
@@ -201,8 +222,12 @@ function collectBitstreams(value: unknown): Bitstream[] {
         if (name && text && !fields.has(name)) fields.set(name, text);
       }
       output.push({
-        downloadUrl: fields.get("oapenidentifierdownloadUrl") ?? fields.get("url") ?? null,
+        assetUrl: fields.get("url") ?? null,
+        downloadUrl:
+          fields.get("oapenidentifierdownloadUrl") ?? fields.get("url") ?? null,
+        description: fields.get("description") ?? null,
         format: fields.get("format") ?? null,
+        size: toPositiveInteger(fields.get("size")),
         rights: fields.get("rights") ?? null,
         rightsUri: fields.get("rightsuri") ?? null,
       });
@@ -212,12 +237,31 @@ function collectBitstreams(value: unknown): Bitstream[] {
   return output;
 }
 
+function chooseCoverUrl(values: Bitstream[]) {
+  for (const item of values) {
+    if (
+      !/^image\/(?:jpeg|png|webp)$/iu.test(item.format ?? "") ||
+      !item.size ||
+      item.size > MAX_COVER_BYTES
+    ) {
+      continue;
+    }
+    const normalized = normalizeDoabCoverUrl(item.assetUrl);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
 function chooseBitstream(values: Bitstream[]) {
   const documents = values.filter((item) =>
     /pdf|epub/iu.test(`${item.format ?? ""} ${item.downloadUrl ?? ""}`),
   );
   return (
-    documents.find((item) => classifyResourceLicense(`${item.rights ?? ""} ${item.rightsUri ?? ""}`).verified) ??
+    documents.find(
+      (item) =>
+        classifyResourceLicense(`${item.rights ?? ""} ${item.rightsUri ?? ""}`)
+          .verified,
+    ) ??
     documents[0] ??
     null
   );
@@ -232,16 +276,42 @@ function firstField(fields: FieldValue[], path: string) {
 }
 
 function isEngineeringResource(title: string, subjects: string[]) {
-  return /(computer|computing|software|programming|algorithm|data science|information technolog|cyber|network|mathemat|statistic|engineering|electronic|electrical|mechanical|civil engineering|robot|artificial intelligence|machine learning|cloud computing|devops)/iu.test(
+  return /(computer|computing|software|programming|algorithm|data science|information technolog|cyber|network|telecommunication|mathemat|statistic|engineering|electronic|electrical|mechanical|civil engineering|industrial|manufactur|operations research|production system|supply chain|aeronaut|aerospace|aviation|aircraft|robot|artificial intelligence|machine learning|cloud computing|devops)/iu.test(
     `${title} ${subjects.join(" ")}`,
   );
 }
 
 function classifyCategory(title: string, subjects: string[]) {
   const value = `${title} ${subjects.join(" ")}`;
+  if (/(aeronaut|aerospace|aviation|aircraft|flight dynamics)/iu.test(value)) {
+    return "Aerospace Engineering";
+  }
+  if (
+    /(industrial engineering|manufactur|operations research|production system|supply chain|process engineering)/iu.test(
+      value,
+    )
+  ) {
+    return "Industrial Engineering";
+  }
   if (/(cyber|security|cryptograph)/iu.test(value)) return "Security";
+  if (/(network|telecommunication|routing|wireless communication)/iu.test(value)) {
+    return "Networking & Telecommunications";
+  }
   if (/(mathemat|statistic)/iu.test(value)) return "Mathematics";
-  if (/(software|programming|algorithm|computer|computing|data science|artificial intelligence|machine learning|devops|cloud)/iu.test(value)) {
+  if (/(electrical|electronic|power system)/iu.test(value)) {
+    return "Electrical Engineering";
+  }
+  if (/(mechanical|thermodynamic|fluid mechanics)/iu.test(value)) {
+    return "Mechanical Engineering";
+  }
+  if (/(civil engineering|structural engineering|construction)/iu.test(value)) {
+    return "Civil Engineering";
+  }
+  if (
+    /(software|programming|algorithm|computer|computing|data science|artificial intelligence|machine learning|devops|cloud)/iu.test(
+      value,
+    )
+  ) {
     return "Computer Science";
   }
   return "Engineering";
@@ -249,7 +319,13 @@ function classifyCategory(title: string, subjects: string[]) {
 
 function normalizeLanguage(value: string | null) {
   const normalized = normalizeText(value ?? "").toLowerCase();
-  const aliases: Record<string, string> = { eng: "en", fra: "fr", fre: "fr", deu: "de", ger: "de" };
+  const aliases: Record<string, string> = {
+    eng: "en",
+    fra: "fr",
+    fre: "fr",
+    deu: "de",
+    ger: "de",
+  };
   return (aliases[normalized] ?? normalized.slice(0, 16)) || "und";
 }
 
@@ -258,12 +334,46 @@ function normalizeHttpsUrl(value: string | null): string | null {
   try {
     const url = new URL(value);
     if (url.protocol === "http:") url.protocol = "https:";
-    if (url.protocol !== "https:" || url.username || url.password || url.port || !url.hostname) return null;
+    if (
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.port ||
+      !url.hostname
+    )
+      return null;
     url.hash = "";
     return url.toString();
   } catch {
     return null;
   }
+}
+
+function normalizeDoabCoverUrl(value: string | null) {
+  const normalized = normalizeHttpsUrl(value);
+  if (!normalized) return null;
+  const url = new URL(normalized);
+  if (
+    url.hostname !== "directory.doabooks.org" ||
+    url.search ||
+    !/^\/bitstream\/20\.500\.12854\/\d+\/\d+\/[A-Za-z0-9._%~-]+\.(?:jpe?g|png|webp)$/iu.test(
+      url.pathname,
+    )
+  ) {
+    return null;
+  }
+  return url.toString();
+}
+
+function cleanText(value: string | null, max: number) {
+  const normalized = normalizeText(value ?? "");
+  return normalized ? normalized.slice(0, max) : null;
+}
+
+function toPositiveInteger(value: string | undefined) {
+  if (!value || !/^\d+$/u.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function normalizeText(value: string) {

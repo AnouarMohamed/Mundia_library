@@ -40,7 +40,7 @@ export const buildContentSecurityPolicy = (
     // attributes. Script execution is nonce-restricted; eliminating this
     // remaining style exception is tracked as a separate verified migration.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://ik.imagekit.io https://m.media-amazon.com https://placehold.co https://www.gutenberg.org",
+    "img-src 'self' data: blob: https://ik.imagekit.io https://m.media-amazon.com https://placehold.co https://www.gutenberg.org https://directory.doabooks.org",
     "media-src 'self' data: blob: https://ik.imagekit.io",
     "font-src 'self' data:",
     `connect-src 'self' https://*.upstash.io https://*.imagekit.io https://ik.imagekit.io${isDevelopment ? " ws: wss:" : ""}`,

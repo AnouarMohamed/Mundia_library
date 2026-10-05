@@ -492,7 +492,18 @@ material. A smaller curated Kubernetes learning path verifies each live official
 documentation page and the website repository's CC BY 4.0 licence before import.
 Both adapters fail closed, store metadata only, and are revision-pinned and
 idempotent.
-Open Library, Internet Archive, and arXiv adapters remain pending. OpenStax was
+The DOAB adapter also extracts bounded abstracts and official catalog thumbnail
+bitstreams for verified records only. Its cover policy requires an exact DOAB
+host and bitstream path, an allowlisted image media type, and a two-megabyte
+metadata size ceiling. A bounded collection runner can review up to ten OAI
+pages while refusing any batch above 250 engineering records. Rocky Linux's two
+official administration course books add more than 470 pages of directly linked
+Linux, UNIX, networking, web-service, shell, security, and operations material;
+both the live PDFs and repository-level CC BY-SA 4.0 licence are checked before
+import. Open Library is intentionally not a public-content source: its cover API
+permits public display, but its licensing notice warns that contributed records
+can have unresolved existing rights, and its availability flags are not
+per-edition licence evidence. Internet Archive and arXiv adapters remain pending. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
 excluded unless a durable qualifying per-edition licence can be proven. Migration

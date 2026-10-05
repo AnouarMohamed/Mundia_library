@@ -34,6 +34,18 @@ describe("learning resource licence policy", () => {
     });
   });
 
+  it("preserves an older allowlisted Creative Commons version", () => {
+    expect(
+      classifyResourceLicense(
+        "CC-BY https://creativecommons.org/licenses/by/3.0/",
+      ),
+    ).toMatchObject({
+      verified: true,
+      expression: "CC-BY",
+      licenseUrl: "https://creativecommons.org/licenses/by/3.0/",
+    });
+  });
+
   it("recognizes only normalized allowlist values", () => {
     expect(isVerifiedLicenseExpression("CC-BY-SA")).toBe(true);
     expect(isVerifiedLicenseExpression("CC-BY-NC")).toBe(false);
