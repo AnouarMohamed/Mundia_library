@@ -36,4 +36,14 @@ class DigitalContentController(
     ): ResponseEntity<DownloadAuthorizationView> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .body(digitalContent.authorize(authentication, request, response, assetId))
+
+    @PostMapping("/external-resources/{resourceId}/authorizations")
+    fun authorizeExternal(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        @PathVariable resourceId: UUID,
+    ): ResponseEntity<ExternalDownloadAuthorizationView> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(digitalContent.authorizeExternal(authentication, request, response, resourceId))
 }

@@ -30,3 +30,11 @@ data class DownloadAuthorizationView(
     val downloadUrl: String,
     val expiresAt: Instant,
 )
+
+data class ExternalDownloadAuthorizationView(
+    val authorizationId: UUID,
+    val resourceId: UUID,
+    val sourceProvider: String,
+    val licenseExpression: String,
+    val downloadUrl: String,
+)

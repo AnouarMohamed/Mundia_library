@@ -50,5 +50,26 @@ class OpenApiContractTest {
             .path("IngestionUploadGrant").path("properties")
         assertFalse(grant.has("sourceUri"))
         assertFalse(grant.has("actorFingerprint"))
+
+        val externalRegistration = document.path("paths")
+            .path("/api/v1/digital-content/external-resources/{resourceId}")
+            .path("put")
+        assertEquals(
+            "digital-content.external-resource.manage",
+            externalRegistration.path("security").path(0).path("oauth2").path(0).stringValue(),
+        )
+        val externalAuthorization = document.path("paths")
+            .path("/api/v1/digital-content/external-resources/{resourceId}/authorizations")
+            .path("post")
+        assertEquals(
+            "digital-content.download.authorize",
+            externalAuthorization.path("security").path(0).path("oauth2").path(0).stringValue(),
+        )
+        val externalAvailability = document.path("components").path("schemas")
+            .path("ExternalResourceAvailability").path("properties")
+        assertFalse(externalAvailability.has("downloadUrl"))
+        val externalGrant = document.path("components").path("schemas")
+            .path("ExternalDownloadAuthorization").path("properties")
+        assertFalse(externalGrant.has("actorFingerprint"))
     }
 }

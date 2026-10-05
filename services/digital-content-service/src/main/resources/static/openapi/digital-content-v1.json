@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundia Digital Content API",
-    "version": "1.2.0",
-    "description": "Rights-aware quarantine ingestion, availability, and short-lived authorization for first-party digital content. Private keys appear only inside tightly constrained upload or download grants."
+    "version": "1.3.0",
+    "description": "Rights-aware quarantine ingestion and caller-bound authorization for first-party and verified external digital content. Private keys appear only inside tightly constrained upload or download grants."
   },
   "paths": {
     "/api/v1/digital-content/editions/{editionId}/availability": {
@@ -104,6 +104,50 @@
           "503": { "$ref": "#/components/responses/IngestionUnavailable" }
         }
       }
+    },
+    "/api/v1/digital-content/external-resources/{resourceId}": {
+      "put": {
+        "operationId": "registerExternalResourceRights",
+        "parameters": [{ "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [{ "oauth2": ["digital-content.external-resource.manage"] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterExternalResourceRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Exact caller-bound manifest replay", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExternalResourceRegistration" } } } },
+          "201": { "description": "Immutable external rights manifest registered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExternalResourceRegistration" } } } },
+          "400": { "$ref": "#/components/responses/InvalidExternalResource" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/ExternalResourceConflict" }
+        }
+      }
+    },
+    "/api/v1/digital-content/external-resources/{resourceId}/availability": {
+      "get": {
+        "operationId": "getExternalResourceAvailability",
+        "parameters": [{ "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [{ "oauth2": ["digital-content.availability.read"] }],
+        "responses": {
+          "200": { "description": "Fail-closed external rights availability without a download URL", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExternalResourceAvailability" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/digital-content/external-resources/{resourceId}/authorizations": {
+      "post": {
+        "operationId": "authorizeExternalResourceDownload",
+        "parameters": [{ "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "security": [{ "oauth2": ["digital-content.download.authorize"] }],
+        "responses": {
+          "200": { "description": "Audited authorization for the exact verified official file", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExternalDownloadAuthorization" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/DownloadUnavailable" }
+        }
+      }
     }
   },
   "components": {
@@ -116,7 +160,8 @@
             "scopes": {
               "digital-content.availability.read": "Read safe digital content availability",
               "digital-content.download.authorize": "Authorize a short-lived first-party download",
-              "digital-content.ingestion.create": "Create a rights-reviewed quarantine ingestion session"
+              "digital-content.ingestion.create": "Create a rights-reviewed quarantine ingestion session",
+              "digital-content.external-resource.manage": "Register immutable rights manifests for external resources"
             }
           }
         }
@@ -160,6 +205,55 @@
           "assetId": { "type": "string", "format": "uuid" },
           "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
           "expiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "RegisterExternalResourceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceProvider", "sourceUrl", "downloadUrl", "mediaType", "licenseExpression", "licenseUrl", "attribution"],
+        "properties": {
+          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "sourceUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "mediaType": { "type": "string", "enum": ["application/pdf", "application/epub+zip"] },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
+          "licenseUrl": { "type": "string", "format": "uri", "pattern": "^https://creativecommons.org/", "maxLength": 2048 },
+          "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 }
+        }
+      },
+      "ExternalResourceRegistration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceId", "sourceProvider", "licenseExpression", "replayed"],
+        "properties": {
+          "resourceId": { "type": "string", "format": "uuid" },
+          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
+          "replayed": { "type": "boolean" }
+        }
+      },
+      "ExternalResourceAvailability": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceId", "downloadable", "sourceProvider", "mediaType", "licenseExpression"],
+        "properties": {
+          "resourceId": { "type": "string", "format": "uuid" },
+          "downloadable": { "type": "boolean" },
+          "sourceProvider": { "type": ["string", "null"], "minLength": 2, "maxLength": 100 },
+          "mediaType": { "type": ["string", "null"], "enum": ["application/pdf", "application/epub+zip", null] },
+          "licenseExpression": { "type": ["string", "null"], "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0", null] }
+        }
+      },
+      "ExternalDownloadAuthorization": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorizationId", "resourceId", "sourceProvider", "licenseExpression", "downloadUrl"],
+        "properties": {
+          "authorizationId": { "type": "string", "format": "uuid" },
+          "resourceId": { "type": "string", "format": "uuid" },
+          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
         }
       },
       "CreateIngestionRequest": {
@@ -236,6 +330,14 @@
       },
       "IngestionUnavailable": {
         "description": "Quarantine upload signing is unavailable",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "InvalidExternalResource": {
+        "description": "The external rights manifest or URL shape is invalid",
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "ExternalResourceConflict": {
+        "description": "The resource identifier is already bound to another caller or manifest",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     }

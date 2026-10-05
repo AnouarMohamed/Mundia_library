@@ -4,6 +4,8 @@ import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_INGESTION
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_SCAN_RECEIPT
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_EXTERNAL_RESOURCE
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_EXTERNAL_AUTHORIZATION_AUDIT
 import com.mundiapolis.library.digitalcontent.service.DownloadUrlSigner
 import com.mundiapolis.library.digitalcontent.service.QuarantineUploadAuthorizer
 import com.mundiapolis.library.digitalcontent.service.SignedUpload
@@ -56,6 +58,8 @@ class DigitalContentIntegrationTest {
 
     @BeforeEach
     fun seedAssets() {
+        dsl.deleteFrom(DIGITAL_CONTENT_EXTERNAL_AUTHORIZATION_AUDIT).execute()
+        dsl.deleteFrom(DIGITAL_CONTENT_EXTERNAL_RESOURCE).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_SCAN_RECEIPT).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_INGESTION).execute()
@@ -230,6 +234,89 @@ class DigitalContentIntegrationTest {
     }
 
     @Test
+    fun `external resource registration is immutable caller bound and authorizable`() {
+        val path = "/api/v1/digital-content/external-resources/$EXTERNAL_RESOURCE_ID"
+        mockMvc.perform(
+            put(path)
+                .with(externalManageScope())
+                .contentType("application/json")
+                .content(EXTERNAL_RESOURCE_BODY),
+        )
+            .andExpect(status().isCreated)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.resourceId").value(EXTERNAL_RESOURCE_ID.toString()))
+            .andExpect(jsonPath("$.licenseExpression").value("PDM-1.0"))
+            .andExpect(jsonPath("$.replayed").value(false))
+
+        mockMvc.perform(
+            put(path)
+                .with(externalManageScope())
+                .contentType("application/json")
+                .content(EXTERNAL_RESOURCE_BODY),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        mockMvc.perform(
+            get("$path/availability").with(readScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.downloadable").value(true))
+            .andExpect(jsonPath("$.sourceProvider").value("NASA Technical Reports"))
+            .andExpect(jsonPath("$.downloadUrl").doesNotExist())
+
+        mockMvc.perform(
+            post("$path/authorizations").with(downloadScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.resourceId").value(EXTERNAL_RESOURCE_ID.toString()))
+            .andExpect(
+                jsonPath("$.downloadUrl")
+                    .value("https://archive.org/download/nasa_techdoc_19670028324/19670028324.pdf"),
+            )
+
+        val audit = dsl.selectFrom(DIGITAL_CONTENT_EXTERNAL_AUTHORIZATION_AUDIT).fetchSingle()
+        org.junit.jupiter.api.Assertions.assertEquals(EXTERNAL_RESOURCE_ID, audit.resourceId)
+        org.junit.jupiter.api.Assertions.assertTrue(
+            requireNotNull(audit.actorFingerprint).matches(Regex("^[0-9a-f]{64}$")),
+        )
+    }
+
+    @Test
+    fun `external resource registration rejects manifest changes and unsafe URLs`() {
+        val path = "/api/v1/digital-content/external-resources/$EXTERNAL_RESOURCE_ID"
+        mockMvc.perform(
+            put(path)
+                .with(externalManageScope("operator-one"))
+                .contentType("application/json")
+                .content(EXTERNAL_RESOURCE_BODY),
+        ).andExpect(status().isCreated)
+
+        mockMvc.perform(
+            put(path)
+                .with(externalManageScope("operator-two"))
+                .contentType("application/json")
+                .content(EXTERNAL_RESOURCE_BODY),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("external_resource_conflict"))
+
+        val unsafeBody = EXTERNAL_RESOURCE_BODY.replace(
+            "https://archive.org/download/nasa_techdoc_19670028324/19670028324.pdf",
+            "https://127.0.0.1/private.pdf",
+        )
+        mockMvc.perform(
+            put("/api/v1/digital-content/external-resources/${UUID.randomUUID()}")
+                .with(externalManageScope())
+                .contentType("application/json")
+                .content(unsafeBody),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("invalid_external_resource"))
+    }
+
+    @Test
     fun `scan receipts are idempotent and any later adverse result fails closed`() {
         mockMvc.perform(
             put("/api/v1/digital-content/ingestions/$INGESTION_ID")
@@ -325,6 +412,13 @@ class DigitalContentIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority("SCOPE_digital-content.ingestion.create"))
 
+    private fun externalManageScope(subject: String = "external-resource-operator") = jwt()
+        .jwt { token ->
+            token.issuer("https://identity.example.test")
+            token.subject(subject)
+        }
+        .authorities(SimpleGrantedAuthority("SCOPE_digital-content.external-resource.manage"))
+
     @TestConfiguration(proxyBeanMethods = false)
     class DownloadSignerTestConfiguration {
         @Bean
@@ -371,6 +465,7 @@ class DigitalContentIntegrationTest {
         val BLOCKED_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000002")
         val INGESTION_ID: UUID = UUID.fromString("13000000-0000-0000-0000-000000000001")
         val SCAN_EVENT_ID: UUID = UUID.fromString("14000000-0000-0000-0000-000000000001")
+        val EXTERNAL_RESOURCE_ID: UUID = UUID.fromString("15000000-0000-0000-0000-000000000001")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 10, 4, 12, 0, 0, 0, ZoneOffset.UTC)
         const val DIGEST = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         val INGESTION_BODY = """
@@ -384,6 +479,17 @@ class DigitalContentIntegrationTest {
               "licenseExpression": "CC-BY-4.0",
               "attribution": "Example Engineering Text, OpenStax",
               "rightsExpiresAt": null
+            }
+        """.trimIndent()
+        val EXTERNAL_RESOURCE_BODY = """
+            {
+              "sourceProvider": "NASA Technical Reports",
+              "sourceUrl": "https://archive.org/details/nasa_techdoc_19670028324",
+              "downloadUrl": "https://archive.org/download/nasa_techdoc_19670028324/19670028324.pdf",
+              "mediaType": "application/pdf",
+              "licenseExpression": "PDM-1.0",
+              "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+              "attribution": "Helicopters Calculation and Design, NASA Technical Reports"
             }
         """.trimIndent()
     }

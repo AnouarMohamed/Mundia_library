@@ -6,6 +6,8 @@ import com.mundiapolis.library.digitalcontent.service.IngestionConflictException
 import com.mundiapolis.library.digitalcontent.service.IngestionExpiredException
 import com.mundiapolis.library.digitalcontent.service.IngestionUnavailableException
 import com.mundiapolis.library.digitalcontent.service.InvalidIngestionRequestException
+import com.mundiapolis.library.digitalcontent.service.ExternalResourceConflictException
+import com.mundiapolis.library.digitalcontent.service.InvalidExternalResourceException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -53,6 +55,20 @@ class DigitalContentExceptionHandler {
         HttpStatus.BAD_REQUEST,
         "invalid_ingestion_request",
         "The ingestion manifest is invalid",
+    )
+
+    @ExceptionHandler(ExternalResourceConflictException::class)
+    fun externalResourceConflict(): ProblemDetail = problem(
+        HttpStatus.CONFLICT,
+        "external_resource_conflict",
+        "The resource identifier is already bound to another rights manifest",
+    )
+
+    @ExceptionHandler(InvalidExternalResourceException::class)
+    fun invalidExternalResource(): ProblemDetail = problem(
+        HttpStatus.BAD_REQUEST,
+        "invalid_external_resource",
+        "The external resource rights manifest is invalid",
     )
 
     private fun problem(status: HttpStatus, code: String, detail: String): ProblemDetail =

@@ -17,6 +17,8 @@ import com.mundiapolis.library.digitalcontent.adapter.`in`.scan.GuardDutyScanDec
 import com.mundiapolis.library.digitalcontent.adapter.`in`.scan.MalwareScanSqsConsumer
 import com.mundiapolis.library.digitalcontent.service.MalwareScanService
 import com.mundiapolis.library.digitalcontent.service.MalwareScanStore
+import com.mundiapolis.library.digitalcontent.service.ExternalResourceService
+import com.mundiapolis.library.digitalcontent.service.ExternalResourceStore
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.health.contributor.Health
@@ -43,6 +45,12 @@ class ApplicationConfiguration {
         signer: DownloadUrlSigner,
         clock: Clock,
     ) = DigitalContentService(reader, signer, clock)
+
+    @Bean
+    fun externalResourceService(
+        store: ExternalResourceStore,
+        clock: Clock,
+    ) = ExternalResourceService(store, clock)
 
     @Bean(destroyMethod = "close")
     @ConditionalOnProperty(prefix = "app.ingestion", name = ["enabled"], havingValue = "true")

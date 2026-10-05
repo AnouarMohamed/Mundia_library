@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClientException
 import tools.jackson.databind.ObjectMapper
 import java.net.SocketTimeoutException
 import java.net.URI
+import java.net.IDN
 import java.net.http.HttpTimeoutException
 import java.time.Clock
 import java.util.UUID
@@ -48,6 +49,21 @@ class DigitalContentClient(
                 handleStatus(response.statusCode.value())
                 decode(response, DownloadAuthorizationView::class.java).also { authorization ->
                     validateAuthorization(authorization, assetId)
+                }
+            }
+    }
+
+    fun authorizeExternal(
+        authorizedClient: OAuth2AuthorizedClient,
+        resourceId: UUID,
+    ): ExternalDownloadAuthorizationView = exchange {
+        digitalContentRestClient.post()
+            .uri("/api/v1/digital-content/external-resources/{resourceId}/authorizations", resourceId)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, ExternalDownloadAuthorizationView::class.java).also { authorization ->
+                    validateExternalAuthorization(authorization, resourceId)
                 }
             }
     }
@@ -96,6 +112,40 @@ class DigitalContentClient(
             !properties.isTrustedDownload(uri) ||
             !DOWNLOAD_PATH.matches(uri.rawPath.orEmpty()) ||
             !validSigningQuery(uri.rawQuery)
+        ) {
+            throw DigitalContentProtocolException()
+        }
+    }
+
+    private fun validateExternalAuthorization(
+        authorization: ExternalDownloadAuthorizationView,
+        expectedResourceId: UUID,
+    ) {
+        val uri = runCatching { URI(authorization.downloadUrl) }
+            .getOrElse { throw DigitalContentProtocolException(it) }
+        val host = runCatching { IDN.toASCII(uri.host.orEmpty()) }
+            .getOrElse { throw DigitalContentProtocolException(it) }
+            .lowercase()
+        if (
+            authorization.resourceId != expectedResourceId ||
+            authorization.sourceProvider.length !in 2..100 ||
+            authorization.licenseExpression !in EXTERNAL_LICENSES ||
+            uri.scheme != "https" ||
+            host.isBlank() ||
+            uri.rawUserInfo != null ||
+            uri.port != -1 ||
+            uri.rawFragment != null ||
+            uri.rawPath.isNullOrBlank() ||
+            uri.normalize().rawPath != uri.rawPath ||
+            authorization.downloadUrl.length > 2048 ||
+            host == "localhost" ||
+            host.endsWith('.') ||
+            host.endsWith(".localhost") ||
+            host.endsWith(".local") ||
+            host.endsWith(".internal") ||
+            IPV4_LITERAL.matches(host) ||
+            host.contains(':') ||
+            ENCODED_PATH_SEPARATOR.containsMatchIn(uri.rawPath)
         ) {
             throw DigitalContentProtocolException()
         }
@@ -168,6 +218,9 @@ class DigitalContentClient(
         val SIGNING_VALUE = Regex("^[A-Za-z0-9_~-]{1,8192}$")
         val SIGNING_PARAMETERS = setOf("Policy", "Signature", "Key-Pair-Id", "Hash-Algorithm")
         val RETRYABLE_STATUSES = setOf(429, 502, 503, 504)
+        val IPV4_LITERAL = Regex("^[0-9.]+$")
+        val ENCODED_PATH_SEPARATOR = Regex("%(?:2e|2f|5c)", RegexOption.IGNORE_CASE)
+        val EXTERNAL_LICENSES = setOf("CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0")
     }
 }
 

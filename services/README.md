@@ -100,8 +100,20 @@ origin, path, query shape, asset identity, and expiry before returning it. The
 service never proxies file bytes and neither signed URLs nor member identifiers
 are persisted.
 
-The quarantined ingestion worker, S3 malware-scan event integration, trusted
-territory signal, and SPA Download action are the next slice. Keep signing
+Rights-reviewed files that remain at an official third-party source use the
+separate external-resource boundary. A machine caller with
+`digital-content.external-resource.manage` registers an immutable manifest at
+`PUT /api/v1/digital-content/external-resources/{resourceId}`. Registration is
+bound to the caller and exact manifest digest, accepts only canonical CC BY
+4.0, CC BY-SA 4.0, CC0 1.0, or Public Domain Mark 1.0 evidence, and rejects
+credentials, non-HTTPS URLs, explicit ports, fragments, IP literals, local
+names, traversal, and encoded path separators. Availability never exposes the
+download URL. Authenticated downloads require a fresh, audited authorization
+through the Kotlin BFF; neither service fetches or proxies third-party bytes.
+
+The quarantined ingestion worker and S3 malware-scan event integration are
+implemented. Safe promotion, a trusted territory signal, and SPA cutover to the
+Kotlin authorization routes are the next slices. Keep signing
 disabled until the private S3 origin, CloudFront trusted key group, and mounted
 PKCS#8 key are provisioned.
 

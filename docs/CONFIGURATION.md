@@ -290,7 +290,12 @@ The Digital Content service uses `DATABASE_URL`, `DATABASE_USERNAME`, and
 `DATABASE_PASSWORD` for its runtime-owned PostgreSQL database and the standard
 `AUTH_ISSUER_URI`, `AUTH_JWK_SET_URI`, and `AUTH_AUDIENCE` settings. Its audience
 defaults to `digital-content-api`; callers need the narrow
-`digital-content.availability.read` scope for the availability endpoint. Flyway
+`digital-content.availability.read` scope for availability and
+`digital-content.download.authorize` for caller-bound download authorization.
+Only the trusted importer client may receive
+`digital-content.external-resource.manage`; browser-delegated tokens must never
+receive that scope. External resource registration is immutable and does not
+require AWS credentials because files remain at their verified official source. Flyway
 is disabled in packaged runtime images and enabled by `bootRun` for local-only
 development, matching the other domain services.
 

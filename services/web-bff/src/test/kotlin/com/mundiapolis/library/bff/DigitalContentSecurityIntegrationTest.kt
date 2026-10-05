@@ -6,6 +6,7 @@ import com.mundiapolis.library.bff.digitalcontent.DigitalContentController
 import com.mundiapolis.library.bff.digitalcontent.DigitalContentSelfServiceUseCase
 import com.mundiapolis.library.bff.digitalcontent.DownloadAuthorizationView
 import com.mundiapolis.library.bff.digitalcontent.EditionDownloadAvailabilityView
+import com.mundiapolis.library.bff.digitalcontent.ExternalDownloadAuthorizationView
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.junit.jupiter.api.Test
@@ -56,6 +57,10 @@ class DigitalContentSecurityIntegrationTest {
             post("/api/v1/digital-content/assets/$ASSET_ID/authorizations").with(csrf()),
         )
             .andExpect(status().isUnauthorized)
+        mockMvc.perform(
+            post("/api/v1/digital-content/external-resources/$RESOURCE_ID/authorizations").with(csrf()),
+        )
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
@@ -79,6 +84,19 @@ class DigitalContentSecurityIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(header().string("Cache-Control", "no-store"))
             .andExpect(jsonPath("$.downloadable").value(false))
+    }
+
+    @Test
+    fun `external authorization requires csrf and is never cacheable`() {
+        val path = "/api/v1/digital-content/external-resources/$RESOURCE_ID/authorizations"
+        mockMvc.perform(post(path).with(oidcLogin()))
+            .andExpect(status().isForbidden)
+
+        mockMvc.perform(post(path).with(oidcLogin()).with(csrf()))
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.resourceId").value(RESOURCE_ID.toString()))
+            .andExpect(jsonPath("$.sourceProvider").value("NASA Technical Reports"))
     }
 
     @TestConfiguration(proxyBeanMethods = false)
@@ -106,11 +124,26 @@ class DigitalContentSecurityIntegrationTest {
             "https://downloads.example.test/signed",
             Instant.parse("2026-10-04T12:01:00Z"),
         )
+
+        override fun authorizeExternal(
+            authentication: OAuth2AuthenticationToken,
+            request: HttpServletRequest,
+            response: HttpServletResponse,
+            resourceId: UUID,
+        ) = ExternalDownloadAuthorizationView(
+            EXTERNAL_AUTHORIZATION_ID,
+            resourceId,
+            "NASA Technical Reports",
+            "PDM-1.0",
+            "https://archive.org/download/nasa/report.pdf",
+        )
     }
 
     private companion object {
         val EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000001")
         val ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000001")
         val AUTHORIZATION_ID: UUID = UUID.fromString("13000000-0000-0000-0000-000000000001")
+        val RESOURCE_ID: UUID = UUID.fromString("15000000-0000-0000-0000-000000000001")
+        val EXTERNAL_AUTHORIZATION_ID: UUID = UUID.fromString("16000000-0000-0000-0000-000000000001")
     }
 }

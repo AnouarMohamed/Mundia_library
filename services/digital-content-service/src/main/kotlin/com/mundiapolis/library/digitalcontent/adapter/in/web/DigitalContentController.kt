@@ -4,7 +4,12 @@ import com.mundiapolis.library.digitalcontent.dto.EditionDownloadAvailability
 import com.mundiapolis.library.digitalcontent.dto.DownloadAuthorization
 import com.mundiapolis.library.digitalcontent.dto.CreateIngestionRequest
 import com.mundiapolis.library.digitalcontent.dto.IngestionUploadGrant
+import com.mundiapolis.library.digitalcontent.dto.ExternalDownloadAuthorization
+import com.mundiapolis.library.digitalcontent.dto.ExternalResourceAvailability
+import com.mundiapolis.library.digitalcontent.dto.ExternalResourceRegistration
+import com.mundiapolis.library.digitalcontent.dto.RegisterExternalResourceRequest
 import com.mundiapolis.library.digitalcontent.service.DigitalContentService
+import com.mundiapolis.library.digitalcontent.service.ExternalResourceService
 import com.mundiapolis.library.digitalcontent.service.IngestionService
 import jakarta.validation.Valid
 import org.springframework.http.CacheControl
@@ -29,6 +34,7 @@ import java.util.HexFormat
 class DigitalContentController(
     private val service: DigitalContentService,
     private val ingestionService: IngestionService,
+    private val externalResourceService: ExternalResourceService,
 ) {
     @GetMapping("/editions/{editionId}/availability")
     @PreAuthorize("hasAuthority('SCOPE_digital-content.availability.read')")
@@ -59,6 +65,40 @@ class DigitalContentController(
             .cacheControl(CacheControl.noStore())
             .body(grant)
     }
+
+    @PutMapping("/external-resources/{resourceId}")
+    @PreAuthorize("hasAuthority('SCOPE_digital-content.external-resource.manage')")
+    fun registerExternalResource(
+        authentication: JwtAuthenticationToken,
+        @PathVariable resourceId: UUID,
+        @Valid @RequestBody request: RegisterExternalResourceRequest,
+    ): ResponseEntity<ExternalResourceRegistration> {
+        val registration = externalResourceService.register(
+            resourceId,
+            request,
+            authentication.actorFingerprint(),
+        )
+        return ResponseEntity.status(if (registration.replayed) 200 else 201)
+            .cacheControl(CacheControl.noStore())
+            .body(registration)
+    }
+
+    @GetMapping("/external-resources/{resourceId}/availability")
+    @PreAuthorize("hasAuthority('SCOPE_digital-content.availability.read')")
+    fun externalAvailability(
+        @PathVariable resourceId: UUID,
+    ): ResponseEntity<ExternalResourceAvailability> = ResponseEntity.ok()
+        .cacheControl(CacheControl.maxAge(30, TimeUnit.SECONDS).cachePrivate().mustRevalidate())
+        .body(externalResourceService.availability(resourceId))
+
+    @PostMapping("/external-resources/{resourceId}/authorizations")
+    @PreAuthorize("hasAuthority('SCOPE_digital-content.download.authorize')")
+    fun authorizeExternalResource(
+        authentication: JwtAuthenticationToken,
+        @PathVariable resourceId: UUID,
+    ): ResponseEntity<ExternalDownloadAuthorization> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(externalResourceService.authorize(resourceId, authentication.actorFingerprint()))
 
     private fun JwtAuthenticationToken.actorFingerprint(): String {
         val issuer = token.issuer?.toString().orEmpty()

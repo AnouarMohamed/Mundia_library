@@ -94,6 +94,44 @@ class DigitalContentClientTest {
         server.verify()
     }
 
+    @Test
+    fun `external authorization accepts a strict public source URL`() {
+        server.expect(
+            requestTo(
+                "https://digital-content.internal/api/v1/digital-content/external-resources/$RESOURCE_ID/authorizations",
+            ),
+        )
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andRespond(withSuccess(EXTERNAL_AUTHORIZATION, MediaType.APPLICATION_JSON))
+
+        val result = client.authorizeExternal(authorizedClient(), RESOURCE_ID)
+
+        assertThat(result.sourceProvider).isEqualTo("NASA Technical Reports")
+        server.verify()
+    }
+
+    @Test
+    fun `external authorization rejects private and mismatched destinations`() {
+        server.expect(
+            requestTo(
+                "https://digital-content.internal/api/v1/digital-content/external-resources/$RESOURCE_ID/authorizations",
+            ),
+        ).andRespond(
+            withSuccess(
+                EXTERNAL_AUTHORIZATION.replace(
+                    "https://archive.org/download/nasa/report.pdf",
+                    "https://127.0.0.1/private.pdf",
+                ),
+                MediaType.APPLICATION_JSON,
+            ),
+        )
+
+        assertThatThrownBy { client.authorizeExternal(authorizedClient(), RESOURCE_ID) }
+            .isInstanceOf(DigitalContentProtocolException::class.java)
+        server.verify()
+    }
+
     private fun authorizedClient(): OAuth2AuthorizedClient {
         val registration = ClientRegistration.withRegistrationId("digital-content-service")
             .clientId("web-bff-digital-content")
@@ -129,12 +167,16 @@ class DigitalContentClientTest {
         val NOW: Instant = Instant.parse("2026-10-04T12:00:00Z")
         val EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000001")
         val ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000001")
+        val RESOURCE_ID: UUID = UUID.fromString("15000000-0000-0000-0000-000000000001")
         const val DIGEST = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         val AVAILABILITY = """
             {"editionId":"$EDITION_ID","downloadable":true,"formats":[{"assetId":"$ASSET_ID","format":"PDF","mediaType":"application/pdf","sizeBytes":4096,"sha256":"$DIGEST","licenseExpression":"CC-BY-4.0","attribution":"Example Engineering Text"}]}
         """.trimIndent()
         val AUTHORIZATION = """
             {"authorizationId":"13000000-0000-0000-0000-000000000001","assetId":"$ASSET_ID","downloadUrl":"https://downloads.example.test/digital-content/ab/$ASSET_ID/$DIGEST.pdf?Policy=abc_&Signature=def_&Key-Pair-Id=K12345678&Hash-Algorithm=SHA256","expiresAt":"2026-10-04T12:01:00Z"}
+        """.trimIndent()
+        val EXTERNAL_AUTHORIZATION = """
+            {"authorizationId":"16000000-0000-0000-0000-000000000001","resourceId":"$RESOURCE_ID","sourceProvider":"NASA Technical Reports","licenseExpression":"PDM-1.0","downloadUrl":"https://archive.org/download/nasa/report.pdf"}
         """.trimIndent()
     }
 }

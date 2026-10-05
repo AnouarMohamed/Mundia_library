@@ -24,6 +24,13 @@ interface DigitalContentSelfServiceUseCase {
         response: HttpServletResponse,
         assetId: UUID,
     ): DownloadAuthorizationView
+
+    fun authorizeExternal(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        resourceId: UUID,
+    ): ExternalDownloadAuthorizationView
 }
 
 @Service
@@ -48,6 +55,15 @@ class DigitalContentService(
         assetId: UUID,
     ): DownloadAuthorizationView = withClient(authentication, request, response) { authorizedClient ->
         client.authorize(authorizedClient, assetId)
+    }
+
+    override fun authorizeExternal(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        resourceId: UUID,
+    ): ExternalDownloadAuthorizationView = withClient(authentication, request, response) { authorizedClient ->
+        client.authorizeExternal(authorizedClient, resourceId)
     }
 
     private fun <T> withClient(

@@ -515,12 +515,18 @@ licence metadata is user-controlled. It searches only the tightly identified
 NASA Technical Reports collection, re-fetches every item's metadata, requires
 the exact item-level public-domain declaration and an original PDF, limits
 concurrency to four with pauses between groups, and imports at most 50 records
-per revision-pinned run. OpenStax was
+per revision-pinned run. Kotlin Digital Content now owns the first external-file
+rights slice: machine-scoped registration is immutable, actor-bound, and
+manifest-idempotent; only canonical allowlisted licences and strict public HTTPS
+URLs are accepted. Availability hides the download target, authorization
+rechecks current global rights and commits a privacy-minimized audit, and the
+Kotlin BFF validates the returned public URL behind session and CSRF controls.
+No service proxies the third-party bytes. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
-excluded unless a durable qualifying per-edition licence can be proven. Migration
-of this temporary read slice to the Kotlin catalog/digital-content services also
-remains pending before monolith retirement.
+excluded unless a durable qualifying per-edition licence can be proven. Catalog
+metadata ownership, importer command wiring, backfill/reconciliation, and SPA
+cutover remain pending before the temporary Next.js read slice can retire.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.
