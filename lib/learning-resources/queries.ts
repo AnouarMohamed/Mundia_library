@@ -9,15 +9,13 @@ export async function listVerifiedLearningResources(input: {
   category: string;
   page: number;
 }) {
-  const conditions = [
-    eq(learningResources.verificationStatus, "VERIFIED"),
-  ];
+  const conditions = [eq(learningResources.verificationStatus, "VERIFIED")];
   if (input.category) {
     conditions.push(eq(learningResources.category, input.category));
   }
   if (input.search) {
     conditions.push(
-      sql<boolean>`to_tsvector('simple', coalesce(${learningResources.title}, '') || ' ' || coalesce(${learningResources.author}, '') || ' ' || coalesce(${learningResources.category}, '')) @@ websearch_to_tsquery('simple', ${input.search})`,
+      sql<boolean>`to_tsvector('simple', coalesce(${learningResources.title}, '') || ' ' || coalesce(${learningResources.author}, '') || ' ' || coalesce(${learningResources.category}, '') || ' ' || coalesce(${learningResources.description}, '')) @@ websearch_to_tsquery('simple', ${input.search})`,
     );
   }
   const where = and(...conditions);
@@ -28,6 +26,9 @@ export async function listVerifiedLearningResources(input: {
         id: learningResources.id,
         title: learningResources.title,
         author: learningResources.author,
+        description: learningResources.description,
+        coverUrl: learningResources.coverUrl,
+        coverAlt: learningResources.coverAlt,
         category: learningResources.category,
         language: learningResources.language,
         licenseExpression: learningResources.licenseExpression,

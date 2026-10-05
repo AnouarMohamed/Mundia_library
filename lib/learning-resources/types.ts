@@ -9,15 +9,16 @@ export type VerifiedLicenseExpression =
   (typeof verifiedLicenseExpressions)[number];
 
 export type LearningResourceVerificationStatus =
-  | "QUARANTINED"
-  | "VERIFIED"
-  | "REJECTED";
+  "QUARANTINED" | "VERIFIED" | "REJECTED";
 
 export interface LearningResourceCandidate {
   sourceName: string;
   sourceRecordKey: string;
   title: string;
   author: string | null;
+  description?: string | null;
+  coverUrl?: string | null;
+  coverAlt?: string | null;
   category: string;
   language: string;
   licenseExpression: VerifiedLicenseExpression | null;

@@ -45,23 +45,35 @@ export async function fetchGutenbergPage(input: {
     throw new Error("GUTENBERG_INVALID_PAGE");
   }
   const fetcher = input.fetcher ?? fetch;
-  const endpoint = new URL(`/ebooks/bookshelf/${config.bookshelfId}.opds`, ORIGIN);
+  const endpoint = new URL(
+    `/ebooks/bookshelf/${config.bookshelfId}.opds`,
+    ORIGIN,
+  );
   endpoint.searchParams.set("sort_order", "downloads");
-  endpoint.searchParams.set("start_index", String((input.page - 1) * PAGE_SIZE + 1));
+  endpoint.searchParams.set(
+    "start_index",
+    String((input.page - 1) * PAGE_SIZE + 1),
+  );
   const listXml = await fetchXml(endpoint, fetcher);
   const list = parseListPage(listXml);
   const details = await mapConcurrent(list.ebookIds, 4, async (ebookId) => {
     const detailUrl = new URL(`/ebooks/${ebookId}.opds`, ORIGIN);
     return parseDetailPage(await fetchXml(detailUrl, fetcher), ebookId);
   });
+  const enriched = await mapConcurrent(details, 4, async (detail) => ({
+    detail,
+    coverUrl: await verifyOfficialCover(detail.ebookId, fetcher),
+  }));
   const revision = sha256(
     JSON.stringify({
       collection: input.collection,
       page: input.page,
-      details,
+      enriched,
     }),
   );
-  const candidates = details.map((detail) => toCandidate(detail, revision));
+  const candidates = enriched.map(({ detail, coverUrl }) =>
+    toCandidate(detail, revision, coverUrl),
+  );
   return {
     revision,
     candidates,
@@ -78,7 +90,9 @@ export function parseListPage(content: string) {
     ...new Set(
       entries
         .map((entry) => normalizeText(String(entry.id ?? "")))
-        .map((id) => /^https:\/\/www\.gutenberg\.org\/ebooks\/(\d+)\.opds$/u.exec(id))
+        .map((id) =>
+          /^https:\/\/www\.gutenberg\.org\/ebooks\/(\d+)\.opds$/u.exec(id),
+        )
         .map((match) => (match ? Number(match[1]) : null))
         .filter(
           (id): id is number =>
@@ -101,7 +115,9 @@ export function parseDetailPage(content: string, expectedEbookId: number) {
 
   const matching = entries.filter((entry) => {
     const value = normalizeText(String(entry.id ?? ""));
-    return new RegExp(`^urn:gutenberg:${expectedEbookId}:\\d+$`, "u").test(value);
+    return new RegExp(`^urn:gutenberg:${expectedEbookId}:\\d+$`, "u").test(
+      value,
+    );
   });
   if (matching.length < 1) throw new Error("GUTENBERG_DETAIL_ID_MISMATCH");
   const first = matching[0]!;
@@ -142,16 +158,26 @@ export function parseDetailPage(content: string, expectedEbookId: number) {
       .map((entry) => cleanText(entry["dcterms:language"], 16))
       .find(Boolean) ?? null,
   );
-  return { ebookId: expectedEbookId, title, authors, language, rights, subjects };
+  return {
+    ebookId: expectedEbookId,
+    title,
+    authors,
+    language,
+    rights,
+    subjects,
+  };
 }
 
 function toCandidate(
   detail: GutenbergDetail,
   revision: string,
+  coverUrl: string | null,
 ): LearningResourceCandidate {
   const publicDomain =
     detail.rights.length > 0 &&
-    detail.rights.every((right) => /^Public domain in the USA\.?$/iu.test(right));
+    detail.rights.every((right) =>
+      /^Public domain in the USA\.?$/iu.test(right),
+    );
   const sourceUrl = `${ORIGIN}/ebooks/${detail.ebookId}`;
   const evidenceUrl = `${ORIGIN}/ebooks/${detail.ebookId}.opds`;
   const base = {
@@ -159,6 +185,12 @@ function toCandidate(
     sourceRecordKey: `gutenberg:${detail.ebookId}`,
     title: detail.title,
     author: detail.authors.join(", ").slice(0, 500) || null,
+    description: detail.subjects.length
+      ? `Subjects: ${detail.subjects.join("; ").slice(0, 3_990)}`
+      : null,
+    coverUrl: publicDomain ? coverUrl : null,
+    coverAlt:
+      publicDomain && coverUrl ? `Official cover of ${detail.title}` : null,
     category: classifyCategory(detail),
     language: detail.language,
     licenseExpression: publicDomain ? ("PUBLIC-DOMAIN" as const) : null,
@@ -178,15 +210,51 @@ function toCandidate(
   return { ...base, contentHash: sha256(JSON.stringify(base)) };
 }
 
+async function verifyOfficialCover(ebookId: number, fetcher: typeof fetch) {
+  const coverUrl = `${ORIGIN}/cache/epub/${ebookId}/pg${ebookId}.cover.medium.jpg`;
+  try {
+    const response = await fetcher(coverUrl, {
+      method: "HEAD",
+      headers: { Accept: "image/jpeg" },
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
+    const size = Number(response.headers.get("content-length") ?? 0);
+    return response.ok &&
+      (response.headers.get("content-type") ?? "")
+        .toLowerCase()
+        .startsWith("image/jpeg") &&
+      Number.isSafeInteger(size) &&
+      size > 0 &&
+      size <= 1_000_000
+      ? coverUrl
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function classifyCategory(detail: GutenbergDetail) {
   const value = `${detail.title} ${detail.subjects.join(" ")}`;
-  if (/(physics|relativit|thermodynamic|quantum|optic|electromagnet|electricity)/iu.test(value)) {
+  if (
+    /(physics|relativit|thermodynamic|quantum|optic|electromagnet|electricity)/iu.test(
+      value,
+    )
+  ) {
     return "Physics";
   }
-  if (/(mathemat|algebra|geometry|calculus|number theory|probability|statistic|logic)/iu.test(value)) {
+  if (
+    /(mathemat|algebra|geometry|calculus|number theory|probability|statistic|logic)/iu.test(
+      value,
+    )
+  ) {
     return "Mathematics";
   }
-  if (/(engineering|mechanic|construction|manufactur|machine|technology|invention)/iu.test(value)) {
+  if (
+    /(engineering|mechanic|construction|manufactur|machine|technology|invention)/iu.test(
+      value,
+    )
+  ) {
     return "Engineering";
   }
   return "Engineering & Science";
@@ -241,7 +309,8 @@ function normalizeOfficialPath(value: unknown) {
   if (typeof value !== "string") return null;
   try {
     const url = new URL(value, ORIGIN);
-    if (url.origin !== ORIGIN || url.username || url.password || url.port) return null;
+    if (url.origin !== ORIGIN || url.username || url.password || url.port)
+      return null;
     return `${url.pathname}${url.search}`;
   } catch {
     return null;
@@ -250,7 +319,14 @@ function normalizeOfficialPath(value: unknown) {
 
 function normalizeLanguage(value: string | null) {
   const language = normalizeText(value ?? "").toLowerCase();
-  const aliases: Record<string, string> = { eng: "en", fra: "fr", fre: "fr", deu: "de", ger: "de", spa: "es" };
+  const aliases: Record<string, string> = {
+    eng: "en",
+    fra: "fr",
+    fre: "fr",
+    deu: "de",
+    ger: "de",
+    spa: "es",
+  };
   return aliases[language] ?? (language.slice(0, 16) || "und");
 }
 

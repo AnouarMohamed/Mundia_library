@@ -37,9 +37,7 @@ export async function importLearningResourceBatch(input: {
 
   return db.transaction(async (tx) => {
     await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${
-        `learning-resource-import:${input.sourceName}`
-      }))`,
+      sql`select pg_advisory_xact_lock(hashtext(${`learning-resource-import:${input.sourceName}`}))`,
     );
 
     const completed = await tx
@@ -101,6 +99,9 @@ export async function importLearningResourceBatch(input: {
       const values = {
         title: candidate.title,
         author: candidate.author,
+        description: candidate.description ?? null,
+        coverUrl: candidate.coverUrl ?? null,
+        coverAlt: candidate.coverAlt ?? null,
         category: candidate.category,
         language: candidate.language,
         licenseExpression: candidate.licenseExpression,
@@ -113,8 +114,7 @@ export async function importLearningResourceBatch(input: {
         verificationEvidenceUrl: candidate.verificationEvidenceUrl,
         contentHash: candidate.contentHash,
         sourceRevision: candidate.sourceRevision,
-        verifiedAt:
-          candidate.verificationStatus === "VERIFIED" ? now : null,
+        verifiedAt: candidate.verificationStatus === "VERIFIED" ? now : null,
         verifiedBy: null,
         updatedAt: now,
       };

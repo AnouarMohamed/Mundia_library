@@ -50,6 +50,8 @@
     "import:learning-resources:gutenberg": "tsx scripts/import-gutenberg.ts",
     "import:learning-resources:nist": "tsx scripts/import-nist.ts",
     "import:learning-resources:faa": "tsx scripts/import-faa.ts",
+    "import:learning-resources:owasp": "tsx scripts/import-owasp.ts",
+    "import:learning-resources:kubernetes": "tsx scripts/import-kubernetes.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },

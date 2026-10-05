@@ -92,6 +92,13 @@
       "when": 1791145000000,
       "tag": "0016_add_learning_resources",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791216000000,
+      "tag": "0017_enrich_learning_resources",
+      "breakpoints": true
     }
   ]
 }

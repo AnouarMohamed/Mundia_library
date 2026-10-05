@@ -481,6 +481,17 @@ manifest adds official aerodynamics,
 aircraft-maintenance, avionics, UAS, aircraft-systems, and flight-engineering
 handbooks. Each FAA PDF is range/type/size checked and linked directly from its
 public-domain official source without passing the large file through Vercel.
+The public catalog now carries bounded descriptions plus optional cover metadata.
+Only exact, verified Project Gutenberg cover URLs are rendered; all other records
+use a restrained typographic bookplate, so the interface never invents or copies
+unlicensed artwork. The cover allowlist rejects alternate hosts, credentials,
+ports, query strings, fragments, and mismatched book identifiers. An OWASP
+adapter verifies the live official index and the project-level CC BY-SA 4.0
+statement before exposing its complete Cheat Sheet Series as read-at-source
+material. A smaller curated Kubernetes learning path verifies each live official
+documentation page and the website repository's CC BY 4.0 licence before import.
+Both adapters fail closed, store metadata only, and are revision-pinned and
+idempotent.
 Open Library, Internet Archive, and arXiv adapters remain pending. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains

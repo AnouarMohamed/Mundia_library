@@ -10,6 +10,7 @@ const payload = (license = "Attribution") =>
       {
         id: 42,
         title: "Operating Systems for Engineers",
+        description: "A practical introduction to reliable operating systems.",
         license,
         language: "eng",
         contributors: [
@@ -35,6 +36,7 @@ describe("Open Textbook Library importer", () => {
       sourceRecordKey: "otl:42",
       title: "Operating Systems for Engineers",
       author: "Ada Author",
+      description: "A practical introduction to reliable operating systems.",
       category: "Computer Science",
       language: "en",
       licenseExpression: "CC-BY",

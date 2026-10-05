@@ -594,6 +594,9 @@ export const learningResources = pgTable(
     sourceRecordKey: varchar("source_record_key", { length: 512 }).notNull(),
     title: varchar("title", { length: 500 }).notNull(),
     author: varchar("author", { length: 500 }),
+    description: text("description"),
+    coverUrl: text("cover_url"),
+    coverAlt: varchar("cover_alt", { length: 300 }),
     category: varchar("category", { length: 128 }).notNull(),
     language: varchar("language", { length: 16 }).notNull(),
     licenseExpression: varchar("license_expression", { length: 64 }),
@@ -604,8 +607,9 @@ export const learningResources = pgTable(
     verificationStatus: varchar("verification_status", { length: 16 })
       .notNull()
       .default("QUARANTINED"),
-    verificationReason: varchar("verification_reason", { length: 500 })
-      .notNull(),
+    verificationReason: varchar("verification_reason", {
+      length: 500,
+    }).notNull(),
     verificationEvidenceUrl: text("verification_evidence_url"),
     contentHash: varchar("content_hash", { length: 64 }).notNull(),
     sourceRevision: varchar("source_revision", { length: 128 }).notNull(),
@@ -647,7 +651,7 @@ export const learningResources = pgTable(
     ),
     index("learning_resources_search_idx").using(
       "gin",
-      sql`to_tsvector('simple', coalesce(${resource.title}, '') || ' ' || coalesce(${resource.author}, '') || ' ' || coalesce(${resource.category}, ''))`,
+      sql`to_tsvector('simple', coalesce(${resource.title}, '') || ' ' || coalesce(${resource.author}, '') || ' ' || coalesce(${resource.category}, '') || ' ' || coalesce(${resource.description}, ''))`,
     ),
     check(
       "learning_resources_source_name_valid",
@@ -672,6 +676,14 @@ export const learningResources = pgTable(
     check(
       "learning_resources_optional_urls_https",
       sql`(${resource.licenseUrl} is null or ${resource.licenseUrl} ~ '^https://') and (${resource.downloadUrl} is null or ${resource.downloadUrl} ~ '^https://') and (${resource.readUrl} is null or ${resource.readUrl} ~ '^https://') and (${resource.verificationEvidenceUrl} is null or ${resource.verificationEvidenceUrl} ~ '^https://')`,
+    ),
+    check(
+      "learning_resources_cover_metadata_valid",
+      sql`(${resource.coverUrl} is null and ${resource.coverAlt} is null) or (${resource.coverUrl} ~ '^https://' and char_length(btrim(${resource.coverAlt})) between 3 and 300)`,
+    ),
+    check(
+      "learning_resources_description_valid",
+      sql`${resource.description} is null or char_length(btrim(${resource.description})) between 1 and 4000`,
     ),
     check(
       "learning_resources_verified_license_valid",

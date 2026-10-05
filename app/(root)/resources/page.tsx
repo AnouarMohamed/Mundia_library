@@ -3,6 +3,7 @@ import {
   LEARNING_RESOURCE_PAGE_SIZE,
   listVerifiedLearningResources,
 } from "@/lib/learning-resources/queries";
+import { LearningResourceCover } from "@/components/LearningResourceCover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,11 @@ const Page = async ({
   const search = (params.search ?? "").trim().slice(0, 100);
   const category = (params.category ?? "").trim().slice(0, 128);
   const page = Math.max(1, Math.min(1_000, Number(params.page) || 1));
-  const result = await listVerifiedLearningResources({ search, category, page });
+  const result = await listVerifiedLearningResources({
+    search,
+    category,
+    page,
+  });
   const totalPages = Math.max(
     1,
     Math.ceil(result.total / LEARNING_RESOURCE_PAGE_SIZE),
@@ -92,7 +97,8 @@ const Page = async ({
 
       <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-[var(--mundia-line)] pb-3">
         <p className="text-sm text-[var(--mundia-muted)]" aria-live="polite">
-          {result.total} verified {result.total === 1 ? "resource" : "resources"}
+          {result.total} verified{" "}
+          {result.total === 1 ? "resource" : "resources"}
         </p>
         {(search || category) && (
           <Link
@@ -115,13 +121,20 @@ const Page = async ({
           </p>
         </section>
       ) : (
-        <ul className="divide-y divide-[var(--mundia-line)] border-y border-[var(--mundia-line)]">
+        <ul className="divide-y divide-[var(--mundia-line)] border-y border-[var(--mundia-line)] bg-[var(--mundia-surface)]">
           {result.items.map((resource) => (
             <li key={resource.id}>
               <Link
                 href={`/resources/${resource.id}`}
-                className="group grid min-h-28 gap-3 px-1 py-5 transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-4"
+                className="group grid grid-cols-[5.25rem_minmax(0,1fr)] gap-4 px-2 py-4 transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)] sm:grid-cols-[5.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
               >
+                <LearningResourceCover
+                  title={resource.title}
+                  category={resource.category}
+                  sourceName={resource.sourceName}
+                  coverUrl={resource.coverUrl}
+                  coverAlt={resource.coverAlt}
+                />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-[var(--mundia-gold-strong)]">
                     {resource.category}
@@ -132,13 +145,23 @@ const Page = async ({
                   <p className="mt-1 text-sm text-[var(--mundia-muted)]">
                     {resource.author || "Author not listed"}
                   </p>
+                  {resource.description && (
+                    <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-5 text-[var(--mundia-muted)]">
+                      {resource.description}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="col-start-2 flex flex-wrap items-center gap-2 self-end text-xs sm:col-start-auto sm:self-center">
                   <span className="border border-[var(--mundia-line)] px-2.5 py-1.5 text-[var(--mundia-ink)]">
                     {resource.licenseExpression}
                   </span>
                   <span className="text-[var(--mundia-muted)]">
-                    {resource.downloadUrl ? "Direct download" : "Official source"}
+                    {resource.downloadUrl
+                      ? "Direct download"
+                      : "Official source"}
+                  </span>
+                  <span className="hidden text-[var(--mundia-muted)] lg:inline">
+                    {resource.sourceName}
                   </span>
                 </div>
               </Link>
@@ -153,7 +176,10 @@ const Page = async ({
           aria-label="Learning resource pages"
         >
           {page > 1 ? (
-            <Link className="catalog-page-link px-4" href={hrefForPage(page - 1)}>
+            <Link
+              className="catalog-page-link px-4"
+              href={hrefForPage(page - 1)}
+            >
               Previous
             </Link>
           ) : (
@@ -163,7 +189,10 @@ const Page = async ({
             Page {Math.min(page, totalPages)} of {totalPages}
           </span>
           {page < totalPages ? (
-            <Link className="catalog-page-link px-4" href={hrefForPage(page + 1)}>
+            <Link
+              className="catalog-page-link px-4"
+              href={hrefForPage(page + 1)}
+            >
               Next
             </Link>
           ) : (

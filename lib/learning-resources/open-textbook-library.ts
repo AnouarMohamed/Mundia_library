@@ -8,7 +8,7 @@ import type {
 const SOURCE_NAME = "Open Textbook Library";
 const API_ORIGIN = "https://open.umn.edu";
 const MAX_RESPONSE_BYTES = 5_000_000;
-const ADAPTER_VERSION = "otl-v2";
+const ADAPTER_VERSION = "otl-v3";
 
 export const OTL_SUBJECTS = {
   3: "Computer Science",
@@ -35,6 +35,7 @@ const LICENSES: Record<string, VerifiedLicenseExpression> = {
 interface OtlRecord {
   id?: unknown;
   title?: unknown;
+  description?: unknown;
   license?: unknown;
   language?: unknown;
   contributors?: unknown;
@@ -134,9 +135,13 @@ export function parseOpenTextbookPage(
         id: record.id,
         updatedAt: record.updated_at,
         title: record.title,
+        description: record.description,
         license: record.license,
+        language: record.language,
+        contributors: record.contributors,
         formats: record.formats,
         subjects: record.subjects,
+        url: record.url,
       })),
     }),
   );
@@ -156,6 +161,7 @@ function parseRecord(
   if (!Number.isSafeInteger(record.id) || Number(record.id) < 1) return null;
   const id = Number(record.id);
   const title = cleanText(record.title, 500);
+  const description = cleanText(record.description, 4_000);
   const sourceUrl = normalizeHttpsUrl(record.url);
   if (!title || !sourceUrl) return null;
 
@@ -198,6 +204,9 @@ function parseRecord(
     sourceRecordKey: `otl:${id}`,
     title,
     author: authors.join(", ").slice(0, 500) || null,
+    description,
+    coverUrl: null,
+    coverAlt: null,
     category: resolveCategory(record, subjectId, title),
     language: normalizeLanguage(record.language),
     licenseExpression: verified ? expression! : null,

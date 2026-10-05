@@ -56,6 +56,12 @@ const nextConfig = {
         hostname: "ik.imagekit.io",
         port: "",
       },
+      {
+        protocol: "https",
+        hostname: "www.gutenberg.org",
+        port: "",
+        pathname: "/cache/epub/*/pg*.cover.medium.jpg",
+      },
     ],
   },
   /*

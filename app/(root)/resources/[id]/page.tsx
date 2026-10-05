@@ -2,12 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getVerifiedLearningResource } from "@/lib/learning-resources/queries";
+import { LearningResourceCover } from "@/components/LearningResourceCover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
-  const parsed = z.string().uuid().safeParse((await params).id);
+  const parsed = z
+    .string()
+    .uuid()
+    .safeParse((await params).id);
   if (!parsed.success) notFound();
   const resource = await getVerifiedLearningResource(parsed.data);
   if (!resource) notFound();
@@ -20,20 +24,40 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
       >
         Back to open learning
       </Link>
-      <header className="mt-4 border-b border-[var(--mundia-line)] pb-7">
-        <p className="text-sm font-medium text-[var(--mundia-gold-strong)]">
-          {resource.category}
-        </p>
-        <h1 className="mt-2 max-w-3xl font-serif text-3xl font-normal leading-tight text-[var(--mundia-ink)] sm:text-4xl">
-          {resource.title}
-        </h1>
-        <p className="mt-3 text-base text-[var(--mundia-muted)]">
-          {resource.author || "Author not listed"}
-        </p>
+      <header className="mt-4 grid gap-6 border-b border-[var(--mundia-line)] pb-7 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-end">
+        <LearningResourceCover
+          title={resource.title}
+          category={resource.category}
+          sourceName={resource.sourceName}
+          coverUrl={resource.coverUrl}
+          coverAlt={resource.coverAlt}
+          size="detail"
+        />
+        <div>
+          <p className="text-sm font-medium text-[var(--mundia-gold-strong)]">
+            {resource.category}
+          </p>
+          <h1 className="mt-2 max-w-3xl font-serif text-3xl font-normal leading-tight text-[var(--mundia-ink)] sm:text-4xl">
+            {resource.title}
+          </h1>
+          <p className="mt-3 text-base text-[var(--mundia-muted)]">
+            {resource.author || "Author not listed"}
+          </p>
+        </div>
       </header>
 
       <div className="grid gap-8 py-7 md:grid-cols-[minmax(0,1fr)_17rem]">
         <section>
+          {resource.description && (
+            <div className="mb-8">
+              <h2 className="font-serif text-2xl text-[var(--mundia-ink)]">
+                About this resource
+              </h2>
+              <p className="mt-3 max-w-[70ch] whitespace-pre-line text-sm leading-6 text-[var(--mundia-muted)]">
+                {resource.description}
+              </p>
+            </div>
+          )}
           <h2 className="font-serif text-2xl text-[var(--mundia-ink)]">
             Access
           </h2>
@@ -70,7 +94,9 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
             <dt className="text-[var(--mundia-muted)]">Licence</dt>
             <dd className="mt-1 font-semibold text-[var(--mundia-ink)]">
               <a
-                href={resource.licenseUrl || resource.verificationEvidenceUrl || "#"}
+                href={
+                  resource.licenseUrl || resource.verificationEvidenceUrl || "#"
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline"
