@@ -39,10 +39,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql:42.7.12")
+    runtimeOnly("org.postgresql:postgresql:42.7.13")
 
     jooqCodegen("org.jooq:jooq-meta-extensions:${libs.versions.jooq.get()}")
-    jooqCodegen("com.h2database:h2:2.4.240")
+    jooqCodegen("com.h2database:h2:2.5.252")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
