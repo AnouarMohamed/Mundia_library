@@ -38,9 +38,9 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
             Access
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--mundia-muted)]">
-            This file is downloaded from a verified third-party university or
-            open publisher. Mundia checks the licence and official source, but
-            does not host the file.
+            {resource.downloadUrl
+              ? "This file is downloaded from a verified third-party university or open publisher. Mundia checks the licence and official source, but does not host the file."
+              : "This resource opens on the verified publisher or library page. Mundia checks the rights evidence and source, but does not host a copy."}
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             {resource.downloadUrl && (
@@ -109,6 +109,9 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
               >
                 View verification source
               </a>
+              <p className="mt-2 leading-5 text-[var(--mundia-muted)]">
+                {resource.verificationReason}
+              </p>
             </dd>
           </div>
         </dl>

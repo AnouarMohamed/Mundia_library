@@ -457,7 +457,11 @@ Linux, software-engineering, security, system-administration, and version-contro
 shelves only when the API returns the expected CC BY-SA 4.0 rights declaration
 and the book root has no fair-use or copyright-review flag. Its official
 Wikimedia PDF endpoint sends files as attachments, so downloads remain direct
-without consuming Vercel transfer. Open Library, Internet Archive, Gutenberg,
+without consuming Vercel transfer. A Project Gutenberg adapter consumes bounded
+official OPDS bookshelf pages and verifies every title against its per-book OPDS
+rights statement. Public-domain records link to the canonical ebook landing page
+instead of hotlinking files, as required by Gutenberg's linking policy, while
+copyrighted permission titles stay quarantined. Open Library, Internet Archive,
 OpenStax, and arXiv adapters remain pending, as does migration of this temporary
 read slice to the Kotlin catalog/digital-content services before monolith
 retirement.
