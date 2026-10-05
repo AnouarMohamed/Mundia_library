@@ -20,7 +20,7 @@ The target platform is:
 
 | Concern         | Decision                                                                   |
 | --------------- | -------------------------------------------------------------------------- |
-| Web/BFF         | Static React/Vite SPA plus Kotlin/Spring BFF; Next.js is migration-only     |
+| Web/BFF         | Static React/Vite SPA plus Kotlin/Spring BFF; Next.js is migration-only    |
 | Services        | Kotlin 2.3, Spring Boot 4.1, JDK 25, Spring MVC with virtual threads       |
 | Persistence     | PostgreSQL 18, one owned database/schema and credentials per service       |
 | SQL/migrations  | jOOQ-generated types and Flyway forward migrations                         |
@@ -444,9 +444,12 @@ metadata only, imports at most 250 records per idempotent batch from an exact
 EbookFoundation Git revision, and publishes only records with evidence for
 CC BY, CC BY-SA, CC0, or public-domain rights. Everything else is quarantined
 for an append-only, audited admin decision. Public queries are backed by
-PostgreSQL full-text/category indexes, and downloads are authenticated 303
-redirects to the verified official HTTPS source; the application does not proxy
-or host files. A second adapter consumes bounded DOAB OAI-PMH pages, validates
+PostgreSQL full-text/category indexes, and downloads are authenticated redirects
+to the verified official HTTPS source; the application does not host files. A
+strict exception streams allowlisted, public-domain NIST PDFs smaller than 4 MB
+as attachments, with an upstream timeout, exact-host check, declared and actual
+body-size limits, content-type enforcement, and no-store/nosniff headers. A
+second adapter consumes bounded DOAB OAI-PMH pages, validates
 XML with entity processing disabled, filters for engineering disciplines, and
 uses the per-file licence URI as evidence. The Open Textbook Library adapter
 adds CC BY, CC BY-SA, and CC0 university textbooks from fixed computer science,
@@ -461,10 +464,20 @@ without consuming Vercel transfer. A Project Gutenberg adapter consumes bounded
 official OPDS bookshelf pages and verifies every title against its per-book OPDS
 rights statement. Public-domain records link to the canonical ebook landing page
 instead of hotlinking files, as required by Gutenberg's linking policy, while
-copyrighted permission titles stay quarantined. Open Library, Internet Archive,
-OpenStax, and arXiv adapters remain pending, as does migration of this temporary
-read slice to the Kotlin catalog/digital-content services before monolith
-retirement.
+copyrighted permission titles stay quarantined. A reviewed NIST SP 800 manifest
+adds cloud-native/API security, DevSecOps, zero trust, container security,
+identity, incident response, VPN, firewall, monitoring, and supply-chain
+guidance. Every entry resolves its PDF from the official CSRC page and passes
+official-host, PDF range, and free-tier proxy-size checks; failures remain
+quarantined. NIST's technical-series policy supplies a worldwide royalty-free
+reprint grant in addition to the U.S. public-domain status. A reviewed FAA
+manifest adds official aerodynamics,
+aircraft-maintenance, avionics, UAS, aircraft-systems, and flight-engineering
+handbooks. Each FAA PDF is range/type/size checked and linked directly from its
+public-domain official source without passing the large file through Vercel.
+Open Library, Internet Archive, OpenStax, and arXiv adapters remain pending, as
+does migration of this temporary read slice to the Kotlin catalog/digital-content
+services before monolith retirement.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.
