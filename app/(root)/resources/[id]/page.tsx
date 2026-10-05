@@ -73,7 +73,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 download
                 className="inline-flex min-h-12 items-center justify-center bg-[var(--mundia-navy)] px-6 text-sm font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
               >
-                Download official file
+                Download from {resource.sourceName}
               </a>
             )}
             {resource.readUrl && (

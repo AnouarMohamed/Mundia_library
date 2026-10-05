@@ -123,10 +123,14 @@ const Page = async ({
       ) : (
         <ul className="divide-y divide-[var(--mundia-line)] border-y border-[var(--mundia-line)] bg-[var(--mundia-surface)]">
           {result.items.map((resource) => (
-            <li key={resource.id}>
+            <li
+              key={resource.id}
+              className="group grid grid-cols-[5.25rem_minmax(0,1fr)] gap-4 px-2 py-4 transition-colors hover:bg-[var(--mundia-panel)] sm:grid-cols-[5.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
+            >
               <Link
                 href={`/resources/${resource.id}`}
-                className="group grid grid-cols-[5.25rem_minmax(0,1fr)] gap-4 px-2 py-4 transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)] sm:grid-cols-[5.25rem_minmax(0,1fr)_auto] sm:items-center sm:px-4"
+                aria-label={`View ${resource.title}`}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
               >
                 <LearningResourceCover
                   title={resource.title}
@@ -135,36 +139,53 @@ const Page = async ({
                   coverUrl={resource.coverUrl}
                   coverAlt={resource.coverAlt}
                 />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-[var(--mundia-gold-strong)]">
-                    {resource.category}
-                  </p>
-                  <h2 className="mt-1 font-serif text-xl text-[var(--mundia-ink)] group-hover:text-[var(--mundia-navy)]">
-                    {resource.title}
-                  </h2>
-                  <p className="mt-1 text-sm text-[var(--mundia-muted)]">
-                    {resource.author || "Author not listed"}
-                  </p>
-                  {resource.description && (
-                    <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-5 text-[var(--mundia-muted)]">
-                      {resource.description}
-                    </p>
-                  )}
-                </div>
-                <div className="col-start-2 flex flex-wrap items-center gap-2 self-end text-xs sm:col-start-auto sm:self-center">
-                  <span className="border border-[var(--mundia-line)] px-2.5 py-1.5 text-[var(--mundia-ink)]">
-                    {resource.licenseExpression}
-                  </span>
-                  <span className="text-[var(--mundia-muted)]">
-                    {resource.downloadUrl
-                      ? "Direct download"
-                      : "Official source"}
-                  </span>
-                  <span className="hidden text-[var(--mundia-muted)] lg:inline">
-                    {resource.sourceName}
-                  </span>
-                </div>
               </Link>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-[var(--mundia-gold-strong)]">
+                  {resource.category}
+                </p>
+                <h2 className="mt-1 font-serif text-xl text-[var(--mundia-ink)] group-hover:text-[var(--mundia-navy)]">
+                  <Link
+                    href={`/resources/${resource.id}`}
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
+                  >
+                    {resource.title}
+                  </Link>
+                </h2>
+                <p className="mt-1 text-sm text-[var(--mundia-muted)]">
+                  {resource.author || "Author not listed"}
+                </p>
+                {resource.description && (
+                  <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-5 text-[var(--mundia-muted)]">
+                    {resource.description}
+                  </p>
+                )}
+              </div>
+              <div className="col-start-2 flex flex-wrap items-center gap-2 self-end text-xs sm:col-start-auto sm:max-w-44 sm:justify-end sm:self-center">
+                <span className="border border-[var(--mundia-line)] px-2.5 py-1.5 text-[var(--mundia-ink)]">
+                  {resource.licenseExpression}
+                </span>
+                {resource.downloadUrl ? (
+                  <a
+                    href={`/api/learning-resources/${resource.id}/download`}
+                    download
+                    className="inline-flex min-h-11 items-center justify-center bg-[var(--mundia-navy)] px-4 font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
+                    aria-label={`Download ${resource.title} from ${resource.sourceName}`}
+                  >
+                    Download
+                  </a>
+                ) : (
+                  <Link
+                    href={`/resources/${resource.id}`}
+                    className="inline-flex min-h-11 items-center justify-center border border-[var(--mundia-navy)] px-4 font-semibold text-[var(--mundia-navy)] transition-colors hover:bg-[var(--mundia-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
+                  >
+                    Read at source
+                  </Link>
+                )}
+                <span className="w-full text-[var(--mundia-muted)] sm:text-right">
+                  via {resource.sourceName}
+                </span>
+              </div>
             </li>
           ))}
         </ul>

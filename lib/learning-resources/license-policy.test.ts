@@ -50,6 +50,7 @@ describe("learning resource licence policy", () => {
     ["http://creativecommons.org/licenses/by/4.0/", "CC-BY"],
     ["https://creativecommons.org/licenses/by-sa/3.0/", "CC-BY-SA"],
     ["https://creativecommons.org/publicdomain/zero/1.0/", "CC0"],
+    ["http://creativecommons.org/licenses/publicdomain/", "PUBLIC-DOMAIN"],
   ])(
     "recognizes a canonical licence URI without a label",
     (value, expected) => {

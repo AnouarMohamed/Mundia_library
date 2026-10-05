@@ -55,6 +55,7 @@
     "import:learning-resources:kubernetes": "tsx scripts/import-kubernetes.ts",
     "import:learning-resources:rocky-linux": "tsx scripts/import-rocky-linux.ts",
     "import:learning-resources:arxiv": "tsx scripts/import-arxiv.ts",
+    "import:learning-resources:internet-archive": "tsx scripts/import-internet-archive.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },

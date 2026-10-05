@@ -91,6 +91,7 @@ function detectAllowedLicense(value: string): VerifiedLicenseExpression | null {
   }
   if (
     /creativecommons\.org\/publicdomain\/mark\/1\.0\/?/i.test(value) ||
+    /creativecommons\.org\/licenses\/publicdomain\/?(?:\s|$)/i.test(value) ||
     /\bPUBLIC DOMAIN\b|\bPDM(?:\s*[0-9.]+)?\b/i.test(value)
   ) {
     return "PUBLIC-DOMAIN";

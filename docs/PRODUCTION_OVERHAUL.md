@@ -509,8 +509,13 @@ architecture, robotics, and performance research. It reads the official
 per-paper licence URI, publishes only CC BY, CC BY-SA, or CC0 papers, and
 quarantines arXiv's default distribution licence and all non-commercial or
 no-derivatives variants. Imports are limited to 250 records, revision-pinned,
-metadata-only, and link directly to official arXiv abstract and PDF URLs.
-Internet Archive remains pending. OpenStax was
+metadata-only, and link directly to official arXiv abstract and PDF URLs. The
+Internet Archive adapter deliberately excludes community uploads because their
+licence metadata is user-controlled. It searches only the tightly identified
+NASA Technical Reports collection, re-fetches every item's metadata, requires
+the exact item-level public-domain declaration and an original PDF, limits
+concurrency to four with pauses between groups, and imports at most 50 records
+per revision-pinned run. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
 excluded unless a durable qualifying per-edition licence can be proven. Migration
