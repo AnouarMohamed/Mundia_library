@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Authoritative catalog metadata and privacy-safe review commands and reads. Copy counts and returned-loan eligibility are versioned projections owned by Circulation."
   },
   "paths": {
@@ -231,6 +231,75 @@
           "403": { "$ref": "#/components/responses/Forbidden" }
         }
       }
+    },
+    "/api/v1/catalog/learning-resources": {
+      "get": {
+        "operationId": "searchLearningResources",
+        "x-required-scopes": ["catalog.learning-resource.read"],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "category", "in": "query", "schema": { "type": "string", "maxLength": 128 } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 24 } }
+        ],
+        "responses": {
+          "200": { "description": "Active learning-resource page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResourcePage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resources/{resourceId}": {
+      "get": {
+        "operationId": "getLearningResource",
+        "x-required-scopes": ["catalog.learning-resource.read"],
+        "parameters": [{ "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Learning resource found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResource" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resource-categories": {
+      "get": {
+        "operationId": "getLearningResourceCategories",
+        "x-required-scopes": ["catalog.learning-resource.read"],
+        "responses": {
+          "200": { "description": "Sorted active learning-resource categories", "content": { "application/json": { "schema": { "type": "array", "items": { "type": "string" } } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resource-imports/{importId}": {
+      "get": {
+        "operationId": "getLearningResourceImportEvidence",
+        "x-required-scopes": ["catalog.learning-resource.import"],
+        "parameters": [{ "name": "importId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": { "description": "Completed immutable import evidence", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResourceImportResult" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "importLearningResources",
+        "x-required-scopes": ["catalog.learning-resource.import"],
+        "parameters": [{ "name": "importId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResourceImportRequest" } } } },
+        "responses": {
+          "200": { "description": "Atomic import completed or exactly replayed", "headers": { "Idempotency-Replayed": { "schema": { "type": "boolean" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResourceImportResult" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" }
+        }
+      }
     }
   },
   "components": {
@@ -433,6 +502,79 @@
         "properties": {
           "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
           "content": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        }
+      },
+      "LearningResource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceId", "title", "category", "language", "sourceName", "sourceUrl"],
+        "properties": {
+          "resourceId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string" },
+          "author": { "type": ["string", "null"] },
+          "description": { "type": ["string", "null"] },
+          "category": { "type": "string" },
+          "language": { "type": "string" },
+          "coverUrl": { "type": ["string", "null"], "format": "uri" },
+          "coverAlt": { "type": ["string", "null"] },
+          "sourceName": { "type": "string" },
+          "sourceUrl": { "type": "string", "format": "uri" }
+        }
+      },
+      "LearningResourcePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resources", "total", "page", "totalPages"],
+        "properties": {
+          "resources": { "type": "array", "items": { "$ref": "#/components/schemas/LearningResource" } },
+          "total": { "type": "integer", "minimum": 0 },
+          "page": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "LearningResourceImportItemRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resourceId", "sourceRecordKey", "title", "category", "language", "sourceUrl", "contentSha256"],
+        "properties": {
+          "resourceId": { "type": "string", "format": "uuid" },
+          "sourceRecordKey": { "type": "string", "maxLength": 512 },
+          "title": { "type": "string", "maxLength": 500 },
+          "author": { "type": ["string", "null"], "maxLength": 500 },
+          "description": { "type": ["string", "null"], "maxLength": 4000 },
+          "category": { "type": "string", "maxLength": 128 },
+          "language": { "type": "string", "maxLength": 16 },
+          "coverUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
+          "coverAlt": { "type": ["string", "null"], "maxLength": 300 },
+          "sourceUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+          "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "LearningResourceImportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceName", "sourceRevision", "items"],
+        "properties": {
+          "sourceName": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "sourceRevision": { "type": "string", "maxLength": 128 },
+          "items": { "type": "array", "minItems": 1, "maxItems": 250, "items": { "$ref": "#/components/schemas/LearningResourceImportItemRequest" } }
+        }
+      },
+      "LearningResourceImportResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["importId", "sourceName", "sourceRevision", "manifestSha256", "recordCount", "insertedCount", "updatedCount", "unchangedCount", "completedAt", "replayed"],
+        "properties": {
+          "importId": { "type": "string", "format": "uuid" },
+          "sourceName": { "type": "string" },
+          "sourceRevision": { "type": "string" },
+          "manifestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "recordCount": { "type": "integer", "minimum": 1, "maximum": 250 },
+          "insertedCount": { "type": "integer", "minimum": 0 },
+          "updatedCount": { "type": "integer", "minimum": 0 },
+          "unchangedCount": { "type": "integer", "minimum": 0 },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
         }
       },
       "CatalogCommandResponse": {

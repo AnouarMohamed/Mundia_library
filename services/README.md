@@ -79,6 +79,31 @@ export AUTH_AUDIENCE=digital-content-api
 ./gradlew :digital-content-service:bootRun
 ```
 
+## Learning-resource catalog boundary
+
+Catalog owns searchable learning-resource metadata; Digital Content remains
+the sole authority for licence evidence and download authorization. Verified
+legacy records are moved in deterministic batches of at most 250 through
+`PUT /api/v1/catalog/learning-resource-imports/{importId}` using the dedicated
+`catalog.learning-resource.import` machine scope. Import IDs are bound to both
+the caller and a canonical manifest, and every completed batch has immutable
+reconciliation evidence at the same URI via `GET`.
+
+Public application reads use `catalog.learning-resource.read` with indexed,
+stable paging at `GET /api/v1/catalog/learning-resources`; detail and category
+routes share that scope. These responses deliberately contain no download URL
+or licence decision. The legacy-to-Kotlin backfill is dry-run by default:
+
+```bash
+npm run backfill:learning-resources:kotlin -- --offset 0 --limit 250
+```
+
+Applying it additionally requires `CATALOG_SERVICE_URL` and a short-lived
+`CATALOG_IMPORT_BEARER_TOKEN`. The script performs a read-after-write evidence
+check for every batch and never logs the token. Keep the current production
+read path until the full verified dataset is reconciled, then cut the frontend
+over separately.
+
 ## Digital content availability API
 
 Digital Content owns downloadable-file rights, immutable digests, private

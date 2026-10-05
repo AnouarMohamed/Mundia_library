@@ -525,8 +525,15 @@ No service proxies the third-party bytes. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
 excluded unless a durable qualifying per-edition licence can be proven. Catalog
-metadata ownership, importer command wiring, backfill/reconciliation, and SPA
-cutover remain pending before the temporary Next.js read slice can retire.
+metadata ownership has now moved into the Kotlin Catalog boundary. Catalog V8
+adds indexed learning-resource metadata plus immutable import receipts; bounded
+machine-scoped commands are actor- and manifest-bound, and dedicated read APIs
+provide stable search, detail, and category results without exposing download
+targets. The verified-only legacy backfill command creates deterministic batches
+of at most 250 records and performs read-after-write receipt reconciliation.
+Running that backfill against production, archiving its evidence, and completing
+the Kotlin BFF/SPA read cutover remain pending before the temporary Next.js read
+slice can retire.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

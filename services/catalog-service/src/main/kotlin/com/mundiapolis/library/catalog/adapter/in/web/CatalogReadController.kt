@@ -5,7 +5,10 @@ import com.mundiapolis.library.catalog.dto.CatalogSearchResult
 import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
+import com.mundiapolis.library.catalog.dto.LearningResource
+import com.mundiapolis.library.catalog.dto.LearningResourcePage
 import com.mundiapolis.library.catalog.service.CatalogService
+import com.mundiapolis.library.catalog.service.LearningResourceService
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
@@ -20,6 +23,7 @@ import java.util.UUID
 @RequestMapping("/api/v1/catalog")
 class CatalogReadController(
     private val catalogService: CatalogService,
+    private val learningResources: LearningResourceService,
 ) {
     @GetMapping("/works/{workId}")
     @PreAuthorize("hasAuthority('SCOPE_catalog.read')")
@@ -66,4 +70,23 @@ class CatalogReadController(
         @RequestParam(required = false) page: Int?,
         @RequestParam(required = false) limit: Int?,
     ): CatalogReviewPage = catalogService.getPublishedReviews(workId.toString(), page, limit)
+
+    @GetMapping("/learning-resources/{resourceId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.learning-resource.read')")
+    fun learningResource(@PathVariable resourceId: UUID): LearningResource =
+        learningResources.find(resourceId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Learning resource not found")
+
+    @GetMapping("/learning-resources")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.learning-resource.read')")
+    fun learningResources(
+        @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) category: String?,
+        @RequestParam(required = false) page: Int?,
+        @RequestParam(required = false) limit: Int?,
+    ): LearningResourcePage = learningResources.search(query, category, page, limit)
+
+    @GetMapping("/learning-resource-categories")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.learning-resource.read')")
+    fun learningResourceCategories(): List<String> = learningResources.categories()
 }

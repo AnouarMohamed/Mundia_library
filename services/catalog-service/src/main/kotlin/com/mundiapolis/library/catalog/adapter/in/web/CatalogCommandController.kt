@@ -12,12 +12,17 @@ import com.mundiapolis.library.catalog.dto.UpdateEditionCommand
 import com.mundiapolis.library.catalog.dto.UpdateReviewCommand
 import com.mundiapolis.library.catalog.dto.UpdateWorkCommand
 import com.mundiapolis.library.catalog.service.CatalogCommandService
+import com.mundiapolis.library.catalog.dto.LearningResourceImportCommand
+import com.mundiapolis.library.catalog.dto.LearningResourceImportItem
+import com.mundiapolis.library.catalog.dto.LearningResourceImportResult
+import com.mundiapolis.library.catalog.service.LearningResourceService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -33,6 +38,7 @@ import java.util.UUID
 class CatalogCommandController(
     private val commandService: CatalogCommandService,
     private val principalResolver: CatalogCommandPrincipalResolver,
+    private val learningResources: LearningResourceService,
 ) {
     @PostMapping("/works")
     @PreAuthorize("hasAuthority('SCOPE_catalog.manage')")
@@ -228,6 +234,38 @@ class CatalogCommandController(
         ),
     )
 
+    @PutMapping("/learning-resource-imports/{importId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.learning-resource.import')")
+    fun importLearningResources(
+        authentication: JwtAuthenticationToken,
+        @PathVariable importId: UUID,
+        @RequestBody request: LearningResourceImportRequest,
+    ): ResponseEntity<LearningResourceImportResult> {
+        val result = learningResources.importBatch(
+            LearningResourceImportCommand(
+                importId,
+                request.sourceName,
+                request.sourceRevision,
+                request.items.map { item ->
+                    LearningResourceImportItem(
+                        item.resourceId, item.sourceRecordKey, item.title, item.author,
+                        item.description, item.category, item.language, item.coverUrl,
+                        item.coverAlt, item.sourceUrl, item.contentSha256,
+                    )
+                },
+                principalResolver.ownerFingerprint(authentication),
+            ),
+        )
+        return ResponseEntity.ok()
+            .header(IDEMPOTENCY_REPLAYED_HEADER, result.replayed.toString())
+            .body(result)
+    }
+
+    @GetMapping("/learning-resource-imports/{importId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.learning-resource.import')")
+    fun learningResourceImport(@PathVariable importId: UUID): LearningResourceImportResult =
+        learningResources.importEvidence(importId)
+
     private fun created(
         execution: CatalogCommandExecution,
         location: String,
@@ -325,6 +363,26 @@ data class CreateReviewRequest(
 data class UpdateReviewRequest(
     val rating: Int,
     val content: String,
+)
+
+data class LearningResourceImportRequest(
+    val sourceName: String,
+    val sourceRevision: String,
+    val items: List<LearningResourceImportItemRequest>,
+)
+
+data class LearningResourceImportItemRequest(
+    val resourceId: UUID,
+    val sourceRecordKey: String,
+    val title: String,
+    val author: String?,
+    val description: String?,
+    val category: String,
+    val language: String,
+    val coverUrl: String?,
+    val coverAlt: String?,
+    val sourceUrl: String,
+    val contentSha256: String,
 )
 
 data class CatalogCommandResponse(

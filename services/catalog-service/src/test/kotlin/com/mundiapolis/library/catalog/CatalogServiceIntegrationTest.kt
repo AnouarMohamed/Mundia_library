@@ -89,6 +89,8 @@ class CatalogServiceIntegrationTest {
 
     @BeforeEach
     fun seedCatalog() {
+        dsl.deleteFrom(org.jooq.impl.DSL.table("catalog_learning_resource_import")).execute()
+        dsl.deleteFrom(org.jooq.impl.DSL.table("catalog_learning_resource")).execute()
         dsl.deleteFrom(CATALOG_OUTBOX_EVENT).execute()
         dsl.deleteFrom(CATALOG_AUDIT_ENTRY).execute()
         dsl.deleteFrom(CATALOG_COMMAND_IDEMPOTENCY).execute()
@@ -165,6 +167,78 @@ class CatalogServiceIntegrationTest {
             status = "HIDDEN",
             createdAt = NOW,
         )
+    }
+
+    @Test
+    fun `learning resource batches are actor-bound idempotent and immediately searchable`() {
+        val importId = UUID.randomUUID()
+        val resourceId = UUID.randomUUID()
+        val body = learningResourceImportBody(resourceId)
+
+        mockMvc.perform(
+            put("/api/v1/catalog/learning-resource-imports/$importId")
+                .with(learningResourceImportScope("trusted-importer"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.recordCount").value(1))
+            .andExpect(jsonPath("$.insertedCount").value(1))
+
+        mockMvc.perform(
+            put("/api/v1/catalog/learning-resource-imports/$importId")
+                .with(learningResourceImportScope("trusted-importer"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/learning-resources")
+                .queryParam("query", "reliable unix")
+                .queryParam("category", "Software Engineering")
+                .with(scope(LEARNING_RESOURCE_READ_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.total").value(1))
+            .andExpect(jsonPath("$.resources[0].resourceId").value(resourceId.toString()))
+            .andExpect(jsonPath("$.resources[0].sourceUrl").value("https://example.edu/books/unix"))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/learning-resource-imports/$importId")
+                .with(learningResourceImportScope("auditor")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.manifestSha256").isString)
+            .andExpect(jsonPath("$.recordCount").value(1))
+    }
+
+    @Test
+    fun `learning resource import rejects private URLs and cross-actor replay`() {
+        val importId = UUID.randomUUID()
+        val body = learningResourceImportBody(UUID.randomUUID())
+        mockMvc.perform(
+            put("/api/v1/catalog/learning-resource-imports/$importId")
+                .with(learningResourceImportScope("trusted-importer"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        ).andExpect(status().isOk)
+
+        mockMvc.perform(
+            put("/api/v1/catalog/learning-resource-imports/$importId")
+                .with(learningResourceImportScope("different-importer"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        ).andExpect(status().isConflict)
+
+        mockMvc.perform(
+            put("/api/v1/catalog/learning-resource-imports/${UUID.randomUUID()}")
+                .with(learningResourceImportScope("trusted-importer"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body.replace("https://example.edu/books/unix", "https://127.0.0.1/private")),
+        ).andExpect(status().isBadRequest)
     }
 
     @Test
@@ -1275,6 +1349,34 @@ class CatalogServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(REVIEW_WRITE_SCOPE))
 
+    private fun learningResourceImportScope(subject: String) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject(subject)
+                .claim("azp", "catalog-importer")
+        }
+        .authorities(SimpleGrantedAuthority(LEARNING_RESOURCE_IMPORT_SCOPE))
+
+    private fun learningResourceImportBody(resourceId: UUID): String = """
+        {
+          "sourceName": "University Open Press",
+          "sourceRevision": "revision-2026-10-05",
+          "items": [{
+            "resourceId": "$resourceId",
+            "sourceRecordKey": "unix-reliability",
+            "title": "Reliable UNIX Systems",
+            "author": "Open Engineering Faculty",
+            "description": "Operational design for reliable UNIX services.",
+            "category": "Software Engineering",
+            "language": "en",
+            "coverUrl": "https://example.edu/covers/unix.jpg",
+            "coverAlt": "Reliable UNIX Systems cover",
+            "sourceUrl": "https://example.edu/books/unix",
+            "contentSha256": "${"a".repeat(64)}"
+          }]
+        }
+    """.trimIndent()
+
     private fun createWorkBody(workId: UUID, contributorId: UUID, title: String): String = """
         {
           "workId": "$workId",
@@ -1310,6 +1412,8 @@ class CatalogServiceIntegrationTest {
         const val SEARCH_SCOPE = "SCOPE_catalog.search"
         const val MANAGE_SCOPE = "SCOPE_catalog.manage"
         const val REVIEW_WRITE_SCOPE = "SCOPE_catalog.review.write"
+        const val LEARNING_RESOURCE_READ_SCOPE = "SCOPE_catalog.learning-resource.read"
+        const val LEARNING_RESOURCE_IMPORT_SCOPE = "SCOPE_catalog.learning-resource.import"
 
         @Container
         @JvmStatic

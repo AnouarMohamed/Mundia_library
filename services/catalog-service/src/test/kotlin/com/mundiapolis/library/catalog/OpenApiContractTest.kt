@@ -11,12 +11,17 @@ import com.mundiapolis.library.catalog.adapter.`in`.web.SetEditionActiveRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateEditionRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateReviewRequest
 import com.mundiapolis.library.catalog.adapter.`in`.web.UpdateWorkRequest
+import com.mundiapolis.library.catalog.adapter.`in`.web.LearningResourceImportItemRequest
+import com.mundiapolis.library.catalog.adapter.`in`.web.LearningResourceImportRequest
 import com.mundiapolis.library.catalog.dto.Author
 import com.mundiapolis.library.catalog.dto.CatalogSearchResult
 import com.mundiapolis.library.catalog.dto.CatalogReview
 import com.mundiapolis.library.catalog.dto.CatalogReviewPage
 import com.mundiapolis.library.catalog.dto.Edition
 import com.mundiapolis.library.catalog.dto.Work
+import com.mundiapolis.library.catalog.dto.LearningResource
+import com.mundiapolis.library.catalog.dto.LearningResourceImportResult
+import com.mundiapolis.library.catalog.dto.LearningResourcePage
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
@@ -54,7 +59,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.4.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.5.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -75,6 +80,11 @@ class OpenApiContractTest {
         assertSchemaFields("CreateReviewRequest", CreateReviewRequest::class.java)
         assertSchemaFields("UpdateReviewRequest", UpdateReviewRequest::class.java)
         assertSchemaFields("CatalogCommandResponse", CatalogCommandResponse::class.java)
+        assertSchemaFields("LearningResource", LearningResource::class.java)
+        assertSchemaFields("LearningResourcePage", LearningResourcePage::class.java)
+        assertSchemaFields("LearningResourceImportItemRequest", LearningResourceImportItemRequest::class.java)
+        assertSchemaFields("LearningResourceImportRequest", LearningResourceImportRequest::class.java)
+        assertSchemaFields("LearningResourceImportResult", LearningResourceImportResult::class.java)
     }
 
     @Test
