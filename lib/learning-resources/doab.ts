@@ -294,7 +294,9 @@ function classifyCategory(title: string, subjects: string[]) {
     return "Industrial Engineering";
   }
   if (/(cyber|security|cryptograph)/iu.test(value)) return "Security";
-  if (/(network|telecommunication|routing|wireless communication)/iu.test(value)) {
+  if (
+    /(network|telecommunication|routing|wireless communication)/iu.test(value)
+  ) {
     return "Networking & Telecommunications";
   }
   if (/(mathemat|statistic)/iu.test(value)) return "Mathematics";
