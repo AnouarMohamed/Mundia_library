@@ -15,7 +15,7 @@ const LICENSE_URLS: Record<VerifiedLicenseExpression, string> = {
 };
 
 const disallowedLicense =
-  /\b(?:CC\s*[- ]?BY\s*[- ]?(?:NC|ND)|NON[- ]?COMMERCIAL|ALL RIGHTS RESERVED|COPYRIGHTED)\b/i;
+  /(?:creativecommons\.org\/licenses\/by-(?:nc|nd)|\bCC\s*[- ]?BY\s*[- ]?(?:NC|ND)|NON[- ]?COMMERCIAL|ALL RIGHTS RESERVED|COPYRIGHTED)\b/i;
 
 /**
  * Fail-closed licence classification. Repository visibility and a repository
@@ -71,16 +71,28 @@ function canonicalLicenseUrl(
 }
 
 function detectAllowedLicense(value: string): VerifiedLicenseExpression | null {
-  if (/\bCC\s*[- ]?BY\s*[- ]?SA(?:\s*[0-9.]+)?\b/i.test(value)) {
+  if (
+    /creativecommons\.org\/licenses\/by-sa\/[1-4]\.0\/?/i.test(value) ||
+    /\bCC\s*[- ]?BY\s*[- ]?SA(?:\s*[0-9.]+)?\b/i.test(value)
+  ) {
     return "CC-BY-SA";
   }
-  if (/\bCC\s*[- ]?BY(?:\s*[0-9.]+)?\b/i.test(value)) {
+  if (
+    /creativecommons\.org\/licenses\/by\/[1-4]\.0\/?/i.test(value) ||
+    /\bCC\s*[- ]?BY(?:\s*[0-9.]+)?\b/i.test(value)
+  ) {
     return "CC-BY";
   }
-  if (/\bCC\s*0(?:\s*[0-9.]+)?\b|\bCC0(?:\s*[0-9.]+)?\b/i.test(value)) {
+  if (
+    /creativecommons\.org\/publicdomain\/zero\/1\.0\/?/i.test(value) ||
+    /\bCC\s*0(?:\s*[0-9.]+)?\b|\bCC0(?:\s*[0-9.]+)?\b/i.test(value)
+  ) {
     return "CC0";
   }
-  if (/\bPUBLIC DOMAIN\b|\bPDM(?:\s*[0-9.]+)?\b/i.test(value)) {
+  if (
+    /creativecommons\.org\/publicdomain\/mark\/1\.0\/?/i.test(value) ||
+    /\bPUBLIC DOMAIN\b|\bPDM(?:\s*[0-9.]+)?\b/i.test(value)
+  ) {
     return "PUBLIC-DOMAIN";
   }
   return null;

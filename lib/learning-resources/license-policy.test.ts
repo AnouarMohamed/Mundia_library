@@ -46,6 +46,28 @@ describe("learning resource licence policy", () => {
     });
   });
 
+  it.each([
+    ["http://creativecommons.org/licenses/by/4.0/", "CC-BY"],
+    ["https://creativecommons.org/licenses/by-sa/3.0/", "CC-BY-SA"],
+    ["https://creativecommons.org/publicdomain/zero/1.0/", "CC0"],
+  ])(
+    "recognizes a canonical licence URI without a label",
+    (value, expected) => {
+      expect(classifyResourceLicense(value)).toMatchObject({
+        verified: true,
+        expression: expected,
+      });
+    },
+  );
+
+  it("quarantines a non-commercial Creative Commons URI", () => {
+    expect(
+      classifyResourceLicense(
+        "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      ),
+    ).toMatchObject({ verified: false, expression: null });
+  });
+
   it("recognizes only normalized allowlist values", () => {
     expect(isVerifiedLicenseExpression("CC-BY-SA")).toBe(true);
     expect(isVerifiedLicenseExpression("CC-BY-NC")).toBe(false);

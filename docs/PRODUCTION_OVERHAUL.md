@@ -503,7 +503,14 @@ both the live PDFs and repository-level CC BY-SA 4.0 licence are checked before
 import. Open Library is intentionally not a public-content source: its cover API
 permits public display, but its licensing notice warns that contributed records
 can have unresolved existing rights, and its availability flags are not
-per-edition licence evidence. Internet Archive and arXiv adapters remain pending. OpenStax was
+per-edition licence evidence. A bounded arXiv OAI-PMH adapter adds current
+security, software, distributed-systems, networking, operating-systems,
+architecture, robotics, and performance research. It reads the official
+per-paper licence URI, publishes only CC BY, CC BY-SA, or CC0 papers, and
+quarantines arXiv's default distribution licence and all non-commercial or
+no-derivatives variants. Imports are limited to 250 records, revision-pinned,
+metadata-only, and link directly to official arXiv abstract and PDF URLs.
+Internet Archive remains pending. OpenStax was
 re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
 excluded unless a durable qualifying per-edition licence can be proven. Migration
