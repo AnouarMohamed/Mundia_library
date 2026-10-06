@@ -10,7 +10,7 @@ const LEGACY_PUBLIC_DOMAIN_URL =
   "http://creativecommons.org/licenses/publicdomain/";
 const MAX_BATCH_SIZE = 50;
 const MAX_RESPONSE_BYTES = 2_000_000;
-const ADAPTER_VERSION = "internet-archive-nasa-v1";
+const ADAPTER_VERSION = "internet-archive-nasa-v2";
 const USER_AGENT =
   "Mundia-Library/0.2 (gpt-6.1-sol; +https://mundialibrary.tech)";
 
@@ -159,6 +159,9 @@ export function parseInternetArchiveItem(
     normalizeLegacyPublicDomainUrl(licenceEvidence) !== null;
   const file = chooseOriginalPdf(payload.files);
   const sourceUrl = `https://archive.org/details/${identifier}`;
+  const coverUrl = verified
+    ? `https://archive.org/services/img/${identifier}`
+    : null;
   const downloadUrl =
     verified && file
       ? `https://archive.org/download/${identifier}/${encodeURIComponent(file.name)}`
@@ -170,8 +173,8 @@ export function parseInternetArchiveItem(
     title,
     author: cleanText(stringArray(metadata.creator).join(", "), 500),
     description: cleanText(firstString(metadata.description), 4_000),
-    coverUrl: null,
-    coverAlt: null,
+    coverUrl,
+    coverAlt: coverUrl ? `Official preview of ${title}`.slice(0, 300) : null,
     category: classifyCategory(`${title} ${subjects.join(" ")}`),
     language: normalizeLanguage(firstString(metadata.language)),
     licenseExpression: verified ? licence.expression : null,

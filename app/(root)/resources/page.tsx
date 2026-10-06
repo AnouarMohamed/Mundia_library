@@ -4,7 +4,7 @@ import {
   listVerifiedLearningResources,
 } from "@/lib/learning-resources/queries";
 import { LearningResourceCover } from "@/components/LearningResourceCover";
-import { decodeDisplayText } from "@/lib/learning-resources/display-text";
+import { formatLearningResourceText } from "@/lib/learning-resources/display-text";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -130,13 +130,14 @@ const Page = async ({
             >
               <Link
                 href={`/resources/${resource.id}`}
-                aria-label={`View ${decodeDisplayText(resource.title)}`}
+                aria-label={`View ${formatLearningResourceText(resource.title)}`}
                 className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
               >
                 <LearningResourceCover
                   title={resource.title}
                   category={resource.category}
                   sourceName={resource.sourceName}
+                  sourceUrl={resource.sourceUrl}
                   coverUrl={resource.coverUrl}
                   coverAlt={resource.coverAlt}
                 />
@@ -158,21 +159,21 @@ const Page = async ({
                     href={`/resources/${resource.id}`}
                     className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
                   >
-                    {decodeDisplayText(resource.title)}
+                    {formatLearningResourceText(resource.title)}
                   </Link>
                 </h2>
                 <p className="mt-1 text-sm text-[var(--mundia-muted)]">
                   {resource.author
-                    ? decodeDisplayText(resource.author)
+                    ? formatLearningResourceText(resource.author)
                     : "Author not listed"}
                 </p>
                 {resource.description && (
                   <p className="mt-2 line-clamp-2 max-w-[65ch] text-sm leading-5 text-[var(--mundia-muted)]">
-                    {decodeDisplayText(resource.description)}
+                    {formatLearningResourceText(resource.description)}
                   </p>
                 )}
                 <p className="mt-2 truncate text-xs text-[var(--mundia-muted)] sm:hidden">
-                  Source: {decodeDisplayText(resource.sourceName)}
+                  Source: {formatLearningResourceText(resource.sourceName)}
                 </p>
               </div>
               <div className="col-start-2 flex items-center gap-3 self-end text-xs sm:col-start-auto sm:flex-col sm:items-stretch sm:self-center">
@@ -181,7 +182,7 @@ const Page = async ({
                     href={`/api/learning-resources/${resource.id}/download`}
                     download
                     className="inline-flex min-h-10 items-center justify-center bg-[var(--mundia-navy)] px-4 text-sm font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
-                    aria-label={`Download ${decodeDisplayText(resource.title)} from ${decodeDisplayText(resource.sourceName)}`}
+                    aria-label={`Download ${formatLearningResourceText(resource.title)} from ${formatLearningResourceText(resource.sourceName)}`}
                   >
                     Download
                   </a>
@@ -194,7 +195,7 @@ const Page = async ({
                   </Link>
                 )}
                 <span className="hidden text-center leading-4 text-[var(--mundia-muted)] sm:block">
-                  From {decodeDisplayText(resource.sourceName)}
+                  From {formatLearningResourceText(resource.sourceName)}
                 </span>
               </div>
             </li>

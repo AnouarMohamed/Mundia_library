@@ -68,6 +68,12 @@ const nextConfig = {
         port: "",
         pathname: "/bitstream/20.500.12854/*/*/*",
       },
+      {
+        protocol: "https",
+        hostname: "archive.org",
+        port: "",
+        pathname: "/services/img/nasa_techdoc_*",
+      },
     ],
   },
   /*

@@ -1,13 +1,14 @@
 import { createHash } from "crypto";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { classifyResourceLicense } from "./license-policy";
+import { decodeDisplayText } from "./display-text";
 import type { LearningResourceCandidate } from "./types";
 
 const SOURCE_NAME = "Directory of Open Access Books";
 const OAI_ENDPOINT = "https://directory.doabooks.org/oai/request";
 const MAX_RESPONSE_BYTES = 5_000_000;
 const MAX_COVER_BYTES = 2_000_000;
-const ADAPTER_VERSION = "doab-v6";
+const ADAPTER_VERSION = "doab-v7";
 
 type XmlNode = Record<string, unknown>;
 
@@ -379,7 +380,7 @@ function toPositiveInteger(value: string | undefined) {
 }
 
 function normalizeText(value: string) {
-  return value.replace(/\s+/gu, " ").trim();
+  return decodeDisplayText(value).replace(/\s+/gu, " ").trim();
 }
 
 function asArray(value: unknown): unknown[] {

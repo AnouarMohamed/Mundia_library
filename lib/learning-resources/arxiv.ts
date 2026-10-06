@@ -1,13 +1,14 @@
 import { createHash } from "crypto";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { classifyResourceLicense } from "./license-policy";
+import { decodeDisplayText } from "./display-text";
 import type { LearningResourceCandidate } from "./types";
 
 const SOURCE_NAME = "arXiv";
 const OAI_ENDPOINT = "https://oaipmh.arxiv.org/oai";
 const MAX_RESPONSE_BYTES = 5_000_000;
 const MAX_RECORDS = 250;
-const ADAPTER_VERSION = "arxiv-v1";
+const ADAPTER_VERSION = "arxiv-v2";
 
 const ALLOWED_SETS = new Set([
   "cs:cs:AR",
@@ -228,7 +229,7 @@ function nodeText(value: unknown) {
 }
 
 function normalizeText(value: string) {
-  return value.replace(/\s+/gu, " ").trim();
+  return decodeDisplayText(value).replace(/\s+/gu, " ").trim();
 }
 
 function asNode(value: unknown): XmlNode | null {

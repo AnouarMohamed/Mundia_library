@@ -515,7 +515,9 @@ licence metadata is user-controlled. It searches only the tightly identified
 NASA Technical Reports collection, re-fetches every item's metadata, requires
 the exact item-level public-domain declaration and an original PDF, limits
 concurrency to four with pauses between groups, and imports at most 50 records
-per revision-pinned run. Kotlin Digital Content now owns the first external-file
+per revision-pinned run. Verified NASA items also display the official
+Internet Archive item thumbnail directly; the exact NASA identifier path is
+allowlisted and no image is copied or proxied. Kotlin Digital Content now owns the first external-file
 rights slice: machine-scoped registration is immutable, actor-bound, and
 manifest-idempotent; only canonical allowlisted licences and strict public HTTPS
 URLs are accepted. Availability hides the download target, authorization

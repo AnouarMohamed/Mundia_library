@@ -63,6 +63,7 @@ describe("document security middleware", () => {
     expect(productionPolicy).not.toContain("'unsafe-eval'");
     expect(productionPolicy).not.toContain("ws: wss:");
     expect(productionPolicy).toContain("upgrade-insecure-requests");
+    expect(productionPolicy).toContain("https://archive.org");
   });
 
   it("redirects requests with no session cookie to sign in", async () => {

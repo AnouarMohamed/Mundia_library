@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { getVerifiedLicenseUrl } from "./license-policy";
+import { decodeDisplayText } from "./display-text";
 import type { LearningResourceCandidate } from "./types";
 
 const SOURCE_NAME = "Project Gutenberg";
@@ -337,7 +338,7 @@ function cleanText(value: unknown, max: number) {
 }
 
 function normalizeText(value: string) {
-  return value.replace(/\s+/gu, " ").trim();
+  return decodeDisplayText(value).replace(/\s+/gu, " ").trim();
 }
 
 async function mapConcurrent<T, R>(

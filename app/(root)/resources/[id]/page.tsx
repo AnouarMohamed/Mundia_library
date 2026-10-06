@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { getVerifiedLearningResource } from "@/lib/learning-resources/queries";
 import { LearningResourceCover } from "@/components/LearningResourceCover";
-import { decodeDisplayText } from "@/lib/learning-resources/display-text";
+import { formatLearningResourceText } from "@/lib/learning-resources/display-text";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +30,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
           title={resource.title}
           category={resource.category}
           sourceName={resource.sourceName}
+          sourceUrl={resource.sourceUrl}
           coverUrl={resource.coverUrl}
           coverAlt={resource.coverAlt}
           size="detail"
@@ -39,11 +40,11 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
             {resource.category}
           </p>
           <h1 className="mt-2 max-w-3xl font-serif text-3xl font-normal leading-tight text-[var(--mundia-ink)] sm:text-4xl">
-            {decodeDisplayText(resource.title)}
+            {formatLearningResourceText(resource.title)}
           </h1>
           <p className="mt-3 text-base text-[var(--mundia-muted)]">
             {resource.author
-              ? decodeDisplayText(resource.author)
+              ? formatLearningResourceText(resource.author)
               : "Author not listed"}
           </p>
         </div>
@@ -57,7 +58,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 About this resource
               </h2>
               <p className="mt-3 max-w-[70ch] whitespace-pre-line text-sm leading-6 text-[var(--mundia-muted)]">
-                {decodeDisplayText(resource.description)}
+                {formatLearningResourceText(resource.description)}
               </p>
             </div>
           )}
@@ -76,7 +77,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 download
                 className="inline-flex min-h-12 items-center justify-center bg-[var(--mundia-navy)] px-6 text-sm font-semibold text-[var(--mundia-surface)] transition-colors hover:bg-[var(--mundia-navy-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] focus-visible:ring-offset-2"
               >
-                Download from {decodeDisplayText(resource.sourceName)}
+                Download from {formatLearningResourceText(resource.sourceName)}
               </a>
             )}
             {resource.readUrl && (
@@ -117,7 +118,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 rel="noopener noreferrer"
                 className="hover:underline"
               >
-                {decodeDisplayText(resource.sourceName)}
+                {formatLearningResourceText(resource.sourceName)}
               </a>
             </dd>
           </div>
@@ -139,7 +140,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                 View verification source
               </a>
               <p className="mt-2 leading-5 text-[var(--mundia-muted)]">
-                {decodeDisplayText(resource.verificationReason)}
+                {formatLearningResourceText(resource.verificationReason)}
               </p>
             </dd>
           </div>

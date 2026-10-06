@@ -42,6 +42,9 @@ describe("Internet Archive NASA importer", () => {
       licenseExpression: "PUBLIC-DOMAIN",
       verificationStatus: "VERIFIED",
       sourceUrl: `https://archive.org/details/${identifier}`,
+      coverUrl: `https://archive.org/services/img/${identifier}`,
+      coverAlt:
+        "Official preview of Helicopters Calculation and Design: Aerodynamics",
       downloadUrl: `https://archive.org/download/${identifier}/19670028324.pdf`,
     });
   });

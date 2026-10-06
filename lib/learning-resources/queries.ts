@@ -33,6 +33,7 @@ export async function listVerifiedLearningResources(input: {
         language: learningResources.language,
         licenseExpression: learningResources.licenseExpression,
         sourceName: learningResources.sourceName,
+        sourceUrl: learningResources.sourceUrl,
         downloadUrl: learningResources.downloadUrl,
         readUrl: learningResources.readUrl,
       })

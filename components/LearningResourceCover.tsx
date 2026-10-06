@@ -1,11 +1,12 @@
 import Image from "next/image";
-import { normalizeOfficialLearningResourceCover } from "@/lib/learning-resources/cover-policy";
-import { decodeDisplayText } from "@/lib/learning-resources/display-text";
+import { resolveOfficialLearningResourceCover } from "@/lib/learning-resources/cover-policy";
+import { formatLearningResourceText } from "@/lib/learning-resources/display-text";
 
 interface LearningResourceCoverProps {
   title: string;
   category: string;
   sourceName: string;
+  sourceUrl: string;
   coverUrl: string | null;
   coverAlt: string | null;
   size?: "list" | "detail";
@@ -15,13 +16,18 @@ export function LearningResourceCover({
   title,
   category,
   sourceName,
+  sourceUrl,
   coverUrl,
   coverAlt,
   size = "list",
 }: LearningResourceCoverProps) {
-  const officialCover = normalizeOfficialLearningResourceCover(coverUrl);
-  const displayTitle = decodeDisplayText(title);
-  const displaySource = decodeDisplayText(sourceName);
+  const officialCover = resolveOfficialLearningResourceCover({
+    coverUrl,
+    sourceName,
+    sourceUrl,
+  });
+  const displayTitle = formatLearningResourceText(title);
+  const displaySource = formatLearningResourceText(sourceName);
   const dimensions =
     size === "detail"
       ? "aspect-[3/4] w-full max-w-56"
@@ -36,7 +42,7 @@ export function LearningResourceCover({
         // does not copy it into application storage or the Next.js image proxy.
         <Image
           src={officialCover}
-          alt={coverAlt ? decodeDisplayText(coverAlt) : `Official cover of ${displayTitle}`}
+          alt={coverAlt ? formatLearningResourceText(coverAlt) : `Official cover of ${displayTitle}`}
           width={280}
           height={373}
           loading={size === "detail" ? "eager" : "lazy"}
