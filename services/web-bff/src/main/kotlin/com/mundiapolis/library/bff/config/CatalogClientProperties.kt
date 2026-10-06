@@ -10,9 +10,11 @@ import java.time.Duration
 @ConfigurationProperties("app.clients.catalog")
 data class CatalogClientProperties(
     val baseUrl: URI,
+    val audience: String,
     val connectTimeout: Duration,
     val readTimeout: Duration,
     val maximumResponseBytes: Int,
+    val maximumDelegatedTokenLifetime: Duration,
 ) {
     @get:AssertTrue(message = "Catalog client configuration is invalid")
     val isValid: Boolean
@@ -22,9 +24,11 @@ data class CatalogClientProperties(
             baseUrl.path.isEmpty() &&
             !baseUrl.host.isNullOrBlank() &&
             baseUrl.scheme in setOf("http", "https") &&
+            audience.matches(AUDIENCE) &&
             connectTimeout in MINIMUM_TIMEOUT..MAXIMUM_CONNECT_TIMEOUT &&
             readTimeout in MINIMUM_TIMEOUT..MAXIMUM_READ_TIMEOUT &&
-            maximumResponseBytes in MINIMUM_RESPONSE_BYTES..MAXIMUM_RESPONSE_BYTES
+            maximumResponseBytes in MINIMUM_RESPONSE_BYTES..MAXIMUM_RESPONSE_BYTES &&
+            maximumDelegatedTokenLifetime in MINIMUM_TOKEN_LIFETIME..MAXIMUM_TOKEN_LIFETIME
 
     fun isSafeFor(deploymentTier: String): Boolean =
         isValid && (deploymentTier == "local" || baseUrl.scheme == "https")
@@ -35,5 +39,8 @@ data class CatalogClientProperties(
         val MAXIMUM_READ_TIMEOUT: Duration = Duration.ofSeconds(10)
         const val MINIMUM_RESPONSE_BYTES = 16 * 1024
         const val MAXIMUM_RESPONSE_BYTES = 1024 * 1024
+        val MINIMUM_TOKEN_LIFETIME: Duration = Duration.ofSeconds(30)
+        val MAXIMUM_TOKEN_LIFETIME: Duration = Duration.ofMinutes(10)
+        val AUDIENCE = Regex("^[A-Za-z0-9._:-]{2,128}$")
     }
 }

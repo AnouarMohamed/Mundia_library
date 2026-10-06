@@ -45,10 +45,11 @@ in step 2:
 - `GET /api/v1/catalog/search` requires a valid browser session, validates and
   bounds its inputs, enforces connect/read/response-size limits, and maps
   downstream failures to stable problem codes.
-- The BFF obtains a dedicated client-credentials token scoped to
-  `catalog.search`; no browser token is forwarded. The authorization server
-  must issue the Catalog service audience (`catalog-api` by default). This is
-  suitable only for non-user-specific catalog reads.
+- Catalog search plus learning-resource search, detail, and category reads use
+  RFC 8693 token exchange from the signed-in user's server-side token. The
+  short-lived downstream token is restricted to the `catalog-api` audience and
+  `catalog.search,catalog.learning-resource.read`; neither token reaches the
+  browser. Responses are bounded, strictly validated, and `no-store`.
 - `GET /api/v1/membership/profile` performs RFC 8693 token exchange from the
   signed-in user's server-side OIDC access token into a short-lived token with
   only the `membership-api` audience and `membership.profile.read` scope. The

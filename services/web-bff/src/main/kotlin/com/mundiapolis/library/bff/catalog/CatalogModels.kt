@@ -36,3 +36,30 @@ data class CatalogEditionView(
     val availableCopies: Int,
     val isActive: Boolean,
 )
+
+data class LearningResourceSearchCriteria(
+    val query: String?,
+    val category: String?,
+    val page: Int?,
+    val limit: Int?,
+)
+
+data class LearningResourcePageView(
+    val resources: List<LearningResourceView>,
+    val total: Int,
+    val page: Int,
+    val totalPages: Int,
+)
+
+data class LearningResourceView(
+    val resourceId: UUID,
+    val title: String,
+    val author: String?,
+    val description: String?,
+    val category: String,
+    val language: String,
+    val coverUrl: String?,
+    val coverAlt: String?,
+    val sourceName: String,
+    val sourceUrl: String,
+)

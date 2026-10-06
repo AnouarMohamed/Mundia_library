@@ -20,6 +20,7 @@ OIDC_CLIENT_SECRET=replace-locally \
 CATALOG_CLIENT_ID=library-web-bff-catalog \
 CATALOG_CLIENT_SECRET=replace-locally \
 CATALOG_SERVICE_URL=http://localhost:8082 \
+CATALOG_AUDIENCE=catalog-api \
 MEMBERSHIP_CLIENT_ID=library-web-bff-membership \
 MEMBERSHIP_CLIENT_SECRET=replace-locally \
 MEMBERSHIP_SERVICE_URL=http://localhost:8081 \
@@ -35,20 +36,18 @@ The exact redirect URI is
 `http://localhost:8080/login/oauth2/code/institutional`. Never use the local
 HTTP or insecure-cookie settings outside local development.
 
-Authenticated browser sessions can call `GET /api/v1/catalog/search`. The BFF
-validates and bounds all query parameters, obtains its own client-credentials
-token with only `catalog.search`, and maps the Catalog
-service response into the browser contract. It never forwards an OIDC browser
-token. The static contract is available at `/openapi/web-bff-v1.json`.
+Authenticated browser sessions can call `GET /api/v1/catalog/search`, the
+learning-resource search/detail routes, and the category route. The BFF
+validates and bounds all inputs, exchanges the server-side institutional token
+for a short-lived `catalog-api` token limited to `catalog.search` and
+`catalog.learning-resource.read`, and strictly validates the Catalog response
+before mapping it into the browser contract. Neither token is returned to the
+browser. The static contract is available at `/openapi/web-bff-v1.json`.
 
-The authorization-server client registration must issue this token with the
-Catalog service's configured audience (`catalog-api` by default). The Catalog
-service independently verifies issuer, audience, token type, and scope.
-
-This application credential is intentionally limited to non-user-specific
-catalog reads. Profile, circulation, reviews, and administrative operations
-must preserve end-user identity through the approved delegated-token design;
-do not reuse the catalog credential for those routes.
+The authorization server must enable RFC 8693 token exchange for the separate
+`catalog-service` confidential client and issue the Catalog service's audience
+(`catalog-api` by default). The Catalog service independently verifies issuer,
+audience, token type, and scope.
 
 Authenticated sessions can also call `GET /api/v1/membership/profile`. For
 this user-specific route, the BFF exchanges the current institutional access

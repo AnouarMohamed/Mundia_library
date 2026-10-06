@@ -89,6 +89,7 @@ class OAuthClientConfiguration {
     @Bean
     fun tokenExchangeTokenResponseClient(
         oauthTokenRestClient: RestClient,
+        catalog: CatalogClientProperties,
         membership: MembershipClientProperties,
         circulation: CirculationClientProperties,
         notification: NotificationClientProperties,
@@ -99,6 +100,7 @@ class OAuthClientConfiguration {
             addParametersConverter { request ->
                 LinkedMultiValueMap<String, String>().apply {
                     when (request.clientRegistration.registrationId) {
+                        CATALOG_REGISTRATION -> add("audience", catalog.audience)
                         MEMBERSHIP_REGISTRATION -> add("audience", membership.audience)
                         CIRCULATION_REGISTRATION -> add("audience", circulation.audience)
                         NOTIFICATION_REGISTRATION -> add("audience", notification.audience)
@@ -184,6 +186,7 @@ class OAuthClientConfiguration {
             )
 
     companion object {
+        const val CATALOG_REGISTRATION = "catalog-service"
         const val MEMBERSHIP_REGISTRATION = "membership-service"
         const val CIRCULATION_REGISTRATION = "circulation-service"
         const val NOTIFICATION_REGISTRATION = "notification-service"
@@ -192,7 +195,7 @@ class OAuthClientConfiguration {
         private val TOKEN_CLOCK_SKEW: Duration = Duration.ofSeconds(10)
         private val KNOWN_REGISTRATIONS = listOf(
             "institutional",
-            "catalog-service",
+            CATALOG_REGISTRATION,
             MEMBERSHIP_REGISTRATION,
             CIRCULATION_REGISTRATION,
             NOTIFICATION_REGISTRATION,

@@ -33,12 +33,17 @@ class CatalogClientPropertiesTest {
         assertThat(properties().copy(readTimeout = Duration.ofSeconds(11)).isValid).isFalse()
         assertThat(properties().copy(maximumResponseBytes = 16_383).isValid).isFalse()
         assertThat(properties().copy(maximumResponseBytes = 1_048_577).isValid).isFalse()
+        assertThat(properties().copy(maximumDelegatedTokenLifetime = Duration.ofSeconds(29)).isValid).isFalse()
+        assertThat(properties().copy(maximumDelegatedTokenLifetime = Duration.ofMinutes(11)).isValid).isFalse()
+        assertThat(properties().copy(audience = "bad audience").isValid).isFalse()
     }
 
     private fun properties() = CatalogClientProperties(
         baseUrl = URI("https://catalog.internal"),
+        audience = "catalog-api",
         connectTimeout = Duration.ofSeconds(1),
         readTimeout = Duration.ofSeconds(3),
         maximumResponseBytes = 512 * 1024,
+        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
     )
 }

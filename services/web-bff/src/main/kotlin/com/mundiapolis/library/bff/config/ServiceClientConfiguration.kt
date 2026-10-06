@@ -6,9 +6,6 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.client.JdkClientHttpRequestFactory
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager
-import org.springframework.security.oauth2.client.web.client.OAuth2ClientHttpRequestInterceptor
-import org.springframework.security.oauth2.client.web.client.RequestAttributePrincipalResolver
 import org.springframework.web.client.RestClient
 import java.net.http.HttpClient
 import java.time.Clock
@@ -20,7 +17,6 @@ class ServiceClientConfiguration {
 
     @Bean
     fun catalogRestClient(
-        authorizedClientManager: OAuth2AuthorizedClientManager,
         observationRegistry: ObservationRegistry,
         catalog: CatalogClientProperties,
         bff: BffProperties,
@@ -35,14 +31,9 @@ class ServiceClientConfiguration {
         val requestFactory = JdkClientHttpRequestFactory(httpClient).apply {
             setReadTimeout(catalog.readTimeout)
         }
-        val oauth = OAuth2ClientHttpRequestInterceptor(authorizedClientManager).apply {
-            setPrincipalResolver(RequestAttributePrincipalResolver())
-        }
-
         return RestClient.builder()
             .baseUrl(catalog.baseUrl.toASCIIString())
             .requestFactory(requestFactory)
-            .requestInterceptor(oauth)
             .observationRegistry(observationRegistry)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build()

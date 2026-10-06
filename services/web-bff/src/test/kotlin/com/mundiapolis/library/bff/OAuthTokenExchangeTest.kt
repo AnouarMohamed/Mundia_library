@@ -1,6 +1,7 @@
 package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.config.CirculationClientProperties
+import com.mundiapolis.library.bff.config.CatalogClientProperties
 import com.mundiapolis.library.bff.config.DigitalContentClientProperties
 import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.config.NotificationClientProperties
@@ -29,11 +30,47 @@ import java.time.Instant
 
 class OAuthTokenExchangeTest {
     @Test
+    fun `catalog token exchange requests only its audience and read scopes`() {
+        val builder = RestClient.builder().withOAuthTokenProtocolSupport()
+        val server = MockRestServiceServer.bindTo(builder).build()
+        val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
+            builder.build(),
+            catalogProperties(),
+            properties(),
+            circulationProperties(),
+            notificationProperties(),
+            digitalContentProperties(),
+        )
+        val now = Instant.now()
+        val source = OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "source-user-token", now, now.plusSeconds(300))
+        server.expect(requestTo("https://issuer.example.test/oauth2/token"))
+            .andExpect(content().string(containsString("audience=catalog-api")))
+            .andExpect(content().string(containsString("scope=catalog.search+catalog.learning-resource.read")))
+            .andRespond(
+                withSuccess(
+                    """{"access_token":"delegated-catalog-token","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":120,"scope":"catalog.search catalog.learning-resource.read"}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+        val registration = registration(
+            registrationId = "catalog-service",
+            clientId = "web-bff-catalog",
+            scopes = arrayOf("catalog.search", "catalog.learning-resource.read"),
+        )
+
+        val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))
+
+        assertThat(response.accessToken.tokenValue).isEqualTo("delegated-catalog-token")
+        server.verify()
+    }
+
+    @Test
     fun `token exchange authenticates the bff and requests one audience and scope`() {
         val builder = RestClient.builder().withOAuthTokenProtocolSupport()
         val server = MockRestServiceServer.bindTo(builder).build()
         val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
             builder.build(),
+            catalogProperties(),
             properties(),
             circulationProperties(),
             notificationProperties(),
@@ -83,6 +120,7 @@ class OAuthTokenExchangeTest {
         val server = MockRestServiceServer.bindTo(builder).build()
         val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
             builder.build(),
+            catalogProperties(),
             properties(),
             circulationProperties(),
             notificationProperties(),
@@ -158,6 +196,7 @@ class OAuthTokenExchangeTest {
         val server = MockRestServiceServer.bindTo(builder).build()
         val client = OAuthClientConfiguration().tokenExchangeTokenResponseClient(
             builder.build(),
+            catalogProperties(),
             properties(),
             circulationProperties(),
             notificationProperties(),
@@ -223,6 +262,15 @@ class OAuthTokenExchangeTest {
         connectTimeout = Duration.ofSeconds(1),
         readTimeout = Duration.ofSeconds(3),
         maximumResponseBytes = 64 * 1024,
+        maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
+    )
+
+    private fun catalogProperties() = CatalogClientProperties(
+        baseUrl = URI("https://catalog.internal"),
+        audience = "catalog-api",
+        connectTimeout = Duration.ofSeconds(1),
+        readTimeout = Duration.ofSeconds(3),
+        maximumResponseBytes = 512 * 1024,
         maximumDelegatedTokenLifetime = Duration.ofMinutes(5),
     )
 

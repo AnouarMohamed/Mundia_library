@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Library Web BFF API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
   },
   "servers": [{ "url": "/" }],
@@ -75,7 +75,74 @@
             }
           },
           "400": { "$ref": "#/components/responses/Problem" },
-          "401": { "description": "Authenticated browser session required" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resources": {
+      "get": {
+        "operationId": "searchLearningResources",
+        "summary": "Search verified open-learning resources through delegated authorization",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "category", "in": "query", "schema": { "type": "string", "maxLength": 128 } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 24 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded verified learning-resource page",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResourcePage" } } }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resources/{resourceId}": {
+      "get": {
+        "operationId": "getLearningResource",
+        "summary": "Get one verified open-learning resource",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "name": "resourceId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": {
+          "200": {
+            "description": "Verified learning-resource metadata",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LearningResource" } } }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/catalog/learning-resource-categories": {
+      "get": {
+        "operationId": "listLearningResourceCategories",
+        "summary": "List verified learning-resource categories",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": {
+            "description": "Unique sorted categories",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "type": "array", "maxItems": 500, "items": { "type": "string", "minLength": 1, "maxLength": 128 } } } }
+          },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
           "502": { "$ref": "#/components/responses/Problem" },
           "503": { "$ref": "#/components/responses/Problem" },
           "504": { "$ref": "#/components/responses/Problem" }
@@ -595,6 +662,34 @@
           "totalCopies": { "type": "integer", "minimum": 0 },
           "availableCopies": { "type": "integer", "minimum": 0 },
           "isActive": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "LearningResourcePage": {
+        "type": "object",
+        "required": ["resources", "total", "page", "totalPages"],
+        "properties": {
+          "resources": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/LearningResource" } },
+          "total": { "type": "integer", "minimum": 0 },
+          "page": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      },
+      "LearningResource": {
+        "type": "object",
+        "required": ["resourceId", "title", "author", "description", "category", "language", "coverUrl", "coverAlt", "sourceName", "sourceUrl"],
+        "properties": {
+          "resourceId": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "author": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 },
+          "description": { "type": ["string", "null"], "minLength": 1, "maxLength": 4000 },
+          "category": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "language": { "type": "string", "minLength": 1, "maxLength": 16 },
+          "coverUrl": { "type": ["string", "null"], "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "coverAlt": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+          "sourceName": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "sourceUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
         },
         "additionalProperties": false
       },

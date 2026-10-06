@@ -1,21 +1,27 @@
 package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.catalog.CatalogBrowseController
-import com.mundiapolis.library.bff.catalog.CatalogClient
+import com.mundiapolis.library.bff.catalog.CatalogBrowseUseCase
 import com.mundiapolis.library.bff.catalog.CatalogEditionView
 import com.mundiapolis.library.bff.catalog.CatalogExceptionHandler
 import com.mundiapolis.library.bff.catalog.CatalogSearchCriteria
 import com.mundiapolis.library.bff.catalog.CatalogSearchView
+import com.mundiapolis.library.bff.catalog.LearningResourcePageView
+import com.mundiapolis.library.bff.catalog.LearningResourceSearchCriteria
+import com.mundiapolis.library.bff.catalog.LearningResourceView
 import com.mundiapolis.library.bff.config.BffProperties
 import com.mundiapolis.library.bff.config.SecurityConfiguration
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.`when`
+import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin
-import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
@@ -36,14 +42,12 @@ import java.util.UUID
 @Import(
     SecurityConfiguration::class,
     CatalogExceptionHandler::class,
+    CatalogBrowseSecurityIntegrationTest.CatalogTestConfiguration::class,
     BffSecurityIntegrationTest.ClientRegistrationTestConfiguration::class,
 )
 class CatalogBrowseSecurityIntegrationTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
-
-    @MockitoBean
-    private lateinit var catalogClient: CatalogClient
 
     @Test
     fun `catalog search requires an authenticated browser session`() {
@@ -64,21 +68,47 @@ class CatalogBrowseSecurityIntegrationTest {
 
     @Test
     fun `catalog search returns only the mapped no-store response`() {
-        `when`(
-            catalogClient.search(
-                CatalogSearchCriteria(
-                    query = "distributed systems",
-                    genre = null,
-                    authorId = null,
-                    availableOnly = null,
-                    minRating = null,
-                    sortBy = null,
-                    page = null,
-                    limit = null,
-                ),
-            ),
-        ).thenReturn(
-            CatalogSearchView(
+        mockMvc.perform(
+            get("/api/v1/catalog/search")
+                .param("query", "distributed systems")
+                .with(oidcLogin()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.editions[0].title").value("Distributed Systems"))
+            .andExpect(jsonPath("$.editions[0].editionId").value("11111111-1111-1111-1111-111111111111"))
+    }
+
+    @Test
+    fun `learning resource routes require a session and remain non cacheable`() {
+        mockMvc.perform(get("/api/v1/catalog/learning-resources"))
+            .andExpect(status().isUnauthorized)
+
+        mockMvc.perform(
+            get("/api/v1/catalog/learning-resources")
+                .param("category", "Operating Systems")
+                .with(oidcLogin()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$.resources[0].title").value("The Linux Command Line"))
+
+        mockMvc.perform(get("/api/v1/catalog/learning-resource-categories").with(oidcLogin()))
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$[0]").value("Operating Systems"))
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class CatalogTestConfiguration {
+        @Bean
+        fun catalogBrowseUseCase(): CatalogBrowseUseCase = object : CatalogBrowseUseCase {
+            override fun search(
+                authentication: OAuth2AuthenticationToken,
+                request: HttpServletRequest,
+                response: HttpServletResponse,
+                criteria: CatalogSearchCriteria,
+            ) = CatalogSearchView(
                 editions = listOf(
                     CatalogEditionView(
                         editionId = UUID.fromString("11111111-1111-1111-1111-111111111111"),
@@ -100,17 +130,27 @@ class CatalogBrowseSecurityIntegrationTest {
                 total = 1,
                 page = 0,
                 totalPages = 1,
-            ),
-        )
+            )
 
-        mockMvc.perform(
-            get("/api/v1/catalog/search")
-                .param("query", "distributed systems")
-                .with(oidcLogin()),
-        )
-            .andExpect(status().isOk)
-            .andExpect(header().string("Cache-Control", "no-store"))
-            .andExpect(jsonPath("$.editions[0].title").value("Distributed Systems"))
-            .andExpect(jsonPath("$.editions[0].editionId").value("11111111-1111-1111-1111-111111111111"))
+            override fun learningResources(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, criteria: LearningResourceSearchCriteria): LearningResourcePageView =
+                LearningResourcePageView(listOf(resource()), 1, 0, 1)
+
+            override fun learningResource(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, resourceId: UUID): LearningResourceView = resource()
+
+            override fun learningResourceCategories(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse): List<String> = listOf("Operating Systems")
+
+            private fun resource() = LearningResourceView(
+                UUID.fromString("44444444-4444-4444-4444-444444444444"),
+                "The Linux Command Line",
+                "William Shotts",
+                "A practical introduction to the command line.",
+                "Operating Systems",
+                "en",
+                "https://covers.example.org/linux.jpg",
+                "The Linux Command Line cover",
+                "Official publisher",
+                "https://source.example.org/books/linux",
+            )
+        }
     }
 }

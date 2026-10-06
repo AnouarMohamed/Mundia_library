@@ -50,8 +50,8 @@ spring:
             client-id: ${CATALOG_CLIENT_ID}
             client-secret: ${CATALOG_CLIENT_SECRET}
             client-authentication-method: client_secret_basic
-            authorization-grant-type: client_credentials
-            scope: catalog.search
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: catalog.search,catalog.learning-resource.read
           membership-service:
             provider: institutional
             client-id: ${MEMBERSHIP_CLIENT_ID}
@@ -102,9 +102,11 @@ app:
   clients:
     catalog:
       base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+      audience: ${CATALOG_AUDIENCE:catalog-api}
       connect-timeout: ${CATALOG_CONNECT_TIMEOUT:PT1S}
       read-timeout: ${CATALOG_READ_TIMEOUT:PT3S}
       maximum-response-bytes: ${CATALOG_MAXIMUM_RESPONSE_BYTES:524288}
+      maximum-delegated-token-lifetime: ${CATALOG_MAXIMUM_DELEGATED_TOKEN_LIFETIME:PT5M}
     membership:
       base-url: ${MEMBERSHIP_SERVICE_URL:http://localhost:8081}
       audience: ${MEMBERSHIP_AUDIENCE:membership-api}

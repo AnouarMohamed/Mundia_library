@@ -89,10 +89,12 @@ legacy records are moved in deterministic batches of at most 250 through
 the caller and a canonical manifest, and every completed batch has immutable
 reconciliation evidence at the same URI via `GET`.
 
-Public application reads use `catalog.learning-resource.read` with indexed,
-stable paging at `GET /api/v1/catalog/learning-resources`; detail and category
-routes share that scope. These responses deliberately contain no download URL
-or licence decision. The legacy-to-Kotlin backfill is dry-run by default:
+Application reads use `catalog.learning-resource.read` with indexed, stable
+paging at `GET /api/v1/catalog/learning-resources`; detail and category routes
+share that scope. The browser-facing equivalents now run through the Web BFF
+with session-bound token exchange and strict downstream validation. These
+responses deliberately contain no download URL or licence decision. The
+legacy-to-Kotlin backfill is dry-run by default:
 
 ```bash
 npm run backfill:learning-resources:kotlin -- --offset 0 --limit 250
