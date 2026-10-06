@@ -17,6 +17,9 @@ revisionHistoryLimit: 5
 minReadySeconds: 10
 terminationGracePeriodSeconds: 45
 
+lifecycle:
+  preStopSleepSeconds: 5
+
 serviceAccount:
   create: true
   name: ""
@@ -231,6 +234,7 @@ networkPolicy:
     - namespace: mundia-dev
       podLabels:
         mundiapolis.io/allow-circulation: "true"
+  egressPeers: []
   egressCidrs:
     - cidr: 10.40.0.0/16
       ports:

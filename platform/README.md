@@ -48,6 +48,7 @@ manifests.
 platform/
 ├── decisions/                 Architecture decisions and open blockers
 ├── docs/                      Operations, trust boundaries, and promotion
+├── edge/                      Provider-neutral same-origin routing contract
 ├── gitops/                    Argo CD bootstrap and environment desired state
 ├── helm/mundia-service/       Secure stateless-service chart
 ├── policies/kyverno/          Enforced admission policies

@@ -12,6 +12,14 @@ controller image, choose an AWS load-balancer/WAF topology, constrain trusted
 proxy headers, tune request/body/time limits, and run false-positive tests
 against real product traffic.
 
+The browser-facing routing contract is recorded in
+`platform/edge/same-origin-routing.yaml`. The CDN serves the private static SPA
+origin by default and sends only `/api/v1/*`, OAuth authorization/callback, and
+the bounded error path to the Web BFF origin. Dynamic and OAuth responses are
+never cached. The origin hostname is not a user-facing fallback: network/WAF
+controls must accept traffic only from the selected edge before production DNS
+is changed.
+
 ## Certificate contract
 
 cert-manager is installed without a `ClusterIssuer`. Security must approve one
@@ -38,4 +46,3 @@ credentials remain least privilege. A production internet dependency such as a
 public institutional JWKS URL requires an approved egress gateway/proxy,
 destination allowlisting, TLS verification, observability, and a documented
 failure mode. Do not solve it by adding `0.0.0.0/0`.
-

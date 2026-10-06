@@ -53,6 +53,17 @@ spec:
         - protocol: TCP
           port: 4317
     {{- end }}
+    {{- range .Values.networkPolicy.egressPeers }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml .podLabels | nindent 14 }}
+      ports:
+        {{- toYaml .ports | nindent 8 }}
+    {{- end }}
     {{- range .Values.networkPolicy.egressCidrs }}
     - to:
         - ipBlock:

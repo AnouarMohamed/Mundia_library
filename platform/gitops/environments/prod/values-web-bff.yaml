@@ -1,0 +1,104 @@
+environment: prod
+image:
+  repository: REPLACE_APPROVED_REGISTRY/mundiapolis/web-bff
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+replicaCount: 4
+revisionHistoryLimit: 10
+minReadySeconds: 20
+podLabels:
+  mundiapolis.io/public-entrypoint: "true"
+env:
+  APP_ENV: prod
+  PORT: "8080"
+  SPRING_FLYWAY_ENABLED: "false"
+  DEPLOYMENT_TIER: production
+  BFF_PUBLIC_BASE_URL: https://mundialibrary.tech
+  BFF_SECURE_COOKIES: "true"
+  BFF_SESSION_MAXIMUM_AGE: PT8H
+  CATALOG_SERVICE_URL: https://catalog-mundia-service:8443
+  MEMBERSHIP_SERVICE_URL: https://membership-mundia-service:8443
+  CIRCULATION_SERVICE_URL: https://circulation-mundia-service:8443
+  NOTIFICATION_SERVICE_URL: https://notification-mundia-service:8443
+  DIGITAL_CONTENT_SERVICE_URL: https://digital-content-mundia-service:8443
+  DOWNLOAD_CLOUDFRONT_BASE_URL: https://downloads.mundialibrary.tech
+externalSecret:
+  refreshInterval: 2m
+  targetName: web-bff-runtime
+  data:
+    - { secretKey: REDIS_URL, remoteKey: mundia/prod/web-bff/redis, property: url }
+    - { secretKey: OIDC_ISSUER, remoteKey: mundia/prod/web-bff/oidc, property: issuer }
+    - { secretKey: OIDC_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: browser_client_id }
+    - { secretKey: OIDC_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: browser_client_secret }
+    - { secretKey: CATALOG_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: catalog_client_id }
+    - { secretKey: CATALOG_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: catalog_client_secret }
+    - { secretKey: MEMBERSHIP_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: membership_client_id }
+    - { secretKey: MEMBERSHIP_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: membership_client_secret }
+    - { secretKey: CIRCULATION_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: circulation_client_id }
+    - { secretKey: CIRCULATION_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: circulation_client_secret }
+    - { secretKey: NOTIFICATION_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: notification_client_id }
+    - { secretKey: NOTIFICATION_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: notification_client_secret }
+    - { secretKey: DIGITAL_CONTENT_CLIENT_ID, remoteKey: mundia/prod/web-bff/oidc, property: digital_content_client_id }
+    - { secretKey: DIGITAL_CONTENT_CLIENT_SECRET, remoteKey: mundia/prod/web-bff/oidc, property: digital_content_client_secret }
+migration:
+  enabled: false
+  managedByPlatform: true
+resources:
+  requests: { cpu: 500m, memory: 768Mi }
+  limits: { cpu: "2", memory: 1536Mi }
+autoscaling:
+  enabled: true
+  minReplicas: 4
+  maxReplicas: 50
+  cpuTargetUtilization: 60
+  memoryTargetUtilization: 70
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 3
+networkPolicy:
+  enabled: true
+  ingressPeers:
+    - namespace: ingress-nginx
+      podLabels: { app.kubernetes.io/component: controller }
+    - namespace: monitoring
+      podLabels: { app.kubernetes.io/name: prometheus }
+  egressPeers:
+    - namespace: mundia-prod
+      podLabels: { app.kubernetes.io/instance: catalog, app.kubernetes.io/component: runtime }
+      ports: [{ protocol: TCP, port: 8443 }]
+    - namespace: mundia-prod
+      podLabels: { app.kubernetes.io/instance: membership, app.kubernetes.io/component: runtime }
+      ports: [{ protocol: TCP, port: 8443 }]
+    - namespace: mundia-prod
+      podLabels: { app.kubernetes.io/instance: circulation, app.kubernetes.io/component: runtime }
+      ports: [{ protocol: TCP, port: 8443 }]
+    - namespace: mundia-prod
+      podLabels: { app.kubernetes.io/instance: notification, app.kubernetes.io/component: runtime }
+      ports: [{ protocol: TCP, port: 8443 }]
+    - namespace: mundia-prod
+      podLabels: { app.kubernetes.io/instance: digital-content, app.kubernetes.io/component: runtime }
+      ports: [{ protocol: TCP, port: 8443 }]
+  egressCidrs:
+    - cidr: 10.60.0.0/16
+      ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 6379 }
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 32k
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "15"
+    nginx.ingress.kubernetes.io/limit-connections: "40"
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+  hosts:
+    - host: bff-origin.mundialibrary.tech
+      paths:
+        - { path: /api/v1, pathType: Prefix }
+        - { path: /oauth2/authorization, pathType: Prefix }
+        - { path: /login/oauth2/code, pathType: Prefix }
+        - { path: /error, pathType: Exact }
+  tls:
+    - secretName: web-bff-origin-tls
+      hosts: [bff-origin.mundialibrary.tech]

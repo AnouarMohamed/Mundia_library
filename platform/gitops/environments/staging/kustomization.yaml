@@ -10,3 +10,8 @@ helmCharts:
     namespace: mundia-staging
     valuesFile: values-circulation.yaml
     includeCRDs: false
+  - name: mundia-service
+    releaseName: web-bff
+    namespace: mundia-staging
+    valuesFile: values-web-bff.yaml
+    includeCRDs: false

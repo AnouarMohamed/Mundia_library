@@ -436,7 +436,9 @@ KMS key. A production-shaped SQS consumer strictly validates GuardDuty
 EventBridge results, commits idempotency receipts and immutable object-version
 evidence atomically, acknowledges only after commit, and treats every result
 except `NO_THREATS_FOUND` as rejection. Safe object promotion, lifecycle/IaC,
-the SPA Download action, and the core OpenSearch projection remain pending.
+the hosted-asset SPA download path, and the core OpenSearch projection remain
+pending; verified external-resource downloads already use the BFF authorization
+path without proxying third-party bytes.
 
 While the full Kotlin Digital Content boundary is being completed, the Vercel
 application provides a deliberately narrow learning-resource catalog. It stores
@@ -541,6 +543,12 @@ slice can retire. The initial static Vite shell now consumes generated BFF types
 boots the server-held session, renders responsive learning-resource search and
 detail states, and obtains CSRF-protected download authorizations. Its cutover
 flag is disabled by default until backfill reconciliation and edge tests pass.
+The hardened Web BFF deployment now renders in every GitOps environment with
+TLS-only origin ingress, External Secrets, autoscaling, disruption budgets, and
+allowlisted service egress. A provider-neutral same-origin contract defines the
+private static origin, uncacheable BFF/auth routes, canonical-host redirect, and
+edge-only origin requirement; selecting and applying the CDN/WAF implementation
+remains an explicit production decision.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

@@ -1,0 +1,50 @@
+apiVersion: mundiapolis.io/v1alpha1
+kind: WebEdgeContract
+metadata:
+  name: mundia-library
+spec:
+  canonicalOrigin: https://mundialibrary.tech
+  alternateHosts:
+    - host: www.mundialibrary.tech
+      action: redirect-permanent-to-canonical
+  origins:
+    static:
+      type: private-object-storage
+      publicAccess: false
+      originAccessControl: required
+    bff:
+      type: kubernetes-ingress
+      host: bff-origin.mundialibrary.tech
+      tlsVerification: required
+      directInternetAccess: denied
+  orderedRoutes:
+    - paths: [/api/v1/*]
+      origin: bff
+      methods: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
+      cache: disabled
+      forward:
+        queryStrings: all
+        cookies: [MUNDIA_SESSION, XSRF-TOKEN]
+        headers: [Accept, Content-Type, X-XSRF-TOKEN]
+    - paths: [/oauth2/authorization/*, /login/oauth2/code/*, /error]
+      origin: bff
+      methods: [GET, HEAD, OPTIONS]
+      cache: disabled
+      forward:
+        queryStrings: all
+        cookies: all
+        headers: [Accept]
+    - paths: [/*]
+      origin: static
+      methods: [GET, HEAD, OPTIONS]
+      cache: immutable-assets
+      spaFallback: /index.html
+  invariants:
+    tlsMinimum: TLSv1.2
+    httpToHttpsRedirect: true
+    compressStaticAssets: true
+    bffResponsesCached: false
+    oauthTokensReachBrowser: false
+    originRestrictedToEdge: true
+    wafRateLimiting: required
+    accessLogsWithoutCookiesOrQueryStrings: required

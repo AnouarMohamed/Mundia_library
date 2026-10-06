@@ -97,8 +97,8 @@ spec:
             failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
           lifecycle:
             preStop:
-              exec:
-                command: ["/bin/sh", "-c", "sleep 5"]
+              sleep:
+                seconds: {{ .Values.lifecycle.preStopSleepSeconds }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- if .Values.topologySpreadConstraints.enabled }}

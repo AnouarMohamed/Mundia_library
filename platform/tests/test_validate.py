@@ -41,6 +41,19 @@ class PlatformValidationTest(unittest.TestCase):
             errors,
         )
 
+    def test_web_edge_contract_is_same_origin_and_fail_closed(self) -> None:
+        self.assertEqual([], VALIDATION.validate_web_edge_contract())
+
+    def test_web_bff_is_rendered_for_every_environment(self) -> None:
+        for environment in VALIDATION.ENVIRONMENTS:
+            with self.subTest(environment=environment):
+                documents, errors = VALIDATION.render_environment(environment)
+                self.assertEqual([], errors)
+                index = VALIDATION._resource_index(documents)
+                self.assertIn(("Deployment", "web-bff-mundia-service"), index)
+                self.assertIn(("Ingress", "web-bff-mundia-service"), index)
+                self.assertIn(("ExternalSecret", "web-bff-mundia-service"), index)
+
     def test_application_artifact_defaults_runtime_flyway_off(self) -> None:
         self.assertEqual([], VALIDATION.validate_service_migration_contract())
 

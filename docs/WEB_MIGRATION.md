@@ -76,11 +76,21 @@ in step 2:
   Vercel route remains authoritative until reconciliation and edge cutover.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
+- Dev, staging, and production GitOps overlays now deploy the Web BFF with
+  digest-pinned images, External Secrets, autoscaling, disruption budgets,
+  TLS-only origin ingress, bounded ingress requests, and allowlisted service
+  egress. The shell-free service images use Kubernetes' native pre-stop sleep
+  lifecycle action rather than assuming `/bin/sh` exists.
+- `platform/edge/same-origin-routing.yaml` is the provider-neutral edge
+  contract: private object storage serves the SPA, BFF/auth paths are
+  uncacheable, `www` permanently redirects to the apex, and the BFF origin must
+  reject direct internet traffic. It is not permission to provision AWS and
+  must be translated into reviewed CDN/WAF infrastructure before cutover.
 
 The deployment is not production-routed. Institutional IdP client
 registration with token exchange, Redis failover testing, circulation admin
-routes, Notification BFF routing, Kubernetes values, edge routing, and
-production browser parity remain required before a UI slice moves. A Kotlin Notification
+routes, a selected and applied CDN/WAF implementation, service TLS endpoints,
+and production browser parity remain required before a UI slice moves. A Kotlin Notification
 service boundary now exists for caller-bound inbox reads and mark-read state,
 with production-shaped Kafka ingestion and a lease/retry/dead-letter email
 worker core. Its service-authenticated, audience-scoped Membership recipient

@@ -98,6 +98,65 @@ def validate_raw_yaml() -> list[str]:
     return errors
 
 
+def validate_web_edge_contract() -> list[str]:
+    path = PLATFORM_ROOT / "edge" / "same-origin-routing.yaml"
+    documents, errors = load_documents(
+        path.read_text(encoding="utf-8"), str(path.relative_to(REPOSITORY_ROOT))
+    )
+    if errors:
+        return errors
+    if len(documents) != 1 or documents[0].get("kind") != "WebEdgeContract":
+        return ["edge routing must contain exactly one WebEdgeContract"]
+
+    spec = documents[0].get("spec", {})
+    if spec.get("canonicalOrigin") != "https://mundialibrary.tech":
+        errors.append("edge routing must use the production apex as its canonical origin")
+    origins = spec.get("origins", {})
+    if origins.get("static", {}).get("publicAccess") is not False:
+        errors.append("edge static origin must deny public object access")
+    bff_origin = origins.get("bff", {})
+    if (
+        bff_origin.get("tlsVerification") != "required"
+        or bff_origin.get("directInternetAccess") != "denied"
+    ):
+        errors.append("edge BFF origin must require TLS and deny direct internet access")
+
+    routes = spec.get("orderedRoutes", [])
+    bff_paths = {
+        path_pattern
+        for route in routes
+        if route.get("origin") == "bff"
+        for path_pattern in route.get("paths", [])
+    }
+    required_bff_paths = {
+        "/api/v1/*",
+        "/oauth2/authorization/*",
+        "/login/oauth2/code/*",
+        "/error",
+    }
+    if bff_paths != required_bff_paths:
+        errors.append("edge BFF route allowlist is incomplete or unexpectedly broad")
+    if any(route.get("cache") != "disabled" for route in routes if route.get("origin") == "bff"):
+        errors.append("edge BFF routes must disable caching")
+    if not any(
+        route.get("origin") == "static" and route.get("spaFallback") == "/index.html"
+        for route in routes
+    ):
+        errors.append("edge static route must define the SPA fallback")
+
+    invariants = spec.get("invariants", {})
+    for invariant in (
+        "httpToHttpsRedirect",
+        "bffResponsesCached",
+        "oauthTokensReachBrowser",
+        "originRestrictedToEdge",
+    ):
+        expected = invariant not in {"bffResponsesCached", "oauthTokensReachBrowser"}
+        if invariants.get(invariant) is not expected:
+            errors.append(f"edge invariant {invariant} has an unsafe value")
+    return errors
+
+
 def _resource_index(
     documents: list[dict[str, Any]],
 ) -> dict[tuple[str, str], dict[str, Any]]:
@@ -270,6 +329,79 @@ def validate_environment(environment: str, release: bool = False) -> list[str]:
             errors.append(f"{source}: matching PodDisruptionBudget is missing")
         if ("NetworkPolicy", name) not in index:
             errors.append(f"{source}: matching NetworkPolicy is missing")
+
+    bff_name = "web-bff-mundia-service"
+    bff = index.get(("Deployment", bff_name), {})
+    bff_containers = (
+        bff.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
+    )
+    bff_container = bff_containers[0] if bff_containers else {}
+    bff_environment = _container_environment(bff_container)
+    expected_public_origin = (
+        "https://mundialibrary.tech"
+        if environment == "prod"
+        else f"https://library.{environment}.mundia.invalid"
+    )
+    if (
+        bff_environment.get("BFF_PUBLIC_BASE_URL") != expected_public_origin
+        or bff_environment.get("BFF_SECURE_COOKIES") != "true"
+    ):
+        errors.append(f"{environment}: Web BFF canonical origin or secure cookies are unsafe")
+
+    bff_external_secret = index.get(("ExternalSecret", bff_name), {})
+    expected_bff_secret_keys = {
+        "REDIS_URL",
+        "OIDC_ISSUER",
+        "OIDC_CLIENT_ID",
+        "OIDC_CLIENT_SECRET",
+        "CATALOG_CLIENT_ID",
+        "CATALOG_CLIENT_SECRET",
+        "MEMBERSHIP_CLIENT_ID",
+        "MEMBERSHIP_CLIENT_SECRET",
+        "CIRCULATION_CLIENT_ID",
+        "CIRCULATION_CLIENT_SECRET",
+        "NOTIFICATION_CLIENT_ID",
+        "NOTIFICATION_CLIENT_SECRET",
+        "DIGITAL_CONTENT_CLIENT_ID",
+        "DIGITAL_CONTENT_CLIENT_SECRET",
+    }
+    if _external_secret_keys(bff_external_secret) != expected_bff_secret_keys:
+        errors.append(f"{environment}: Web BFF ExternalSecret contract is incomplete")
+    if _secret_refs(bff_container) != ["web-bff-runtime"]:
+        errors.append(f"{environment}: Web BFF must mount only its runtime secret")
+
+    bff_ingress = index.get(("Ingress", bff_name), {})
+    ingress_paths = {
+        path.get("path")
+        for rule in bff_ingress.get("spec", {}).get("rules", [])
+        for path in rule.get("http", {}).get("paths", [])
+    }
+    if ingress_paths != {
+        "/api/v1",
+        "/oauth2/authorization",
+        "/login/oauth2/code",
+        "/error",
+    }:
+        errors.append(f"{environment}: Web BFF ingress path allowlist is unsafe")
+
+    bff_policy = index.get(("NetworkPolicy", bff_name), {})
+    service_egress_instances = {
+        peer.get("podSelector", {}).get("matchLabels", {}).get(
+            "app.kubernetes.io/instance"
+        )
+        for rule in bff_policy.get("spec", {}).get("egress", [])
+        for peer in rule.get("to", [])
+        if peer.get("podSelector")
+    }
+    required_service_egress = {
+        "catalog",
+        "membership",
+        "circulation",
+        "notification",
+        "digital-content",
+    }
+    if not required_service_egress <= service_egress_instances:
+        errors.append(f"{environment}: Web BFF service egress allowlist is incomplete")
 
     circulation_network_policy = index.get(
         ("NetworkPolicy", "circulation-mundia-service"), {}
@@ -883,6 +1015,7 @@ def validate_release_inputs() -> list[str]:
 def validate(release: bool = False) -> list[str]:
     errors: list[str] = []
     errors.extend(validate_raw_yaml())
+    errors.extend(validate_web_edge_contract())
     errors.extend(validate_terraform_contract())
     errors.extend(validate_gitops_boundaries())
     errors.extend(validate_service_migration_contract())
