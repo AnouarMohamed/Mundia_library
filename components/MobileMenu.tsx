@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LogOut, UserRound, X } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showToast } from "@/lib/toast";
 
@@ -74,7 +74,7 @@ const MobileMenu = ({
   };
 
   const navLinkClass =
-    "flex min-h-12 items-center rounded-lg px-3 text-sm font-medium text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]";
+    "flex min-h-12 items-center border-b border-[var(--mundia-line)] px-1 text-sm font-medium text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)]";
 
   return (
     <>
@@ -84,11 +84,11 @@ const MobileMenu = ({
         onClick={() => setIsOpen(true)}
         disabled={!isHydrated}
         className="flex size-11 items-center justify-center rounded-lg border border-[var(--mundia-line)] bg-[var(--mundia-paper)] text-[var(--mundia-ink)] transition-colors hover:border-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)] disabled:opacity-60 md:hidden"
-        aria-label="Open account menu"
+        aria-label="Open navigation"
         aria-expanded={isOpen}
         aria-controls="mobile-account-menu"
       >
-        <UserRound className="size-5" aria-hidden="true" />
+        <Menu className="size-5" aria-hidden="true" />
       </button>
 
       <dialog
@@ -114,7 +114,7 @@ const MobileMenu = ({
               id="mobile-account-menu-title"
               className="font-serif text-xl text-[var(--mundia-ink)]"
             >
-              Account
+              Navigation
             </h2>
             <button
               ref={closeButtonRef}
@@ -148,12 +148,18 @@ const MobileMenu = ({
             )}
           </div>
 
-          <nav className="flex-1 px-3 py-4" aria-label="Account navigation">
+          <nav className="flex-1 px-4 py-4" aria-label="Primary navigation">
+            <Link href="/library" onClick={closeMenu} className={navLinkClass}>
+              Library
+            </Link>
+            <Link href="/all-books" onClick={closeMenu} className={navLinkClass}>
+              Catalog
+            </Link>
             <Link href="/resources" onClick={closeMenu} className={navLinkClass}>
-              Open learning resources
+              Open learning
             </Link>
             <Link href="/my-profile" onClick={closeMenu} className={navLinkClass}>
-              Account and borrowing history
+              My account
             </Link>
 
             {isAdmin && (

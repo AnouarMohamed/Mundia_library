@@ -2,6 +2,7 @@ import type { components } from "./schema";
 
 export type LearningResource = components["schemas"]["LearningResource"];
 export type LearningResourcePage = components["schemas"]["LearningResourcePage"];
+export type MemberProfile = components["schemas"]["MemberProfile"];
 export type Session = components["schemas"]["Session"];
 
 export class ApiError extends Error {
@@ -29,6 +30,12 @@ export async function getSession(): Promise<Session> {
     authenticated: value.authenticated,
     displayName: typeof value.displayName === "string" ? value.displayName : null,
   };
+}
+
+export async function getMemberProfile(signal?: AbortSignal): Promise<MemberProfile> {
+  const value = await requestJson("/api/v1/membership/profile", { signal });
+  if (!isMemberProfile(value)) throw new ApiError(502);
+  return value;
 }
 
 export async function searchLearningResources(input: {
@@ -118,12 +125,42 @@ function isResource(value: unknown): value is LearningResource {
       (value.accessMode === "READ_AT_SOURCE" && typeof value.readUrl === "string" && isPublicHttpsUrl(value.readUrl)));
 }
 
+function isMemberProfile(value: unknown): value is MemberProfile {
+  if (!isRecord(value)) return false;
+  if (!isUuid(value.memberId) || !isEmail(value.email) || !isSafeText(value.fullName, 200) ||
+      !Number.isSafeInteger(value.universityId) || Number(value.universityId) < 1 ||
+      !["PENDING", "APPROVED", "REJECTED"].includes(String(value.status)) ||
+      !["USER", "ADMIN", "SUPER_ADMIN"].includes(String(value.role)) ||
+      !isIsoInstant(value.createdAt) || !isIsoInstant(value.updatedAt)) {
+    return false;
+  }
+  return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isSafeText(value: unknown, maximum: number): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= maximum && value === value.trim();
+  if (typeof value !== "string" || value.length === 0 || value.length > maximum || value !== value.trim()) {
+    return false;
+  }
+  return Array.from(value).every((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && codePoint > 31 && codePoint !== 127;
+  });
+}
+
+function isEmail(value: unknown): value is string {
+  if (!isSafeText(value, 320)) return false;
+  const separator = value.indexOf("@");
+  return separator > 0 && separator === value.lastIndexOf("@") && separator < value.length - 1;
+}
+
+function isIsoInstant(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 20 && value.length <= 35 &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u.test(value) &&
+    Number.isFinite(Date.parse(value));
 }
 
 function isNonNegativeInteger(value: unknown): value is number {

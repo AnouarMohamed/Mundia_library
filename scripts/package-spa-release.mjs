@@ -59,7 +59,8 @@ const buildMetadata = JSON.parse(
 );
 if (
   buildMetadata.schemaVersion !== 1 ||
-  typeof buildMetadata.featureFlags?.learningResources !== "boolean"
+  typeof buildMetadata.featureFlags?.learningResources !== "boolean" ||
+  typeof buildMetadata.featureFlags?.memberProfile !== "boolean"
 ) {
   throw new Error("SPA build metadata is missing or invalid");
 }

@@ -68,12 +68,17 @@ in step 2:
   claim. The browser supplies only an edition, loan, or reservation UUID, CSRF
   token, and bounded actor-scoped idempotency key; it cannot select a member
   identity.
-- The first static Vite/React shell now provides session bootstrap, accessible
-  learning-resource search/detail routes, generated OpenAPI types, strict
-  runtime response checks, error boundaries, responsive loading/empty/error
-  states, and CSRF-protected external-download authorization. Its
-  `VITE_ENABLE_LEARNING_RESOURCES` switch defaults to `false`; the current
-  Vercel route remains authoritative until reconciliation and edge cutover.
+- The static Vite/React shell now provides session bootstrap, accessible
+  learning-resource search/detail and read-only member-profile routes,
+  generated OpenAPI types, strict runtime response checks, error boundaries,
+  responsive loading/empty/error states, and CSRF-protected external-download
+  authorization. Learning resources and member profile have independent,
+  disabled-by-default `VITE_ENABLE_LEARNING_RESOURCES` and
+  `VITE_ENABLE_MEMBER_PROFILE` release switches; the current Vercel routes
+  remain authoritative until reconciliation and edge cutover.
+- Mobile navigation is now a compact top-header navigation surface in both the
+  migration shell and static SPA. The fixed bottom dock was removed so it no
+  longer obscures catalog content or competes with browser controls.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

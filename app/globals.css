@@ -598,14 +598,7 @@
   .root-container {
     @apply relative flex min-h-screen flex-1 flex-col px-4 pt-4 xs:px-7 md:px-10 lg:px-14;
     @apply w-full max-w-full overflow-x-hidden;
-
-    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
-  }
-
-  @media (min-width: 768px) {
-    .root-container {
-      padding-bottom: 4rem;
-    }
+    padding-bottom: 4rem;
   }
 
   /* Book Details */

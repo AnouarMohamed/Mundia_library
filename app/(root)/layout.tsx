@@ -11,7 +11,6 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import Header from "@/components/Header";
-import MobileBottomNav from "@/components/MobileBottomNav";
 import { requireApprovedUser } from "@/lib/security/auth-guards";
 
 /**
@@ -39,7 +38,6 @@ const Layout = async ({ children }: { children: ReactNode }) => {
       
       {/* Page Content */}
       {children}
-      <MobileBottomNav />
     </main>
   );
 };

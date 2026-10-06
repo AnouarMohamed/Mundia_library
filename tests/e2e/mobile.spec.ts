@@ -78,7 +78,7 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
       await page.goto(pathname);
       await expectNoHorizontalOverflow(page);
       await expect(
-        page.getByRole("navigation", { name: "Primary navigation" }),
+        page.getByRole("button", { name: "Open navigation" }),
       ).toBeVisible();
     }
   }
@@ -107,35 +107,31 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
     page.getByText("Algorithms", { exact: true }).first(),
   ).toBeVisible();
 
-  const bottomSpacing = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    const navigation = document.querySelector(
-      'nav[aria-label="Primary navigation"]',
-    );
-    return {
-      mainPaddingBottom: Number.parseFloat(
-        main ? getComputedStyle(main).paddingBottom : "0",
-      ),
-      navigationHeight: navigation?.getBoundingClientRect().height ?? 0,
-    };
-  });
-  expect(bottomSpacing.mainPaddingBottom).toBeGreaterThanOrEqual(
-    bottomSpacing.navigationHeight,
+  const hasFixedBottomNavigation = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("nav")).some((navigation) => {
+      const style = getComputedStyle(navigation);
+      return style.position === "fixed" && style.bottom === "0px";
+    }),
   );
+  expect(hasFixedBottomNavigation).toBe(false);
 
   const accountMenuTrigger = page.getByRole("button", {
-    name: "Open account menu",
+    name: "Open navigation",
   });
   await expect(accountMenuTrigger).toBeEnabled();
   await accountMenuTrigger.click();
-  const accountDialog = page.getByRole("dialog", { name: "Account" });
+  const accountDialog = page.getByRole("dialog", { name: "Navigation" });
   await expect(accountDialog).toBeVisible();
   expect(
     await accountDialog.evaluate((element) => element.matches(":modal")),
   ).toBe(true);
+  await expect(accountDialog.getByRole("link", { name: "Library" })).toBeVisible();
+  await expect(accountDialog.getByRole("link", { name: "Catalog" })).toBeVisible();
+  await expect(accountDialog.getByRole("link", { name: "Open learning" })).toBeVisible();
+  await expect(accountDialog.getByRole("link", { name: "My account" })).toBeVisible();
   await expect(page.getByText("Request Admin Access")).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Account" })).not.toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Navigation" })).not.toBeVisible();
   await expect(accountMenuTrigger).toBeFocused();
 });
 

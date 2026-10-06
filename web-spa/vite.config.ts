@@ -17,6 +17,7 @@ export default defineConfig({
               schemaVersion: 1,
               featureFlags: {
                 learningResources: process.env.VITE_ENABLE_LEARNING_RESOURCES === "true",
+                memberProfile: process.env.VITE_ENABLE_MEMBER_PROFILE === "true",
               },
             },
             null,

@@ -25,8 +25,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .skip-link { position: fixed; left: 1rem; top: -5rem; z-index: 20; background: var(--surface); padding: .75rem 1rem; }
 .skip-link:focus { top: 1rem; }
 .site-header { min-height: 4.75rem; padding: .7rem clamp(1rem, 4vw, 3rem); display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+.header-primary { display: flex; align-items: center; gap: clamp(1.5rem, 4vw, 4rem); min-width: 0; }
 .brand { display: flex; align-items: center; gap: 1rem; text-decoration: none; color: var(--navy-strong); font-family: Georgia, "Times New Roman", serif; font-size: 1.25rem; }
 .brand img { width: 11rem; max-height: 3.15rem; object-fit: contain; object-position: left center; }
+.site-nav { align-self: stretch; display: flex; align-items: stretch; gap: 1.5rem; }
+.site-nav a { min-height: 3rem; display: flex; align-items: center; border-bottom: 2px solid transparent; color: var(--muted); font-size: .875rem; font-weight: 650; text-decoration: none; }
+.site-nav a:hover { color: var(--navy); }
+.site-nav a[aria-current="page"] { border-bottom-color: var(--navy); color: var(--navy); }
 .session-summary { display: flex; align-items: center; gap: 1rem; font-size: .875rem; color: var(--muted); }
 .session-action { min-height: 2.75rem; padding: 0 .9rem; border: 1px solid var(--line); background: transparent; color: var(--navy); font-weight: 650; cursor: pointer; }
 .page-shell, .detail-shell { width: min(75rem, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 4rem; }
@@ -86,16 +91,38 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .resource-facts dt { color: var(--muted); font-size: .78rem; }
 .resource-facts dd { margin: .3rem 0 0; overflow-wrap: anywhere; font-size: .9rem; font-weight: 650; }
 .resource-facts a { color: var(--navy); }
-.resource-skeleton, .detail-skeleton, .shell-skeleton { width: min(75rem, calc(100% - 2rem)); margin: 2rem auto; display: grid; gap: 1px; background: var(--line); }
+.profile-shell { width: min(68rem, calc(100% - 2rem)); margin: 0 auto; padding: 2.5rem 0 5rem; }
+.profile-heading { padding-bottom: 2rem; border-bottom: 1px solid var(--line); }
+.profile-heading h1 { max-width: 22ch; margin: .4rem 0 1rem; font: 400 clamp(2rem, 4vw, 2.75rem)/1.08 Georgia, "Times New Roman", serif; }
+.membership-summary { display: flex; align-items: center; gap: .8rem; }
+.membership-summary p { margin: 0; color: var(--muted); line-height: 1.5; }
+.membership-status { flex: none; padding: .35rem .55rem; border: 1px solid var(--line); font-size: .75rem; font-weight: 750; }
+.membership-status-approved { border-color: oklch(72% .08 150); color: oklch(40% .1 150); background: oklch(94% .035 150); }
+.membership-status-pending { border-color: oklch(78% .09 78); color: oklch(43% .1 72); background: oklch(96% .04 82); }
+.membership-status-rejected { border-color: oklch(77% .08 28); color: oklch(44% .13 28); background: oklch(96% .03 28); }
+.profile-layout { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: clamp(2rem, 6vw, 5rem); padding-top: 2rem; }
+.profile-layout h2 { margin: 0 0 1rem; font: 400 1.5rem Georgia, "Times New Roman", serif; }
+.profile-ledger { margin: 0; border-top: 1px solid var(--line); }
+.profile-ledger > div { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+.profile-ledger dt { color: var(--muted); font-size: .8rem; }
+.profile-ledger dd { margin: 0; overflow-wrap: anywhere; font-weight: 650; }
+.profile-note { align-self: start; padding: 1.25rem 0; border-top: 3px solid var(--navy); border-bottom: 1px solid var(--line); }
+.profile-note h2 { margin: .45rem 0 .65rem; font-size: 1.25rem; }
+.profile-note > p:last-child { margin: 0; color: var(--muted); font-size: .875rem; line-height: 1.6; }
+.resource-skeleton, .detail-skeleton, .profile-skeleton, .shell-skeleton { width: min(75rem, calc(100% - 2rem)); margin: 2rem auto; display: grid; gap: 1px; background: var(--line); }
 .resource-skeleton span { height: 9rem; background: var(--surface); animation: pulse 1.3s ease-in-out infinite alternate; }
-.detail-skeleton span, .shell-skeleton span { height: 4rem; background: var(--surface); animation: pulse 1.3s ease-in-out infinite alternate; }
+.detail-skeleton span, .profile-skeleton span, .shell-skeleton span { height: 4rem; background: var(--surface); animation: pulse 1.3s ease-in-out infinite alternate; }
 @keyframes pulse { from { opacity: .55; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
 
 @media (max-width: 700px) {
-  .site-header { min-height: 4rem; padding: .5rem 1rem; }
+  .site-header { min-height: 4rem; padding: .5rem 1rem 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .35rem .75rem; }
+  .header-primary { min-width: 0; display: contents; }
   .brand img { width: 8.75rem; }
   .brand span, .session-summary > span { display: none; }
+  .site-nav { grid-column: 1 / -1; grid-row: 2; min-width: 0; gap: 0; border-top: 1px solid var(--line); }
+  .site-nav a { flex: 1; min-height: 2.9rem; justify-content: center; padding: 0 .65rem; font-size: .8rem; }
+  .session-summary { grid-column: 2; grid-row: 1; }
   .page-shell, .detail-shell { width: min(100% - 1.25rem, 75rem); padding-top: 1.2rem; }
   .page-heading h1, .detail-heading h1 { font-size: 2rem; }
   .resource-filters { grid-template-columns: 1fr; }
@@ -110,6 +137,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .resource-cover-detail { width: 6.5rem; }
   .detail-grid { grid-template-columns: 1fr; gap: 2rem; }
   .detail-actions .primary-action { width: 100%; }
+  .profile-shell { width: min(100% - 1.25rem, 68rem); padding-top: 1.5rem; }
+  .membership-summary { align-items: flex-start; flex-direction: column; }
+  .profile-layout { grid-template-columns: 1fr; gap: 2.5rem; }
+  .profile-ledger > div { grid-template-columns: 1fr; gap: .35rem; }
   .pagination { gap: .5rem; }
   .pagination a, .pagination > span { padding: 0 .65rem; }
 }

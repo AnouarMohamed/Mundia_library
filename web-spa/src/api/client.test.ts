@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getLearningResource, isPublicHttpsUrl, searchLearningResources } from "./client";
+import { ApiError, getLearningResource, getMemberProfile, isPublicHttpsUrl, searchLearningResources } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -24,6 +24,53 @@ describe("learning-resource BFF client", () => {
     expect(isPublicHttpsUrl("https://publisher.example.edu/book")).toBe(true);
   });
 });
+
+describe("member-profile BFF client", () => {
+  it("accepts a caller-bound profile contract", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(profile())));
+
+    await expect(getMemberProfile()).resolves.toMatchObject({
+      fullName: "Houda Benjdida",
+      role: "USER",
+      status: "APPROVED",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/membership/profile",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
+  it.each([
+    { fullName: "Unsafe\nName" },
+    { universityId: 0 },
+    { role: "ROOT" },
+    { createdAt: "2026-10-07T00:00:00Z", updatedAt: "2026-10-06T00:00:00Z" },
+  ])("rejects malformed profile data: %j", async (override) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ...profile(), ...override })));
+
+    await expect(getMemberProfile()).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+function jsonResponse(value: unknown) {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function profile() {
+  return {
+    memberId: "77777777-7777-4777-8777-777777777777",
+    email: "h.benjdida@mundiapolis.ma",
+    fullName: "Houda Benjdida",
+    universityId: 1,
+    status: "APPROVED",
+    role: "USER",
+    createdAt: "2026-10-01T10:00:00Z",
+    updatedAt: "2026-10-06T11:00:00Z",
+  };
+}
 
 function resource() {
   return {

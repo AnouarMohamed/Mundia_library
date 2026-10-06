@@ -1,11 +1,13 @@
 import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { LearningResourceDetailPage } from "./pages/LearningResourceDetailPage";
 import { LearningResourcesPage } from "./pages/LearningResourcesPage";
+import { MemberProfilePage } from "./pages/MemberProfilePage";
 import { getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
 const resourcesEnabled = import.meta.env.VITE_ENABLE_LEARNING_RESOURCES === "true";
+const profileEnabled = import.meta.env.VITE_ENABLE_MEMBER_PROFILE === "true";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,25 +29,35 @@ export function App() {
       </section>
     );
   }
+  const defaultPath = resourcesEnabled ? "/resources" : profileEnabled ? "/profile" : null;
   return (
     <AppErrorBoundary>
       <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="site-header">
-        <Link className="brand" to="/resources" aria-label="Mundiapolis Library home">
-          <img src={logoUrl} alt="Mundiapolis University" />
-          <span>Library</span>
-        </Link>
+        <div className="header-primary">
+          <Link className="brand" to={defaultPath ?? "/"} aria-label="Mundiapolis Library home">
+            <img src={logoUrl} alt="Mundiapolis University" />
+            <span>Library</span>
+          </Link>
+          {defaultPath && (
+            <nav className="site-nav" aria-label="Primary navigation">
+              {resourcesEnabled && <NavLink to="/resources">Open learning</NavLink>}
+              {profileEnabled && <NavLink to="/profile">My account</NavLink>}
+            </nav>
+          )}
+        </div>
         <div className="session-summary">
           {session.displayName && <span>{session.displayName}</span>}
           <button className="session-action" type="button" onClick={() => void logout().then(() => window.location.assign("/")).catch(() => window.location.reload())}>Sign out</button>
         </div>
       </header>
       <main id="main-content">
-        {resourcesEnabled ? (
+        {defaultPath ? (
           <Routes>
-            <Route path="/resources" element={<LearningResourcesPage />} />
-            <Route path="/resources/:resourceId" element={<LearningResourceDetailPage />} />
-            <Route path="*" element={<Navigate replace to="/resources" />} />
+            {resourcesEnabled && <Route path="/resources" element={<LearningResourcesPage />} />}
+            {resourcesEnabled && <Route path="/resources/:resourceId" element={<LearningResourceDetailPage />} />}
+            {profileEnabled && <Route path="/profile" element={<MemberProfilePage />} />}
+            <Route path="*" element={<Navigate replace to={defaultPath} />} />
           </Routes>
         ) : (
           <MigrationHold />
@@ -73,8 +85,8 @@ function MigrationHold() {
   return (
     <section className="status-page" aria-labelledby="migration-title">
       <p className="eyebrow">Migration safeguard</p>
-      <h1 id="migration-title">Open learning is not enabled on this release.</h1>
-      <p>The current library remains available while catalog reconciliation is completed.</p>
+      <h1 id="migration-title">The new library experience is not enabled on this release.</h1>
+      <p>The current library remains available while service data and edge routing are verified.</p>
     </section>
   );
 }
