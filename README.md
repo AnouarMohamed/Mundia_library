@@ -130,7 +130,7 @@ flowchart TD
   ServerActions -->|"Transactions"| DB
   API -->|"Queries / Mutations"| DB
   API -->|"Cached Reads / Rate Limit"| Redis
-  API -.->"Fallback Rate Limit"| DBRateLimit
+  API -.->|"Fallback Rate Limit"| DBRateLimit
   ServerActions -->|"Upload Media"| ImageKit
   ServerActions -->|"Schedule Reminder Jobs"| QStash
   QStash -->|"Send Due / Overdue Alerts"| Email
