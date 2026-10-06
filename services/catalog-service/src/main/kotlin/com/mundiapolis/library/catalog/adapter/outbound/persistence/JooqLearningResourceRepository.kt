@@ -44,7 +44,10 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
         var unchanged = 0
         val timestamp = OffsetDateTime.ofInstant(now, ZoneOffset.UTC)
         command.items.forEach { item ->
-            val existing = tx.select(RESOURCE_ID, CONTENT_SHA256, SOURCE_REVISION)
+            val existing = tx.select(
+                RESOURCE_ID, CONTENT_SHA256, SOURCE_REVISION, LICENSE_EXPRESSION,
+                LICENSE_URL, ACCESS_MODE, READ_URL, IS_ACTIVE,
+            )
                 .from(RESOURCE_TABLE)
                 .where(SOURCE_NAME.eq(command.sourceName).and(SOURCE_RECORD_KEY.eq(item.sourceRecordKey)))
                 .forUpdate()
@@ -57,12 +60,15 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
                     .columns(
                         RESOURCE_ID, SOURCE_NAME, SOURCE_RECORD_KEY, TITLE, AUTHOR, DESCRIPTION,
                         CATEGORY, LANGUAGE, COVER_URL, COVER_ALT, SOURCE_URL, CONTENT_SHA256,
+                        LICENSE_EXPRESSION, LICENSE_URL, ACCESS_MODE, READ_URL,
                         SOURCE_REVISION, IS_ACTIVE, CREATED_AT, UPDATED_AT,
                     )
                     .values(
                         item.resourceId, command.sourceName, item.sourceRecordKey, item.title,
                         item.author, item.description, item.category, item.language, item.coverUrl,
-                        item.coverAlt, item.sourceUrl, item.contentSha256, command.sourceRevision,
+                        item.coverAlt, item.sourceUrl, item.contentSha256,
+                        item.licenseExpression, item.licenseUrl, item.accessMode, item.readUrl,
+                        command.sourceRevision,
                         true, timestamp, timestamp,
                     )
                     .execute()
@@ -73,7 +79,12 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
                 }
                 if (
                     existing.get(CONTENT_SHA256) == item.contentSha256 &&
-                    existing.get(SOURCE_REVISION) == command.sourceRevision
+                    existing.get(SOURCE_REVISION) == command.sourceRevision &&
+                    existing.get(LICENSE_EXPRESSION) == item.licenseExpression &&
+                    existing.get(LICENSE_URL) == item.licenseUrl &&
+                    existing.get(ACCESS_MODE) == item.accessMode &&
+                    existing.get(READ_URL) == item.readUrl &&
+                    existing.get(IS_ACTIVE) == true
                 ) {
                     unchanged++
                 } else {
@@ -86,6 +97,10 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
                         .set(COVER_URL, item.coverUrl)
                         .set(COVER_ALT, item.coverAlt)
                         .set(SOURCE_URL, item.sourceUrl)
+                        .set(LICENSE_EXPRESSION, item.licenseExpression)
+                        .set(LICENSE_URL, item.licenseUrl)
+                        .set(ACCESS_MODE, item.accessMode)
+                        .set(READ_URL, item.readUrl)
                         .set(CONTENT_SHA256, item.contentSha256)
                         .set(SOURCE_REVISION, command.sourceRevision)
                         .set(IS_ACTIVE, true)
@@ -124,7 +139,8 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
 
     fun find(resourceId: UUID): LearningResource? = dsl.select(
         RESOURCE_ID, TITLE, AUTHOR, DESCRIPTION, CATEGORY, LANGUAGE,
-        COVER_URL, COVER_ALT, SOURCE_NAME, SOURCE_URL,
+        COVER_URL, COVER_ALT, SOURCE_NAME, SOURCE_URL, LICENSE_EXPRESSION,
+        LICENSE_URL, ACCESS_MODE, READ_URL,
     ).from(RESOURCE_TABLE)
         .where(RESOURCE_ID.eq(resourceId).and(IS_ACTIVE.isTrue))
         .fetchOne()?.toResource()
@@ -143,7 +159,8 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
         val total = dsl.fetchCount(RESOURCE_TABLE, condition)
         val resources = dsl.select(
             RESOURCE_ID, TITLE, AUTHOR, DESCRIPTION, CATEGORY, LANGUAGE,
-            COVER_URL, COVER_ALT, SOURCE_NAME, SOURCE_URL,
+            COVER_URL, COVER_ALT, SOURCE_NAME, SOURCE_URL, LICENSE_EXPRESSION,
+            LICENSE_URL, ACCESS_MODE, READ_URL,
         ).from(RESOURCE_TABLE)
             .where(condition)
             .orderBy(TITLE.asc(), RESOURCE_ID.asc())
@@ -164,6 +181,8 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
         requireNotNull(get(RESOURCE_ID)), requireNotNull(get(TITLE)), get(AUTHOR), get(DESCRIPTION),
         requireNotNull(get(CATEGORY)), requireNotNull(get(LANGUAGE)), get(COVER_URL), get(COVER_ALT),
         requireNotNull(get(SOURCE_NAME)), requireNotNull(get(SOURCE_URL)),
+        requireNotNull(get(LICENSE_EXPRESSION)), requireNotNull(get(LICENSE_URL)),
+        requireNotNull(get(ACCESS_MODE)), get(READ_URL),
     )
 
     private fun org.jooq.Record.toImportResult(importId: UUID, replayed: Boolean) =
@@ -191,6 +210,10 @@ class JooqLearningResourceRepository(private val dsl: DSLContext) {
         val COVER_URL = DSL.field(DSL.name("cover_url"), String::class.java)
         val COVER_ALT = DSL.field(DSL.name("cover_alt"), String::class.java)
         val SOURCE_URL = DSL.field(DSL.name("source_url"), String::class.java)
+        val LICENSE_EXPRESSION = DSL.field(DSL.name("license_expression"), String::class.java)
+        val LICENSE_URL = DSL.field(DSL.name("license_url"), String::class.java)
+        val ACCESS_MODE = DSL.field(DSL.name("access_mode"), String::class.java)
+        val READ_URL = DSL.field(DSL.name("read_url"), String::class.java)
         val CONTENT_SHA256 = DSL.field(DSL.name("content_sha256"), String::class.java)
         val SOURCE_REVISION = DSL.field(DSL.name("source_revision"), String::class.java)
         val IS_ACTIVE = DSL.field(DSL.name("is_active"), Boolean::class.java)

@@ -62,4 +62,10 @@ data class LearningResourceView(
     val coverAlt: String?,
     val sourceName: String,
     val sourceUrl: String,
+    val licenseExpression: String,
+    val licenseUrl: String,
+    val accessMode: LearningResourceAccessMode,
+    val readUrl: String?,
 )
+
+enum class LearningResourceAccessMode { DOWNLOAD, READ_AT_SOURCE }

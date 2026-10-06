@@ -17,6 +17,10 @@ const record = (key: string): CatalogBackfillRecord => ({
   category: "Engineering",
   language: "en",
   sourceUrl: `https://example.edu/books/${key}`,
+  licenseExpression: "CC-BY",
+  licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
+  downloadUrl: `https://example.edu/books/${key}.pdf`,
+  readUrl: null,
   contentHash: key.padStart(64, "a"),
   sourceRevision: "b".repeat(64),
 });

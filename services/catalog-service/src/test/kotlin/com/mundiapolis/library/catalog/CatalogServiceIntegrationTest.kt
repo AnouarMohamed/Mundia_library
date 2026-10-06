@@ -205,6 +205,8 @@ class CatalogServiceIntegrationTest {
             .andExpect(jsonPath("$.total").value(1))
             .andExpect(jsonPath("$.resources[0].resourceId").value(resourceId.toString()))
             .andExpect(jsonPath("$.resources[0].sourceUrl").value("https://example.edu/books/unix"))
+            .andExpect(jsonPath("$.resources[0].licenseExpression").value("CC-BY"))
+            .andExpect(jsonPath("$.resources[0].accessMode").value("DOWNLOAD"))
 
         mockMvc.perform(
             get("/api/v1/catalog/learning-resource-imports/$importId")
@@ -1372,6 +1374,10 @@ class CatalogServiceIntegrationTest {
             "coverUrl": "https://example.edu/covers/unix.jpg",
             "coverAlt": "Reliable UNIX Systems cover",
             "sourceUrl": "https://example.edu/books/unix",
+            "licenseExpression": "CC-BY",
+            "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+            "accessMode": "DOWNLOAD",
+            "readUrl": null,
             "contentSha256": "${"a".repeat(64)}"
           }]
         }

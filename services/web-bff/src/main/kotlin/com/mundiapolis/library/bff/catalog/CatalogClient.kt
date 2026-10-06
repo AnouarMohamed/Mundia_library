@@ -163,7 +163,12 @@ class CatalogClient(
             resource.coverAlt?.let { validText(it, 1, 300) } != false &&
             validText(resource.sourceName, 2, 100) &&
             validPublicHttpsUrl(resource.sourceUrl) &&
-            resource.coverUrl?.let(::validPublicHttpsUrl) != false
+            resource.coverUrl?.let(::validPublicHttpsUrl) != false &&
+            resource.licenseExpression in LICENSE_EXPRESSIONS &&
+            validPublicHttpsUrl(resource.licenseUrl) &&
+            ((resource.accessMode == LearningResourceAccessMode.DOWNLOAD && resource.readUrl == null) ||
+                (resource.accessMode == LearningResourceAccessMode.READ_AT_SOURCE &&
+                    resource.readUrl?.let(::validPublicHttpsUrl) == true))
 
     private fun validText(value: String, minimum: Int, maximum: Int, allowLines: Boolean = false): Boolean =
         value.length in minimum..maximum && value == value.trim() &&
@@ -219,6 +224,7 @@ class CatalogClient(
         const val MAXIMUM_CATEGORY_LENGTH = 128
         val IPV4_LITERAL = Regex("^[0-9.]+$")
         val ENCODED_PATH_SEPARATOR = Regex("%(?:2e|2f|5c)", RegexOption.IGNORE_CASE)
+        val LICENSE_EXPRESSIONS = setOf("CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN")
         val RETRYABLE_STATUSES = setOf(429, 502, 503, 504)
     }
 }

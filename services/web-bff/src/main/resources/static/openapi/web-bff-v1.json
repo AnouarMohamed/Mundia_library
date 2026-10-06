@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Library Web BFF API",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
   },
   "servers": [{ "url": "/" }],
@@ -514,53 +514,6 @@
       "csrfHeader": { "type": "apiKey", "in": "header", "name": "X-XSRF-TOKEN" }
     },
     "responses": {
-      "EditionDownloadAvailability": {
-        "type": "object",
-        "required": ["editionId", "downloadable", "formats"],
-        "properties": {
-          "editionId": { "type": "string", "format": "uuid" },
-          "downloadable": { "type": "boolean" },
-          "formats": { "type": "array", "maxItems": 2, "items": { "$ref": "#/components/schemas/DownloadableFormat" } }
-        },
-        "additionalProperties": false
-      },
-      "DownloadableFormat": {
-        "type": "object",
-        "required": ["assetId", "format", "mediaType", "sizeBytes", "sha256", "licenseExpression", "attribution"],
-        "properties": {
-          "assetId": { "type": "string", "format": "uuid" },
-          "format": { "type": "string", "enum": ["PDF", "EPUB"] },
-          "mediaType": { "type": "string", "enum": ["application/pdf", "application/epub+zip"] },
-          "sizeBytes": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1073741824 },
-          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "licenseExpression": { "type": "string", "minLength": 2, "maxLength": 128 },
-          "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 }
-        },
-        "additionalProperties": false
-      },
-      "DownloadAuthorization": {
-        "type": "object",
-        "required": ["authorizationId", "assetId", "downloadUrl", "expiresAt"],
-        "properties": {
-          "authorizationId": { "type": "string", "format": "uuid" },
-          "assetId": { "type": "string", "format": "uuid" },
-          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
-          "expiresAt": { "type": "string", "format": "date-time" }
-        },
-        "additionalProperties": false
-      },
-      "ExternalDownloadAuthorization": {
-        "type": "object",
-        "required": ["authorizationId", "resourceId", "sourceProvider", "licenseExpression", "downloadUrl"],
-        "properties": {
-          "authorizationId": { "type": "string", "format": "uuid" },
-          "resourceId": { "type": "string", "format": "uuid" },
-          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
-          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
-          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
-        },
-        "additionalProperties": false
-      },
       "Problem": {
         "description": "Stable non-sensitive error response",
         "content": {
@@ -610,6 +563,53 @@
       }
     },
     "schemas": {
+      "EditionDownloadAvailability": {
+        "type": "object",
+        "required": ["editionId", "downloadable", "formats"],
+        "properties": {
+          "editionId": { "type": "string", "format": "uuid" },
+          "downloadable": { "type": "boolean" },
+          "formats": { "type": "array", "maxItems": 2, "items": { "$ref": "#/components/schemas/DownloadableFormat" } }
+        },
+        "additionalProperties": false
+      },
+      "DownloadableFormat": {
+        "type": "object",
+        "required": ["assetId", "format", "mediaType", "sizeBytes", "sha256", "licenseExpression", "attribution"],
+        "properties": {
+          "assetId": { "type": "string", "format": "uuid" },
+          "format": { "type": "string", "enum": ["PDF", "EPUB"] },
+          "mediaType": { "type": "string", "enum": ["application/pdf", "application/epub+zip"] },
+          "sizeBytes": { "type": "integer", "format": "int64", "minimum": 1, "maximum": 1073741824 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "licenseExpression": { "type": "string", "minLength": 2, "maxLength": 128 },
+          "attribution": { "type": "string", "minLength": 2, "maxLength": 1000 }
+        },
+        "additionalProperties": false
+      },
+      "DownloadAuthorization": {
+        "type": "object",
+        "required": ["authorizationId", "assetId", "downloadUrl", "expiresAt"],
+        "properties": {
+          "authorizationId": { "type": "string", "format": "uuid" },
+          "assetId": { "type": "string", "format": "uuid" },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "expiresAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "ExternalDownloadAuthorization": {
+        "type": "object",
+        "required": ["authorizationId", "resourceId", "sourceProvider", "licenseExpression", "downloadUrl"],
+        "properties": {
+          "authorizationId": { "type": "string", "format": "uuid" },
+          "resourceId": { "type": "string", "format": "uuid" },
+          "sourceProvider": { "type": "string", "minLength": 2, "maxLength": 100 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"] },
+          "downloadUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
+        },
+        "additionalProperties": false
+      },
       "Session": {
         "type": "object",
         "required": ["authenticated"],
@@ -678,7 +678,7 @@
       },
       "LearningResource": {
         "type": "object",
-        "required": ["resourceId", "title", "author", "description", "category", "language", "coverUrl", "coverAlt", "sourceName", "sourceUrl"],
+        "required": ["resourceId", "title", "author", "description", "category", "language", "coverUrl", "coverAlt", "sourceName", "sourceUrl", "licenseExpression", "licenseUrl", "accessMode", "readUrl"],
         "properties": {
           "resourceId": { "type": "string", "format": "uuid" },
           "title": { "type": "string", "minLength": 1, "maxLength": 500 },
@@ -689,7 +689,11 @@
           "coverUrl": { "type": ["string", "null"], "format": "uri", "pattern": "^https://", "maxLength": 2048 },
           "coverAlt": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
           "sourceName": { "type": "string", "minLength": 2, "maxLength": 100 },
-          "sourceUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 }
+          "sourceUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN"] },
+          "licenseUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "accessMode": { "type": "string", "enum": ["DOWNLOAD", "READ_AT_SOURCE"] },
+          "readUrl": { "type": ["string", "null"], "format": "uri", "pattern": "^https://", "maxLength": 2048 }
         },
         "additionalProperties": false
       },

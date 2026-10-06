@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Authoritative catalog metadata and privacy-safe review commands and reads. Copy counts and returned-loan eligibility are versioned projections owned by Circulation."
   },
   "paths": {
@@ -507,7 +507,7 @@
       "LearningResource": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["resourceId", "title", "category", "language", "sourceName", "sourceUrl"],
+        "required": ["resourceId", "title", "category", "language", "sourceName", "sourceUrl", "licenseExpression", "licenseUrl", "accessMode", "readUrl"],
         "properties": {
           "resourceId": { "type": "string", "format": "uuid" },
           "title": { "type": "string" },
@@ -518,7 +518,11 @@
           "coverUrl": { "type": ["string", "null"], "format": "uri" },
           "coverAlt": { "type": ["string", "null"] },
           "sourceName": { "type": "string" },
-          "sourceUrl": { "type": "string", "format": "uri" }
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN"] },
+          "licenseUrl": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "accessMode": { "type": "string", "enum": ["DOWNLOAD", "READ_AT_SOURCE"] },
+          "readUrl": { "type": ["string", "null"], "format": "uri", "pattern": "^https://" }
         }
       },
       "LearningResourcePage": {
@@ -535,7 +539,7 @@
       "LearningResourceImportItemRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["resourceId", "sourceRecordKey", "title", "category", "language", "sourceUrl", "contentSha256"],
+        "required": ["resourceId", "sourceRecordKey", "title", "category", "language", "sourceUrl", "licenseExpression", "licenseUrl", "accessMode", "readUrl", "contentSha256"],
         "properties": {
           "resourceId": { "type": "string", "format": "uuid" },
           "sourceRecordKey": { "type": "string", "maxLength": 512 },
@@ -547,6 +551,10 @@
           "coverUrl": { "type": ["string", "null"], "format": "uri", "maxLength": 2048 },
           "coverAlt": { "type": ["string", "null"], "maxLength": 300 },
           "sourceUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+          "licenseExpression": { "type": "string", "enum": ["CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN"] },
+          "licenseUrl": { "type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048 },
+          "accessMode": { "type": "string", "enum": ["DOWNLOAD", "READ_AT_SOURCE"] },
+          "readUrl": { "type": ["string", "null"], "format": "uri", "pattern": "^https://", "maxLength": 2048 },
           "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
         }
       },

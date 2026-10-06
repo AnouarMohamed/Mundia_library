@@ -1,0 +1,5 @@
+{
+  "name": "@mundia/library-spa",
+  "private": true,
+  "type": "module"
+}

@@ -29,6 +29,7 @@
     "services/**/*",
     "tools/**/*",
     "platform/**/*",
+    "web-spa/**/*",
     "**/*.test.ts",
     "**/*.test.tsx",
     "database/migrate-from-csv.ts",

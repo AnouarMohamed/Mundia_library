@@ -14,6 +14,10 @@ data class LearningResource(
     val coverAlt: String?,
     val sourceName: String,
     val sourceUrl: String,
+    val licenseExpression: String,
+    val licenseUrl: String,
+    val accessMode: String,
+    val readUrl: String?,
 )
 
 data class LearningResourcePage(
@@ -34,6 +38,10 @@ data class LearningResourceImportItem(
     val coverUrl: String?,
     val coverAlt: String?,
     val sourceUrl: String,
+    val licenseExpression: String,
+    val licenseUrl: String,
+    val accessMode: String,
+    val readUrl: String?,
     val contentSha256: String,
 )
 

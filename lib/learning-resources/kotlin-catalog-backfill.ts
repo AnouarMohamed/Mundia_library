@@ -14,6 +14,10 @@ export interface CatalogBackfillRecord {
   category: string;
   language: string;
   sourceUrl: string;
+  licenseExpression: string;
+  licenseUrl: string;
+  downloadUrl: string | null;
+  readUrl: string | null;
   contentHash: string;
   sourceRevision: string;
 }
@@ -33,6 +37,10 @@ export interface CatalogBackfillBatch {
     coverUrl: string | null;
     coverAlt: string | null;
     sourceUrl: string;
+    licenseExpression: string;
+    licenseUrl: string;
+    accessMode: "DOWNLOAD" | "READ_AT_SOURCE";
+    readUrl: string | null;
     contentSha256: string;
   }>;
 }
@@ -71,7 +79,7 @@ export function createCatalogBackfillBatches(
       const sourceName = chunk[0]!.sourceName;
       const sourceRevision = chunk[0]!.sourceRevision;
       const identity = createHash("sha256")
-        .update("catalog-backfill-v1\u0000")
+        .update("catalog-backfill-v2\u0000")
         .update(sourceName)
         .update("\u0000")
         .update(sourceRevision)
@@ -97,6 +105,10 @@ export function createCatalogBackfillBatches(
           coverUrl: record.coverUrl,
           coverAlt: record.coverAlt,
           sourceUrl: record.sourceUrl,
+          licenseExpression: record.licenseExpression,
+          licenseUrl: record.licenseUrl,
+          accessMode: record.downloadUrl ? "DOWNLOAD" : "READ_AT_SOURCE",
+          readUrl: record.downloadUrl ? null : (record.readUrl ?? record.sourceUrl),
           contentSha256: record.contentHash,
         })),
       });

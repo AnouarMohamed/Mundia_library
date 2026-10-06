@@ -528,14 +528,19 @@ re-evaluated in October 2026, but its current catalog-wide CC BY-NC-SA terms are
 outside this project's CC BY/CC BY-SA/CC0/public-domain allowlist. It remains
 excluded unless a durable qualifying per-edition licence can be proven. Catalog
 metadata ownership has now moved into the Kotlin Catalog boundary. Catalog V8
-adds indexed learning-resource metadata plus immutable import receipts; bounded
+adds indexed learning-resource metadata plus immutable import receipts; V9
+adds licence links and explicit download/read-at-source display modes while
+leaving every download decision in Digital Content. Bounded
 machine-scoped commands are actor- and manifest-bound, and dedicated read APIs
 provide stable search, detail, and category results without exposing download
 targets. The verified-only legacy backfill command creates deterministic batches
 of at most 250 records and performs read-after-write receipt reconciliation.
 Running that backfill against production, archiving its evidence, and completing
 the Kotlin BFF/SPA read cutover remain pending before the temporary Next.js read
-slice can retire.
+slice can retire. The initial static Vite shell now consumes generated BFF types,
+boots the server-held session, renders responsive learning-resource search and
+detail states, and obtains CSRF-protected download authorizations. Its cutover
+flag is disabled by default until backfill reconciliation and edge tests pass.
 
 Exit gate: broker/provider/search outages cannot corrupt authoritative state;
 replay and full projection rebuilds are demonstrated.

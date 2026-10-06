@@ -89,6 +89,13 @@
       }
     },
     {
+      "files": ["web-spa/**/*.ts", "web-spa/**/*.tsx"],
+      "rules": {
+        "nextjs/no-html-link-for-pages": "off",
+        "nextjs/no-img-element": "off"
+      }
+    },
+    {
       "files": ["components/BookVideo.tsx", "components/FileUpload.tsx"],
       "rules": {
         "jsx-a11y/media-has-caption": "off"

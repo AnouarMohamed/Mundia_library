@@ -250,7 +250,8 @@ class CatalogCommandController(
                     LearningResourceImportItem(
                         item.resourceId, item.sourceRecordKey, item.title, item.author,
                         item.description, item.category, item.language, item.coverUrl,
-                        item.coverAlt, item.sourceUrl, item.contentSha256,
+                        item.coverAlt, item.sourceUrl, item.licenseExpression,
+                        item.licenseUrl, item.accessMode, item.readUrl, item.contentSha256,
                     )
                 },
                 principalResolver.ownerFingerprint(authentication),
@@ -382,6 +383,10 @@ data class LearningResourceImportItemRequest(
     val coverUrl: String?,
     val coverAlt: String?,
     val sourceUrl: String,
+    val licenseExpression: String,
+    val licenseUrl: String,
+    val accessMode: String,
+    val readUrl: String?,
     val contentSha256: String,
 )
 

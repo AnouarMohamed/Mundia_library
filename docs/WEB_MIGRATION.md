@@ -68,13 +68,19 @@ in step 2:
   claim. The browser supplies only an edition, loan, or reservation UUID, CSRF
   token, and bounded actor-scoped idempotency key; it cannot select a member
   identity.
+- The first static Vite/React shell now provides session bootstrap, accessible
+  learning-resource search/detail routes, generated OpenAPI types, strict
+  runtime response checks, error boundaries, responsive loading/empty/error
+  states, and CSRF-protected external-download authorization. Its
+  `VITE_ENABLE_LEARNING_RESOURCES` switch defaults to `false`; the current
+  Vercel route remains authoritative until reconciliation and edge cutover.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 
 The deployment is not production-routed. Institutional IdP client
 registration with token exchange, Redis failover testing, circulation admin
-routes, Notification BFF routing, Kubernetes values, edge routing, and the
-React shell remain required before a UI slice moves. A Kotlin Notification
+routes, Notification BFF routing, Kubernetes values, edge routing, and
+production browser parity remain required before a UI slice moves. A Kotlin Notification
 service boundary now exists for caller-bound inbox reads and mark-read state,
 with production-shaped Kafka ingestion and a lease/retry/dead-letter email
 worker core. Its service-authenticated, audience-scoped Membership recipient

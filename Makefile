@@ -14,7 +14,7 @@ GRADLE := ./gradlew
 TRIVY_IMAGE := aquasec/trivy:0.72.0
 TRIVY_CACHE_VOLUME := mundia-library-trivy-cache
 
-.PHONY: help toolchain bootstrap contracts database-ci web-ci-fast web-ci services-ci migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
+.PHONY: help toolchain bootstrap contracts database-ci spa-ci web-ci-fast web-ci services-ci migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
 
 WEB_CI_ENV := \
 	APP_ENV=development \
@@ -71,6 +71,10 @@ database-ci: toolchain ## Rehearse legacy PostgreSQL migrations, seed, and concu
 	@DATABASE_URL=$(DATABASE_URL) ALLOW_TEST_FIXTURES=true $(NPM) run seed
 	@DATABASE_URL=$(DATABASE_URL) $(NPM) run db:verify-concurrency
 	@DATABASE_URL=$(DATABASE_URL) $(NPM) run db:verify-rate-limits
+
+spa-ci: toolchain contracts ## Generate, typecheck, test, and build the static React migration shell
+	@$(NPM) run spa:build
+	@$(NPM) run spa:test
 
 web-ci-fast: toolchain ## Run web gates with database-dependent browser cases disabled
 	@$(WEB_CI_ENV) $(NPM) run ci:quality

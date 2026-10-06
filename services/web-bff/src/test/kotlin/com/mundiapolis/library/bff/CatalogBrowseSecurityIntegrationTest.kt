@@ -9,6 +9,7 @@ import com.mundiapolis.library.bff.catalog.CatalogSearchView
 import com.mundiapolis.library.bff.catalog.LearningResourcePageView
 import com.mundiapolis.library.bff.catalog.LearningResourceSearchCriteria
 import com.mundiapolis.library.bff.catalog.LearningResourceView
+import com.mundiapolis.library.bff.catalog.LearningResourceAccessMode
 import com.mundiapolis.library.bff.config.BffProperties
 import com.mundiapolis.library.bff.config.SecurityConfiguration
 import org.junit.jupiter.api.Test
@@ -150,6 +151,10 @@ class CatalogBrowseSecurityIntegrationTest {
                 "The Linux Command Line cover",
                 "Official publisher",
                 "https://source.example.org/books/linux",
+                "CC-BY",
+                "https://creativecommons.org/licenses/by/4.0/",
+                LearningResourceAccessMode.DOWNLOAD,
+                null,
             )
         }
     }

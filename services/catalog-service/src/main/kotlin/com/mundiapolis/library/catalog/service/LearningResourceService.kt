@@ -75,6 +75,10 @@ class LearningResourceService(
             coverUrl = item.coverUrl?.let(::strictPublicHttpsUrl),
             coverAlt = item.coverAlt?.safeOptionalText("coverAlt", 300),
             sourceUrl = strictPublicHttpsUrl(item.sourceUrl),
+            licenseExpression = item.licenseExpression.safeText("licenseExpression", 64),
+            licenseUrl = strictPublicHttpsUrl(item.licenseUrl),
+            accessMode = item.accessMode.safeText("accessMode", 24),
+            readUrl = item.readUrl?.let(::strictPublicHttpsUrl),
             contentSha256 = item.contentSha256.lowercase(),
         )
         if ((normalized.coverUrl == null) != (normalized.coverAlt == null)) {
@@ -83,11 +87,19 @@ class LearningResourceService(
         if (!SHA256.matches(normalized.contentSha256)) {
             throw InvalidCatalogCommandException("contentSha256 must be a lowercase SHA-256 digest")
         }
+        if (
+            normalized.licenseExpression !in LICENSE_EXPRESSIONS ||
+            normalized.accessMode !in ACCESS_MODES ||
+            (normalized.accessMode == "DOWNLOAD" && normalized.readUrl != null) ||
+            (normalized.accessMode == "READ_AT_SOURCE" && normalized.readUrl == null)
+        ) {
+            throw InvalidCatalogCommandException("learning-resource access metadata is invalid")
+        }
         return normalized
     }
 
     private fun canonicalManifest(command: LearningResourceImportCommand): String = buildString {
-        append("catalog-learning-resource-import-v1")
+        append("catalog-learning-resource-import-v2")
         field(command.importId.toString())
         field(command.sourceName)
         field(command.sourceRevision)
@@ -102,6 +114,10 @@ class LearningResourceService(
             field(item.coverUrl.orEmpty())
             field(item.coverAlt.orEmpty())
             field(item.sourceUrl)
+            field(item.licenseExpression)
+            field(item.licenseUrl)
+            field(item.accessMode)
+            field(item.readUrl.orEmpty())
             field(item.contentSha256)
         }
     }
@@ -157,6 +173,8 @@ class LearningResourceService(
     private companion object {
         const val MAX_BATCH_SIZE = 250
         val SHA256 = Regex("^[0-9a-f]{64}$")
+        val LICENSE_EXPRESSIONS = setOf("CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN")
+        val ACCESS_MODES = setOf("DOWNLOAD", "READ_AT_SOURCE")
         val IPV4_LITERAL = Regex("^[0-9.]+$")
         val ENCODED_PATH_SEPARATOR = Regex("%(?:2e|2f|5c)", RegexOption.IGNORE_CASE)
     }

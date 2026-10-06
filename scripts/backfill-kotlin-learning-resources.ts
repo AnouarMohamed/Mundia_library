@@ -27,6 +27,10 @@ async function main() {
         category: learningResources.category,
         language: learningResources.language,
         sourceUrl: learningResources.sourceUrl,
+        licenseExpression: learningResources.licenseExpression,
+        licenseUrl: learningResources.licenseUrl,
+        downloadUrl: learningResources.downloadUrl,
+        readUrl: learningResources.readUrl,
         contentHash: learningResources.contentHash,
         sourceRevision: learningResources.sourceRevision,
       })

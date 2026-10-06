@@ -93,7 +93,9 @@ Application reads use `catalog.learning-resource.read` with indexed, stable
 paging at `GET /api/v1/catalog/learning-resources`; detail and category routes
 share that scope. The browser-facing equivalents now run through the Web BFF
 with session-bound token exchange and strict downstream validation. These
-responses deliberately contain no download URL or licence decision. The
+responses include bounded licence and access-mode display metadata but never a
+download target or authorization decision. Digital Content remains the
+authority that rechecks rights and issues an audited download URL. The
 legacy-to-Kotlin backfill is dry-run by default:
 
 ```bash

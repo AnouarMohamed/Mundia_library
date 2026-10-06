@@ -236,7 +236,11 @@ class CatalogClientTest {
               "coverUrl": "https://covers.example.org/linux.jpg",
               "coverAlt": "The Linux Command Line cover",
               "sourceName": "Official publisher",
-              "sourceUrl": "https://source.example.org/books/linux"
+              "sourceUrl": "https://source.example.org/books/linux",
+              "licenseExpression": "CC-BY",
+              "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+              "accessMode": "DOWNLOAD",
+              "readUrl": null
             }
         """.trimIndent()
 
