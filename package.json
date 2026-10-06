@@ -15,6 +15,8 @@
     "spa:typecheck": "tsc -p web-spa/tsconfig.json",
     "spa:test": "vitest run web-spa/src",
     "spa:build": "npm run spa:generate && git diff --exit-code -- web-spa/src/api/schema.d.ts && npm run spa:typecheck && vite build --config web-spa/vite.config.ts",
+    "spa:package": "node scripts/package-spa-release.mjs",
+    "spa:release": "npm run spa:build && npm run spa:test && npm run spa:package",
     "start": "next start",
     "lint": "oxlint --deny-warnings --report-unused-disable-directives .",
     "typecheck": "tsc --noEmit",

@@ -181,6 +181,22 @@ jobs:
           ENABLE_WORKFLOWS: "false"
         run: npm run build
 
+      - name: Package verified static SPA
+        run: npm run spa:package
+
+      - name: Upload immutable SPA deployment artifact
+        if: >-
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: web-spa-${{ github.sha }}
+          path: |
+            dist/web-spa
+            dist/web-spa-manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
   circulation-migration-tool:
     name: Circulation Migration Tool (PostgreSQL 18)
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft

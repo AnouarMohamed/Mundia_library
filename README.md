@@ -37,6 +37,7 @@ The Next.js product is live while a measured strangler migration moves domain ow
 - [Environment Configuration](#environment-configuration)
 - [Testing & Quality Assurance](#testing--quality-assurance)
 - [Deployment Options](#deployment-options)
+- [Kubernetes and AWS Platform](#kubernetes-and-aws-platform)
 - [Security & Governance](#security--governance)
 - [Documentation Directory](#documentation-directory)
 
@@ -336,6 +337,21 @@ The application supports three production deployment targets:
 3. **Standalone Server Bundle**: Next.js is configured with `output: "standalone"`, producing an optimized production bundle suitable for custom Node.js servers.
 
 Refer to [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructions and environment verification.
+
+---
+
+## Kubernetes and AWS Platform
+
+The future production platform is isolated under [`platform/`](platform/README.md):
+Kubernetes desired state is in `platform/gitops/`, reusable charts are in
+`platform/helm/`, and admission policies are in `platform/policies/`. Terraform
+for EKS and managed AWS boundaries lives alongside them in
+`platform/terraform/`. There is intentionally no duplicate top-level
+`kubernetes/` tree.
+
+These files are reviewable infrastructure contracts, not evidence that AWS is
+currently deployed. Running Terraform would create billable resources and
+requires an explicit, reviewed environment approval.
 
 ---
 

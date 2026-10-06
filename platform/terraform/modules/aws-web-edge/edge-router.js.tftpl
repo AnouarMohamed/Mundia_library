@@ -1,0 +1,42 @@
+function encodeQuery(query) {
+  var parts = [];
+  Object.keys(query).sort().forEach(function (key) {
+    var entry = query[key];
+    var values = entry.multiValue || [entry];
+    values.forEach(function (item) {
+      parts.push(encodeURIComponent(key) + "=" + encodeURIComponent(item.value || ""));
+    });
+  });
+  return parts.length ? "?" + parts.join("&") : "";
+}
+
+function handler(event) {
+  var request = event.request;
+  var host = request.headers.host.value.toLowerCase();
+  var redirectHosts = ${redirect_hosts_json};
+  if (redirectHosts.indexOf(host) !== -1) {
+    return {
+      statusCode: 308,
+      statusDescription: "Permanent Redirect",
+      headers: {
+        location: {
+          value: "https://${canonical_host}" + request.uri + encodeQuery(request.querystring),
+        },
+        "cache-control": { value: "public, max-age=3600" },
+      },
+    };
+  }
+
+  var dynamicPrefixes = ["/api/v1/", "/oauth2/authorization/", "/login/oauth2/code/"];
+  if (request.uri === "/error" || dynamicPrefixes.some(function (prefix) {
+    return request.uri.indexOf(prefix) === 0;
+  })) {
+    return request;
+  }
+
+  var lastSegment = request.uri.split("/").pop();
+  if (request.uri.endsWith("/") || lastSegment.indexOf(".") === -1) {
+    request.uri = "/index.html";
+  }
+  return request;
+}

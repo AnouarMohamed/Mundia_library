@@ -859,6 +859,16 @@ def validate_terraform_contract() -> list[str]:
             "external_secrets_identity",
             "postgres_migration_secret_arn",
         ],
+        "terraform/modules/aws-web-edge/main.tf": [
+            'resource "aws_cloudfront_origin_access_control" "spa"',
+            'signing_behavior                  = "always"',
+            'resource "aws_s3_bucket_public_access_block" "spa"',
+            'block_public_policy     = true',
+            'path_pattern               = "/assets/*"',
+            'viewer_protocol_policy     = "redirect-to-https"',
+            'minimum_protocol_version = "TLSv1.2_2021"',
+            'web_acl_id          = var.web_acl_arn',
+        ],
     }
     for relative, fragments in required_fragments.items():
         text = (PLATFORM_ROOT / relative).read_text(encoding="utf-8")

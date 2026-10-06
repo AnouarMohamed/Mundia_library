@@ -86,6 +86,13 @@ in step 2:
   uncacheable, `www` permanently redirects to the apex, and the BFF origin must
   reject direct internet traffic. It is not permission to provision AWS and
   must be translated into reviewed CDN/WAF infrastructure before cutover.
+- CI now packages the already-tested SPA as an immutable artifact with its
+  source revision, compiled feature flags, aggregate SHA-256, per-file hashes,
+  sizes, and cache directives. The dormant `aws-web-edge` Terraform module
+  translates the routing contract into private S3 Origin Access Control and
+  CloudFront behavior definitions, but no environment calls the module yet.
+  Applying it would create billable AWS resources and remains an explicit
+  approval gate.
 
 The deployment is not production-routed. Institutional IdP client
 registration with token exchange, Redis failover testing, circulation admin

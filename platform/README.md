@@ -58,6 +58,16 @@ platform/
     └── modules/               AWS implementation and portable contracts
 ```
 
+## Where Kubernetes lives
+
+Kubernetes is intentionally isolated inside `platform/`, not a separate
+top-level directory. `platform/gitops/` is the deployable desired state,
+`platform/helm/` contains workload charts, and `platform/policies/` contains
+admission controls. Terraform remains beside them because it creates the EKS
+control plane and the cloud identities those manifests consume. This keeps one
+platform ownership boundary without mixing Kubernetes resources into service
+source directories.
+
 ## Trust boundaries
 
 ```text

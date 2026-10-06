@@ -9,6 +9,7 @@ backfill, parity, rollback, and edge-routing gates.
 npm run spa:generate
 VITE_ENABLE_LEARNING_RESOURCES=true npm run spa:build
 npm run spa:test
+npm run spa:release
 ```
 
 `VITE_ENABLE_LEARNING_RESOURCES` defaults to disabled. Enable it only for a
@@ -20,3 +21,9 @@ CSRF token first.
 During local development, Vite proxies `/api`, `/oauth2`, and `/login` to the
 Web BFF at `http://localhost:8080`. Production must present the static assets
 and those BFF paths through one HTTPS origin.
+
+`npm run spa:release` produces `dist/web-spa` plus a deterministic
+`dist/web-spa-manifest.json` containing the full source revision, aggregate
+SHA-256, per-file hashes, sizes, feature flags, and deployment cache policy.
+CI uploads those exact tested files; later environments promote that artifact
+without rebuilding it.
