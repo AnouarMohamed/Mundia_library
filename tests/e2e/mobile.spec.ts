@@ -125,8 +125,14 @@ test("core student flows preserve mobile navigation and touch ergonomics", async
   expect(
     await accountDialog.evaluate((element) => element.matches(":modal")),
   ).toBe(true);
+  const sidebarBounds = await accountDialog.locator("aside").boundingBox();
+  expect(sidebarBounds?.x ?? -1).toBeLessThanOrEqual(1);
+  expect(sidebarBounds?.width ?? 0).toBeLessThanOrEqual(320);
   await expect(accountDialog.getByRole("link", { name: "Library" })).toBeVisible();
-  await expect(accountDialog.getByRole("link", { name: "Catalog" })).toBeVisible();
+  await expect(accountDialog.getByRole("link", { name: "Catalog" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   await expect(accountDialog.getByRole("link", { name: "Open learning" })).toBeVisible();
   await expect(accountDialog.getByRole("link", { name: "My account" })).toBeVisible();
   await expect(page.getByText("Request Admin Access")).toHaveCount(0);

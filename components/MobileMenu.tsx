@@ -1,10 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { LogOut, Menu, X } from "lucide-react";
+import {
+  BookCopy,
+  BookOpen,
+  BookmarkCheck,
+  CalendarClock,
+  GraduationCap,
+  LayoutDashboard,
+  LibraryBig,
+  LogOut,
+  Menu,
+  UserCheck,
+  UserRound,
+  UsersRound,
+  Workflow,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { signOut } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { showToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 interface MobileMenuProps {
   fullName: string;
@@ -13,12 +32,37 @@ interface MobileMenuProps {
   isAdmin: boolean;
 }
 
+interface NavigationItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+const libraryItems: NavigationItem[] = [
+  { href: "/library", label: "Library", icon: LibraryBig },
+  { href: "/all-books", label: "Catalog", icon: BookOpen },
+  { href: "/resources", label: "Open learning", icon: GraduationCap },
+  { href: "/my-profile", label: "My account", icon: UserRound },
+];
+
+const adminItems: NavigationItem[] = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/automation", label: "Automation", icon: Workflow },
+  { href: "/admin/users", label: "Users", icon: UsersRound },
+  { href: "/admin/books", label: "Catalog management", icon: BookCopy },
+  { href: "/admin/learning-resources", label: "Learning resources", icon: GraduationCap },
+  { href: "/admin/book-requests", label: "Borrow requests", icon: BookmarkCheck },
+  { href: "/admin/renewal-requests", label: "Renewal requests", icon: CalendarClock },
+  { href: "/admin/account-requests", label: "Account requests", icon: UserCheck },
+];
+
 const MobileMenu = ({
   fullName,
   email,
   universityId,
   isAdmin,
 }: MobileMenuProps) => {
+  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -33,6 +77,17 @@ const MobileMenu = ({
 
   useEffect(() => {
     setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const desktopViewport = window.matchMedia("(min-width: 768px)");
+    const closeAtDesktop = (event: MediaQueryListEvent | MediaQueryList) => {
+      if (event.matches) setIsOpen(false);
+    };
+
+    closeAtDesktop(desktopViewport);
+    desktopViewport.addEventListener("change", closeAtDesktop);
+    return () => desktopViewport.removeEventListener("change", closeAtDesktop);
   }, []);
 
   useEffect(() => {
@@ -73,9 +128,6 @@ const MobileMenu = ({
     }
   };
 
-  const navLinkClass =
-    "flex min-h-12 items-center border-b border-[var(--mundia-line)] px-1 text-sm font-medium text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)]";
-
   return (
     <>
       <button
@@ -108,115 +160,102 @@ const MobileMenu = ({
           aria-hidden="true"
           tabIndex={-1}
         />
-        <div className="relative z-10 ml-auto flex h-full w-[min(88vw,22rem)] flex-col overflow-y-auto border-l border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
-          <div className="flex min-h-16 items-center justify-between border-b border-[var(--mundia-line)] px-4">
-            <h2
-              id="mobile-account-menu-title"
-              className="font-serif text-xl text-[var(--mundia-ink)]"
-            >
-              Navigation
-            </h2>
+        <aside className="mobile-navigation-panel relative z-10 flex h-full w-[min(86vw,20rem)] flex-col overflow-hidden border-r border-[var(--mundia-line)] bg-[var(--surface-card-strong)] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
+          <div className="flex min-h-16 shrink-0 items-center justify-between border-b border-[var(--mundia-line)] px-4">
+            <h2 id="mobile-account-menu-title" className="sr-only">Navigation</h2>
+            <Image
+              src="/images/mundiapolis-logo-transparent.png"
+              alt="Mundiapolis Library"
+              width={145}
+              height={45}
+              className="h-auto w-[132px]"
+              priority
+            />
             <button
               ref={closeButtonRef}
               type="button"
               onClick={closeMenu}
               className="flex size-11 items-center justify-center rounded-lg text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--mundia-navy)]"
-              aria-label="Close account menu"
+              aria-label="Close navigation"
             >
               <X className="size-5" aria-hidden="true" />
             </button>
           </div>
 
-          <div className="border-b border-[var(--mundia-line)] px-4 py-5">
-            <div className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[var(--mundia-panel)] text-sm font-semibold text-[var(--mundia-navy)]">
-                {fullName.charAt(0).toUpperCase()}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[var(--mundia-ink)]">
-                  {fullName}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-[var(--mundia-muted)]">
-                  {email}
-                </p>
-              </div>
-            </div>
-            {typeof universityId === "number" && (
-              <p className="mt-3 text-xs text-[var(--mundia-muted)]">
-                University ID: {universityId}
-              </p>
-            )}
-          </div>
-
-          <nav className="flex-1 px-4 py-4" aria-label="Primary navigation">
-            <Link href="/library" onClick={closeMenu} className={navLinkClass}>
-              Library
-            </Link>
-            <Link href="/all-books" onClick={closeMenu} className={navLinkClass}>
-              Catalog
-            </Link>
-            <Link href="/resources" onClick={closeMenu} className={navLinkClass}>
-              Open learning
-            </Link>
-            <Link href="/my-profile" onClick={closeMenu} className={navLinkClass}>
-              My account
-            </Link>
-
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Primary navigation">
+            <NavigationList items={libraryItems} pathname={pathname} onNavigate={closeMenu} />
             {isAdmin && (
-              <div className="mt-4 border-t border-[var(--mundia-line)] pt-4">
-                <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-[var(--mundia-muted)]">
+              <div className="mt-5 border-t border-[var(--mundia-line)] pt-4">
+                <p className="px-3 pb-2 text-xs font-medium text-[var(--mundia-muted)]">
                   Administration
                 </p>
-                <Link href="/admin" onClick={closeMenu} className={navLinkClass}>
-                  Dashboard
-                </Link>
-                <Link
-                  href="/admin/book-requests"
-                  onClick={closeMenu}
-                  className={navLinkClass}
-                >
-                  Borrow requests
-                </Link>
-                <Link
-                  href="/admin/users"
-                  onClick={closeMenu}
-                  className={navLinkClass}
-                >
-                  Users
-                </Link>
-                <Link
-                  href="/admin/books"
-                  onClick={closeMenu}
-                  className={navLinkClass}
-                >
-                  Catalog management
-                </Link>
-                <Link
-                  href="/admin/learning-resources"
-                  onClick={closeMenu}
-                  className={navLinkClass}
-                >
-                  Learning resource review
-                </Link>
+                <NavigationList items={adminItems} pathname={pathname} onNavigate={closeMenu} />
               </div>
             )}
           </nav>
 
-          <div className="border-t border-[var(--mundia-line)] p-4">
+          <div className="shrink-0 border-t border-[var(--mundia-line)] p-3">
+            <div className="mb-2 flex min-w-0 items-center gap-3 px-2 py-2">
+              <span className="flex size-9 shrink-0 items-center justify-center bg-[var(--mundia-panel)] text-sm font-semibold text-[var(--mundia-navy)]">
+                {fullName.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-[var(--mundia-ink)]">{fullName}</p>
+                <p className="truncate text-xs text-[var(--mundia-muted)]">
+                  {typeof universityId === "number" ? `ID ${universityId} · ` : ""}{email}
+                </p>
+              </div>
+            </div>
             <button
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg border border-[var(--mundia-line)] px-4 text-sm font-semibold text-[var(--mundia-ink)] transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-900 disabled:opacity-50"
+              className="flex min-h-11 w-full items-center gap-3 border border-transparent px-3 text-sm font-medium text-[var(--mundia-ink)] transition-colors hover:border-[var(--mundia-line)] hover:bg-[var(--mundia-panel)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)] disabled:opacity-50"
             >
               <LogOut className="size-4" aria-hidden="true" />
               {isLoggingOut ? "Signing out…" : "Sign out"}
             </button>
           </div>
-        </div>
+        </aside>
       </dialog>
     </>
   );
 };
+
+const NavigationList = ({
+  items,
+  pathname,
+  onNavigate,
+}: {
+  items: NavigationItem[];
+  pathname: string;
+  onNavigate: () => void;
+}) => (
+  <ul className="flex flex-col gap-1">
+    {items.map(({ href, label, icon: Icon }) => {
+      const isCurrent =
+        pathname === href ||
+        (href === "/library" && pathname.startsWith("/library/")) ||
+        (href === "/all-books" && pathname.startsWith("/books/")) ||
+        (href !== "/admin" && pathname.startsWith(`${href}/`));
+      return (
+        <li key={href}>
+          <Link
+            href={href}
+            onClick={onNavigate}
+            aria-current={isCurrent ? "page" : undefined}
+            className={cn(
+              "flex min-h-11 items-center gap-3 border border-transparent px-3 text-sm font-medium text-[var(--mundia-ink)] transition-colors hover:bg-[var(--mundia-panel)] hover:text-[var(--mundia-navy)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--mundia-navy)]",
+              isCurrent && "border-[var(--mundia-line)] bg-[var(--mundia-panel)] font-semibold text-[var(--mundia-navy)]",
+            )}
+          >
+            <Icon className="size-[18px] shrink-0" strokeWidth={1.8} aria-hidden="true" />
+            <span>{label}</span>
+          </Link>
+        </li>
+      );
+    })}
+  </ul>
+);
 
 export default MobileMenu;

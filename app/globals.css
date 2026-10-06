@@ -413,6 +413,26 @@
     background: oklch(15% 0.025 255 / 0.38);
   }
 
+  .mobile-navigation-panel {
+    animation: mobile-navigation-enter 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes mobile-navigation-enter {
+    from {
+      transform: translateX(-100%);
+    }
+
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-navigation-panel {
+      animation: none;
+    }
+  }
+
   /* Book Overview */
   .book-overview {
     @apply relative flex w-full max-w-full flex-col-reverse gap-8 overflow-hidden rounded-lg border p-5 sm:gap-10 sm:p-8 xl:flex-row xl:items-start xl:gap-12 xl:p-10;
