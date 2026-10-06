@@ -76,9 +76,6 @@ in step 2:
   disabled-by-default `VITE_ENABLE_LEARNING_RESOURCES` and
   `VITE_ENABLE_MEMBER_PROFILE` release switches; the current Vercel routes
   remain authoritative until reconciliation and edge cutover.
-- Mobile navigation is now a compact top-header navigation surface in both the
-  migration shell and static SPA. The fixed bottom dock was removed so it no
-  longer obscures catalog content or competes with browser controls.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with
