@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
+  authorizeEditionDownload,
   cancelLoan,
   cancelReservation,
   getCirculationOverview,
+  getEditionDownloadAvailability,
   getLearningResource,
   getMemberProfile,
   getNotificationPreference,
@@ -211,6 +213,56 @@ describe("notification BFF client", () => {
   });
 });
 
+describe("digital-content BFF client", () => {
+  it("accepts rights-safe bounded edition formats", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(downloadAvailability())));
+
+    await expect(getEditionDownloadAvailability(LOAN_EDITION_ID)).resolves.toMatchObject({
+      downloadable: true,
+      formats: [{ format: "PDF", licenseExpression: "CC-BY-4.0" }],
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/digital-content/editions/${LOAN_EDITION_ID}/availability`,
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
+  it("authorizes a signed download only after csrf bootstrap", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        authorizationId: "99999999-9999-4999-8999-999999999999",
+        assetId: ASSET_ID,
+        downloadUrl: SIGNED_DOWNLOAD_URL,
+        expiresAt: shortLivedExpiry(),
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(authorizeEditionDownload(ASSET_ID)).resolves.toMatchObject({ downloadUrl: SIGNED_DOWNLOAD_URL });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`/api/v1/digital-content/assets/${ASSET_ID}/authorizations`);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST" });
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("X-XSRF-TOKEN")).toBe(CSRF_TOKEN);
+  });
+
+  it("rejects unapproved licences and malformed signed URLs", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(jsonResponse({
+      ...downloadAvailability(),
+      formats: [{ ...downloadAvailability().formats[0], licenseExpression: "ARR" }],
+    })));
+    await expect(getEditionDownloadAvailability(LOAN_EDITION_ID)).rejects.toBeInstanceOf(ApiError);
+
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        authorizationId: "99999999-9999-4999-8999-999999999999",
+        assetId: ASSET_ID,
+        downloadUrl: "https://attacker.example/download.pdf?Policy=x",
+        expiresAt: shortLivedExpiry(),
+      })));
+    await expect(authorizeEditionDownload(ASSET_ID)).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
 function jsonResponse(value: unknown) {
   return new Response(JSON.stringify(value), {
     status: 200,
@@ -238,6 +290,9 @@ const LOAN_ID = "33333333-3333-4333-8333-333333333333";
 const RESERVATION_ID = "55555555-5555-4555-8555-555555555555";
 const CSRF_TOKEN = "csrf-token-for-browser-tests";
 const NOTIFICATION_ID = "88888888-8888-4888-8888-888888888888";
+const ASSET_ID = "12000000-0000-4000-8000-000000000001";
+const SHA256 = "a".repeat(64);
+const SIGNED_DOWNLOAD_URL = `https://downloads.example.test/digital-content/ab/${ASSET_ID}/${SHA256}.pdf?Policy=abc&Signature=def&Key-Pair-Id=ghi&Hash-Algorithm=SHA256`;
 
 function eligibility() {
   return {
@@ -331,6 +386,26 @@ function notificationPreference(version: number, emailEnabled = true) {
     version,
     updatedAt: "2026-10-07T08:00:00Z",
   };
+}
+
+function downloadAvailability() {
+  return {
+    editionId: LOAN_EDITION_ID,
+    downloadable: true,
+    formats: [{
+      assetId: ASSET_ID,
+      format: "PDF",
+      mediaType: "application/pdf",
+      sizeBytes: 2_097_152,
+      sha256: SHA256,
+      licenseExpression: "CC-BY-4.0",
+      attribution: "Distributed Systems, Open Engineering Faculty.",
+    }],
+  };
+}
+
+function shortLivedExpiry() {
+  return new Date(Date.now() + 5 * 60_000).toISOString();
 }
 
 function loanCommand(status: "REQUESTED" | "CANCELLED" | "ACTIVE") {

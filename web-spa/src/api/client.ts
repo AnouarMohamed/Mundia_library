@@ -15,6 +15,9 @@ export type NotificationItem = components["schemas"]["NotificationItem"];
 export type NotificationPage = components["schemas"]["NotificationPage"];
 export type NotificationPreference = components["schemas"]["NotificationPreference"];
 export type UpdateNotificationPreference = components["schemas"]["UpdateNotificationPreference"];
+export type EditionDownloadAvailability = components["schemas"]["EditionDownloadAvailability"];
+export type DownloadableFormat = components["schemas"]["DownloadableFormat"];
+export type DownloadAuthorization = components["schemas"]["DownloadAuthorization"];
 export type Session = components["schemas"]["Session"];
 export type CommandResult<T> = { record: T; replayed: boolean };
 export type VersionedNotificationPreference = { preference: NotificationPreference; entityTag: string };
@@ -144,6 +147,32 @@ export async function getCirculationEligibility(signal?: AbortSignal): Promise<C
   const value = await requestJson("/api/v1/circulation/eligibility", { signal });
   if (!isEligibility(value)) throw new ApiError(502);
   return value;
+}
+
+export async function getEditionDownloadAvailability(
+  editionId: string,
+  signal?: AbortSignal,
+): Promise<EditionDownloadAvailability> {
+  validateCommandIdentifiers(editionId);
+  const value = await requestJson(
+    `/api/v1/digital-content/editions/${encodeURIComponent(editionId)}/availability`,
+    { signal },
+  );
+  if (!isEditionDownloadAvailability(value) || value.editionId !== editionId) throw new ApiError(502);
+  return value;
+}
+
+export async function authorizeEditionDownload(assetId: string): Promise<DownloadAuthorization> {
+  validateCommandIdentifiers(assetId);
+  const csrf = await getCsrfToken();
+  const value = await mutationJson(
+    `/api/v1/digital-content/assets/${encodeURIComponent(assetId)}/authorizations`,
+    { method: "POST", headers: { [csrf.headerName]: csrf.token } },
+  );
+  if (!isRecord(value) || !isUuid(value.authorizationId) || value.assetId !== assetId ||
+      typeof value.downloadUrl !== "string" || !isSignedDownloadUrl(value.downloadUrl) ||
+      !isIsoInstant(value.expiresAt) || !isShortLivedExpiry(value.expiresAt)) throw new ApiError(502);
+  return value as DownloadAuthorization;
 }
 
 export async function getLoanPage(cursor?: string, signal?: AbortSignal): Promise<MemberLoanPage> {
@@ -433,6 +462,40 @@ function isMemberProfile(value: unknown): value is MemberProfile {
   return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
 }
 
+function isEditionDownloadAvailability(value: unknown): value is EditionDownloadAvailability {
+  if (!isRecord(value) || !isUuid(value.editionId) || typeof value.downloadable !== "boolean" ||
+      !Array.isArray(value.formats) || value.formats.length > 2 ||
+      value.downloadable !== (value.formats.length > 0) || !value.formats.every(isDownloadableFormat)) return false;
+  return new Set(value.formats.map((format) => format.assetId)).size === value.formats.length &&
+    new Set(value.formats.map((format) => format.format)).size === value.formats.length;
+}
+
+function isDownloadableFormat(value: unknown): value is DownloadableFormat {
+  if (!isRecord(value) || !isUuid(value.assetId) || !["PDF", "EPUB"].includes(String(value.format)) ||
+      !Number.isSafeInteger(value.sizeBytes) || Number(value.sizeBytes) < 1 || Number(value.sizeBytes) > MAXIMUM_ASSET_BYTES ||
+      typeof value.sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(value.sha256) ||
+      typeof value.licenseExpression !== "string" || !DIGITAL_LICENSES.has(value.licenseExpression) ||
+      !isSafeMultilineText(value.attribution, 1_000)) return false;
+  return value.mediaType === (value.format === "PDF" ? "application/pdf" : "application/epub+zip");
+}
+
+function isSignedDownloadUrl(value: string): boolean {
+  if (!isPublicHttpsUrl(value) || value.length > 12_000) return false;
+  const url = new URL(value);
+  if (!/^\/digital-content\/[0-9a-f]{2}\/[0-9a-f-]{36}\/[0-9a-f]{64}\.(?:pdf|epub)$/u.test(url.pathname)) return false;
+  const entries = Array.from(url.searchParams.entries());
+  const expected = new Set(["Policy", "Signature", "Key-Pair-Id", "Hash-Algorithm"]);
+  return entries.length === expected.size && new Set(entries.map(([key]) => key)).size === expected.size &&
+    entries.every(([key, item]) => expected.has(key) && /^[A-Za-z0-9_~-]{1,8192}$/u.test(item)) &&
+    url.searchParams.get("Hash-Algorithm") === "SHA256";
+}
+
+function isShortLivedExpiry(value: string): boolean {
+  const expiresAt = Date.parse(value);
+  const now = Date.now();
+  return expiresAt > now - 60_000 && expiresAt <= now + 10 * 60_000;
+}
+
 function isNotificationPage(value: unknown, limit: number, status: NotificationReadStatus): value is NotificationPage {
   if (!isRecord(value) || !isUuid(value.memberId) || !Array.isArray(value.items) || value.items.length > limit ||
       !value.items.every(isNotificationItem) || !isNullableNotificationCursor(value.nextCursor) ||
@@ -665,3 +728,5 @@ const HISTORY_PAGE_SIZE = 20;
 const CATALOG_PAGE_SIZE = 20;
 const MAXIMUM_EDITION_BATCH = 50;
 const NOTIFICATION_PAGE_SIZE = 20;
+const MAXIMUM_ASSET_BYTES = 1024 * 1024 * 1024;
+const DIGITAL_LICENSES = new Set(["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"]);

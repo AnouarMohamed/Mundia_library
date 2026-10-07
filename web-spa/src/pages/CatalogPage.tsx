@@ -146,11 +146,12 @@ function CatalogRow({ edition, eligible, pending, commandsDisabled, notice, onCo
       </div>
       <div className="catalog-copy">
         <p>{edition.publisher} · {edition.publicationYear} · {edition.language.toUpperCase()}</p>
-        <h2>{edition.title}</h2>
+        <h2><Link to={`/catalog/${edition.editionId}`}>{edition.title}</Link></h2>
         <p>{edition.pageCount} pages · ISBN {edition.isbn}</p>
       </div>
       <div className="catalog-action">
         <strong>{edition.availableCopies} of {edition.totalCopies} available</strong>
+        <Link className="catalog-detail-link" to={`/catalog/${edition.editionId}`}>View edition</Link>
         <button type="button" onClick={onCommand} disabled={!eligible || !canCirculate || commandsDisabled}>
           {pending ? "Submitting…" : canCirculate ? action : "Not in circulation"}
         </button>

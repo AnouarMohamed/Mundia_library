@@ -106,13 +106,44 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .catalog-cover img { width: 100%; height: 100%; object-fit: contain; background: var(--surface); }
 .catalog-copy { min-width: 0; }
 .catalog-copy h2 { margin: .35rem 0; font: 400 1.25rem/1.2 Georgia, "Times New Roman", serif; }
+.catalog-copy h2 a { text-decoration: none; }
+.catalog-copy h2 a:hover { color: var(--navy); text-decoration: underline; text-underline-offset: .18em; }
 .catalog-copy p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
 .catalog-action { display: grid; gap: .55rem; justify-items: stretch; }
 .catalog-action strong { color: var(--muted); font-size: .78rem; font-weight: 650; text-align: center; }
+.catalog-detail-link { min-height: 2.5rem; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); color: var(--navy); font-size: .78rem; font-weight: 700; text-decoration: none; }
+.catalog-detail-link:hover { border-color: var(--navy); }
 .command-notice { display: block; margin: 0; color: var(--muted); font-size: .76rem; line-height: 1.4; }
 .command-success { color: oklch(40% .1 150); }
 .command-error { color: oklch(44% .13 28); }
 .command-notice a { color: var(--navy); font-weight: 700; }
+.edition-detail-heading { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 2rem; align-items: center; padding: 1rem 0 2rem; border-bottom: 1px solid var(--line); }
+.edition-detail-heading h1 { max-width: 28ch; margin: .4rem 0 .65rem; font: 400 2.5rem/1.08 Georgia, "Times New Roman", serif; }
+.edition-detail-heading > div:last-child > p:last-child { margin: 0; color: var(--muted); }
+.edition-detail-cover { width: 8rem; aspect-ratio: 3 / 4; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--line); background: var(--navy-strong); color: var(--surface); font: 400 2.2rem Georgia, "Times New Roman", serif; }
+.edition-detail-cover img { width: 100%; height: 100%; object-fit: contain; background: var(--surface); }
+.edition-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: clamp(2rem, 6vw, 5rem); padding-top: 2rem; }
+.edition-detail-grid h2 { margin: 0 0 .75rem; font: 400 1.55rem Georgia, "Times New Roman", serif; }
+.edition-download-intro { max-width: 68ch; margin: 0 0 1.25rem; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+.edition-download-empty { padding: 1.25rem 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.edition-download-empty h3 { margin: 0; font-size: 1rem; }
+.edition-download-empty p { margin: .5rem 0 0; color: var(--muted); font-size: .85rem; }
+.edition-format-list { margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--line); }
+.edition-format-list > li { padding: 1.25rem 0; border-top: 1px solid var(--line); }
+.edition-format-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.edition-format-heading > div { display: flex; align-items: baseline; gap: .65rem; }
+.edition-format-heading strong { color: var(--navy); font-size: 1rem; }
+.edition-format-heading span { color: var(--muted); font-size: .78rem; }
+.edition-format-heading button { min-height: 2.75rem; padding: .55rem .85rem; border: 1px solid var(--navy); background: var(--navy); color: var(--surface); font-weight: 700; cursor: pointer; }
+.edition-format-heading button:hover { background: var(--navy-strong); }
+.edition-format-heading button:disabled { cursor: wait; opacity: .6; }
+.edition-format-list dl { margin: 1rem 0 0; display: grid; gap: .55rem; }
+.edition-format-list dl > div { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 1rem; }
+.edition-format-list dt { color: var(--muted); font-size: .75rem; }
+.edition-format-list dd { margin: 0; overflow-wrap: anywhere; font-size: .8rem; line-height: 1.5; }
+.edition-format-list code { font-size: .72rem; }
+.edition-catalog-action { min-height: 2.75rem; margin-top: 1rem; display: flex; align-items: center; justify-content: center; border: 1px solid var(--navy); color: var(--navy); font-size: .8rem; font-weight: 700; text-decoration: none; }
+.edition-catalog-action:hover { background: var(--navy); color: var(--surface); }
 .profile-shell { width: min(68rem, calc(100% - 2rem)); margin: 0 auto; padding: 2.5rem 0 5rem; }
 .profile-heading { padding-bottom: 2rem; border-bottom: 1px solid var(--line); }
 .profile-heading h1 { max-width: 22ch; margin: .4rem 0 1rem; font: 400 clamp(2rem, 4vw, 2.75rem)/1.08 Georgia, "Times New Roman", serif; }
@@ -232,6 +263,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .catalog-copy h2 { font-size: 1.08rem; }
   .catalog-action { grid-column: 2; }
   .catalog-action strong { text-align: left; }
+  .edition-detail-heading { grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1rem; }
+  .edition-detail-heading h1 { font-size: 2rem; }
+  .edition-detail-cover { width: 5.5rem; }
+  .edition-detail-grid { grid-template-columns: 1fr; gap: 2.5rem; }
+  .edition-format-heading { align-items: stretch; flex-direction: column; }
+  .edition-format-heading button { width: 100%; }
+  .edition-format-list dl > div { grid-template-columns: 1fr; gap: .2rem; }
   .profile-shell { width: min(100% - 1.25rem, 68rem); padding-top: 1.5rem; }
   .membership-summary { align-items: flex-start; flex-direction: column; }
   .profile-layout { grid-template-columns: 1fr; gap: 2.5rem; }

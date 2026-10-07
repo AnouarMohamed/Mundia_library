@@ -20,7 +20,9 @@ only after Catalog and Digital Content reconciliation. Enable
 `VITE_ENABLE_MEMBER_PROFILE` only after Membership parity and browser checks.
 Enable `VITE_ENABLE_CIRCULATION_SELF_SERVICE` only after Catalog and Circulation
 projections reconcile and failure drills pass. This switch enables physical
-catalog search, borrow and reservation commands, and caller-bound history.
+catalog search, edition details, licensed first-party downloads, borrow and
+reservation commands, and caller-bound history. Digital files are authorized
+only after a user chooses PDF or EPUB; signed URLs are never prefetched.
 Flags can be enabled independently. The SPA never receives OAuth tokens or
 service credentials. Browser authentication uses the BFF's secure Redis-backed
 session cookie; mutations obtain the BFF's CSRF token first and use a unique,

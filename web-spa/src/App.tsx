@@ -6,6 +6,7 @@ import { MemberProfilePage } from "./pages/MemberProfilePage";
 import { CirculationPage } from "./pages/CirculationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
+import { CatalogEditionPage } from "./pages/CatalogEditionPage";
 import { getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
@@ -66,6 +67,7 @@ export function App() {
             {resourcesEnabled && <Route path="/resources/:resourceId" element={<LearningResourceDetailPage />} />}
             {profileEnabled && <Route path="/profile" element={<MemberProfilePage />} />}
             {circulationEnabled && <Route path="/catalog" element={<CatalogPage />} />}
+            {circulationEnabled && <Route path="/catalog/:editionId" element={<CatalogEditionPage />} />}
             {circulationEnabled && <Route path="/borrowing" element={<CirculationPage />} />}
             {notificationsEnabled && <Route path="/notifications" element={<NotificationsPage />} />}
             <Route path="*" element={<Navigate replace to={defaultPath} />} />
