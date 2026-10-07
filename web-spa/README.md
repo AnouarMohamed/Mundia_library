@@ -9,6 +9,7 @@ backfill, parity, rollback, and edge-routing gates.
 npm run spa:generate
 VITE_ENABLE_LEARNING_RESOURCES=true npm run spa:build
 VITE_ENABLE_MEMBER_PROFILE=true npm run spa:build
+VITE_ENABLE_CIRCULATION_SELF_SERVICE=true npm run spa:build
 npm run spa:test
 npm run spa:release
 ```
@@ -16,9 +17,11 @@ npm run spa:release
 Both slice flags default to disabled. Enable `VITE_ENABLE_LEARNING_RESOURCES`
 only after Catalog and Digital Content reconciliation. Enable
 `VITE_ENABLE_MEMBER_PROFILE` only after Membership parity and browser checks.
-Flags can be enabled independently. The SPA never receives OAuth tokens or
-service credentials. Browser authentication uses the BFF's secure Redis-backed
-session cookie; mutations obtain the BFF's CSRF token first.
+Enable `VITE_ENABLE_CIRCULATION_SELF_SERVICE` only after Catalog and Circulation
+projections reconcile and failure drills pass. Flags can be enabled
+independently. The SPA never receives OAuth tokens or service credentials.
+Browser authentication uses the BFF's secure Redis-backed session cookie;
+mutations obtain the BFF's CSRF token first.
 
 During local development, Vite proxies `/api`, `/oauth2`, and `/login` to the
 Web BFF at `http://localhost:8080`. Production must present the static assets

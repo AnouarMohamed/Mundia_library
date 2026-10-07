@@ -30,6 +30,7 @@ import tools.jackson.module.kotlin.KotlinModule
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 
 class CatalogClientTest {
     private lateinit var server: MockRestServiceServer
@@ -160,6 +161,32 @@ class CatalogClientTest {
         server.verify()
     }
 
+    @Test
+    fun `edition batch uses one bounded request and preserves request order`() {
+        val first = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        val second = UUID.fromString("33333333-3333-3333-3333-333333333333")
+        server.expect(requestTo(containsString("/api/v1/catalog/editions?editionId=$first&editionId=$second")))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andRespond(withSuccess("[${editionJson(first)},${editionJson(second)}]", MediaType.APPLICATION_JSON))
+
+        assertThat(client.editions(authorizedClient(), listOf(first, second)).map { it.editionId })
+            .containsExactly(first, second)
+        server.verify()
+    }
+
+    @Test
+    fun `edition batch rejects reordered or unrequested identities`() {
+        val first = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        val second = UUID.fromString("33333333-3333-3333-3333-333333333333")
+        server.expect(requestTo(containsString("/api/v1/catalog/editions")))
+            .andRespond(withSuccess("[${editionJson(second)},${editionJson(first)}]", MediaType.APPLICATION_JSON))
+
+        assertThatThrownBy { client.editions(authorizedClient(), listOf(first, second)) }
+            .isInstanceOf(CatalogProtocolException::class.java)
+        server.verify()
+    }
+
     private fun criteria(
         query: String? = null,
         availableOnly: Boolean? = null,
@@ -199,6 +226,11 @@ class CatalogClientTest {
             OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "delegated-token", now, now.plusSeconds(300)),
         )
     }
+
+    private fun editionJson(editionId: UUID) = VALID_RESPONSE
+        .substringAfter("\"editions\": [")
+        .substringBefore("],")
+        .replace("11111111-1111-1111-1111-111111111111", editionId.toString())
 
     private companion object {
         val VALID_RESPONSE = """

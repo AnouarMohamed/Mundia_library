@@ -53,6 +53,14 @@ class JooqCatalogRepository(
         .fetchOne()
         ?.let(::toEdition)
 
+    fun findEditions(editionIds: List<UUID>): List<Edition> {
+        val editionsById = editionSelect()
+            .where(CATALOG_EDITION.EDITION_ID.`in`(editionIds))
+            .fetch(::toEdition)
+            .associateBy { UUID.fromString(it.editionId) }
+        return editionIds.mapNotNull(editionsById::get)
+    }
+
     fun search(filters: CatalogSearchFilters): CatalogSearchResult {
         val page = requireNotNull(filters.page)
         val limit = requireNotNull(filters.limit)

@@ -48,8 +48,12 @@ in step 2:
 - Catalog search plus learning-resource search, detail, and category reads use
   RFC 8693 token exchange from the signed-in user's server-side token. The
   short-lived downstream token is restricted to the `catalog-api` audience and
-  `catalog.search,catalog.learning-resource.read`; neither token reaches the
+  `catalog.search,catalog.read,catalog.learning-resource.read`; neither token reaches the
   browser. Responses are bounded, strictly validated, and `no-store`.
+- Bounded catalog-edition batch reads resolve up to 50 unique edition UUIDs in
+  request order with one database query and one browser-to-BFF request. This
+  prevents circulation history from creating per-item Catalog fan-out while
+  preserving Catalog ownership of titles, covers, and edition metadata.
 - `GET /api/v1/membership/profile` performs RFC 8693 token exchange from the
   signed-in user's server-side OIDC access token into a short-lived token with
   only the `membership-api` audience and `membership.profile.read` scope. The
@@ -69,13 +73,16 @@ in step 2:
   token, and bounded actor-scoped idempotency key; it cannot select a member
   identity.
 - The static Vite/React shell now provides session bootstrap, accessible
-  learning-resource search/detail and read-only member-profile routes,
+  learning-resource search/detail, read-only member-profile, and caller-bound
+  circulation eligibility/history routes,
   generated OpenAPI types, strict runtime response checks, error boundaries,
   responsive loading/empty/error states, and CSRF-protected external-download
   authorization. Learning resources and member profile have independent,
-  disabled-by-default `VITE_ENABLE_LEARNING_RESOURCES` and
-  `VITE_ENABLE_MEMBER_PROFILE` release switches; the current Vercel routes
-  remain authoritative until reconciliation and edge cutover.
+  disabled-by-default `VITE_ENABLE_LEARNING_RESOURCES`,
+  `VITE_ENABLE_MEMBER_PROFILE`, and `VITE_ENABLE_CIRCULATION_SELF_SERVICE`
+  release switches; the current Vercel routes remain authoritative until
+  reconciliation and edge cutover. Circulation history enriches each bounded
+  keyset page through one Catalog batch rather than an N+1 request pattern.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

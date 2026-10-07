@@ -36,13 +36,14 @@ The exact redirect URI is
 `http://localhost:8080/login/oauth2/code/institutional`. Never use the local
 HTTP or insecure-cookie settings outside local development.
 
-Authenticated browser sessions can call `GET /api/v1/catalog/search`, the
-learning-resource search/detail routes, and the category route. The BFF
-validates and bounds all inputs, exchanges the server-side institutional token
-for a short-lived `catalog-api` token limited to `catalog.search` and
-`catalog.learning-resource.read`, and strictly validates the Catalog response
-before mapping it into the browser contract. Neither token is returned to the
-browser. The static contract is available at `/openapi/web-bff-v1.json`.
+Authenticated browser sessions can call `GET /api/v1/catalog/search`, bounded
+edition batch reads, the learning-resource search/detail routes, and the
+category route. The BFF validates and bounds all inputs, exchanges the
+server-side institutional token for a short-lived `catalog-api` token limited
+to `catalog.search`, `catalog.read`, and `catalog.learning-resource.read`, and
+strictly validates the Catalog response before mapping it into the browser
+contract. Neither token is returned to the browser. The static contract is
+available at `/openapi/web-bff-v1.json`.
 
 The authorization server must enable RFC 8693 token exchange for the separate
 `catalog-service` confidential client and issue the Catalog service's audience

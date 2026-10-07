@@ -98,4 +98,14 @@ class CatalogBrowseController(
     ): ResponseEntity<List<String>> = ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
         .body(catalog.learningResourceCategories(authentication, request, response))
+
+    @GetMapping("/editions")
+    fun editions(
+        authentication: OAuth2AuthenticationToken,
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        @RequestParam @Size(min = 1, max = 50) editionId: List<UUID>,
+    ): ResponseEntity<List<CatalogEditionView>> = ResponseEntity.ok()
+        .cacheControl(CacheControl.noStore())
+        .body(catalog.editions(authentication, request, response, editionId))
 }

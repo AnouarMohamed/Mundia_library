@@ -3,11 +3,13 @@ import { Link, Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { LearningResourceDetailPage } from "./pages/LearningResourceDetailPage";
 import { LearningResourcesPage } from "./pages/LearningResourcesPage";
 import { MemberProfilePage } from "./pages/MemberProfilePage";
+import { CirculationPage } from "./pages/CirculationPage";
 import { getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
 const resourcesEnabled = import.meta.env.VITE_ENABLE_LEARNING_RESOURCES === "true";
 const profileEnabled = import.meta.env.VITE_ENABLE_MEMBER_PROFILE === "true";
+const circulationEnabled = import.meta.env.VITE_ENABLE_CIRCULATION_SELF_SERVICE === "true";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -29,7 +31,7 @@ export function App() {
       </section>
     );
   }
-  const defaultPath = resourcesEnabled ? "/resources" : profileEnabled ? "/profile" : null;
+  const defaultPath = resourcesEnabled ? "/resources" : circulationEnabled ? "/borrowing" : profileEnabled ? "/profile" : null;
   return (
     <AppErrorBoundary>
       <a className="skip-link" href="#main-content">Skip to content</a>
@@ -42,6 +44,7 @@ export function App() {
           {defaultPath && (
             <nav className="site-nav" aria-label="Primary navigation">
               {resourcesEnabled && <NavLink to="/resources">Open learning</NavLink>}
+              {circulationEnabled && <NavLink to="/borrowing">Borrowing</NavLink>}
               {profileEnabled && <NavLink to="/profile">My account</NavLink>}
             </nav>
           )}
@@ -57,6 +60,7 @@ export function App() {
             {resourcesEnabled && <Route path="/resources" element={<LearningResourcesPage />} />}
             {resourcesEnabled && <Route path="/resources/:resourceId" element={<LearningResourceDetailPage />} />}
             {profileEnabled && <Route path="/profile" element={<MemberProfilePage />} />}
+            {circulationEnabled && <Route path="/borrowing" element={<CirculationPage />} />}
             <Route path="*" element={<Navigate replace to={defaultPath} />} />
           </Routes>
         ) : (

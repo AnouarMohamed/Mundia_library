@@ -2,6 +2,12 @@ import type { components } from "./schema";
 
 export type LearningResource = components["schemas"]["LearningResource"];
 export type LearningResourcePage = components["schemas"]["LearningResourcePage"];
+export type CatalogEdition = components["schemas"]["CatalogEdition"];
+export type CirculationEligibility = components["schemas"]["CirculationEligibility"];
+export type LoanHistoryItem = components["schemas"]["LoanHistoryItem"];
+export type MemberLoanPage = components["schemas"]["MemberLoanPage"];
+export type MemberReservationPage = components["schemas"]["MemberReservationPage"];
+export type Reservation = components["schemas"]["ReservationCommand"];
 export type MemberProfile = components["schemas"]["MemberProfile"];
 export type Session = components["schemas"]["Session"];
 
@@ -36,6 +42,62 @@ export async function getMemberProfile(signal?: AbortSignal): Promise<MemberProf
   const value = await requestJson("/api/v1/membership/profile", { signal });
   if (!isMemberProfile(value)) throw new ApiError(502);
   return value;
+}
+
+export async function getCirculationEligibility(signal?: AbortSignal): Promise<CirculationEligibility> {
+  const value = await requestJson("/api/v1/circulation/eligibility", { signal });
+  if (!isEligibility(value)) throw new ApiError(502);
+  return value;
+}
+
+export async function getLoanPage(cursor?: string, signal?: AbortSignal): Promise<MemberLoanPage> {
+  const query = historyQuery(cursor);
+  const value = await requestJson(`/api/v1/circulation/loans?${query}`, { signal });
+  if (!isLoanPage(value, HISTORY_PAGE_SIZE)) throw new ApiError(502);
+  return value;
+}
+
+export async function getReservationPage(cursor?: string, signal?: AbortSignal): Promise<MemberReservationPage> {
+  const query = historyQuery(cursor);
+  const value = await requestJson(`/api/v1/circulation/reservations?${query}`, { signal });
+  if (!isReservationPage(value, HISTORY_PAGE_SIZE)) throw new ApiError(502);
+  return value;
+}
+
+export async function getCatalogEditions(editionIds: string[], signal?: AbortSignal): Promise<CatalogEdition[]> {
+  if (editionIds.length === 0) return [];
+  if (editionIds.length > MAXIMUM_EDITION_BATCH || editionIds.some((id) => !isUuid(id)) ||
+      new Set(editionIds).size !== editionIds.length) throw new ApiError(400);
+  const query = new URLSearchParams();
+  editionIds.forEach((editionId) => query.append("editionId", editionId));
+  const value = await requestJson(`/api/v1/catalog/editions?${query}`, { signal });
+  if (!Array.isArray(value) || value.length > editionIds.length || value.some((item) => !isCatalogEdition(item))) {
+    throw new ApiError(502);
+  }
+  const positions = new Map(editionIds.map((id, index) => [id, index]));
+  const returnedIds = value.map((edition) => edition.editionId);
+  if (new Set(returnedIds).size !== returnedIds.length || returnedIds.some((id) => !positions.has(id)) ||
+      returnedIds.some((id, index) => index > 0 && positions.get(id)! <= positions.get(returnedIds[index - 1])!)) {
+    throw new ApiError(502);
+  }
+  return value;
+}
+
+export async function getCirculationOverview(signal?: AbortSignal) {
+  const [eligibility, loans, reservations] = await Promise.all([
+    getCirculationEligibility(signal),
+    getLoanPage(undefined, signal),
+    getReservationPage(undefined, signal),
+  ]);
+  if (loans.memberId !== eligibility.memberId || reservations.memberId !== eligibility.memberId) {
+    throw new ApiError(502);
+  }
+  const editionIds = Array.from(new Set([
+    ...loans.items.map((loan) => loan.editionId),
+    ...reservations.items.map((reservation) => reservation.editionId),
+  ]));
+  const editions = await getCatalogEditions(editionIds, signal);
+  return { eligibility, loans, reservations, editions };
 }
 
 export async function searchLearningResources(input: {
@@ -137,6 +199,106 @@ function isMemberProfile(value: unknown): value is MemberProfile {
   return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
 }
 
+function historyQuery(cursor?: string): URLSearchParams {
+  if (cursor !== undefined && !isCursor(cursor)) throw new ApiError(400);
+  const query = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
+  if (cursor) query.set("cursor", cursor);
+  return query;
+}
+
+function isEligibility(value: unknown): value is CirculationEligibility {
+  return isRecord(value) && isUuid(value.memberId) &&
+    ["ELIGIBLE", "INELIGIBLE", "SUSPENDED"].includes(String(value.status)) &&
+    (value.reasonCode === null || (typeof value.reasonCode === "string" && /^[A-Z][A-Z0-9_]{0,63}$/u.test(value.reasonCode))) &&
+    isNonNegativeInteger(value.sourceVersion) && isIsoInstant(value.sourceOccurredAt) &&
+    ((value.status === "ELIGIBLE") === (value.reasonCode === null));
+}
+
+function isLoanPage(value: unknown, limit: number): value is MemberLoanPage {
+  if (!isRecord(value) || !isUuid(value.memberId) || !Array.isArray(value.items) || value.items.length > limit ||
+      !isNullableCursor(value.nextCursor) || (value.nextCursor !== null && value.items.length !== limit) ||
+      !value.items.every((item) => isLoan(item) && item.memberId === value.memberId)) return false;
+  return isDescending(value.items, (item) => item.requestedAt, (item) => item.loanId);
+}
+
+function isLoan(value: unknown): value is LoanHistoryItem {
+  if (!isRecord(value) || !isUuid(value.loanId) || !isUuid(value.memberId) || !isUuid(value.editionId) ||
+      (value.copyId !== null && !isUuid(value.copyId)) ||
+      !["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"].includes(String(value.status)) ||
+      !isIsoInstant(value.requestedAt) || !isNullableInstant(value.checkedOutAt) || !isNullableInstant(value.dueAt) ||
+      !isNullableInstant(value.returnedAt) || !isNullableInstant(value.rejectedAt) ||
+      !isNonNegativeInteger(value.renewalCount) || !isNonNegativeInteger(value.version)) return false;
+  switch (value.status) {
+    case "REQUESTED":
+    case "CANCELLED":
+      return value.copyId === null && value.checkedOutAt === null && value.dueAt === null &&
+        value.returnedAt === null && value.rejectedAt === null;
+    case "ACTIVE":
+      return value.copyId !== null && value.checkedOutAt !== null && value.dueAt !== null &&
+        Date.parse(value.dueAt) > Date.parse(value.checkedOutAt) && value.returnedAt === null && value.rejectedAt === null;
+    case "RETURNED":
+      return value.copyId !== null && value.checkedOutAt !== null && value.dueAt !== null && value.returnedAt !== null &&
+        Date.parse(value.returnedAt) >= Date.parse(value.checkedOutAt) && value.rejectedAt === null;
+    case "REJECTED":
+      return value.copyId === null && value.checkedOutAt === null && value.dueAt === null && value.returnedAt === null &&
+        value.rejectedAt !== null && Date.parse(value.rejectedAt) >= Date.parse(value.requestedAt);
+    default:
+      return false;
+  }
+}
+
+function isReservationPage(value: unknown, limit: number): value is MemberReservationPage {
+  if (!isRecord(value) || !isUuid(value.memberId) || !Array.isArray(value.items) || value.items.length > limit ||
+      !isNullableCursor(value.nextCursor) || (value.nextCursor !== null && value.items.length !== limit) ||
+      !value.items.every((item) => isReservation(item) && item.memberId === value.memberId)) return false;
+  return isDescending(value.items, (item) => item.placedAt, (item) => item.reservationId);
+}
+
+function isReservation(value: unknown): value is Reservation {
+  if (!isRecord(value) || !isUuid(value.reservationId) || !isUuid(value.memberId) || !isUuid(value.editionId) ||
+      (value.copyId !== null && !isUuid(value.copyId)) ||
+      !["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"].includes(String(value.status)) ||
+      !isIsoInstant(value.placedAt) || !isNullableInstant(value.readyAt) || !isNullableInstant(value.expiresAt) ||
+      !isNullableInstant(value.fulfilledAt) || !isNullableInstant(value.cancelledAt) || !isNonNegativeInteger(value.version)) return false;
+  const readyShape = value.copyId !== null && value.readyAt !== null && value.expiresAt !== null &&
+    Date.parse(value.readyAt) >= Date.parse(value.placedAt) && Date.parse(value.expiresAt) > Date.parse(value.readyAt);
+  switch (value.status) {
+    case "WAITING":
+      return value.copyId === null && value.readyAt === null && value.expiresAt === null && value.fulfilledAt === null && value.cancelledAt === null;
+    case "READY":
+    case "EXPIRED":
+      return readyShape && value.fulfilledAt === null && value.cancelledAt === null;
+    case "FULFILLED":
+      return readyShape && value.fulfilledAt !== null && value.cancelledAt === null &&
+        Date.parse(value.fulfilledAt) >= Date.parse(value.readyAt!) && Date.parse(value.fulfilledAt) <= Date.parse(value.expiresAt!);
+    case "CANCELLED":
+      return value.fulfilledAt === null && value.cancelledAt !== null && Date.parse(value.cancelledAt) >= Date.parse(value.placedAt) &&
+        ((value.copyId === null && value.readyAt === null && value.expiresAt === null) || readyShape);
+    default:
+      return false;
+  }
+}
+
+function isCatalogEdition(value: unknown): value is CatalogEdition {
+  return isRecord(value) && isUuid(value.editionId) && isUuid(value.workId) && isSafeText(value.title, 500) &&
+    isSafeText(value.isbn, 32) && isSafeText(value.publisher, 300) &&
+    Number.isSafeInteger(value.publicationYear) && Number(value.publicationYear) >= 1000 && Number(value.publicationYear) <= 3000 &&
+    isSafeText(value.language, 32) && Number.isSafeInteger(value.pageCount) && Number(value.pageCount) > 0 &&
+    (value.coverUrl === null || (typeof value.coverUrl === "string" && isPublicHttpsUrl(value.coverUrl))) &&
+    (value.coverColor === null || isSafeText(value.coverColor, 64)) &&
+    (value.videoUrl === null || (typeof value.videoUrl === "string" && isPublicHttpsUrl(value.videoUrl))) &&
+    isNonNegativeInteger(value.totalCopies) && isNonNegativeInteger(value.availableCopies) &&
+    Number(value.availableCopies) <= Number(value.totalCopies) && typeof value.isActive === "boolean";
+}
+
+function isDescending<T>(items: T[], time: (item: T) => string, id: (item: T) => string): boolean {
+  return items.slice(1).every((item, index) => {
+    const previous = items[index]!;
+    const timeDifference = Date.parse(time(previous)) - Date.parse(time(item));
+    return timeDifference > 0 || (timeDifference === 0 && id(previous) > id(item));
+  });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -163,6 +325,18 @@ function isIsoInstant(value: unknown): value is string {
     Number.isFinite(Date.parse(value));
 }
 
+function isNullableInstant(value: unknown): value is string | null {
+  return value === null || isIsoInstant(value);
+}
+
+function isCursor(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 160 && /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function isNullableCursor(value: unknown): value is string | null {
+  return value === null || isCursor(value);
+}
+
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
@@ -170,3 +344,6 @@ function isNonNegativeInteger(value: unknown): value is number {
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
+
+const HISTORY_PAGE_SIZE = 20;
+const MAXIMUM_EDITION_BATCH = 50;

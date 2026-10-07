@@ -45,17 +45,17 @@ class OAuthTokenExchangeTest {
         val source = OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "source-user-token", now, now.plusSeconds(300))
         server.expect(requestTo("https://issuer.example.test/oauth2/token"))
             .andExpect(content().string(containsString("audience=catalog-api")))
-            .andExpect(content().string(containsString("scope=catalog.search+catalog.learning-resource.read")))
+            .andExpect(content().string(containsString("scope=catalog.search+catalog.read+catalog.learning-resource.read")))
             .andRespond(
                 withSuccess(
-                    """{"access_token":"delegated-catalog-token","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":120,"scope":"catalog.search catalog.learning-resource.read"}""",
+                    """{"access_token":"delegated-catalog-token","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":120,"scope":"catalog.search catalog.read catalog.learning-resource.read"}""",
                     MediaType.APPLICATION_JSON,
                 ),
             )
         val registration = registration(
             registrationId = "catalog-service",
             clientId = "web-bff-catalog",
-            scopes = arrayOf("catalog.search", "catalog.learning-resource.read"),
+            scopes = arrayOf("catalog.search", "catalog.read", "catalog.learning-resource.read"),
         )
 
         val response = client.getTokenResponse(TokenExchangeGrantRequest(registration, source, null))

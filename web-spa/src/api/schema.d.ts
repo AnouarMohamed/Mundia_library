@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve a bounded set of catalog editions */
+        get: operations["getCatalogEditions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/learning-resources": {
         parameters: {
             query?: never;
@@ -757,6 +774,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogSearch"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    getCatalogEditions: {
+        parameters: {
+            query: {
+                editionId: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Existing editions in request order; unknown identifiers are omitted */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogEdition"][];
                 };
             };
             400: components["responses"]["Problem"];

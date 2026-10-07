@@ -236,6 +236,7 @@ known state. The immutable contract is public at
 |---|---|---|
 | Work metadata and ordered authors | `GET /api/v1/catalog/works/{workId}` | `catalog.read` |
 | Edition metadata and projected availability | `GET /api/v1/catalog/editions/{editionId}` | `catalog.read` |
+| Bounded edition metadata batch (maximum 50) | `GET /api/v1/catalog/editions?editionId=…` | `catalog.read` |
 | Filtered, sorted catalog page | `GET /api/v1/catalog/search` | `catalog.search` |
 | Active-edition genres | `GET /api/v1/catalog/genres` | `catalog.search` |
 | Privacy-safe published reviews | `GET /api/v1/catalog/works/{workId}/reviews` | `catalog.read` |

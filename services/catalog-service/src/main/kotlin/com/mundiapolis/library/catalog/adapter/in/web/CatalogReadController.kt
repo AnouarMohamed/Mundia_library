@@ -17,9 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.validation.annotation.Validated
+import jakarta.validation.constraints.Size
 import java.util.UUID
 
 @RestController
+@Validated
 @RequestMapping("/api/v1/catalog")
 class CatalogReadController(
     private val catalogService: CatalogService,
@@ -34,6 +37,12 @@ class CatalogReadController(
     @PreAuthorize("hasAuthority('SCOPE_catalog.read')")
     fun edition(@PathVariable editionId: UUID): Edition = catalogService.getEdition(editionId.toString())
         ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Edition not found")
+
+    @GetMapping("/editions")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.read')")
+    fun editions(
+        @RequestParam @Size(min = 1, max = 50) editionId: List<UUID>,
+    ): List<Edition> = catalogService.getEditions(editionId.map(UUID::toString))
 
     @GetMapping("/search")
     @PreAuthorize("hasAuthority('SCOPE_catalog.search')")

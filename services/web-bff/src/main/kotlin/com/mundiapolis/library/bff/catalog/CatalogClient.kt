@@ -14,6 +14,7 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.IDN
 import java.util.Optional
+import java.util.UUID
 
 @Component
 class CatalogClient(
@@ -94,6 +95,32 @@ class CatalogClient(
             }
     }
 
+    fun editions(
+        authorizedClient: OAuth2AuthorizedClient,
+        editionIds: List<UUID>,
+    ): List<CatalogEditionView> = exchange {
+        catalogRestClient.get()
+            .uri { builder ->
+                builder.path("/api/v1/catalog/editions")
+                    .queryParam("editionId", *editionIds.map(UUID::toString).toTypedArray())
+                    .build()
+            }
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                val editions = decode(boundedBody(response), Array<CatalogEditionView>::class.java).toList()
+                val requestedPositions = editionIds.withIndex().associate { (index, id) -> id to index }
+                if (
+                    editions.size > editionIds.size ||
+                    editions.map { it.editionId }.distinct().size != editions.size ||
+                    editions.any { it.editionId !in requestedPositions || !validEdition(it) } ||
+                    editions.map { requestedPositions.getValue(it.editionId) } !=
+                    editions.map { requestedPositions.getValue(it.editionId) }.sorted()
+                ) throw CatalogProtocolException()
+                editions
+            }
+    }
+
     private fun <T> exchange(operation: () -> T): T {
         try {
             return operation()
@@ -169,6 +196,12 @@ class CatalogClient(
             ((resource.accessMode == LearningResourceAccessMode.DOWNLOAD && resource.readUrl == null) ||
                 (resource.accessMode == LearningResourceAccessMode.READ_AT_SOURCE &&
                     resource.readUrl?.let(::validPublicHttpsUrl) == true))
+
+    private fun validEdition(edition: CatalogEditionView): Boolean =
+        validText(edition.title, 1, 500) &&
+            edition.pageCount > 0 &&
+            edition.totalCopies >= 0 &&
+            edition.availableCopies in 0..edition.totalCopies
 
     private fun validText(value: String, minimum: Int, maximum: Int, allowLines: Boolean = false): Boolean =
         value.length in minimum..maximum && value == value.trim() &&

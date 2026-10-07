@@ -19,6 +19,15 @@ class CatalogServiceImpl(
     override fun getEdition(editionId: String): Edition? =
         repository.findEdition(editionId.toIdentifier("editionId"))
 
+    override fun getEditions(editionIds: List<String>): List<Edition> {
+        require(editionIds.size in 1..MAX_BATCH_EDITIONS) {
+            "editionIds must contain between 1 and $MAX_BATCH_EDITIONS values"
+        }
+        val identifiers = editionIds.map { it.toIdentifier("editionId") }
+        require(identifiers.distinct().size == identifiers.size) { "editionIds must be unique" }
+        return repository.findEditions(identifiers)
+    }
+
     override fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult =
         repository.search(filters.normalized())
 
@@ -78,6 +87,7 @@ class CatalogServiceImpl(
         const val MAX_GENRE_LENGTH = 120
         const val DEFAULT_LIMIT = 20
         const val MAX_LIMIT = 100
+        const val MAX_BATCH_EDITIONS = 50
         const val MAX_PAGE = 10_000
         val ALLOWED_SORTS = setOf("title", "rating", "publicationYear")
     }

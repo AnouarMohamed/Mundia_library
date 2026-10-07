@@ -277,6 +277,28 @@ class CatalogServiceIntegrationTest {
     }
 
     @Test
+    fun `edition batch preserves requested order omits missing records and rejects duplicates`() {
+        mockMvc.perform(
+            get("/api/v1/catalog/editions")
+                .param("editionId", AVAILABLE_EDITION_ID.toString())
+                .param("editionId", UUID.randomUUID().toString())
+                .param("editionId", INACTIVE_EDITION_ID.toString())
+                .with(scope(READ_SCOPE)),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].editionId").value(AVAILABLE_EDITION_ID.toString()))
+            .andExpect(jsonPath("$[1].editionId").value(INACTIVE_EDITION_ID.toString()))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/editions")
+                .param("editionId", AVAILABLE_EDITION_ID.toString())
+                .param("editionId", AVAILABLE_EDITION_ID.toString())
+                .with(scope(READ_SCOPE)),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun `copy events atomically project availability with replay and ordering guards`() {
         val copyId = UUID.randomUUID()
         val registered = circulationCopyEvent(
@@ -686,6 +708,10 @@ class CatalogServiceIntegrationTest {
     fun `protected reads enforce authentication and endpoint scopes`() {
         mockMvc.perform(get("/api/v1/catalog/editions/$AVAILABLE_EDITION_ID"))
             .andExpect(status().isUnauthorized)
+
+        mockMvc.perform(
+            get("/api/v1/catalog/editions").param("editionId", AVAILABLE_EDITION_ID.toString()),
+        ).andExpect(status().isUnauthorized)
 
         mockMvc.perform(
             get("/api/v1/catalog/search").with(scope(READ_SCOPE)),

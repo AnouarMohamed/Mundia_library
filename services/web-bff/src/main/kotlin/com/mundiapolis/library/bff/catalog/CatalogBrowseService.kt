@@ -15,6 +15,7 @@ interface CatalogBrowseUseCase {
     fun learningResources(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, criteria: LearningResourceSearchCriteria): LearningResourcePageView
     fun learningResource(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, resourceId: UUID): LearningResourceView
     fun learningResourceCategories(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse): List<String>
+    fun editions(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, editionIds: List<UUID>): List<CatalogEditionView>
 }
 
 @Service
@@ -34,6 +35,11 @@ class CatalogBrowseService(
 
     override fun learningResourceCategories(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse) =
         withClient(authentication, request, response) { client.learningResourceCategories(it) }
+
+    override fun editions(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, editionIds: List<UUID>): List<CatalogEditionView> {
+        require(editionIds.distinct().size == editionIds.size) { "editionId values must be unique" }
+        return withClient(authentication, request, response) { client.editions(it, editionIds) }
+    }
 
     private fun <T> withClient(
         authentication: OAuth2AuthenticationToken,

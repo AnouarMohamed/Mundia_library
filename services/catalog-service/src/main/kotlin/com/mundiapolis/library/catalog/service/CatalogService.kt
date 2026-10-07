@@ -9,6 +9,7 @@ import com.mundiapolis.library.catalog.dto.Work
 interface CatalogService {
     fun getWork(workId: String): Work?
     fun getEdition(editionId: String): Edition?
+    fun getEditions(editionIds: List<String>): List<Edition>
     fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult
     fun getDistinctGenres(): List<String>
     fun getPublishedReviews(workId: String, page: Int?, limit: Int?): CatalogReviewPage

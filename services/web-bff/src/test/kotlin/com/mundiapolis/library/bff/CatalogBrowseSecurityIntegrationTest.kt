@@ -100,6 +100,22 @@ class CatalogBrowseSecurityIntegrationTest {
             .andExpect(jsonPath("$[0]").value("Operating Systems"))
     }
 
+    @Test
+    fun `edition batch requires a session and remains bounded and non cacheable`() {
+        mockMvc.perform(get("/api/v1/catalog/editions").param("editionId", EDITION_ID.toString()))
+            .andExpect(status().isUnauthorized)
+
+        mockMvc.perform(
+            get("/api/v1/catalog/editions")
+                .param("editionId", EDITION_ID.toString())
+                .with(oidcLogin()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Cache-Control", "no-store"))
+            .andExpect(jsonPath("$[0].editionId").value(EDITION_ID.toString()))
+            .andExpect(jsonPath("$[0].title").value("Distributed Systems"))
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     class CatalogTestConfiguration {
         @Bean
@@ -140,6 +156,30 @@ class CatalogBrowseSecurityIntegrationTest {
 
             override fun learningResourceCategories(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse): List<String> = listOf("Operating Systems")
 
+            override fun editions(
+                authentication: OAuth2AuthenticationToken,
+                request: HttpServletRequest,
+                response: HttpServletResponse,
+                editionIds: List<UUID>,
+            ): List<CatalogEditionView> = listOf(
+                CatalogEditionView(
+                    editionId = EDITION_ID,
+                    workId = UUID.fromString("22222222-2222-2222-2222-222222222222"),
+                    title = "Distributed Systems",
+                    isbn = "9780000000001",
+                    publisher = "Mundia Press",
+                    publicationYear = 2026,
+                    language = "en",
+                    pageCount = 320,
+                    coverUrl = null,
+                    coverColor = null,
+                    videoUrl = null,
+                    totalCopies = 1,
+                    availableCopies = 1,
+                    isActive = true,
+                ),
+            )
+
             private fun resource() = LearningResourceView(
                 UUID.fromString("44444444-4444-4444-4444-444444444444"),
                 "The Linux Command Line",
@@ -157,5 +197,9 @@ class CatalogBrowseSecurityIntegrationTest {
                 null,
             )
         }
+    }
+
+    private companion object {
+        val EDITION_ID: UUID = UUID.fromString("11111111-1111-1111-1111-111111111111")
     }
 }
