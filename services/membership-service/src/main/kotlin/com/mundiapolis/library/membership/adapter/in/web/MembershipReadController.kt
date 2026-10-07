@@ -1,6 +1,8 @@
 package com.mundiapolis.library.membership.adapter.`in`.web
 
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
+import com.mundiapolis.library.membership.dto.AccountStatus
+import com.mundiapolis.library.membership.dto.AdminMemberPage
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
 import com.mundiapolis.library.membership.service.MembershipService
@@ -11,6 +13,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
@@ -20,6 +23,14 @@ import java.util.UUID
 class MembershipReadController(
     private val membershipService: MembershipService,
 ) {
+    @GetMapping("")
+    @PreAuthorize("hasAuthority('SCOPE_membership.members.read')")
+    fun membersForAdministration(
+        @RequestParam(defaultValue = "PENDING") status: AccountStatus,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): AdminMemberPage = membershipService.listMembersForAdministration(status, limit, cursor)
+
     @GetMapping("/me/profile")
     @PreAuthorize("hasAuthority('SCOPE_membership.profile.read')")
     fun ownProfile(authentication: JwtAuthenticationToken): MemberProfile {

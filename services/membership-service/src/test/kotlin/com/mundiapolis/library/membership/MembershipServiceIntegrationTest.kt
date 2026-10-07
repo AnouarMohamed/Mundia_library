@@ -194,6 +194,47 @@ class MembershipServiceIntegrationTest {
     }
 
     @Test
+    fun `administrative member queue is scoped bounded and keyset paginated`() {
+        val secondPending = UUID.fromString("70000000-0000-0000-0000-000000000007")
+        insertMember(secondPending, "PENDING", activeLoans = 0, maximumLoans = 5)
+
+        val firstPage = mockMvc.perform(
+            get("/api/v1/members")
+                .param("status", "PENDING")
+                .param("limit", "1")
+                .with(jwt().authorities(SimpleGrantedAuthority(MEMBERS_READ_SCOPE))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].memberId").value(PENDING_MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.items[0].aggregateVersion").value(0))
+            .andExpect(jsonPath("$.nextCursor").isString)
+            .andReturn()
+        val cursor = tools.jackson.databind.ObjectMapper()
+            .readTree(firstPage.response.contentAsByteArray)["nextCursor"].stringValue()
+
+        mockMvc.perform(
+            get("/api/v1/members")
+                .param("status", "PENDING")
+                .param("limit", "1")
+                .param("cursor", cursor)
+                .with(jwt().authorities(SimpleGrantedAuthority(MEMBERS_READ_SCOPE))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(1))
+            .andExpect(jsonPath("$.items[0].memberId").value(secondPending.toString()))
+            .andExpect(jsonPath("$.nextCursor").doesNotExist())
+
+        mockMvc.perform(get("/api/v1/members").with(jwt()))
+            .andExpect(status().isForbidden)
+        mockMvc.perform(
+            get("/api/v1/members")
+                .param("cursor", "not-a-valid-cursor")
+                .with(jwt().authorities(SimpleGrantedAuthority(MEMBERS_READ_SCOPE))),
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun `status command is versioned idempotent and atomically emits privacy-safe evidence`() {
         val request = post("/api/v1/members/$PENDING_MEMBER_ID/status")
             .header("If-Match", "\"0\"")
@@ -404,6 +445,7 @@ class MembershipServiceIntegrationTest {
         const val ELIGIBILITY_ANY_SCOPE = "SCOPE_membership.eligibility.read.any"
         const val EVIDENCE_SCOPE = "SCOPE_membership.identity-evidence.read"
         const val STATUS_MANAGE_SCOPE = "SCOPE_membership.status.manage"
+        const val MEMBERS_READ_SCOPE = "SCOPE_membership.members.read"
 
         @Container
         @JvmStatic

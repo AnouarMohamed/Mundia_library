@@ -36,6 +36,9 @@ resource "aws_s3_bucket_ownership_controls" "spa" {
   }
 }
 
+# This bucket contains only immutable public SPA artifacts. SSE-S3 encrypts them
+# at rest without introducing a paid customer-managed KMS key or request fees.
+#trivy:ignore:AVD-AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "spa" {
   bucket = aws_s3_bucket.spa.id
 

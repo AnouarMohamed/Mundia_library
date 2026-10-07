@@ -3,6 +3,7 @@ package com.mundiapolis.library.membership.adapter.outbound.persistence
 import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.generated.Tables.MEMBERSHIP_IDENTITY_EVIDENCE
 import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.generated.Tables.MEMBERSHIP_MEMBER
 import com.mundiapolis.library.membership.dto.AccountStatus
+import com.mundiapolis.library.membership.dto.AdminMemberSummary
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
@@ -10,6 +11,7 @@ import com.mundiapolis.library.membership.dto.MembershipRole
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
 import java.time.Clock
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -17,6 +19,41 @@ class JooqMembershipRepository(
     private val dsl: DSLContext,
     private val clock: Clock,
 ) {
+    fun findMembersForAdministration(
+        status: AccountStatus,
+        afterCreatedAt: Instant?,
+        afterMemberId: UUID?,
+        limit: Int,
+    ): List<AdminMemberSummary> {
+        var condition = MEMBERSHIP_MEMBER.ACCOUNT_STATUS.eq(status.name)
+        if (afterCreatedAt != null && afterMemberId != null) {
+            val timestamp = afterCreatedAt.atOffset(java.time.ZoneOffset.UTC)
+            condition = condition.and(
+                MEMBERSHIP_MEMBER.CREATED_AT.gt(timestamp).or(
+                    MEMBERSHIP_MEMBER.CREATED_AT.eq(timestamp)
+                        .and(MEMBERSHIP_MEMBER.MEMBER_ID.gt(afterMemberId)),
+                ),
+            )
+        }
+        return dsl.selectFrom(MEMBERSHIP_MEMBER)
+            .where(condition)
+            .orderBy(MEMBERSHIP_MEMBER.CREATED_AT.asc(), MEMBERSHIP_MEMBER.MEMBER_ID.asc())
+            .limit(limit)
+            .fetch { member ->
+                AdminMemberSummary(
+                    memberId = requireNotNull(member.memberId),
+                    email = requireNotNull(member.email),
+                    fullName = requireNotNull(member.fullName),
+                    universityId = requireNotNull(member.universityId),
+                    status = AccountStatus.valueOf(requireNotNull(member.accountStatus)),
+                    role = MembershipRole.valueOf(requireNotNull(member.membershipRole)),
+                    aggregateVersion = requireNotNull(member.aggregateVersion),
+                    createdAt = requireNotNull(member.createdAt).toInstant(),
+                    updatedAt = requireNotNull(member.updatedAt).toInstant(),
+                )
+            }
+    }
+
     fun findProfile(memberId: UUID): MemberProfile? = dsl
         .selectFrom(MEMBERSHIP_MEMBER)
         .where(MEMBERSHIP_MEMBER.MEMBER_ID.eq(memberId))

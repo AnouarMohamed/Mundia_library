@@ -208,6 +208,7 @@ same public actuator paths as Circulation.
 | Own eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read` |
 | Delegated eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read.any` |
 | Identity-evidence metadata | `GET /api/v1/members/{memberId}/identity-evidence` | `membership.identity-evidence.read` |
+| Administrative member queue | `GET /api/v1/members` | `membership.members.read` |
 
 Self-service profile and eligibility reads require a canonical UUID
 `membership_id` token claim equal to the path member. Eligibility is derived

@@ -102,6 +102,7 @@ class OAuthClientConfiguration {
                     when (request.clientRegistration.registrationId) {
                         CATALOG_REGISTRATION -> add("audience", catalog.audience)
                         MEMBERSHIP_REGISTRATION -> add("audience", membership.audience)
+                        MEMBERSHIP_ADMIN_REGISTRATION -> add("audience", membership.audience)
                         CIRCULATION_REGISTRATION -> add("audience", circulation.audience)
                         NOTIFICATION_REGISTRATION -> add("audience", notification.audience)
                         DIGITAL_CONTENT_REGISTRATION -> add("audience", digitalContent.audience)
@@ -188,6 +189,7 @@ class OAuthClientConfiguration {
     companion object {
         const val CATALOG_REGISTRATION = "catalog-service"
         const val MEMBERSHIP_REGISTRATION = "membership-service"
+        const val MEMBERSHIP_ADMIN_REGISTRATION = "membership-admin-service"
         const val CIRCULATION_REGISTRATION = "circulation-service"
         const val NOTIFICATION_REGISTRATION = "notification-service"
         const val DIGITAL_CONTENT_REGISTRATION = "digital-content-service"
@@ -197,6 +199,7 @@ class OAuthClientConfiguration {
             "institutional",
             CATALOG_REGISTRATION,
             MEMBERSHIP_REGISTRATION,
+            MEMBERSHIP_ADMIN_REGISTRATION,
             CIRCULATION_REGISTRATION,
             NOTIFICATION_REGISTRATION,
             DIGITAL_CONTENT_REGISTRATION,

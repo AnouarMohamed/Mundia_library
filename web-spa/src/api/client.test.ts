@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
+  changeAdminMemberStatus,
   authorizeEditionDownload,
   cancelLoan,
   cancelReservation,
   getCirculationOverview,
+  getAdminMembers,
   getEditionDownloadAvailability,
   getLearningResource,
   getMemberProfile,
@@ -68,6 +70,50 @@ describe("member-profile BFF client", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ...profile(), ...override })));
 
     await expect(getMemberProfile()).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe("administration BFF client", () => {
+  it("accepts a bounded, ordered account queue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ items: [adminMember()], nextCursor: null })));
+
+    await expect(getAdminMembers("PENDING")).resolves.toMatchObject({
+      items: [{ fullName: "Pending Student", aggregateVersion: 0 }],
+    });
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain("status=PENDING");
+  });
+
+  it("sends csrf, exact version and unique idempotency for a decision", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        memberId: ADMIN_TARGET_ID,
+        aggregateVersion: 1,
+        status: "APPROVED",
+        occurredAt: "2026-10-07T10:00:00Z",
+        replayed: false,
+      }), { status: 200, headers: {
+        "content-type": "application/json",
+        etag: '"1"',
+        "idempotency-replayed": "false",
+      } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(changeAdminMemberStatus(adminMember(), "APPROVED", "Identity evidence verified"))
+      .resolves.toMatchObject({ status: "APPROVED", aggregateVersion: 1 });
+    const request = fetchMock.mock.calls[1]?.[1];
+    const headers = new Headers(request?.headers);
+    expect(headers.get("If-Match")).toBe('"0"');
+    expect(headers.get("X-XSRF-TOKEN")).toBe(CSRF_TOKEN);
+    expect(headers.get("Idempotency-Key")).toMatch(/^spa:member-status:/u);
+  });
+
+  it("rejects a queue with the wrong status", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      items: [{ ...adminMember(), status: "APPROVED" }], nextCursor: null,
+    })));
+
+    await expect(getAdminMembers("PENDING")).rejects.toBeInstanceOf(ApiError);
   });
 });
 
@@ -291,6 +337,7 @@ const RESERVATION_ID = "55555555-5555-4555-8555-555555555555";
 const CSRF_TOKEN = "csrf-token-for-browser-tests";
 const NOTIFICATION_ID = "88888888-8888-4888-8888-888888888888";
 const ASSET_ID = "12000000-0000-4000-8000-000000000001";
+const ADMIN_TARGET_ID = "13000000-0000-4000-8000-000000000001";
 const SHA256 = "a".repeat(64);
 const SIGNED_DOWNLOAD_URL = `https://downloads.example.test/digital-content/ab/${ASSET_ID}/${SHA256}.pdf?Policy=abc&Signature=def&Key-Pair-Id=ghi&Hash-Algorithm=SHA256`;
 
@@ -301,6 +348,20 @@ function eligibility() {
     reasonCode: null,
     sourceVersion: 4,
     sourceOccurredAt: "2026-10-06T10:00:00Z",
+  };
+}
+
+function adminMember() {
+  return {
+    memberId: ADMIN_TARGET_ID,
+    email: "pending.student@mundiapolis.ma",
+    fullName: "Pending Student",
+    universityId: 20260001,
+    status: "PENDING" as const,
+    role: "USER" as const,
+    aggregateVersion: 0,
+    createdAt: "2026-10-07T08:00:00Z",
+    updatedAt: "2026-10-07T08:00:00Z",
   };
 }
 

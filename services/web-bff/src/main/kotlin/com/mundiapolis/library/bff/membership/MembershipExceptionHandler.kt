@@ -8,7 +8,7 @@ import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
-@RestControllerAdvice(assignableTypes = [MembershipProfileController::class])
+@RestControllerAdvice(assignableTypes = [MembershipProfileController::class, MembershipAdminController::class])
 class MembershipExceptionHandler {
     @ExceptionHandler(
         MembershipReauthenticationRequiredException::class,
@@ -32,6 +32,20 @@ class MembershipExceptionHandler {
         HttpStatus.NOT_FOUND,
         "membership_profile_not_found",
         "Membership profile was not found",
+    )
+
+    @ExceptionHandler(MembershipInvalidRequestException::class)
+    fun invalidRequest(): ProblemDetail = problem(
+        HttpStatus.BAD_REQUEST,
+        "invalid_membership_request",
+        "The membership request is invalid",
+    )
+
+    @ExceptionHandler(MembershipConflictException::class)
+    fun conflict(): ProblemDetail = problem(
+        HttpStatus.CONFLICT,
+        "membership_conflict",
+        "Membership state changed; refresh and try again",
     )
 
     @ExceptionHandler(MembershipTimeoutException::class)

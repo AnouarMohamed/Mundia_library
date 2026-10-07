@@ -69,6 +69,16 @@ HTTPS; authorization and token endpoints must share an exact origin. The
 issuer may use a different HTTPS origin, as it does with Amazon Cognito hosted
 domains.
 
+Administration uses a distinct `membership-admin-service` token-exchange
+registration so ordinary profile access never requests privileged scopes. Its
+token must be issued only to approved administrators and is limited to the
+same `membership-api` audience plus `membership.profile.read`,
+`membership.members.read`, and `membership.status.manage`. Every administrative
+request re-reads the operator's authoritative profile and requires an approved
+`ADMIN` or `SUPER_ADMIN` before the BFF reads or mutates another account. The
+BFF exposes a bounded member queue and forwards status decisions with CSRF,
+exact `If-Match`, and idempotency protections.
+
 The Circulation self-service routes cover eligibility, bounded keyset-paginated
 loan and reservation history, loan request/cancel/renew, and reservation
 place/cancel. They exchange the same server-side user token for a separate

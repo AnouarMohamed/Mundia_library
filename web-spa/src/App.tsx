@@ -7,21 +7,33 @@ import { CirculationPage } from "./pages/CirculationPage";
 import { CatalogPage } from "./pages/CatalogPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { CatalogEditionPage } from "./pages/CatalogEditionPage";
-import { getSession, logout, type Session } from "./api/client";
+import { AdminMembersPage } from "./pages/AdminMembersPage";
+import { getAdminMembers, getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
 const resourcesEnabled = import.meta.env.VITE_ENABLE_LEARNING_RESOURCES === "true";
 const profileEnabled = import.meta.env.VITE_ENABLE_MEMBER_PROFILE === "true";
 const circulationEnabled = import.meta.env.VITE_ENABLE_CIRCULATION_SELF_SERVICE === "true";
 const notificationsEnabled = import.meta.env.VITE_ENABLE_NOTIFICATIONS === "true";
+const administrationEnabled = import.meta.env.VITE_ENABLE_ADMINISTRATION === "true";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [sessionFailed, setSessionFailed] = useState(false);
+  const [adminAvailable, setAdminAvailable] = useState(false);
 
   useEffect(() => {
     void getSession().then(setSession).catch(() => setSessionFailed(true));
   }, []);
+
+  useEffect(() => {
+    if (!administrationEnabled || !session?.authenticated) return;
+    const controller = new AbortController();
+    void getAdminMembers("PENDING", undefined, 1, controller.signal)
+      .then(() => setAdminAvailable(true))
+      .catch(() => setAdminAvailable(false));
+    return () => controller.abort();
+  }, [session]);
 
   if (sessionFailed) return <ServiceUnavailable />;
   if (!session) return <ShellSkeleton />;
@@ -52,6 +64,7 @@ export function App() {
               {circulationEnabled && <NavLink to="/borrowing">Borrowing</NavLink>}
               {notificationsEnabled && <NavLink to="/notifications">Updates</NavLink>}
               {profileEnabled && <NavLink to="/profile">Account</NavLink>}
+              {adminAvailable && <NavLink to="/admin">Admin</NavLink>}
             </nav>
           )}
         </div>
@@ -70,6 +83,7 @@ export function App() {
             {circulationEnabled && <Route path="/catalog/:editionId" element={<CatalogEditionPage />} />}
             {circulationEnabled && <Route path="/borrowing" element={<CirculationPage />} />}
             {notificationsEnabled && <Route path="/notifications" element={<NotificationsPage />} />}
+            {administrationEnabled && <Route path="/admin" element={<AdminMembersPage />} />}
             <Route path="*" element={<Navigate replace to={defaultPath} />} />
           </Routes>
         ) : (

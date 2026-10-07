@@ -2,9 +2,12 @@ package com.mundiapolis.library.bff
 
 import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.membership.MembershipClient
+import com.mundiapolis.library.bff.membership.AccountStatusView
+import com.mundiapolis.library.bff.membership.ChangeMemberStatusView
 import com.mundiapolis.library.bff.membership.MembershipDelegationRejectedException
 import com.mundiapolis.library.bff.membership.MembershipProtocolException
 import com.mundiapolis.library.bff.membership.MembershipReauthenticationRequiredException
+import com.mundiapolis.library.bff.membership.MembershipInvalidRequestException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -19,6 +22,7 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod
 import org.springframework.security.oauth2.core.OAuth2AccessToken
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.match.MockRestRequestMatchers.header
+import org.springframework.test.web.client.match.MockRestRequestMatchers.content
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
@@ -93,6 +97,56 @@ class MembershipClientTest {
         server.verify()
     }
 
+    @Test
+    fun `administrative queue is bounded and status filtered`() {
+        server.expect(requestTo("https://membership.internal/api/v1/members?status=PENDING&limit=1"))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andRespond(withSuccess(ADMIN_PAGE, MediaType.APPLICATION_JSON))
+
+        val page = client.membersForAdministration(authorizedClient(), AccountStatusView.PENDING, 1, null)
+
+        assertThat(page.items.single().aggregateVersion).isZero()
+        server.verify()
+    }
+
+    @Test
+    fun `administrative status command preserves version and idempotency`() {
+        server.expect(requestTo("https://membership.internal/api/v1/members/13000000-0000-4000-8000-000000000001/status"))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header("If-Match", "\"0\""))
+            .andExpect(header("Idempotency-Key", "admin-decision-00000001"))
+            .andExpect(content().json("""{"status":"APPROVED","reason":"Identity evidence verified"}"""))
+            .andRespond(
+                withSuccess(ADMIN_COMMAND, MediaType.APPLICATION_JSON)
+                    .header("Idempotency-Replayed", "false"),
+            )
+
+        val result = client.changeMemberStatus(
+            authorizedClient(),
+            java.util.UUID.fromString("13000000-0000-4000-8000-000000000001"),
+            0,
+            "admin-decision-00000001",
+            ChangeMemberStatusView(AccountStatusView.APPROVED, "Identity evidence verified"),
+        )
+
+        assertThat(result.command.aggregateVersion).isEqualTo(1)
+        assertThat(result.idempotencyReplayed).isFalse()
+        server.verify()
+    }
+
+    @Test
+    fun `administrative status command cannot restore a pending state`() {
+        assertThatThrownBy {
+            client.changeMemberStatus(
+                authorizedClient(),
+                java.util.UUID.fromString("13000000-0000-4000-8000-000000000001"),
+                1,
+                "admin-decision-00000002",
+                ChangeMemberStatusView(AccountStatusView.PENDING, "Return account to pending"),
+            )
+        }.isInstanceOf(MembershipInvalidRequestException::class.java)
+    }
+
     private fun authorizedClient(): OAuth2AuthorizedClient {
         val registration = ClientRegistration.withRegistrationId("membership-service")
             .clientId("web-bff-membership")
@@ -131,6 +185,31 @@ class MembershipClientTest {
               "role": "USER",
               "createdAt": "2026-01-01T00:00:00Z",
               "updatedAt": "2026-09-01T00:00:00Z"
+            }
+        """.trimIndent()
+        val ADMIN_PAGE = """
+            {
+              "items": [{
+                "memberId": "13000000-0000-4000-8000-000000000001",
+                "email": "pending.student@mundiapolis.ma",
+                "fullName": "Pending Student",
+                "universityId": 20260001,
+                "status": "PENDING",
+                "role": "USER",
+                "aggregateVersion": 0,
+                "createdAt": "2026-10-07T10:00:00Z",
+                "updatedAt": "2026-10-07T10:00:00Z"
+              }],
+              "nextCursor": null
+            }
+        """.trimIndent()
+        val ADMIN_COMMAND = """
+            {
+              "memberId": "13000000-0000-4000-8000-000000000001",
+              "aggregateVersion": 1,
+              "status": "APPROVED",
+              "occurredAt": "2026-10-07T10:01:00Z",
+              "replayed": false
             }
         """.trimIndent()
     }

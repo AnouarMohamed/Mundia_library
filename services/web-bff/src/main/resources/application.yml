@@ -59,6 +59,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: membership.profile.read
+          membership-admin-service:
+            provider: institutional
+            client-id: ${MEMBERSHIP_CLIENT_ID}
+            client-secret: ${MEMBERSHIP_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: membership.profile.read,membership.members.read,membership.status.manage
           circulation-service:
             provider: institutional
             client-id: ${CIRCULATION_CLIENT_ID}

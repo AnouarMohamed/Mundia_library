@@ -5,6 +5,8 @@ import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandCont
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandResponse
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipReadController
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
+import com.mundiapolis.library.membership.dto.AdminMemberPage
+import com.mundiapolis.library.membership.dto.AdminMemberSummary
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
 import org.assertj.core.api.Assertions.assertThat
@@ -49,6 +51,8 @@ class OpenApiContractTest {
     @Test
     fun `published JSON fields match transport models exactly`() {
         assertSchemaFields("MemberProfile", MemberProfile::class.java)
+        assertSchemaFields("AdminMemberPage", AdminMemberPage::class.java)
+        assertSchemaFields("AdminMemberSummary", AdminMemberSummary::class.java)
         assertSchemaFields("MemberEligibility", MemberEligibility::class.java)
         assertSchemaFields("IdentityEvidenceRef", IdentityEvidenceRef::class.java)
         assertSchemaFields("ChangeAccountStatusRequest", ChangeAccountStatusRequest::class.java)

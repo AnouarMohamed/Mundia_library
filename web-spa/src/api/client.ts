@@ -19,6 +19,10 @@ export type EditionDownloadAvailability = components["schemas"]["EditionDownload
 export type DownloadableFormat = components["schemas"]["DownloadableFormat"];
 export type DownloadAuthorization = components["schemas"]["DownloadAuthorization"];
 export type Session = components["schemas"]["Session"];
+export type AdminMemberPage = components["schemas"]["AdminMemberPage"];
+export type AdminMember = components["schemas"]["AdminMemberSummary"];
+export type AccountStatus = components["schemas"]["AccountStatus"];
+export type MembershipCommand = components["schemas"]["MembershipCommand"];
 export type CommandResult<T> = { record: T; replayed: boolean };
 export type VersionedNotificationPreference = { preference: NotificationPreference; entityTag: string };
 export type NotificationReadStatus = "ALL" | "READ" | "UNREAD";
@@ -53,6 +57,52 @@ export async function getSession(): Promise<Session> {
 export async function getMemberProfile(signal?: AbortSignal): Promise<MemberProfile> {
   const value = await requestJson("/api/v1/membership/profile", { signal });
   if (!isMemberProfile(value)) throw new ApiError(502);
+  return value;
+}
+
+export async function getAdminMembers(
+  status: AccountStatus = "PENDING",
+  cursor?: string,
+  limit = 25,
+  signal?: AbortSignal,
+): Promise<AdminMemberPage> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 ||
+      (cursor !== undefined && !isAdminCursor(cursor))) throw new ApiError(400);
+  const query = new URLSearchParams({ status, limit: String(limit) });
+  if (cursor) query.set("cursor", cursor);
+  const value = await requestJson(`/api/v1/admin/members?${query}`, { signal });
+  if (!isAdminMemberPage(value, status, limit)) throw new ApiError(502);
+  return value;
+}
+
+export async function changeAdminMemberStatus(
+  member: AdminMember,
+  status: Exclude<AccountStatus, "PENDING">,
+  reason: string,
+): Promise<MembershipCommand> {
+  if (!isAdminMember(member) || !["APPROVED", "REJECTED"].includes(status) ||
+      !isSafeMultilineText(reason.trim(), 500) || reason.trim().length < 8) throw new ApiError(400);
+  const csrf = await getCsrfToken();
+  const response = await fetch(`/api/v1/admin/members/${encodeURIComponent(member.memberId)}/status`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "If-Match": `"${member.aggregateVersion}"`,
+      "Idempotency-Key": `spa:member-status:${crypto.randomUUID()}`,
+      [csrf.headerName]: csrf.token,
+    },
+    body: JSON.stringify({ status, reason: reason.trim() }),
+  });
+  const value = await responseJson(response);
+  const entityTag = response.headers.get("etag");
+  const replayed = response.headers.get("idempotency-replayed");
+  if (!isMembershipCommand(value) || value.memberId !== member.memberId || value.status !== status ||
+      value.aggregateVersion <= member.aggregateVersion || entityTag !== `"${value.aggregateVersion}"` ||
+      (replayed !== "true" && replayed !== "false") || value.replayed !== (replayed === "true")) {
+    throw new ApiError(502);
+  }
   return value;
 }
 
@@ -462,6 +512,33 @@ function isMemberProfile(value: unknown): value is MemberProfile {
   return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
 }
 
+function isAdminMemberPage(value: unknown, status: AccountStatus, limit: number): value is AdminMemberPage {
+  if (!isRecord(value) || !Array.isArray(value.items) || value.items.length > limit ||
+      !value.items.every((item) => isAdminMember(item) && item.status === status) ||
+      !isNullableAdminCursor(value.nextCursor) || (value.nextCursor !== null && value.items.length !== limit)) return false;
+  const items = value.items as AdminMember[];
+  return items.slice(1).every((member, index) => {
+    const previous = items[index]!;
+    const difference = Date.parse(previous.createdAt) - Date.parse(member.createdAt);
+    return difference < 0 || (difference === 0 && previous.memberId < member.memberId);
+  });
+}
+
+function isAdminMember(value: unknown): value is AdminMember {
+  return isRecord(value) && isUuid(value.memberId) && isEmail(value.email) && isSafeText(value.fullName, 200) &&
+    Number.isSafeInteger(value.universityId) && Number(value.universityId) > 0 &&
+    ["PENDING", "APPROVED", "REJECTED"].includes(String(value.status)) &&
+    ["USER", "ADMIN", "SUPER_ADMIN"].includes(String(value.role)) &&
+    isNonNegativeInteger(value.aggregateVersion) && isIsoInstant(value.createdAt) && isIsoInstant(value.updatedAt) &&
+    Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
+}
+
+function isMembershipCommand(value: unknown): value is MembershipCommand {
+  return isRecord(value) && isUuid(value.memberId) && isNonNegativeInteger(value.aggregateVersion) &&
+    Number(value.aggregateVersion) > 0 && ["APPROVED", "REJECTED"].includes(String(value.status)) &&
+    isIsoInstant(value.occurredAt) && typeof value.replayed === "boolean";
+}
+
 function isEditionDownloadAvailability(value: unknown): value is EditionDownloadAvailability {
   if (!isRecord(value) || !isUuid(value.editionId) || typeof value.downloadable !== "boolean" ||
       !Array.isArray(value.formats) || value.formats.length > 2 ||
@@ -701,6 +778,14 @@ function isNullableCursor(value: unknown): value is string | null {
 
 function isNotificationCursor(value: unknown): value is string {
   return typeof value === "string" && value.length >= 1 && value.length <= 128 && /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function isAdminCursor(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 16 && value.length <= 200 && /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function isNullableAdminCursor(value: unknown): value is string | null {
+  return value === null || isAdminCursor(value);
 }
 
 function isNullableNotificationCursor(value: unknown): value is string | null {

@@ -79,8 +79,8 @@ in step 2:
   responsive loading/empty/error states, and CSRF-protected download
   authorization. Migrated slices have independent, disabled-by-default
   `VITE_ENABLE_LEARNING_RESOURCES`,
-  `VITE_ENABLE_MEMBER_PROFILE`, `VITE_ENABLE_CIRCULATION_SELF_SERVICE`, and
-  `VITE_ENABLE_NOTIFICATIONS`
+  `VITE_ENABLE_MEMBER_PROFILE`, `VITE_ENABLE_CIRCULATION_SELF_SERVICE`,
+  `VITE_ENABLE_NOTIFICATIONS`, and `VITE_ENABLE_ADMINISTRATION`
   release switches; the current Vercel routes remain authoritative until
   reconciliation and edge cutover. Circulation history enriches each bounded
   keyset page through one Catalog batch rather than an N+1 request pattern.
@@ -95,6 +95,13 @@ in step 2:
   filters, idempotent CSRF-protected mark-read actions, and email preferences.
   Preference writes carry the last strong ETag with `If-Match`; conflicts
   replace stale form state with the authoritative version before another save.
+- The first administration slice uses a separate privileged token-exchange
+  registration, a keyset-paginated Membership queue, and CSRF + ETag +
+  idempotency protected approve/reject commands. Membership commits each
+  decision, audit entry, and eligibility event atomically. Non-administrators
+  fail closed during delegated authorization, and every request rechecks the
+  operator's fresh Membership status and role; browser state never grants a
+  role or receives a service token.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

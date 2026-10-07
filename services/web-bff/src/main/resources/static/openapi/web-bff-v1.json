@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Library Web BFF API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
   },
   "servers": [{ "url": "/" }],
@@ -46,6 +46,66 @@
         "responses": {
           "204": { "description": "Session invalidated" },
           "403": { "description": "CSRF token missing or invalid" }
+        }
+      }
+    },
+    "/api/v1/admin/members": {
+      "get": {
+        "operationId": "listAdministrativeMembers",
+        "summary": "List members for administrative review",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/AccountStatus", "default": "PENDING" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fresh, bounded administrative member queue",
+            "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminMemberPage" } } }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/members/{memberId}/status": {
+      "post": {
+        "operationId": "changeAdministrativeMemberStatus",
+        "summary": "Approve or reject a member account",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "name": "memberId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangeMemberStatus" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Member status changed or the prior result replayed",
+            "headers": {
+              "Cache-Control": { "schema": { "type": "string", "const": "no-store" } },
+              "ETag": { "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" } },
+              "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } }
+            },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MembershipCommand" } } }
+          },
+          "400": { "$ref": "#/components/responses/Problem" },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "404": { "$ref": "#/components/responses/Problem" },
+          "409": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
         }
       }
     },
@@ -598,9 +658,63 @@
         "required": true,
         "description": "Actor-scoped command key. Reuse with a different request is rejected.",
         "schema": { "type": "string", "minLength": 16, "maxLength": 128, "pattern": "^[!-~]+$" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" }
       }
     },
     "schemas": {
+      "AdminMemberPage": {
+        "type": "object",
+        "required": ["items", "nextCursor"],
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/AdminMemberSummary" } },
+          "nextCursor": { "type": ["string", "null"], "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9_-]+$" }
+        },
+        "additionalProperties": false
+      },
+      "AdminMemberSummary": {
+        "type": "object",
+        "required": ["memberId", "email", "fullName", "universityId", "status", "role", "aggregateVersion", "createdAt", "updatedAt"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email", "maxLength": 320 },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "universityId": { "type": "integer", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "role": { "$ref": "#/components/schemas/MembershipRole" },
+          "aggregateVersion": { "type": "integer", "format": "int64", "minimum": 0 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      },
+      "ChangeMemberStatus": {
+        "type": "object",
+        "required": ["status", "reason"],
+        "properties": {
+          "status": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+          "reason": { "type": "string", "minLength": 8, "maxLength": 500 }
+        },
+        "additionalProperties": false
+      },
+      "MembershipCommand": {
+        "type": "object",
+        "required": ["memberId", "aggregateVersion", "status", "occurredAt", "replayed"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "aggregateVersion": { "type": "integer", "format": "int64", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "occurredAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      },
+      "AccountStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+      "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN", "SUPER_ADMIN"] },
       "EditionDownloadAvailability": {
         "type": "object",
         "required": ["editionId", "downloadable", "formats"],
