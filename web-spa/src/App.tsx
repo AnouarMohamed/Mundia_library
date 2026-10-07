@@ -5,12 +5,14 @@ import { LearningResourcesPage } from "./pages/LearningResourcesPage";
 import { MemberProfilePage } from "./pages/MemberProfilePage";
 import { CirculationPage } from "./pages/CirculationPage";
 import { CatalogPage } from "./pages/CatalogPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 import { getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
 const resourcesEnabled = import.meta.env.VITE_ENABLE_LEARNING_RESOURCES === "true";
 const profileEnabled = import.meta.env.VITE_ENABLE_MEMBER_PROFILE === "true";
 const circulationEnabled = import.meta.env.VITE_ENABLE_CIRCULATION_SELF_SERVICE === "true";
+const notificationsEnabled = import.meta.env.VITE_ENABLE_NOTIFICATIONS === "true";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -32,7 +34,7 @@ export function App() {
       </section>
     );
   }
-  const defaultPath = circulationEnabled ? "/catalog" : resourcesEnabled ? "/resources" : profileEnabled ? "/profile" : null;
+  const defaultPath = circulationEnabled ? "/catalog" : resourcesEnabled ? "/resources" : notificationsEnabled ? "/notifications" : profileEnabled ? "/profile" : null;
   return (
     <AppErrorBoundary>
       <a className="skip-link" href="#main-content">Skip to content</a>
@@ -44,10 +46,11 @@ export function App() {
           </Link>
           {defaultPath && (
             <nav className="site-nav" aria-label="Primary navigation">
-              {resourcesEnabled && <NavLink to="/resources">Open learning</NavLink>}
+              {resourcesEnabled && <NavLink to="/resources">Learning</NavLink>}
               {circulationEnabled && <NavLink to="/catalog">Catalog</NavLink>}
               {circulationEnabled && <NavLink to="/borrowing">Borrowing</NavLink>}
-              {profileEnabled && <NavLink to="/profile">My account</NavLink>}
+              {notificationsEnabled && <NavLink to="/notifications">Updates</NavLink>}
+              {profileEnabled && <NavLink to="/profile">Account</NavLink>}
             </nav>
           )}
         </div>
@@ -64,6 +67,7 @@ export function App() {
             {profileEnabled && <Route path="/profile" element={<MemberProfilePage />} />}
             {circulationEnabled && <Route path="/catalog" element={<CatalogPage />} />}
             {circulationEnabled && <Route path="/borrowing" element={<CirculationPage />} />}
+            {notificationsEnabled && <Route path="/notifications" element={<NotificationsPage />} />}
             <Route path="*" element={<Navigate replace to={defaultPath} />} />
           </Routes>
         ) : (

@@ -79,13 +79,18 @@ in step 2:
   responsive loading/empty/error states, and CSRF-protected external-download
   authorization. Learning resources and member profile have independent,
   disabled-by-default `VITE_ENABLE_LEARNING_RESOURCES`,
-  `VITE_ENABLE_MEMBER_PROFILE`, and `VITE_ENABLE_CIRCULATION_SELF_SERVICE`
+  `VITE_ENABLE_MEMBER_PROFILE`, `VITE_ENABLE_CIRCULATION_SELF_SERVICE`, and
+  `VITE_ENABLE_NOTIFICATIONS`
   release switches; the current Vercel routes remain authoritative until
   reconciliation and edge cutover. Circulation history enriches each bounded
   keyset page through one Catalog batch rather than an N+1 request pattern.
   Borrow, reserve, cancel, and renew actions use CSRF tokens plus unique
   idempotency keys, validate caller-bound command responses, and refresh
   authoritative history after success or concurrency conflicts.
+- The notification SPA slice provides caller-bound keyset pagination, unread
+  filters, idempotent CSRF-protected mark-read actions, and email preferences.
+  Preference writes carry the last strong ETag with `If-Match`; conflicts
+  replace stale form state with the authoritative version before another save.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

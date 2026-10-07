@@ -6,12 +6,16 @@ import {
   getCirculationOverview,
   getLearningResource,
   getMemberProfile,
+  getNotificationPreference,
+  getNotifications,
   isPublicHttpsUrl,
+  markNotificationRead,
   placeReservation,
   renewLoan,
   requestLoan,
   searchCatalog,
   searchLearningResources,
+  updateNotificationPreference,
 } from "./client";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -142,6 +146,71 @@ describe("circulation BFF client", () => {
   });
 });
 
+describe("notification BFF client", () => {
+  it("accepts an ordered caller-bound unread page", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      memberId: MEMBER_ID,
+      items: [notification(NOTIFICATION_ID, null)],
+      nextCursor: null,
+    })));
+
+    await expect(getNotifications("UNREAD")).resolves.toMatchObject({
+      memberId: MEMBER_ID,
+      items: [{ subject: "Loan due soon", readAt: null }],
+    });
+    expect(String(vi.mocked(fetch).mock.calls[0]?.[0])).toContain("status=UNREAD");
+  });
+
+  it("rejects a read item returned by the unread filter", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      memberId: MEMBER_ID,
+      items: [notification(NOTIFICATION_ID, "2026-10-07T09:00:00Z")],
+      nextCursor: null,
+    })));
+
+    await expect(getNotifications("UNREAD")).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("marks owned notifications read with csrf", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(jsonResponse(notification(NOTIFICATION_ID, "2026-10-07T09:00:00Z")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(markNotificationRead(NOTIFICATION_ID)).resolves.toMatchObject({ readAt: "2026-10-07T09:00:00Z" });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`/api/v1/notifications/${NOTIFICATION_ID}/read`);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PATCH" });
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("X-XSRF-TOKEN")).toBe(CSRF_TOKEN);
+  });
+
+  it("preserves the strong preference version on csrf-protected updates", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(preferenceResponse(notificationPreference(1), "\"1\""))
+      .mockResolvedValueOnce(csrfResponse())
+      .mockResolvedValueOnce(preferenceResponse(notificationPreference(2, false), "\"2\""));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const current = await getNotificationPreference();
+    await expect(updateNotificationPreference(MEMBER_ID, current.entityTag, {
+      emailEnabled: false,
+      dueSoonEnabled: true,
+      overdueEnabled: true,
+      holdReadyEnabled: true,
+      accountStatusEnabled: true,
+    })).resolves.toMatchObject({ entityTag: "\"2\"", preference: { emailEnabled: false, version: 2 } });
+
+    const headers = new Headers(fetchMock.mock.calls[2]?.[1]?.headers);
+    expect(headers.get("If-Match")).toBe("\"1\"");
+    expect(headers.get("X-XSRF-TOKEN")).toBe(CSRF_TOKEN);
+  });
+
+  it("rejects a preference body whose ETag does not match its version", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(preferenceResponse(notificationPreference(2), "\"1\"")));
+
+    await expect(getNotificationPreference()).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
 function jsonResponse(value: unknown) {
   return new Response(JSON.stringify(value), {
     status: 200,
@@ -168,6 +237,7 @@ const RESERVATION_EDITION_ID = "22222222-2222-4222-8222-222222222222";
 const LOAN_ID = "33333333-3333-4333-8333-333333333333";
 const RESERVATION_ID = "55555555-5555-4555-8555-555555555555";
 const CSRF_TOKEN = "csrf-token-for-browser-tests";
+const NOTIFICATION_ID = "88888888-8888-4888-8888-888888888888";
 
 function eligibility() {
   return {
@@ -229,6 +299,38 @@ function commandResponse(value: unknown, status: number) {
     status,
     headers: { "content-type": "application/json", "idempotency-replayed": "false" },
   });
+}
+
+function preferenceResponse(value: unknown, entityTag: string) {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { "content-type": "application/json", etag: entityTag },
+  });
+}
+
+function notification(notificationId: string, readAt: string | null) {
+  return {
+    notificationId,
+    category: "DUE_SOON",
+    subject: "Loan due soon",
+    body: "Distributed Systems is due soon.",
+    occurredAt: "2026-10-07T08:00:00Z",
+    createdAt: "2026-10-07T08:00:01Z",
+    readAt,
+  };
+}
+
+function notificationPreference(version: number, emailEnabled = true) {
+  return {
+    memberId: MEMBER_ID,
+    emailEnabled,
+    dueSoonEnabled: true,
+    overdueEnabled: true,
+    holdReadyEnabled: true,
+    accountStatusEnabled: true,
+    version,
+    updatedAt: "2026-10-07T08:00:00Z",
+  };
 }
 
 function loanCommand(status: "REQUESTED" | "CANCELLED" | "ACTIVE") {

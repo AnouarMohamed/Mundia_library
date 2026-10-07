@@ -11,8 +11,14 @@ export type MemberLoanPage = components["schemas"]["MemberLoanPage"];
 export type MemberReservationPage = components["schemas"]["MemberReservationPage"];
 export type Reservation = components["schemas"]["ReservationCommand"];
 export type MemberProfile = components["schemas"]["MemberProfile"];
+export type NotificationItem = components["schemas"]["NotificationItem"];
+export type NotificationPage = components["schemas"]["NotificationPage"];
+export type NotificationPreference = components["schemas"]["NotificationPreference"];
+export type UpdateNotificationPreference = components["schemas"]["UpdateNotificationPreference"];
 export type Session = components["schemas"]["Session"];
 export type CommandResult<T> = { record: T; replayed: boolean };
+export type VersionedNotificationPreference = { preference: NotificationPreference; entityTag: string };
+export type NotificationReadStatus = "ALL" | "READ" | "UNREAD";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message = "The library service is unavailable") {
@@ -45,6 +51,74 @@ export async function getMemberProfile(signal?: AbortSignal): Promise<MemberProf
   const value = await requestJson("/api/v1/membership/profile", { signal });
   if (!isMemberProfile(value)) throw new ApiError(502);
   return value;
+}
+
+export async function getNotifications(
+  status: NotificationReadStatus,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<NotificationPage> {
+  if (!["ALL", "READ", "UNREAD"].includes(status) || (cursor !== undefined && !isNotificationCursor(cursor))) {
+    throw new ApiError(400);
+  }
+  const query = new URLSearchParams({ status, limit: String(NOTIFICATION_PAGE_SIZE) });
+  if (cursor) query.set("cursor", cursor);
+  const value = await requestJson(`/api/v1/notifications?${query}`, { signal });
+  if (!isNotificationPage(value, NOTIFICATION_PAGE_SIZE, status)) throw new ApiError(502);
+  return value;
+}
+
+export async function markNotificationRead(notificationId: string): Promise<NotificationItem> {
+  validateCommandIdentifiers(notificationId);
+  const csrf = await getCsrfToken();
+  const value = await mutationJson(
+    `/api/v1/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: "PATCH", headers: { [csrf.headerName]: csrf.token } },
+  );
+  if (!isNotificationItem(value) || value.notificationId !== notificationId || value.readAt === null) {
+    throw new ApiError(502);
+  }
+  return value;
+}
+
+export async function getNotificationPreference(signal?: AbortSignal): Promise<VersionedNotificationPreference> {
+  const response = await fetch("/api/v1/notifications/preferences", {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  const value = await responseJson(response);
+  if (!isNotificationPreference(value)) throw new ApiError(502);
+  const entityTag = response.headers.get("etag");
+  if (!entityTag || !isEntityTag(entityTag) || entityTag !== `"${value.version}"`) throw new ApiError(502);
+  return { preference: value, entityTag };
+}
+
+export async function updateNotificationPreference(
+  memberId: string,
+  entityTag: string,
+  update: UpdateNotificationPreference,
+): Promise<VersionedNotificationPreference> {
+  validateCommandIdentifiers(memberId);
+  if (!isEntityTag(entityTag) || !isNotificationPreferenceUpdate(update)) throw new ApiError(400);
+  const csrf = await getCsrfToken();
+  const response = await fetch("/api/v1/notifications/preferences", {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "If-Match": entityTag,
+      [csrf.headerName]: csrf.token,
+    },
+    body: JSON.stringify(update),
+  });
+  const value = await responseJson(response);
+  if (!isNotificationPreference(value) || value.memberId !== memberId) throw new ApiError(502);
+  const nextEntityTag = response.headers.get("etag");
+  if (!nextEntityTag || !isEntityTag(nextEntityTag) || nextEntityTag !== `"${value.version}"` ||
+      value.version <= Number(entityTag.slice(1, -1))) throw new ApiError(502);
+  return { preference: value, entityTag: nextEntityTag };
 }
 
 export async function searchCatalog(input: {
@@ -294,6 +368,23 @@ async function circulationCommand<T>(
   return { record: await response.json() as T, replayed: replayedHeader === "true" };
 }
 
+async function mutationJson(path: string, init: RequestInit): Promise<unknown> {
+  const response = await fetch(path, {
+    ...init,
+    credentials: "same-origin",
+    headers: { Accept: "application/json", ...init.headers },
+  });
+  return responseJson(response);
+}
+
+async function responseJson(response: Response): Promise<unknown> {
+  if (!response.ok) throw new ApiError(response.status);
+  if (!(response.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+    throw new ApiError(502);
+  }
+  return response.json();
+}
+
 function validateCommandIdentifiers(...identifiers: string[]) {
   if (identifiers.some((identifier) => !isUuid(identifier))) throw new ApiError(400);
 }
@@ -340,6 +431,40 @@ function isMemberProfile(value: unknown): value is MemberProfile {
     return false;
   }
   return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
+}
+
+function isNotificationPage(value: unknown, limit: number, status: NotificationReadStatus): value is NotificationPage {
+  if (!isRecord(value) || !isUuid(value.memberId) || !Array.isArray(value.items) || value.items.length > limit ||
+      !value.items.every(isNotificationItem) || !isNullableNotificationCursor(value.nextCursor) ||
+      (value.nextCursor !== null && value.items.length !== limit) ||
+      new Set(value.items.map((item) => item.notificationId)).size !== value.items.length ||
+      (status === "READ" && value.items.some((item) => item.readAt === null)) ||
+      (status === "UNREAD" && value.items.some((item) => item.readAt !== null))) return false;
+  return isDescending(value.items, (item) => item.createdAt, (item) => item.notificationId);
+}
+
+function isNotificationItem(value: unknown): value is NotificationItem {
+  return isRecord(value) && isUuid(value.notificationId) &&
+    ["DUE_SOON", "OVERDUE", "HOLD_READY", "ACCOUNT_STATUS", "GENERAL"].includes(String(value.category)) &&
+    isSafeText(value.subject, 160) && isSafeMultilineText(value.body, 2_000) &&
+    isIsoInstant(value.occurredAt) && isIsoInstant(value.createdAt) &&
+    Date.parse(value.createdAt) >= Date.parse(value.occurredAt) && isNullableInstant(value.readAt) &&
+    (value.readAt === null || Date.parse(value.readAt) >= Date.parse(value.createdAt));
+}
+
+function isNotificationPreference(value: unknown): value is NotificationPreference {
+  return isRecord(value) && isUuid(value.memberId) &&
+    typeof value.emailEnabled === "boolean" && typeof value.dueSoonEnabled === "boolean" &&
+    typeof value.overdueEnabled === "boolean" && typeof value.holdReadyEnabled === "boolean" &&
+    typeof value.accountStatusEnabled === "boolean" && isNonNegativeInteger(value.version) &&
+    isNullableInstant(value.updatedAt) && ((value.version === 0) === (value.updatedAt === null));
+}
+
+function isNotificationPreferenceUpdate(value: unknown): value is UpdateNotificationPreference {
+  return isRecord(value) && Object.keys(value).length === 5 &&
+    typeof value.emailEnabled === "boolean" && typeof value.dueSoonEnabled === "boolean" &&
+    typeof value.overdueEnabled === "boolean" && typeof value.holdReadyEnabled === "boolean" &&
+    typeof value.accountStatusEnabled === "boolean";
 }
 
 function isCatalogSearch(value: unknown, page: number, limit: number): value is CatalogSearch {
@@ -511,6 +636,23 @@ function isNullableCursor(value: unknown): value is string | null {
   return value === null || isCursor(value);
 }
 
+function isNotificationCursor(value: unknown): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= 128 && /^[A-Za-z0-9_-]+$/u.test(value);
+}
+
+function isNullableNotificationCursor(value: unknown): value is string | null {
+  return value === null || isNotificationCursor(value);
+}
+
+function isEntityTag(value: string): boolean {
+  return /^"(?:0|[1-9][0-9]{0,18})"$/u.test(value);
+}
+
+function isSafeMultilineText(value: unknown, maximum: number): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= maximum && value === value.trim() &&
+    !Array.from(value).some((character) => character !== "\n" && character !== "\t" && /\p{Cc}/u.test(character));
+}
+
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
@@ -522,3 +664,4 @@ function isUuid(value: unknown): value is string {
 const HISTORY_PAGE_SIZE = 20;
 const CATALOG_PAGE_SIZE = 20;
 const MAXIMUM_EDITION_BATCH = 50;
+const NOTIFICATION_PAGE_SIZE = 20;

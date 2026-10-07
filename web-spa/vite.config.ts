@@ -19,6 +19,7 @@ export default defineConfig({
                 learningResources: process.env.VITE_ENABLE_LEARNING_RESOURCES === "true",
                 memberProfile: process.env.VITE_ENABLE_MEMBER_PROFILE === "true",
                 circulationSelfService: process.env.VITE_ENABLE_CIRCULATION_SELF_SERVICE === "true",
+                notifications: process.env.VITE_ENABLE_NOTIFICATIONS === "true",
               },
             },
             null,
