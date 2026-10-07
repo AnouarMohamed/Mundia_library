@@ -18,10 +18,12 @@ Both slice flags default to disabled. Enable `VITE_ENABLE_LEARNING_RESOURCES`
 only after Catalog and Digital Content reconciliation. Enable
 `VITE_ENABLE_MEMBER_PROFILE` only after Membership parity and browser checks.
 Enable `VITE_ENABLE_CIRCULATION_SELF_SERVICE` only after Catalog and Circulation
-projections reconcile and failure drills pass. Flags can be enabled
-independently. The SPA never receives OAuth tokens or service credentials.
-Browser authentication uses the BFF's secure Redis-backed session cookie;
-mutations obtain the BFF's CSRF token first.
+projections reconcile and failure drills pass. This switch enables physical
+catalog search, borrow and reservation commands, and caller-bound history.
+Flags can be enabled independently. The SPA never receives OAuth tokens or
+service credentials. Browser authentication uses the BFF's secure Redis-backed
+session cookie; mutations obtain the BFF's CSRF token first and use a unique,
+actor-scoped idempotency key.
 
 During local development, Vite proxies `/api`, `/oauth2`, and `/login` to the
 Web BFF at `http://localhost:8080`. Production must present the static assets

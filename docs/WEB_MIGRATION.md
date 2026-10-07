@@ -73,8 +73,8 @@ in step 2:
   token, and bounded actor-scoped idempotency key; it cannot select a member
   identity.
 - The static Vite/React shell now provides session bootstrap, accessible
-  learning-resource search/detail, read-only member-profile, and caller-bound
-  circulation eligibility/history routes,
+  learning-resource search/detail, read-only member-profile, physical catalog
+  search, and caller-bound circulation eligibility/history routes,
   generated OpenAPI types, strict runtime response checks, error boundaries,
   responsive loading/empty/error states, and CSRF-protected external-download
   authorization. Learning resources and member profile have independent,
@@ -83,6 +83,9 @@ in step 2:
   release switches; the current Vercel routes remain authoritative until
   reconciliation and edge cutover. Circulation history enriches each bounded
   keyset page through one Catalog batch rather than an N+1 request pattern.
+  Borrow, reserve, cancel, and renew actions use CSRF tokens plus unique
+  idempotency keys, validate caller-bound command responses, and refresh
+  authoritative history after success or concurrency conflicts.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

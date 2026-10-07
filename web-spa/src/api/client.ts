@@ -3,13 +3,16 @@ import type { components } from "./schema";
 export type LearningResource = components["schemas"]["LearningResource"];
 export type LearningResourcePage = components["schemas"]["LearningResourcePage"];
 export type CatalogEdition = components["schemas"]["CatalogEdition"];
+export type CatalogSearch = components["schemas"]["CatalogSearch"];
 export type CirculationEligibility = components["schemas"]["CirculationEligibility"];
+export type LoanCommand = components["schemas"]["LoanCommand"];
 export type LoanHistoryItem = components["schemas"]["LoanHistoryItem"];
 export type MemberLoanPage = components["schemas"]["MemberLoanPage"];
 export type MemberReservationPage = components["schemas"]["MemberReservationPage"];
 export type Reservation = components["schemas"]["ReservationCommand"];
 export type MemberProfile = components["schemas"]["MemberProfile"];
 export type Session = components["schemas"]["Session"];
+export type CommandResult<T> = { record: T; replayed: boolean };
 
 export class ApiError extends Error {
   constructor(readonly status: number, message = "The library service is unavailable") {
@@ -41,6 +44,25 @@ export async function getSession(): Promise<Session> {
 export async function getMemberProfile(signal?: AbortSignal): Promise<MemberProfile> {
   const value = await requestJson("/api/v1/membership/profile", { signal });
   if (!isMemberProfile(value)) throw new ApiError(502);
+  return value;
+}
+
+export async function searchCatalog(input: {
+  query: string;
+  page: number;
+  availableOnly?: boolean;
+  limit?: number;
+  signal?: AbortSignal;
+}): Promise<CatalogSearch> {
+  const limit = input.limit ?? CATALOG_PAGE_SIZE;
+  if (input.query.length > 200 || !Number.isSafeInteger(input.page) || input.page < 0 || input.page > 10_000 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ApiError(400);
+  const query = new URLSearchParams({ page: String(input.page), limit: String(limit), sortBy: "title" });
+  const search = input.query.trim();
+  if (search) query.set("query", search);
+  if (input.availableOnly) query.set("availableOnly", "true");
+  const value = await requestJson(`/api/v1/catalog/search?${query}`, { signal: input.signal });
+  if (!isCatalogSearch(value, input.page, limit)) throw new ApiError(502);
   return value;
 }
 
@@ -100,6 +122,94 @@ export async function getCirculationOverview(signal?: AbortSignal) {
   return { eligibility, loans, reservations, editions };
 }
 
+export async function requestLoan(
+  editionId: string,
+  memberId: string,
+): Promise<CommandResult<LoanCommand>> {
+  validateCommandIdentifiers(editionId, memberId);
+  const result = await circulationCommand<LoanCommand>(
+    "/api/v1/circulation/loans",
+    "request-loan",
+    201,
+    { editionId },
+  );
+  if (!isLoanCommand(result.record) || result.record.memberId !== memberId ||
+      result.record.editionId !== editionId || result.record.status !== "REQUESTED" || result.record.version !== 0) {
+    throw new ApiError(502);
+  }
+  return result;
+}
+
+export async function cancelLoan(
+  loanId: string,
+  memberId: string,
+  editionId: string,
+): Promise<CommandResult<LoanCommand>> {
+  validateCommandIdentifiers(loanId, memberId, editionId);
+  const result = await circulationCommand<LoanCommand>(
+    `/api/v1/circulation/loans/${encodeURIComponent(loanId)}/cancel`,
+    "cancel-loan",
+    200,
+  );
+  if (!isLoanCommand(result.record) || result.record.loanId !== loanId || result.record.memberId !== memberId ||
+      result.record.editionId !== editionId || result.record.status !== "CANCELLED" || result.record.version < 1) {
+    throw new ApiError(502);
+  }
+  return result;
+}
+
+export async function renewLoan(
+  loanId: string,
+  memberId: string,
+  editionId: string,
+): Promise<CommandResult<LoanCommand>> {
+  validateCommandIdentifiers(loanId, memberId, editionId);
+  const result = await circulationCommand<LoanCommand>(
+    `/api/v1/circulation/loans/${encodeURIComponent(loanId)}/renew`,
+    "renew-loan",
+    200,
+  );
+  if (!isLoanCommand(result.record) || result.record.loanId !== loanId || result.record.memberId !== memberId ||
+      result.record.editionId !== editionId || result.record.status !== "ACTIVE" ||
+      result.record.renewalCount < 1 || result.record.version < 2) throw new ApiError(502);
+  return result;
+}
+
+export async function placeReservation(
+  editionId: string,
+  memberId: string,
+): Promise<CommandResult<Reservation>> {
+  validateCommandIdentifiers(editionId, memberId);
+  const result = await circulationCommand<Reservation>(
+    "/api/v1/circulation/reservations",
+    "place-reservation",
+    201,
+    { editionId },
+  );
+  if (!isReservation(result.record) || result.record.memberId !== memberId ||
+      result.record.editionId !== editionId || !["WAITING", "READY"].includes(result.record.status)) {
+    throw new ApiError(502);
+  }
+  return result;
+}
+
+export async function cancelReservation(
+  reservationId: string,
+  memberId: string,
+  editionId: string,
+): Promise<CommandResult<Reservation>> {
+  validateCommandIdentifiers(reservationId, memberId, editionId);
+  const result = await circulationCommand<Reservation>(
+    `/api/v1/circulation/reservations/${encodeURIComponent(reservationId)}/cancel`,
+    "cancel-reservation",
+    200,
+  );
+  if (!isReservation(result.record) || result.record.reservationId !== reservationId ||
+      result.record.memberId !== memberId || result.record.editionId !== editionId ||
+      result.record.status !== "CANCELLED" || result.record.version < 1) throw new ApiError(502);
+  return result;
+}
+
 export async function searchLearningResources(input: {
   query: string;
   category: string;
@@ -127,10 +237,7 @@ export async function getLearningResourceCategories(): Promise<string[]> {
 }
 
 export async function authorizeExternalDownload(resourceId: string): Promise<string> {
-  const csrf = await requestJson("/api/v1/auth/csrf");
-  if (!isRecord(csrf) || typeof csrf.headerName !== "string" || typeof csrf.token !== "string") {
-    throw new ApiError(502);
-  }
+  const csrf = await getCsrfToken();
   const authorization = await requestJson(
     `/api/v1/digital-content/external-resources/${encodeURIComponent(resourceId)}/authorizations`,
     { method: "POST", headers: { [csrf.headerName]: csrf.token } },
@@ -143,16 +250,52 @@ export async function authorizeExternalDownload(resourceId: string): Promise<str
 }
 
 export async function logout(): Promise<void> {
-  const csrf = await requestJson("/api/v1/auth/csrf");
-  if (!isRecord(csrf) || typeof csrf.headerName !== "string" || typeof csrf.token !== "string") {
-    throw new ApiError(502);
-  }
+  const csrf = await getCsrfToken();
   const response = await fetch("/api/v1/auth/logout", {
     method: "POST",
     credentials: "same-origin",
     headers: { [csrf.headerName]: csrf.token },
   });
   if (!response.ok && response.status !== 204) throw new ApiError(response.status);
+}
+
+async function getCsrfToken(): Promise<{ headerName: "X-XSRF-TOKEN"; token: string }> {
+  const csrf = await requestJson("/api/v1/auth/csrf");
+  if (!isRecord(csrf) || csrf.headerName !== "X-XSRF-TOKEN" || typeof csrf.token !== "string" ||
+      csrf.token.length < 16 || csrf.token.length > 1024 || /[\r\n]/u.test(csrf.token)) throw new ApiError(502);
+  return { headerName: csrf.headerName, token: csrf.token };
+}
+
+async function circulationCommand<T>(
+  path: string,
+  operation: string,
+  expectedStatus: number,
+  body?: Record<string, string>,
+): Promise<CommandResult<T>> {
+  const csrf = await getCsrfToken();
+  const idempotencyKey = `spa:${operation}:${crypto.randomUUID()}`;
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      [csrf.headerName]: csrf.token,
+      "Idempotency-Key": idempotencyKey,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok || response.status !== expectedStatus) throw new ApiError(response.status);
+  if (!(response.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+    throw new ApiError(502);
+  }
+  const replayedHeader = response.headers.get("idempotency-replayed");
+  if (replayedHeader !== "true" && replayedHeader !== "false") throw new ApiError(502);
+  return { record: await response.json() as T, replayed: replayedHeader === "true" };
+}
+
+function validateCommandIdentifiers(...identifiers: string[]) {
+  if (identifiers.some((identifier) => !isUuid(identifier))) throw new ApiError(400);
 }
 
 export function isPublicHttpsUrl(value: string): boolean {
@@ -199,6 +342,15 @@ function isMemberProfile(value: unknown): value is MemberProfile {
   return Date.parse(value.updatedAt) >= Date.parse(value.createdAt);
 }
 
+function isCatalogSearch(value: unknown, page: number, limit: number): value is CatalogSearch {
+  if (!isRecord(value) || !Array.isArray(value.editions) || value.editions.length > limit ||
+      !value.editions.every(isCatalogEdition) || new Set(value.editions.map((edition) => edition.editionId)).size !== value.editions.length ||
+      !isNonNegativeInteger(value.total) || !isNonNegativeInteger(value.page) || value.page !== page ||
+      !isNonNegativeInteger(value.totalPages) || value.totalPages !== (value.total === 0 ? 0 : Math.ceil(value.total / limit)) ||
+      value.editions.length > value.total) return false;
+  return value.editions.every((edition) => edition.isActive);
+}
+
 function historyQuery(cursor?: string): URLSearchParams {
   if (cursor !== undefined && !isCursor(cursor)) throw new ApiError(400);
   const query = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
@@ -242,6 +394,28 @@ function isLoan(value: unknown): value is LoanHistoryItem {
     case "REJECTED":
       return value.copyId === null && value.checkedOutAt === null && value.dueAt === null && value.returnedAt === null &&
         value.rejectedAt !== null && Date.parse(value.rejectedAt) >= Date.parse(value.requestedAt);
+    default:
+      return false;
+  }
+}
+
+function isLoanCommand(value: unknown): value is LoanCommand {
+  if (!isRecord(value) || !isUuid(value.loanId) || !isUuid(value.memberId) || !isUuid(value.editionId) ||
+      (value.copyId !== null && !isUuid(value.copyId)) ||
+      !["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"].includes(String(value.status)) ||
+      !isIsoInstant(value.requestedAt) || !isNullableInstant(value.checkedOutAt) || !isNullableInstant(value.dueAt) ||
+      !isNullableInstant(value.returnedAt) || !isNonNegativeInteger(value.renewalCount) || !isNonNegativeInteger(value.version)) return false;
+  switch (value.status) {
+    case "REQUESTED":
+    case "CANCELLED":
+    case "REJECTED":
+      return value.copyId === null && value.checkedOutAt === null && value.dueAt === null && value.returnedAt === null;
+    case "ACTIVE":
+      return value.copyId !== null && value.checkedOutAt !== null && value.dueAt !== null && value.returnedAt === null &&
+        Date.parse(value.checkedOutAt) >= Date.parse(value.requestedAt) && Date.parse(value.dueAt) > Date.parse(value.checkedOutAt);
+    case "RETURNED":
+      return value.copyId !== null && value.checkedOutAt !== null && value.dueAt !== null && value.returnedAt !== null &&
+        Date.parse(value.returnedAt) >= Date.parse(value.checkedOutAt);
     default:
       return false;
   }
@@ -346,4 +520,5 @@ function isUuid(value: unknown): value is string {
 }
 
 const HISTORY_PAGE_SIZE = 20;
+const CATALOG_PAGE_SIZE = 20;
 const MAXIMUM_EDITION_BATCH = 50;

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ApiError,
+  cancelLoan,
+  cancelReservation,
   getCatalogEditions,
   getCirculationOverview,
   getLoanPage,
   getReservationPage,
+  renewLoan,
   type CatalogEdition,
   type CirculationEligibility,
   type LoanHistoryItem,
@@ -14,6 +17,7 @@ import {
 type Overview = Awaited<ReturnType<typeof getCirculationOverview>>;
 type LoadState = { kind: "loading" } | { kind: "ready"; overview: Overview } | { kind: "failed" | "forbidden" };
 type HistoryKind = "loans" | "reservations";
+type CommandFeedback = { tone: "success" | "error"; message: string };
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" });
 
@@ -43,6 +47,8 @@ export function CirculationPage() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [loadingMore, setLoadingMore] = useState<HistoryKind | null>(null);
   const [pageError, setPageError] = useState<HistoryKind | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<string | null>(null);
+  const [commandFeedback, setCommandFeedback] = useState<CommandFeedback | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -70,6 +76,29 @@ export function CirculationPage() {
 
   const { overview } = state;
   const eligibility = eligibilityCopy[overview.eligibility.status];
+
+  const runCommand = async (key: string, operation: () => Promise<unknown>, success: string) => {
+    if (pendingCommand) return;
+    setPendingCommand(key);
+    setCommandFeedback(null);
+    try {
+      await operation();
+      const refreshed = await getCirculationOverview();
+      setState({ kind: "ready", overview: refreshed });
+      setCommandFeedback({ tone: "success", message: success });
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        window.location.assign("/oauth2/authorization/institutional");
+        return;
+      }
+      if (error instanceof ApiError && error.status === 409) {
+        void getCirculationOverview().then((refreshed) => setState({ kind: "ready", overview: refreshed })).catch(() => undefined);
+      }
+      setCommandFeedback({ tone: "error", message: historyCommandError(error) });
+    } finally {
+      setPendingCommand(null);
+    }
+  };
 
   const loadMore = async (kind: HistoryKind) => {
     const currentPage = overview[kind];
@@ -121,6 +150,8 @@ export function CirculationPage() {
         </div>
       </header>
 
+      {commandFeedback && <output className={`history-command-feedback command-${commandFeedback.tone}`}>{commandFeedback.message}</output>}
+
       <HistorySection
         id="loans"
         title="Loans"
@@ -131,7 +162,19 @@ export function CirculationPage() {
         loading={loadingMore === "loans"}
         failed={pageError === "loans"}
         onLoadMore={() => void loadMore("loans")}
-        render={(loan, edition) => <LoanRow key={(loan as LoanHistoryItem).loanId} loan={loan as LoanHistoryItem} edition={edition} />}
+        render={(loan, edition) => {
+          const item = loan as LoanHistoryItem;
+          const key = `loan:${item.loanId}`;
+          return <LoanRow
+            key={item.loanId}
+            loan={item}
+            edition={edition}
+            pending={pendingCommand === key}
+            commandsDisabled={pendingCommand !== null}
+            onCancel={() => void runCommand(key, () => cancelLoan(item.loanId, item.memberId, item.editionId), "Borrow request cancelled.")}
+            onRenew={() => void runCommand(key, () => renewLoan(item.loanId, item.memberId, item.editionId), "Loan renewed. Your due date is up to date.")}
+          />;
+        }}
       />
       <HistorySection
         id="reservations"
@@ -143,7 +186,18 @@ export function CirculationPage() {
         loading={loadingMore === "reservations"}
         failed={pageError === "reservations"}
         onLoadMore={() => void loadMore("reservations")}
-        render={(reservation, edition) => <ReservationRow key={(reservation as Reservation).reservationId} reservation={reservation as Reservation} edition={edition} />}
+        render={(reservation, edition) => {
+          const item = reservation as Reservation;
+          const key = `reservation:${item.reservationId}`;
+          return <ReservationRow
+            key={item.reservationId}
+            reservation={item}
+            edition={edition}
+            pending={pendingCommand === key}
+            commandsDisabled={pendingCommand !== null}
+            onCancel={() => void runCommand(key, () => cancelReservation(item.reservationId, item.memberId, item.editionId), "Reservation cancelled.")}
+          />;
+        }}
       />
     </article>
   );
@@ -182,7 +236,14 @@ function HistorySection<T extends { editionId: string }>({
   );
 }
 
-function LoanRow({ loan, edition }: { loan: LoanHistoryItem; edition?: CatalogEdition }) {
+function LoanRow({ loan, edition, pending, commandsDisabled, onCancel, onRenew }: {
+  loan: LoanHistoryItem;
+  edition?: CatalogEdition;
+  pending: boolean;
+  commandsDisabled: boolean;
+  onCancel: () => void;
+  onRenew: () => void;
+}) {
   const date = loan.status === "ACTIVE" && loan.dueAt
     ? { label: "Due", value: loan.dueAt }
     : loan.status === "RETURNED" && loan.returnedAt
@@ -196,12 +257,22 @@ function LoanRow({ loan, edition }: { loan: LoanHistoryItem; edition?: CatalogEd
         {edition && <p>{edition.publisher} · {edition.publicationYear}</p>}
         <p><span>{date.label}</span> <time dateTime={date.value}>{formatDate(date.value)}</time></p>
       </div>
-      <span className={`history-status status-${loan.status.toLowerCase()}`}>{loanLabels[loan.status]}</span>
+      <div className="history-row-action">
+        <span className={`history-status status-${loan.status.toLowerCase()}`}>{loanLabels[loan.status]}</span>
+        {loan.status === "REQUESTED" && <button type="button" onClick={onCancel} disabled={commandsDisabled}>{pending ? "Cancelling…" : "Cancel request"}</button>}
+        {loan.status === "ACTIVE" && <button type="button" onClick={onRenew} disabled={commandsDisabled}>{pending ? "Renewing…" : "Renew loan"}</button>}
+      </div>
     </li>
   );
 }
 
-function ReservationRow({ reservation, edition }: { reservation: Reservation; edition?: CatalogEdition }) {
+function ReservationRow({ reservation, edition, pending, commandsDisabled, onCancel }: {
+  reservation: Reservation;
+  edition?: CatalogEdition;
+  pending: boolean;
+  commandsDisabled: boolean;
+  onCancel: () => void;
+}) {
   const date = reservation.status === "READY" && reservation.expiresAt
     ? { label: "Collect by", value: reservation.expiresAt }
     : { label: "Placed", value: reservation.placedAt };
@@ -213,7 +284,12 @@ function ReservationRow({ reservation, edition }: { reservation: Reservation; ed
         {edition && <p>{edition.publisher} · {edition.publicationYear}</p>}
         <p><span>{date.label}</span> <time dateTime={date.value}>{formatDate(date.value)}</time></p>
       </div>
-      <span className={`history-status status-${reservation.status.toLowerCase()}`}>{reservationLabels[reservation.status]}</span>
+      <div className="history-row-action">
+        <span className={`history-status status-${reservation.status.toLowerCase()}`}>{reservationLabels[reservation.status]}</span>
+        {(reservation.status === "WAITING" || reservation.status === "READY") && (
+          <button type="button" onClick={onCancel} disabled={commandsDisabled}>{pending ? "Cancelling…" : "Cancel reservation"}</button>
+        )}
+      </div>
     </li>
   );
 }
@@ -243,4 +319,13 @@ function formatDate(value: string) {
 
 function humanizeReason(reason: string) {
   return reason.toLowerCase().split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+function historyCommandError(error: unknown) {
+  if (!(error instanceof ApiError)) return "The action could not be confirmed. Your history was not changed in this view.";
+  if (error.status === 409) return "This record changed while you were viewing it. The latest history has been requested.";
+  if (error.status === 422) return "Library policy does not allow this action right now.";
+  if (error.status === 403) return "Your account is not permitted to perform this action.";
+  if (error.status === 404) return "This record is no longer available. Refresh to see the latest history.";
+  return "The action could not be confirmed. Check the latest history before trying again.";
 }
