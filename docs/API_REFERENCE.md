@@ -61,6 +61,14 @@ legacy identity-document reference in quarantine. It never accepts passwords
 or treats historical documents as verified evidence. Historical imports do not
 emit live eligibility events; projection bootstrap is a separate cutover gate.
 
+Verified legacy evidence is registered separately through machine-only
+`PUT|GET /api/v1/members/identity-evidence-transfers/{transferId}` with
+`membership.identity-evidence.transfer`. The command accepts only the exact
+quarantined-reference digest, an opaque private-storage key, normalized media
+metadata, content and scanner-attestation digests, and a bounded retention
+deadline. Its immutable receipt and all public evidence reads omit the source
+locator, object key, and scanner artifact.
+
 ## Conventions
 
 Base URL:

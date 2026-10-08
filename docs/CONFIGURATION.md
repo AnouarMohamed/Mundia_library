@@ -145,6 +145,13 @@ PostgreSQL 18 restore through a current-user-owned `0600` file. Both variables
 above are unnecessary for the default dry run and must be removed after the
 reconciliation window.
 
+Identity-evidence transfer uses a different short-lived machine identity with
+only `membership.identity-evidence.transfer`. Do not grant that scope to the
+browser BFF, the membership importer, or normal administrators. The external
+transfer worker must use private object storage and retain its malware-scanner
+attestation outside the application; Membership receives only the attestation
+digest and never accepts a public or durable URL.
+
 ## Docker Compose Variables
 
 `docker-compose.yml` also reads:

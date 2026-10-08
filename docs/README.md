@@ -78,5 +78,8 @@ the production-overhaul plan and operations runbook.
 Membership now has the same dry-run-first, exact-reconciliation boundary for
 profiles and eligibility snapshots. Passwords are excluded, unverified legacy
 identity references are digest-only quarantine records, and historical imports
-emit no live events. Private evidence transfer, projection bootstrap, shadow
-parity, and production sign-off remain explicit gates.
+emit no live events. The verified-transfer registration boundary is now
+implemented with private-key redaction, scanner-attestation digests, retention,
+and immutable reconciliation receipts. Provisioning and exercising the actual
+private storage/scanner pipeline, projection bootstrap, shadow parity, and
+production sign-off remain explicit gates.

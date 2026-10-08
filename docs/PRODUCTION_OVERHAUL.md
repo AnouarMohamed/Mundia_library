@@ -311,8 +311,14 @@ validation. A dry-run-first legacy importer now transfers only allowlisted
 profile, role, status, and eligibility fields; passwords are never selected,
 unverified card references become digest-only quarantine entries, and exact
 actor-bound receipts make batches safely replayable. Historical imports do not
-fabricate audit entries or live events. Production snapshot execution, private
-evidence verification/transfer, Circulation eligibility projection bootstrap,
+fabricate audit entries or live events. Membership now also has a separate,
+machine-scoped evidence-transfer command that atomically reconciles the
+quarantined digest with an opaque private-object key, normalized-media digest,
+scanner-attestation digest, retention deadline, and immutable actor-bound
+receipt. Read APIs and receipts expose none of the storage or source locators.
+The actual private bucket/scanner pipeline and lifecycle evidence are not
+provisioned by this repository. Production snapshot execution, production
+evidence transfer, Circulation eligibility projection bootstrap,
 shadow parity, broker provisioning, remaining profile and eligibility writes,
 other BFF routes, and production cutover remain pending.
 Catalog now has a separate PostgreSQL-backed read

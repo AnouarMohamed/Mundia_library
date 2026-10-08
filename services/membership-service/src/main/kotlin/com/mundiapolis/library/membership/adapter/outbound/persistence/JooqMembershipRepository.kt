@@ -5,6 +5,7 @@ import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.gene
 import com.mundiapolis.library.membership.dto.AccountStatus
 import com.mundiapolis.library.membership.dto.AdminMemberSummary
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
+import com.mundiapolis.library.membership.dto.IdentityEvidenceVerificationStatus
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
 import com.mundiapolis.library.membership.dto.MembershipRole
@@ -110,6 +111,11 @@ class JooqMembershipRepository(
                 fileSize = requireNotNull(evidence.fileSize),
                 checksumSha256 = requireNotNull(evidence.checksumSha256).trim(),
                 uploadedAt = requireNotNull(evidence.uploadedAt).toInstant(),
+                verificationStatus = IdentityEvidenceVerificationStatus.valueOf(
+                    requireNotNull(evidence.verificationStatus),
+                ),
+                verifiedAt = evidence.verifiedAt?.toInstant(),
+                retentionExpiresAt = evidence.retentionExpiresAt?.toInstant(),
             )
         }
 }

@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Membership API",
-    "version": "1.1.0",
-    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata, versioned account-status commands, and reconciled legacy imports.",
+    "version": "1.2.0",
+    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata and verified transfer receipts, versioned account-status commands, and reconciled legacy imports.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [
@@ -195,6 +195,66 @@
         }
       }
     },
+    "/api/v1/members/identity-evidence-transfers/{transferId}": {
+      "get": {
+        "operationId": "getIdentityEvidenceTransfer",
+        "summary": "Read an immutable identity-evidence transfer receipt",
+        "description": "Returns reconciliation metadata only. The private object key, source locator, and scanner attestation are never returned.",
+        "x-required-scopes": ["membership.identity-evidence.transfer"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TransferId" }],
+        "responses": {
+          "200": {
+            "description": "Identity-evidence transfer receipt",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdentityEvidenceTransferResult" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "transferIdentityEvidence",
+        "summary": "Register one independently verified legacy evidence transfer",
+        "description": "Atomically binds a quarantined legacy-reference digest to an opaque private-storage object after external normalization and malware scanning. Exact replays require the same actor and manifest.",
+        "x-required-scopes": ["membership.identity-evidence.transfer"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/TransferId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IdentityEvidenceTransferRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transfer registered or exact prior receipt replayed",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": { "type": "string", "enum": ["true", "false"] }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdentityEvidenceTransferResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "description": "The transfer body exceeds the bounded command envelope" }
+        }
+      }
+    },
     "/api/v1/members/legacy-imports/{importId}": {
       "get": {
         "operationId": "getLegacyMembershipImport",
@@ -272,6 +332,12 @@
       },
       "ImportId": {
         "name": "importId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "TransferId": {
+        "name": "transferId",
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -375,7 +441,10 @@
           "mimeType",
           "fileSize",
           "checksumSha256",
-          "uploadedAt"
+          "uploadedAt",
+          "verificationStatus",
+          "verifiedAt",
+          "retentionExpiresAt"
         ],
         "properties": {
           "evidenceId": { "type": "string", "format": "uuid" },
@@ -386,7 +455,50 @@
           },
           "fileSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
           "checksumSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "uploadedAt": { "type": "string", "format": "date-time" }
+          "uploadedAt": { "type": "string", "format": "date-time" },
+          "verificationStatus": { "$ref": "#/components/schemas/IdentityEvidenceVerificationStatus" },
+          "verifiedAt": { "type": ["string", "null"], "format": "date-time" },
+          "retentionExpiresAt": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "IdentityEvidenceTransferRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memberId",
+          "evidenceId",
+          "objectKey",
+          "mimeType",
+          "fileSize",
+          "checksumSha256",
+          "sourceReferenceSha256",
+          "scanAttestationSha256",
+          "verifiedAt",
+          "retentionExpiresAt"
+        ],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "objectKey": { "type": "string", "pattern": "^identity-evidence/[a-f0-9-]{36}/[a-f0-9-]{36}$" },
+          "mimeType": { "type": "string", "enum": ["application/pdf", "image/jpeg", "image/png"] },
+          "fileSize": { "type": "integer", "minimum": 1, "maximum": 10485760 },
+          "checksumSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "sourceReferenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "scanAttestationSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "verifiedAt": { "type": "string", "format": "date-time" },
+          "retentionExpiresAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "IdentityEvidenceTransferResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["transferId", "evidenceId", "manifestSha256", "completedAt", "replayed"],
+        "properties": {
+          "transferId": { "type": "string", "format": "uuid" },
+          "evidenceId": { "type": "string", "format": "uuid" },
+          "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
         }
       },
       "ChangeAccountStatusRequest": {
@@ -489,6 +601,10 @@
       "AccountStatus": {
         "type": "string",
         "enum": ["PENDING", "APPROVED", "REJECTED"]
+      },
+      "IdentityEvidenceVerificationStatus": {
+        "type": "string",
+        "enum": ["LEGACY_UNATTESTED", "VERIFIED"]
       },
       "MembershipRole": { "type": "string", "enum": ["USER", "ADMIN", "SUPER_ADMIN"] }
     },

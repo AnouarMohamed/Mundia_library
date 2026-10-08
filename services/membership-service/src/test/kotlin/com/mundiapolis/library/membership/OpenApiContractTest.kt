@@ -3,10 +3,12 @@ package com.mundiapolis.library.membership
 import com.mundiapolis.library.membership.adapter.`in`.web.ChangeAccountStatusRequest
 import com.mundiapolis.library.membership.adapter.`in`.web.LegacyMembershipImportItemRequest
 import com.mundiapolis.library.membership.adapter.`in`.web.LegacyMembershipImportRequest
+import com.mundiapolis.library.membership.adapter.`in`.web.IdentityEvidenceTransferRequest
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandController
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandResponse
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipReadController
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportResult
+import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferResult
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
 import com.mundiapolis.library.membership.dto.AdminMemberPage
 import com.mundiapolis.library.membership.dto.AdminMemberSummary
@@ -48,7 +50,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.1.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.2.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -64,6 +66,8 @@ class OpenApiContractTest {
         assertSchemaFields("LegacyMembershipImportRequest", LegacyMembershipImportRequest::class.java)
         assertSchemaFields("LegacyMembershipImportItemRequest", LegacyMembershipImportItemRequest::class.java)
         assertSchemaFields("LegacyMembershipImportResult", LegacyMembershipImportResult::class.java)
+        assertSchemaFields("IdentityEvidenceTransferRequest", IdentityEvidenceTransferRequest::class.java)
+        assertSchemaFields("IdentityEvidenceTransferResult", IdentityEvidenceTransferResult::class.java)
     }
 
     private fun assertSchemaFields(schemaName: String, model: Class<*>) {

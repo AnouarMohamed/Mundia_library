@@ -231,6 +231,7 @@ same public actuator paths as Circulation.
 | Own eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read` |
 | Delegated eligibility | `GET /api/v1/members/{memberId}/eligibility` | `membership.eligibility.read.any` |
 | Identity-evidence metadata | `GET /api/v1/members/{memberId}/identity-evidence` | `membership.identity-evidence.read` |
+| Verified legacy-evidence transfer | `PUT|GET /api/v1/members/identity-evidence-transfers/{transferId}` | `membership.identity-evidence.transfer` |
 | Administrative member queue | `GET /api/v1/members` | `membership.members.read` |
 
 Self-service profile and eligibility reads require a canonical UUID
@@ -250,9 +251,12 @@ legacy import boundary is `PUT|GET
 limited to 100 members and exactly replayable by the same actor and manifest.
 The importer stores no password and quarantines only the SHA-256 digest of each
 unverified legacy evidence reference. Historical import emits neither audit nor
-live eligibility events. Private evidence transfer, Circulation projection
-bootstrap, shadow comparison, and BFF cutover remain Phase 4 gates; the Next.js
-application is still authoritative until those gates pass.
+live eligibility events. The separate evidence-transfer boundary binds that
+digest to normalized private-object metadata, a scanner-attestation digest,
+retention, and an immutable actor-bound receipt without exposing storage keys.
+The external storage/scanner pipeline, Circulation projection bootstrap, shadow
+comparison, and BFF cutover remain Phase 4 gates; the Next.js application is
+still authoritative until those gates pass.
 
 ## Catalog read API
 

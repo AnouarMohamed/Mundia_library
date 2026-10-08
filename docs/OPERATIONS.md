@@ -360,6 +360,30 @@ projection, compare exact member/version/count evidence, run shadow parity, and
 retain a tested rollback path. Do not infer that a successful import is a
 production cutover.
 
+### Legacy identity-evidence transfer
+
+Never copy a legacy card reference directly into Membership. Resolve it only
+inside the isolated transfer worker, enforce the pre-buffer byte limit, decode
+and normalize supported media, strip metadata, run the approved malware scanner
+fail-closed, and write the result to the private identity bucket under the exact
+opaque key `identity-evidence/{memberId}/{evidenceId}`. Public access, listing,
+and cross-purpose encryption keys remain prohibited.
+
+After the object and scanner evidence are independently durable, use a
+short-lived token carrying only `membership.identity-evidence.transfer` to PUT
+the transfer manifest to
+`/api/v1/members/identity-evidence-transfers/{transferId}`. Read the same URI
+back and require an exact receipt match. A transfer succeeds only when its
+source-reference digest matches that member's quarantine record. Reuse by a
+different actor or with changed input fails. Receipts reveal neither the raw
+legacy locator, private object key, nor scanner attestation. Revoke the token
+after reconciliation.
+
+This API records verified transfer evidence; it does not fetch, decode, scan,
+or upload files itself. Production execution remains blocked until the private
+bucket, KMS key, isolated scanner, lifecycle deletion, access audit, and restore
+deletion behavior have been provisioned and tested.
+
 Do:
 
 - Take a backup first.

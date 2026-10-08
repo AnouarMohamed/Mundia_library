@@ -9,4 +9,7 @@ data class IdentityEvidenceRef(
     val fileSize: Int,
     val checksumSha256: String,
     val uploadedAt: Instant,
+    val verificationStatus: IdentityEvidenceVerificationStatus,
+    val verifiedAt: Instant?,
+    val retentionExpiresAt: Instant?,
 )

@@ -53,6 +53,9 @@ class MembershipServiceIntegrationTest {
 
     @BeforeEach
     fun seedMembership() {
+        dsl.execute("ALTER TABLE membership_identity_evidence_transfer DISABLE TRIGGER USER")
+        dsl.deleteFrom(DSL.table(DSL.name("membership_identity_evidence_transfer"))).execute()
+        dsl.execute("ALTER TABLE membership_identity_evidence_transfer ENABLE TRIGGER USER")
         dsl.deleteFrom(DSL.table(DSL.name("membership_legacy_import"))).execute()
         dsl.deleteFrom(DSL.table(DSL.name("membership_legacy_evidence_quarantine"))).execute()
         dsl.deleteFrom(MEMBERSHIP_OUTBOX_EVENT).execute()
@@ -494,6 +497,106 @@ class MembershipServiceIntegrationTest {
     }
 
     @Test
+    fun `verified evidence transfer is actor bound replay safe and privacy preserving`() {
+        val transferId = UUID.fromString("81000000-0000-5000-8000-000000000008")
+        val evidenceId = UUID.fromString("82000000-0000-4000-8000-000000000008")
+        val sourceDigest = "d".repeat(64)
+        val scanDigest = "e".repeat(64)
+        val contentDigest = "f".repeat(64)
+        val verifiedAt = Instant.now().minusSeconds(60).truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+        val retentionExpiresAt = verifiedAt.plusSeconds(86_400L * 365L)
+        val objectKey = "identity-evidence/$PENDING_MEMBER_ID/$evidenceId"
+        val quarantine = DSL.table(DSL.name("membership_legacy_evidence_quarantine"))
+        dsl.insertInto(quarantine)
+            .columns(
+                DSL.field(DSL.name("member_id")),
+                DSL.field(DSL.name("reference_sha256")),
+                DSL.field(DSL.name("reason")),
+                DSL.field(DSL.name("quarantined_at")),
+            )
+            .values(PENDING_MEMBER_ID, sourceDigest, "UNVERIFIED_LEGACY_REFERENCE", NOW)
+            .execute()
+        val body = """
+            {
+              "memberId":"$PENDING_MEMBER_ID",
+              "evidenceId":"$evidenceId",
+              "objectKey":"$objectKey",
+              "mimeType":"application/pdf",
+              "fileSize":8192,
+              "checksumSha256":"$contentDigest",
+              "sourceReferenceSha256":"$sourceDigest",
+              "scanAttestationSha256":"$scanDigest",
+              "verifiedAt":"$verifiedAt",
+              "retentionExpiresAt":"$retentionExpiresAt"
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            put("/api/v1/members/identity-evidence-transfers/$transferId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(evidenceTransferJwt("evidence-transfer-operator")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.evidenceId").value(evidenceId.toString()))
+            .andExpect(jsonPath("$.memberId").doesNotExist())
+            .andExpect(jsonPath("$.replayed").value(false))
+            .andExpect(jsonPath("$.objectKey").doesNotExist())
+            .andExpect(jsonPath("$.scanAttestationSha256").doesNotExist())
+
+        mockMvc.perform(
+            put("/api/v1/members/identity-evidence-transfers/$transferId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(evidenceTransferJwt("evidence-transfer-operator")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        mockMvc.perform(
+            get("/api/v1/members/identity-evidence-transfers/$transferId")
+                .with(evidenceTransferJwt("evidence-transfer-operator")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.manifestSha256").isString)
+            .andExpect(jsonPath("$.objectKey").doesNotExist())
+
+        mockMvc.perform(
+            put("/api/v1/members/identity-evidence-transfers/$transferId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(evidenceTransferJwt("different-operator")),
+        ).andExpect(status().isConflict)
+
+        mockMvc.perform(
+            get("/api/v1/members/$PENDING_MEMBER_ID/identity-evidence")
+                .with(jwt().authorities(SimpleGrantedAuthority(EVIDENCE_SCOPE))),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.verificationStatus").value("VERIFIED"))
+            .andExpect(jsonPath("$.retentionExpiresAt").value(retentionExpiresAt.toString()))
+            .andExpect(jsonPath("$.objectKey").doesNotExist())
+            .andExpect(jsonPath("$.scanAttestationSha256").doesNotExist())
+
+        val stored = dsl.selectFrom(MEMBERSHIP_IDENTITY_EVIDENCE)
+            .where(MEMBERSHIP_IDENTITY_EVIDENCE.EVIDENCE_ID.eq(evidenceId))
+            .fetchOne()!!
+        assertThat(stored.objectKey).isEqualTo(objectKey)
+        assertThat(stored.verificationStatus).isEqualTo("VERIFIED")
+        assertThat(stored.scanAttestationSha256?.trim()).isEqualTo(scanDigest)
+        assertThat(
+            dsl.deleteFrom(MEMBERSHIP_IDENTITY_EVIDENCE)
+                .where(MEMBERSHIP_IDENTITY_EVIDENCE.EVIDENCE_ID.eq(evidenceId))
+                .execute(),
+        ).isEqualTo(1)
+        assertThat(
+            dsl.fetchCount(DSL.table(DSL.name("membership_identity_evidence_transfer"))),
+        ).isEqualTo(1)
+    }
+
+    @Test
     fun `health probes remain public`() {
         mockMvc.perform(get("/actuator/health/liveness"))
             .andExpect(status().isOk)
@@ -547,6 +650,14 @@ class MembershipServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(IMPORT_SCOPE))
 
+    private fun evidenceTransferJwt(subject: String) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject(subject)
+                .claim("azp", "evidence-transfer-operator")
+        }
+        .authorities(SimpleGrantedAuthority(EVIDENCE_TRANSFER_SCOPE))
+
     private fun legacyContentSha256(
         memberId: UUID,
         email: String,
@@ -591,6 +702,7 @@ class MembershipServiceIntegrationTest {
         const val STATUS_MANAGE_SCOPE = "SCOPE_membership.status.manage"
         const val MEMBERS_READ_SCOPE = "SCOPE_membership.members.read"
         const val IMPORT_SCOPE = "SCOPE_membership.import"
+        const val EVIDENCE_TRANSFER_SCOPE = "SCOPE_membership.identity-evidence.transfer"
 
         @Container
         @JvmStatic

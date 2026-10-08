@@ -3,12 +3,15 @@ package com.mundiapolis.library.membership.adapter.`in`.web
 import com.mundiapolis.library.membership.dto.AccountStatus
 import com.mundiapolis.library.membership.dto.ChangeAccountStatusCommand
 import com.mundiapolis.library.membership.dto.InvalidMembershipCommandException
+import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferCommand
+import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferResult
 import com.mundiapolis.library.membership.dto.MembershipCommandExecution
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportCommand
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportItem
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportResult
 import com.mundiapolis.library.membership.dto.MembershipRole
 import com.mundiapolis.library.membership.service.LegacyMembershipImportService
+import com.mundiapolis.library.membership.service.IdentityEvidenceTransferService
 import com.mundiapolis.library.membership.service.MembershipCommandService
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -30,6 +33,7 @@ class MembershipCommandController(
     private val commandService: MembershipCommandService,
     private val principalResolver: MembershipCommandPrincipalResolver,
     private val legacyImports: LegacyMembershipImportService,
+    private val evidenceTransfers: IdentityEvidenceTransferService,
 ) {
     @PostMapping("/{memberId}/status")
     @PreAuthorize("hasAuthority('SCOPE_membership.status.manage')")
@@ -98,6 +102,39 @@ class MembershipCommandController(
     fun legacyMembershipImport(@PathVariable importId: UUID): LegacyMembershipImportResult =
         legacyImports.importEvidence(importId)
 
+    @PutMapping("/identity-evidence-transfers/{transferId}")
+    @PreAuthorize("hasAuthority('SCOPE_membership.identity-evidence.transfer')")
+    fun transferIdentityEvidence(
+        authentication: JwtAuthenticationToken,
+        @PathVariable transferId: UUID,
+        @RequestBody request: IdentityEvidenceTransferRequest,
+    ): ResponseEntity<IdentityEvidenceTransferResult> {
+        val result = evidenceTransfers.transfer(
+            IdentityEvidenceTransferCommand(
+                transferId = transferId,
+                memberId = request.memberId,
+                evidenceId = request.evidenceId,
+                objectKey = request.objectKey,
+                mimeType = request.mimeType,
+                fileSize = request.fileSize,
+                checksumSha256 = request.checksumSha256,
+                sourceReferenceSha256 = request.sourceReferenceSha256,
+                scanAttestationSha256 = request.scanAttestationSha256,
+                verifiedAt = request.verifiedAt,
+                retentionExpiresAt = request.retentionExpiresAt,
+                actorFingerprint = principalResolver.ownerFingerprint(authentication),
+            ),
+        )
+        return ResponseEntity.ok()
+            .header(IDEMPOTENCY_REPLAYED_HEADER, result.replayed.toString())
+            .body(result)
+    }
+
+    @GetMapping("/identity-evidence-transfers/{transferId}")
+    @PreAuthorize("hasAuthority('SCOPE_membership.identity-evidence.transfer')")
+    fun identityEvidenceTransfer(@PathVariable transferId: UUID): IdentityEvidenceTransferResult =
+        evidenceTransfers.receipt(transferId)
+
     private fun parseIfMatch(value: String): Long {
         val match = VERSION_ETAG.matchEntire(value)
             ?: throw InvalidMembershipCommandException(
@@ -139,6 +176,19 @@ data class LegacyMembershipImportItemRequest(
     val updatedAt: Instant,
     val evidenceReferenceSha256: String,
     val contentSha256: String,
+)
+
+data class IdentityEvidenceTransferRequest(
+    val memberId: UUID,
+    val evidenceId: UUID,
+    val objectKey: String,
+    val mimeType: String,
+    val fileSize: Int,
+    val checksumSha256: String,
+    val sourceReferenceSha256: String,
+    val scanAttestationSha256: String,
+    val verifiedAt: Instant,
+    val retentionExpiresAt: Instant,
 )
 
 data class MembershipCommandResponse(

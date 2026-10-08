@@ -7,6 +7,7 @@ import com.mundiapolis.library.membership.dto.MembershipCommandNotFoundException
 import com.mundiapolis.library.membership.dto.MembershipIdempotencyConflictException
 import com.mundiapolis.library.membership.dto.MembershipIdempotencyIncompleteException
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportNotFoundException
+import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -23,7 +24,11 @@ class MembershipExceptionHandler {
     fun invalidActor(exception: InvalidMembershipActorException): ProblemDetail =
         problem(HttpStatus.FORBIDDEN, "invalid_membership_actor", exception.message)
 
-    @ExceptionHandler(MembershipCommandNotFoundException::class, LegacyMembershipImportNotFoundException::class)
+    @ExceptionHandler(
+        MembershipCommandNotFoundException::class,
+        LegacyMembershipImportNotFoundException::class,
+        IdentityEvidenceTransferNotFoundException::class,
+    )
     fun notFound(exception: RuntimeException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "membership_command_target_not_found", exception.message)
 
