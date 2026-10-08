@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.HandlerMethodValidationException
 
-@RestControllerAdvice(assignableTypes = [CatalogBrowseController::class])
+@RestControllerAdvice(assignableTypes = [CatalogBrowseController::class, CatalogAdminController::class])
 class CatalogExceptionHandler {
     @ExceptionHandler(CatalogReauthenticationRequiredException::class, DelegatedReauthenticationRequiredException::class)
     fun reauthenticationRequired() = problem(HttpStatus.UNAUTHORIZED, "reauthentication_required", "Authentication must be renewed")
@@ -20,6 +20,9 @@ class CatalogExceptionHandler {
 
     @ExceptionHandler(CatalogNotFoundException::class)
     fun notFound() = problem(HttpStatus.NOT_FOUND, "catalog_resource_not_found", "The requested catalog resource was not found")
+
+    @ExceptionHandler(CatalogConflictException::class)
+    fun conflict() = problem(HttpStatus.CONFLICT, "catalog_conflict", "The catalog record changed or the command conflicts with existing data")
 
     @ExceptionHandler(CatalogInvalidRequestException::class)
     fun downstreamInvalidRequest() = invalidRequest()

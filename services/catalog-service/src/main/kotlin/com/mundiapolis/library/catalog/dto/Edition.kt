@@ -1,5 +1,7 @@
 package com.mundiapolis.library.catalog.dto
 
+import com.fasterxml.jackson.annotation.JsonProperty
+
 data class Edition(
     val editionId: String,
     val workId: String,
@@ -14,5 +16,6 @@ data class Edition(
     val videoUrl: String? = null,
     val totalCopies: Int,
     val availableCopies: Int,
-    val isActive: Boolean
+    @get:JsonProperty("isActive") val isActive: Boolean,
+    val aggregateVersion: Long = 0,
 )

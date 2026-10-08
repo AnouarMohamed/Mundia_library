@@ -8,5 +8,6 @@ data class CatalogSearchFilters(
     val minRating: Double? = null,
     val sortBy: String? = null,
     val page: Int? = null,
-    val limit: Int? = null
+    val limit: Int? = null,
+    val includeInactive: Boolean = false,
 )

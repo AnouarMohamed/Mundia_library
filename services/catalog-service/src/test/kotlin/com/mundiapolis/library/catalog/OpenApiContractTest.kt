@@ -59,7 +59,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.7.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.8.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 

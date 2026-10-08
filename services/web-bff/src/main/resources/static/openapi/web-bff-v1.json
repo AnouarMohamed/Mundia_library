@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Library Web BFF API",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "description": "Browser contract for the static React application. Domain-service contracts are not exposed directly."
   },
   "servers": [{ "url": "/" }],
@@ -186,6 +186,72 @@
           "200": { "description": "Reservation command applied or replayed", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommand" } } } },
           "400": { "$ref": "#/components/responses/Problem" }, "401": { "description": "Browser session missing or user authorization must be renewed" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
         }
+      }
+    },
+    "/api/v1/admin/catalog/editions": {
+      "get": {
+        "operationId": "searchAdministrativeCatalogEditions",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Catalog management page including inactive editions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogSearch" } } } },
+          "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/catalog/works": {
+      "post": {
+        "operationId": "createAdministrativeCatalogWork",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCatalogWork" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CatalogCommandCreated" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/api/v1/admin/catalog/works/{workId}": {
+      "get": {
+        "operationId": "getAdministrativeCatalogWork",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [{ "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Authoritative work metadata", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogWork" } } } }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
+      },
+      "put": {
+        "operationId": "updateAdministrativeCatalogWork",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "$ref": "#/components/parameters/IfMatch" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCatalogWork" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/CatalogCommandSucceeded" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/api/v1/admin/catalog/works/{workId}/editions": {
+      "post": {
+        "operationId": "createAdministrativeCatalogEdition",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "workId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCatalogEdition" } } } },
+        "responses": { "201": { "$ref": "#/components/responses/CatalogCommandCreated" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/api/v1/admin/catalog/editions/{editionId}": {
+      "put": {
+        "operationId": "updateAdministrativeCatalogEdition",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "$ref": "#/components/parameters/IfMatch" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateCatalogEdition" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/CatalogCommandSucceeded" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
+      }
+    },
+    "/api/v1/admin/catalog/editions/{editionId}/activation": {
+      "post": {
+        "operationId": "setAdministrativeCatalogEditionActive",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [{ "name": "editionId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }, { "$ref": "#/components/parameters/IfMatch" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SetCatalogEditionActive" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/CatalogCommandSucceeded" }, "400": { "$ref": "#/components/responses/Problem" }, "401": { "$ref": "#/components/responses/Problem" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" } }
       }
     },
     "/api/v1/catalog/search": {
@@ -716,6 +782,16 @@
         "content": {
           "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommand" } }
         }
+      },
+      "CatalogCommandSucceeded": {
+        "description": "Catalog command committed or its original result replayed",
+        "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "ETag": { "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" } }, "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommand" } } }
+      },
+      "CatalogCommandCreated": {
+        "description": "Catalog aggregate created or its original result replayed",
+        "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "ETag": { "schema": { "type": "string", "pattern": "^\\\"[0-9]+\\\"$" } }, "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogCommand" } } }
       }
     },
     "parameters": {
@@ -877,7 +953,7 @@
       },
       "CatalogEdition": {
         "type": "object",
-        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive"],
+        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive", "aggregateVersion"],
         "properties": {
           "editionId": { "type": "string", "format": "uuid" },
           "workId": { "type": "string", "format": "uuid" },
@@ -892,9 +968,51 @@
           "videoUrl": { "type": ["string", "null"], "format": "uri" },
           "totalCopies": { "type": "integer", "minimum": 0 },
           "availableCopies": { "type": "integer", "minimum": 0 },
-          "isActive": { "type": "boolean" }
+          "isActive": { "type": "boolean" },
+          "aggregateVersion": { "type": "integer", "format": "int64", "minimum": 0 }
         },
         "additionalProperties": false
+      },
+      "CatalogAuthor": {
+        "type": "object", "additionalProperties": false, "required": ["id", "name", "bio"],
+        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string", "minLength": 1, "maxLength": 300 }, "bio": { "type": ["string", "null"], "maxLength": 5000 } }
+      },
+      "CatalogAuthorCommand": {
+        "type": "object", "additionalProperties": false, "required": ["contributorId", "name", "bio"],
+        "properties": { "contributorId": { "type": "string", "format": "uuid" }, "name": { "type": "string", "minLength": 1, "maxLength": 300 }, "bio": { "type": ["string", "null"], "maxLength": 5000 } }
+      },
+      "CatalogWork": {
+        "type": "object", "additionalProperties": false,
+        "required": ["workId", "title", "summary", "description", "genre", "rating", "authors", "aggregateVersion"],
+        "properties": { "workId": { "type": "string", "format": "uuid" }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "summary": { "type": "string", "maxLength": 1000 }, "description": { "type": "string", "maxLength": 10000 }, "genre": { "type": "string", "minLength": 1, "maxLength": 120 }, "rating": { "type": "number", "minimum": 0, "maximum": 5 }, "authors": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/components/schemas/CatalogAuthor" } }, "aggregateVersion": { "type": "integer", "format": "int64", "minimum": 0 } }
+      },
+      "CreateCatalogWork": {
+        "type": "object", "additionalProperties": false,
+        "required": ["workId", "title", "summary", "description", "genre", "authors", "reason"],
+        "properties": { "workId": { "type": "string", "format": "uuid" }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "summary": { "type": "string", "maxLength": 1000 }, "description": { "type": "string", "maxLength": 10000 }, "genre": { "type": "string", "minLength": 1, "maxLength": 120 }, "authors": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/components/schemas/CatalogAuthorCommand" } }, "reason": { "type": "string", "minLength": 8, "maxLength": 500 } }
+      },
+      "UpdateCatalogWork": {
+        "type": "object", "additionalProperties": false,
+        "required": ["title", "summary", "description", "genre", "authors", "reason"],
+        "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "summary": { "type": "string", "maxLength": 1000 }, "description": { "type": "string", "maxLength": 10000 }, "genre": { "type": "string", "minLength": 1, "maxLength": 120 }, "authors": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/components/schemas/CatalogAuthorCommand" } }, "reason": { "type": "string", "minLength": 8, "maxLength": 500 } }
+      },
+      "CreateCatalogEdition": {
+        "type": "object", "additionalProperties": false,
+        "required": ["editionId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "coverUrl", "coverColor", "videoUrl", "isActive", "reason"],
+        "properties": { "editionId": { "type": "string", "format": "uuid" }, "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "isbn": { "type": "string", "minLength": 1, "maxLength": 32 }, "publisher": { "type": "string", "minLength": 1, "maxLength": 300 }, "publicationYear": { "type": "integer", "minimum": 1000, "maximum": 3000 }, "language": { "type": "string", "minLength": 1, "maxLength": 80 }, "pageCount": { "type": "integer", "minimum": 1, "maximum": 100000 }, "coverUrl": { "type": ["string", "null"], "maxLength": 2048 }, "coverColor": { "type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$" }, "videoUrl": { "type": ["string", "null"], "maxLength": 2048 }, "isActive": { "type": "boolean" }, "reason": { "type": "string", "minLength": 8, "maxLength": 500 } }
+      },
+      "UpdateCatalogEdition": {
+        "type": "object", "additionalProperties": false,
+        "required": ["title", "isbn", "publisher", "publicationYear", "language", "pageCount", "coverUrl", "coverColor", "videoUrl", "reason"],
+        "properties": { "title": { "type": "string", "minLength": 1, "maxLength": 500 }, "isbn": { "type": "string", "minLength": 1, "maxLength": 32 }, "publisher": { "type": "string", "minLength": 1, "maxLength": 300 }, "publicationYear": { "type": "integer", "minimum": 1000, "maximum": 3000 }, "language": { "type": "string", "minLength": 1, "maxLength": 80 }, "pageCount": { "type": "integer", "minimum": 1, "maximum": 100000 }, "coverUrl": { "type": ["string", "null"], "maxLength": 2048 }, "coverColor": { "type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$" }, "videoUrl": { "type": ["string", "null"], "maxLength": 2048 }, "reason": { "type": "string", "minLength": 8, "maxLength": 500 } }
+      },
+      "SetCatalogEditionActive": {
+        "type": "object", "additionalProperties": false, "required": ["isActive", "reason"],
+        "properties": { "isActive": { "type": "boolean" }, "reason": { "type": "string", "minLength": 8, "maxLength": 500 } }
+      },
+      "CatalogCommand": {
+        "type": "object", "additionalProperties": false, "required": ["aggregateType", "aggregateId", "aggregateVersion", "occurredAt"],
+        "properties": { "aggregateType": { "type": "string", "enum": ["work", "edition"] }, "aggregateId": { "type": "string", "format": "uuid" }, "aggregateVersion": { "type": "integer", "format": "int64", "minimum": 0 }, "occurredAt": { "type": "string", "format": "date-time" } }
       },
       "LearningResourcePage": {
         "type": "object",

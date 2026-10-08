@@ -26,6 +26,12 @@ export type MembershipCommand = components["schemas"]["MembershipCommand"];
 export type AdministrativeCirculationOverview = components["schemas"]["AdministrativeCirculationOverview"];
 export type AdministrativeLoanPage = components["schemas"]["AdministrativeLoanPage"];
 export type AdministrativeReservationPage = components["schemas"]["AdministrativeReservationPage"];
+export type CatalogWork = components["schemas"]["CatalogWork"];
+export type CreateCatalogWork = components["schemas"]["CreateCatalogWork"];
+export type UpdateCatalogWork = components["schemas"]["UpdateCatalogWork"];
+export type CreateCatalogEdition = components["schemas"]["CreateCatalogEdition"];
+export type UpdateCatalogEdition = components["schemas"]["UpdateCatalogEdition"];
+export type CatalogCommand = components["schemas"]["CatalogCommand"];
 export type CommandResult<T> = { record: T; replayed: boolean };
 export type VersionedNotificationPreference = { preference: NotificationPreference; entityTag: string };
 export type NotificationReadStatus = "ALL" | "READ" | "UNREAD";
@@ -113,6 +119,45 @@ export async function getAdminCirculationOverview(signal?: AbortSignal): Promise
   const value = await requestJson("/api/v1/admin/circulation/overview", { signal });
   if (!isAdminCirculationOverview(value)) throw new ApiError(502);
   return value;
+}
+
+export async function getAdminCatalogEditions(queryText: string, page = 0, limit = 25, signal?: AbortSignal): Promise<CatalogSearch> {
+  if (queryText.length > 200 || !Number.isSafeInteger(page) || page < 0 || page > 10_000 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ApiError(400);
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const search = queryText.trim();
+  if (search) query.set("query", search);
+  const value = await requestJson(`/api/v1/admin/catalog/editions?${query}`, { signal });
+  if (!isCatalogSearch(value, page, limit, true)) throw new ApiError(502);
+  return value;
+}
+
+export async function getAdminCatalogWork(workId: string, signal?: AbortSignal): Promise<CatalogWork> {
+  validateCommandIdentifiers(workId);
+  const value = await requestJson(`/api/v1/admin/catalog/works/${encodeURIComponent(workId)}`, { signal });
+  if (!isCatalogWork(value) || value.workId !== workId) throw new ApiError(502);
+  return value;
+}
+
+export async function createAdminCatalogWork(command: CreateCatalogWork, idempotencyKey: string): Promise<CatalogCommand> {
+  return catalogAdminCommand("/api/v1/admin/catalog/works", "POST", command, idempotencyKey, "work", command.workId, 0);
+}
+
+export async function updateAdminCatalogWork(workId: string, version: number, command: UpdateCatalogWork, idempotencyKey: string): Promise<CatalogCommand> {
+  return catalogAdminCommand(`/api/v1/admin/catalog/works/${encodeURIComponent(workId)}`, "PUT", command, idempotencyKey, "work", workId, version + 1, version);
+}
+
+export async function createAdminCatalogEdition(workId: string, command: CreateCatalogEdition, idempotencyKey: string): Promise<CatalogCommand> {
+  validateCommandIdentifiers(workId);
+  return catalogAdminCommand(`/api/v1/admin/catalog/works/${encodeURIComponent(workId)}/editions`, "POST", command, idempotencyKey, "edition", command.editionId, 0);
+}
+
+export async function updateAdminCatalogEdition(edition: CatalogEdition, command: UpdateCatalogEdition, idempotencyKey: string): Promise<CatalogCommand> {
+  return catalogAdminCommand(`/api/v1/admin/catalog/editions/${encodeURIComponent(edition.editionId)}`, "PUT", command, idempotencyKey, "edition", edition.editionId, edition.aggregateVersion + 1, edition.aggregateVersion);
+}
+
+export async function setAdminCatalogEditionActive(edition: CatalogEdition, isActive: boolean, reason: string, idempotencyKey: string): Promise<CatalogCommand> {
+  return catalogAdminCommand(`/api/v1/admin/catalog/editions/${encodeURIComponent(edition.editionId)}/activation`, "POST", { isActive, reason }, idempotencyKey, "edition", edition.editionId, edition.aggregateVersion + 1, edition.aggregateVersion);
 }
 
 export async function getAdminLoanQueue(
@@ -698,13 +743,13 @@ function isNotificationPreferenceUpdate(value: unknown): value is UpdateNotifica
     typeof value.accountStatusEnabled === "boolean";
 }
 
-function isCatalogSearch(value: unknown, page: number, limit: number): value is CatalogSearch {
+function isCatalogSearch(value: unknown, page: number, limit: number, allowInactive = false): value is CatalogSearch {
   if (!isRecord(value) || !Array.isArray(value.editions) || value.editions.length > limit ||
       !value.editions.every(isCatalogEdition) || new Set(value.editions.map((edition) => edition.editionId)).size !== value.editions.length ||
       !isNonNegativeInteger(value.total) || !isNonNegativeInteger(value.page) || value.page !== page ||
       !isNonNegativeInteger(value.totalPages) || value.totalPages !== (value.total === 0 ? 0 : Math.ceil(value.total / limit)) ||
       value.editions.length > value.total) return false;
-  return value.editions.every((edition) => edition.isActive);
+  return allowInactive || value.editions.every((edition) => edition.isActive);
 }
 
 function historyQuery(cursor?: string): URLSearchParams {
@@ -818,7 +863,51 @@ function isCatalogEdition(value: unknown): value is CatalogEdition {
     (value.coverColor === null || isSafeText(value.coverColor, 64)) &&
     (value.videoUrl === null || (typeof value.videoUrl === "string" && isPublicHttpsUrl(value.videoUrl))) &&
     isNonNegativeInteger(value.totalCopies) && isNonNegativeInteger(value.availableCopies) &&
-    Number(value.availableCopies) <= Number(value.totalCopies) && typeof value.isActive === "boolean";
+    Number(value.availableCopies) <= Number(value.totalCopies) && typeof value.isActive === "boolean" &&
+    isNonNegativeInteger(value.aggregateVersion);
+}
+
+function isCatalogWork(value: unknown): value is CatalogWork {
+  return isRecord(value) && isUuid(value.workId) && isSafeText(value.title, 500) &&
+    typeof value.summary === "string" && value.summary.length <= 1_000 &&
+    typeof value.description === "string" && value.description.length <= 10_000 &&
+    isSafeText(value.genre, 120) && typeof value.rating === "number" && value.rating >= 0 && value.rating <= 5 &&
+    Array.isArray(value.authors) && value.authors.length > 0 && value.authors.length <= 20 &&
+    value.authors.every((author) => isRecord(author) && isUuid(author.id) && isSafeText(author.name, 300) &&
+      (author.bio === null || typeof author.bio === "string")) && isNonNegativeInteger(value.aggregateVersion);
+}
+
+async function catalogAdminCommand(
+  path: string,
+  method: "POST" | "PUT",
+  body: object,
+  idempotencyKey: string,
+  aggregateType: "work" | "edition",
+  aggregateId: string,
+  resultVersion: number,
+  expectedVersion?: number,
+): Promise<CatalogCommand> {
+  validateCommandIdentifiers(aggregateId);
+  if (idempotencyKey.length < 16 || idempotencyKey.length > 128 || !/^[\x21-\x7e]+$/.test(idempotencyKey)) throw new ApiError(400);
+  const csrf = await getCsrfToken();
+  const response = await fetch(path, {
+    method,
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+      ...(expectedVersion === undefined ? {} : { "If-Match": `"${expectedVersion}"` }),
+      [csrf.headerName]: csrf.token,
+    },
+    body: JSON.stringify(body),
+  });
+  const value = await responseJson(response);
+  const replayed = response.headers.get("idempotency-replayed");
+  if (!isRecord(value) || value.aggregateType !== aggregateType || value.aggregateId !== aggregateId ||
+      value.aggregateVersion !== resultVersion || !isIsoInstant(value.occurredAt) ||
+      response.headers.get("etag") !== `"${resultVersion}"` || (replayed !== "true" && replayed !== "false")) throw new ApiError(502);
+  return value as CatalogCommand;
 }
 
 function isDescending<T>(items: T[], time: (item: T) => string, id: (item: T) => string): boolean {

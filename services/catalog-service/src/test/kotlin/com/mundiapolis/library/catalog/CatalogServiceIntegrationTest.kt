@@ -251,6 +251,7 @@ class CatalogServiceIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.workId").value(FICTION_WORK_ID.toString()))
             .andExpect(jsonPath("$.rating").value(4.75))
+            .andExpect(jsonPath("$.aggregateVersion").value(0))
             .andExpect(jsonPath("$.authors[0].id").value(PRIMARY_AUTHOR_ID.toString()))
             .andExpect(jsonPath("$.authors[0].bio").value("Primary biography"))
             .andExpect(jsonPath("$.authors[1].id").value(SECONDARY_AUTHOR_ID.toString()))
@@ -266,6 +267,7 @@ class CatalogServiceIntegrationTest {
             .andExpect(jsonPath("$.totalCopies").value(4))
             .andExpect(jsonPath("$.availableCopies").value(2))
             .andExpect(jsonPath("$.coverColor").value("#123ABC"))
+            .andExpect(jsonPath("$.aggregateVersion").value(0))
 
         mockMvc.perform(
             get("/api/v1/catalog/editions/$INACTIVE_EDITION_ID").with(scope(READ_SCOPE)),
@@ -689,6 +691,25 @@ class CatalogServiceIntegrationTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0]").value("Fiction"))
             .andExpect(jsonPath("$[1]").value("Science"))
+    }
+
+    @Test
+    fun `administrative edition search includes inactive records and requires catalog management scope`() {
+        mockMvc.perform(
+            get("/api/v1/catalog/admin/editions")
+                .param("query", "Archived")
+                .param("limit", "10")
+                .with(commandScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.total").value(1))
+            .andExpect(jsonPath("$.editions[0].editionId").value(INACTIVE_EDITION_ID.toString()))
+            .andExpect(jsonPath("$.editions[0].isActive").value(false))
+            .andExpect(jsonPath("$.editions[0].aggregateVersion").value(0))
+
+        mockMvc.perform(
+            get("/api/v1/catalog/admin/editions").with(scope(READ_SCOPE)),
+        ).andExpect(status().isForbidden)
     }
 
     @Test

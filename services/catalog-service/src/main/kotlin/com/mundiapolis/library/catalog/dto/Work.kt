@@ -7,5 +7,6 @@ data class Work(
     val description: String,
     val genre: String,
     val rating: Double,
-    val authors: List<Author>
+    val authors: List<Author>,
+    val aggregateVersion: Long = 0,
 )

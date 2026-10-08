@@ -5,6 +5,7 @@ import com.mundiapolis.library.bff.catalog.CatalogProtocolException
 import com.mundiapolis.library.bff.catalog.CatalogSearchCriteria
 import com.mundiapolis.library.bff.catalog.CatalogUnavailableException
 import com.mundiapolis.library.bff.catalog.LearningResourceSearchCriteria
+import com.mundiapolis.library.bff.catalog.SetCatalogEditionActiveView
 import com.mundiapolis.library.bff.config.CatalogClientProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -187,6 +188,34 @@ class CatalogClientTest {
         server.verify()
     }
 
+    @Test
+    fun `edition activation preserves exact version and replay evidence`() {
+        val editionId = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        server.expect(requestTo("https://catalog.internal/api/v1/catalog/editions/$editionId/activation"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer delegated-token"))
+            .andExpect(header(HttpHeaders.IF_MATCH, "\"3\""))
+            .andExpect(header("Idempotency-Key", "catalog-activation-0001"))
+            .andRespond(
+                withSuccess(
+                    """{"aggregateType":"edition","aggregateId":"$editionId","aggregateVersion":4,"occurredAt":"2026-10-08T10:00:00Z"}""",
+                    MediaType.APPLICATION_JSON,
+                ).header(HttpHeaders.ETAG, "\"4\"").header("Idempotency-Replayed", "true"),
+            )
+
+        val result = client.setEditionActive(
+            authorizedClient(),
+            editionId,
+            3,
+            SetCatalogEditionActiveView(false, "Withdrawn after metadata review"),
+            "catalog-activation-0001",
+        )
+
+        assertThat(result.command.aggregateVersion).isEqualTo(4)
+        assertThat(result.replayed).isTrue()
+        server.verify()
+    }
+
     private fun criteria(
         query: String? = null,
         availableOnly: Boolean? = null,
@@ -249,7 +278,8 @@ class CatalogClientTest {
                 "videoUrl": null,
                 "totalCopies": 1,
                 "availableCopies": 1,
-                "isActive": true
+                "isActive": true,
+                "aggregateVersion": 0
               }],
               "total": 1,
               "page": 0,

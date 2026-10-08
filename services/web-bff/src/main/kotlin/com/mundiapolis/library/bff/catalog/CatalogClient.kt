@@ -121,6 +121,92 @@ class CatalogClient(
             }
     }
 
+    fun administrativeEditions(
+        authorizedClient: OAuth2AuthorizedClient,
+        query: String?,
+        page: Int?,
+        limit: Int?,
+    ): CatalogSearchView = exchange {
+        val criteria = CatalogSearchCriteria(query, null, null, null, null, "title", page, limit)
+        catalogRestClient.get()
+            .uri { builder ->
+                builder.path("/api/v1/catalog/admin/editions")
+                    .queryParamIfPresent("query", Optional.ofNullable(query))
+                    .queryParamIfPresent("page", Optional.ofNullable(page))
+                    .queryParamIfPresent("limit", Optional.ofNullable(limit))
+                    .build()
+            }
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decodeAndValidate(boundedBody(response), criteria)
+            }
+    }
+
+    fun work(authorizedClient: OAuth2AuthorizedClient, workId: UUID): CatalogWorkView = exchange {
+        catalogRestClient.get().uri("/api/v1/catalog/works/{workId}", workId)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(boundedBody(response), CatalogWorkView::class.java).also {
+                    if (it.workId != workId || !validWork(it)) throw CatalogProtocolException()
+                }
+            }
+    }
+
+    fun createWork(authorizedClient: OAuth2AuthorizedClient, command: CreateCatalogWorkView, idempotencyKey: String): CatalogMutationResult =
+        command(authorizedClient, "/api/v1/catalog/works", "POST", null, idempotencyKey, command, "work", command.workId, 0, 201)
+
+    fun updateWork(authorizedClient: OAuth2AuthorizedClient, workId: UUID, expectedVersion: Long, command: UpdateCatalogWorkView, idempotencyKey: String): CatalogMutationResult =
+        command(authorizedClient, "/api/v1/catalog/works/$workId", "PUT", expectedVersion, idempotencyKey, command, "work", workId, expectedVersion + 1)
+
+    fun createEdition(authorizedClient: OAuth2AuthorizedClient, workId: UUID, command: CreateCatalogEditionView, idempotencyKey: String): CatalogMutationResult =
+        command(authorizedClient, "/api/v1/catalog/works/$workId/editions", "POST", null, idempotencyKey, command, "edition", command.editionId, 0, 201)
+
+    fun updateEdition(authorizedClient: OAuth2AuthorizedClient, editionId: UUID, expectedVersion: Long, command: UpdateCatalogEditionView, idempotencyKey: String): CatalogMutationResult =
+        command(authorizedClient, "/api/v1/catalog/editions/$editionId", "PUT", expectedVersion, idempotencyKey, command, "edition", editionId, expectedVersion + 1)
+
+    fun setEditionActive(authorizedClient: OAuth2AuthorizedClient, editionId: UUID, expectedVersion: Long, command: SetCatalogEditionActiveView, idempotencyKey: String): CatalogMutationResult =
+        command(authorizedClient, "/api/v1/catalog/editions/$editionId/activation", "POST", expectedVersion, idempotencyKey, command, "edition", editionId, expectedVersion + 1)
+
+    private fun command(
+        authorizedClient: OAuth2AuthorizedClient,
+        path: String,
+        method: String,
+        expectedVersion: Long?,
+        idempotencyKey: String,
+        body: Any,
+        aggregateType: String,
+        aggregateId: UUID,
+        resultVersion: Long,
+        expectedStatus: Int = 200,
+    ): CatalogMutationResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        if (expectedVersion != null && expectedVersion < 0) throw CatalogInvalidRequestException()
+        val request = when (method) {
+            "POST" -> catalogRestClient.post().uri(path)
+            "PUT" -> catalogRestClient.put().uri(path)
+            else -> throw CatalogInvalidRequestException()
+        }
+        request.header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .apply { expectedVersion?.let { header(HttpHeaders.IF_MATCH, "\"$it\"") } }
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(body)
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value(), expectedStatus)
+                val replayed = response.headers.getFirst(IDEMPOTENCY_REPLAYED)?.let(::strictBoolean)
+                    ?: throw CatalogProtocolException()
+                val result = decode(boundedBody(response), CatalogCommandView::class.java)
+                val entityTag = response.headers.getFirst(HttpHeaders.ETAG)
+                if (result.aggregateType != aggregateType || result.aggregateId != aggregateId ||
+                    result.aggregateVersion != resultVersion || entityTag != "\"${result.aggregateVersion}\"") {
+                    throw CatalogProtocolException()
+                }
+                CatalogMutationResult(result, replayed)
+            }
+    }
+
     private fun <T> exchange(operation: () -> T): T {
         try {
             return operation()
@@ -169,11 +255,7 @@ class CatalogClient(
             result.total < result.editions.size ||
             result.page != requestedPage ||
             result.totalPages != expectedTotalPages ||
-            result.editions.any { edition ->
-                edition.pageCount < 1 ||
-                    edition.totalCopies < 0 ||
-                    edition.availableCopies !in 0..edition.totalCopies
-            }
+            result.editions.any { !validEdition(it) }
         ) {
             throw CatalogProtocolException()
         }
@@ -199,9 +281,24 @@ class CatalogClient(
 
     private fun validEdition(edition: CatalogEditionView): Boolean =
         validText(edition.title, 1, 500) &&
-            edition.pageCount > 0 &&
+            validText(edition.isbn, 1, 32) &&
+            validText(edition.publisher, 1, 300) &&
+            edition.publicationYear in 1000..3000 &&
+            validText(edition.language, 1, 80) &&
+            edition.pageCount in 1..100_000 &&
+            edition.coverUrl?.let(::validPublicHttpsUrl) != false &&
+            edition.videoUrl?.let(::validPublicHttpsUrl) != false &&
+            edition.coverColor?.matches(HEX_COLOR) != false &&
             edition.totalCopies >= 0 &&
-            edition.availableCopies in 0..edition.totalCopies
+            edition.availableCopies in 0..edition.totalCopies &&
+            edition.aggregateVersion >= 0
+
+    private fun validWork(work: CatalogWorkView): Boolean =
+        validText(work.title, 1, 500) && validText(work.summary, 0, 1_000, allowLines = true) &&
+            validText(work.description, 0, 10_000, allowLines = true) && validText(work.genre, 1, 120) &&
+            work.rating in 0.0..5.0 && work.aggregateVersion >= 0 && work.authors.isNotEmpty() &&
+            work.authors.size <= 20 && work.authors.map { it.id }.distinct().size == work.authors.size &&
+            work.authors.all { validText(it.name, 1, 300) && it.bio?.let { bio -> validText(bio, 0, 5_000, allowLines = true) } != false }
 
     private fun validText(value: String, minimum: Int, maximum: Int, allowLines: Boolean = false): Boolean =
         value.length in minimum..maximum && value == value.trim() &&
@@ -230,19 +327,31 @@ class CatalogClient(
         objectMapper.readValue(body, type)
     }.getOrElse { throw CatalogProtocolException(it) }
 
-    private fun handleStatus(status: Int) {
+    private fun handleStatus(status: Int, expected: Int = 200) {
         when (status) {
-            200 -> return
+            expected -> return
             400 -> throw CatalogInvalidRequestException()
             401 -> throw CatalogReauthenticationRequiredException()
             403 -> throw CatalogAccessDeniedException()
             404 -> throw CatalogNotFoundException()
+            409 -> throw CatalogConflictException()
+            413 -> throw CatalogInvalidRequestException()
             in RETRYABLE_STATUSES -> throw CatalogUnavailableException()
             else -> throw CatalogProtocolException()
         }
     }
 
     private fun bearer(client: OAuth2AuthorizedClient): String = "Bearer ${client.accessToken.tokenValue}"
+
+    private fun validateIdempotencyKey(value: String) {
+        if (value.length !in 16..128 || value.any { it.code !in 0x21..0x7e }) throw CatalogInvalidRequestException()
+    }
+
+    private fun strictBoolean(value: String): Boolean = when (value) {
+        "true" -> true
+        "false" -> false
+        else -> throw CatalogProtocolException()
+    }
 
     private fun totalPages(total: Int, limit: Int): Int = if (total == 0) 0 else ((total.toLong() + limit - 1) / limit).toInt()
 
@@ -257,8 +366,11 @@ class CatalogClient(
         const val MAXIMUM_CATEGORY_LENGTH = 128
         val IPV4_LITERAL = Regex("^[0-9.]+$")
         val ENCODED_PATH_SEPARATOR = Regex("%(?:2e|2f|5c)", RegexOption.IGNORE_CASE)
+        val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
         val LICENSE_EXPRESSIONS = setOf("CC-BY", "CC-BY-SA", "CC0", "PUBLIC-DOMAIN")
         val RETRYABLE_STATUSES = setOf(429, 502, 503, 504)
+        const val IDEMPOTENCY_KEY = "Idempotency-Key"
+        const val IDEMPOTENCY_REPLAYED = "Idempotency-Replayed"
     }
 }
 
@@ -269,6 +381,7 @@ class CatalogReauthenticationRequiredException : CatalogAuthorizationRejectedExc
 class CatalogAccessDeniedException : CatalogAuthorizationRejectedException()
 class CatalogInvalidRequestException : CatalogClientException()
 class CatalogNotFoundException : CatalogClientException()
+class CatalogConflictException : CatalogClientException()
 
 class CatalogTimeoutException(cause: Throwable? = null) : CatalogClientException(cause)
 

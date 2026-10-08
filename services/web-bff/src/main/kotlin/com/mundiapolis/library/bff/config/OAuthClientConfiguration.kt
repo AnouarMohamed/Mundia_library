@@ -101,6 +101,7 @@ class OAuthClientConfiguration {
                 LinkedMultiValueMap<String, String>().apply {
                     when (request.clientRegistration.registrationId) {
                         CATALOG_REGISTRATION -> add("audience", catalog.audience)
+                        CATALOG_ADMIN_REGISTRATION -> add("audience", catalog.audience)
                         MEMBERSHIP_REGISTRATION -> add("audience", membership.audience)
                         MEMBERSHIP_ADMIN_REGISTRATION -> add("audience", membership.audience)
                         CIRCULATION_REGISTRATION -> add("audience", circulation.audience)
@@ -189,6 +190,7 @@ class OAuthClientConfiguration {
 
     companion object {
         const val CATALOG_REGISTRATION = "catalog-service"
+        const val CATALOG_ADMIN_REGISTRATION = "catalog-admin-service"
         const val MEMBERSHIP_REGISTRATION = "membership-service"
         const val MEMBERSHIP_ADMIN_REGISTRATION = "membership-admin-service"
         const val CIRCULATION_REGISTRATION = "circulation-service"
@@ -200,6 +202,7 @@ class OAuthClientConfiguration {
         private val KNOWN_REGISTRATIONS = listOf(
             "institutional",
             CATALOG_REGISTRATION,
+            CATALOG_ADMIN_REGISTRATION,
             MEMBERSHIP_REGISTRATION,
             MEMBERSHIP_ADMIN_REGISTRATION,
             CIRCULATION_REGISTRATION,

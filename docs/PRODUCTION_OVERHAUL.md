@@ -334,8 +334,10 @@ transaction. Updates require exact version ETags and reject stale writers.
 Catalog outbox delivery now uses crash-recoverable aggregate-ordered leases,
 bounded retries, poison-event blocking, Protobuf v1 encoding, synchronous Kafka
 acknowledgements, retention cleanup, and health/metrics. Broker provisioning,
-availability replay/reconciliation evidence and all cutover
-gates remain open; these command APIs are not production-routed yet.
+availability replay/reconciliation evidence and production cutover gates remain
+open. The Kotlin BFF and SPA now route the administration slice through a
+separate `catalog.manage` token after a fresh Membership admin check; this is
+implemented but not yet the public production authority.
 
 Exit gate: there are no cross-service database reads or writes and all privacy
 retention/deletion workflows pass.
@@ -537,9 +539,9 @@ machine-scoped commands are actor- and manifest-bound, and dedicated read APIs
 provide stable search, detail, and category results without exposing download
 targets. The verified-only legacy backfill command creates deterministic batches
 of at most 250 records and performs read-after-write receipt reconciliation.
-Running that backfill against production, archiving its evidence, and completing
-the Kotlin BFF/SPA read cutover remain pending before the temporary Next.js read
-slice can retire. The initial static Vite shell now consumes generated BFF types,
+Running that backfill against production, archiving its evidence, and enabling
+the already-implemented Kotlin BFF/SPA read and administration slices remain
+pending before the temporary Next.js slice can retire. The static Vite shell now consumes generated BFF types,
 boots the server-held session, renders responsive learning-resource search and
 detail states, and obtains CSRF-protected download authorizations. Its cutover
 flag is disabled by default until backfill reconciliation and edge tests pass.

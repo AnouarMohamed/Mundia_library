@@ -248,6 +248,7 @@ known state. The immutable contract is public at
 | Bounded edition metadata batch (maximum 50) | `GET /api/v1/catalog/editions?editionId=…` | `catalog.read` |
 | Filtered, sorted catalog page | `GET /api/v1/catalog/search` | `catalog.search` |
 | Active-edition genres | `GET /api/v1/catalog/genres` | `catalog.search` |
+| Administrative edition search, including inactive records | `GET /api/v1/catalog/admin/editions` | `catalog.manage` |
 | Privacy-safe published reviews | `GET /api/v1/catalog/works/{workId}/reviews` | `catalog.read` |
 | Create a work and ordered authors | `POST /api/v1/catalog/works` | `catalog.manage` |
 | Create an edition under a work | `POST /api/v1/catalog/works/{workId}/editions` | `catalog.manage` |
@@ -270,8 +271,12 @@ member can publish at most one review per work. Review deletion physically
 removes the text; audit and broker events intentionally retain neither member
 identity nor review content. Catalog commands never accept copy counts or copy state. The schema is installed
 from `catalog-service/src/main/resources/db/migration`; runtime Flyway remains
-disabled by default. Legacy backfill/reconciliation and BFF cutover remain
-later Phase 4 gates, so Next.js is still the production authority.
+disabled by default. The Kotlin BFF and SPA now expose the Catalog administration
+slice through a dedicated `catalog-admin-service` token-exchange registration.
+Each browser request first revalidates the operator against Membership, and
+mutations preserve exact ETags, actor-bound idempotency, and audit reasons.
+Legacy backfill/reconciliation and production routing remain later Phase 4
+gates, so Next.js is still the production authority.
 
 When `CIRCULATION_CONSUMER_ENABLED=true`, Catalog consumes Circulation's shared
 v1 event topic with an independent consumer group and broker credentials. It

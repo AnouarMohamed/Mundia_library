@@ -288,6 +288,28 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-command-confirm { position: fixed; inset: auto 1rem 1rem auto; z-index: 10; width: min(32rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid var(--navy); border-top-width: 4px; background: var(--surface); box-shadow: 0 .8rem 2rem oklch(18% .014 72 / .18); }
 .admin-command-confirm h2 { margin: .35rem 0 .5rem; font: 400 1.45rem Georgia, "Times New Roman", serif; }
 .admin-command-confirm p:last-child { margin: 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.catalog-admin-toolbar { align-items: end; }
+.catalog-admin-toolbar form { min-width: min(100%, 34rem); display: grid; gap: .4rem; }
+.catalog-admin-toolbar form > label, .catalog-admin-editor label { color: var(--muted); font-size: .76rem; font-weight: 700; }
+.catalog-admin-toolbar form > div { display: flex; }
+.catalog-admin-toolbar input, .catalog-admin-editor input, .catalog-admin-editor textarea { width: 100%; min-height: 2.75rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: .65rem .75rem; font: inherit; }
+.catalog-admin-toolbar button { min-height: 2.75rem; padding: 0 1rem; border: 1px solid var(--navy); background: var(--navy); color: var(--surface); font-weight: 700; cursor: pointer; }
+.catalog-admin-list { margin: 0; padding: 0; list-style: none; border-bottom: 1px solid var(--line); }
+.catalog-admin-list > li { display: grid; grid-template-columns: minmax(16rem, 1.5fr) minmax(18rem, 1fr) max-content; gap: 1.5rem; align-items: center; padding: 1.1rem 0; border-top: 1px solid var(--line); }
+.catalog-admin-list > li > div:first-child { min-width: 0; display: grid; gap: .35rem; }
+.catalog-admin-list strong { overflow-wrap: anywhere; font: 400 1.08rem Georgia, "Times New Roman", serif; }
+.catalog-admin-list span { overflow-wrap: anywhere; color: var(--muted); font-size: .75rem; line-height: 1.45; }
+.catalog-admin-list dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; }
+.catalog-admin-list dt { color: var(--muted); font-size: .68rem; }
+.catalog-admin-list dd { margin: .25rem 0 0; overflow-wrap: anywhere; font-size: .78rem; font-weight: 700; }
+.catalog-admin-editor { position: fixed; inset: 1rem 1rem 1rem auto; z-index: 12; width: min(35rem, calc(100% - 2rem)); overflow-y: auto; display: grid; align-content: start; gap: 1rem; padding: 1.5rem; border: 1px solid var(--navy); border-top-width: 4px; background: var(--surface); box-shadow: 0 .8rem 2rem oklch(18% .014 72 / .18); }
+.catalog-admin-editor header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.catalog-admin-editor h2 { margin: .35rem 0 0; font: 400 1.55rem Georgia, "Times New Roman", serif; }
+.catalog-admin-editor header button { border: 0; background: transparent; color: var(--navy); font-weight: 700; cursor: pointer; }
+.catalog-admin-editor label { display: grid; gap: .4rem; }
+.catalog-admin-editor textarea { min-height: 6rem; resize: vertical; line-height: 1.5; }
+.catalog-admin-editor input:disabled { background: var(--paper); color: var(--muted); }
+.catalog-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .resource-skeleton, .catalog-skeleton, .detail-skeleton, .profile-skeleton, .history-skeleton, .notification-skeleton, .admin-skeleton, .shell-skeleton { width: min(75rem, calc(100% - 2rem)); margin: 2rem auto; display: grid; gap: 1px; background: var(--line); }
 .resource-skeleton span, .catalog-skeleton span { height: 9rem; background: var(--surface); animation: pulse 1.3s ease-in-out infinite alternate; }
 .detail-skeleton span, .profile-skeleton span, .history-skeleton span, .notification-skeleton span, .admin-skeleton span, .shell-skeleton span { height: 4rem; background: var(--surface); animation: pulse 1.3s ease-in-out infinite alternate; }
@@ -363,6 +385,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .admin-local-nav a { flex: 1; justify-content: center; padding: 0 .55rem; }
   .admin-desk-grid { grid-template-columns: 1fr; gap: 0; }
   .admin-command-confirm { inset: auto .625rem .625rem; width: auto; }
+  .catalog-admin-toolbar form { min-width: 0; }
+  .catalog-admin-toolbar .admin-member-actions { width: 100%; }
+  .catalog-admin-list > li { grid-template-columns: 1fr; gap: .85rem; }
+  .catalog-admin-list dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .catalog-admin-editor { inset: .625rem; width: auto; padding: 1.1rem; }
+  .catalog-editor-grid { grid-template-columns: 1fr; }
   .site-nav { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
   .site-nav a { flex: 0 0 auto; min-width: 5.2rem; }
   .pagination { gap: .5rem; }

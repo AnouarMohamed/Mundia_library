@@ -518,6 +518,7 @@ function edition(editionId: string) {
     totalCopies: 4,
     availableCopies: 2,
     isActive: true,
+    aggregateVersion: 0,
   };
 }
 

@@ -5,6 +5,7 @@ export function AdminNavigation() {
     <nav className="admin-local-nav" aria-label="Administration sections">
       <NavLink end to="/admin">Account review</NavLink>
       <NavLink to="/admin/circulation">Circulation desk</NavLink>
+      <NavLink to="/admin/catalog">Catalog</NavLink>
     </nav>
   );
 }

@@ -88,6 +88,13 @@ Each Kotlin service has an independent Flyway migration chain and database
 credential. No service reads another service's tables. Derived state is
 versioned and recoverable from APIs or events.
 
+Catalog staff writes follow the same zero-trust browser boundary as Circulation:
+the BFF verifies the live Membership administrator record, exchanges into a
+separate `catalog.manage` token, and forwards only bounded metadata commands.
+Catalog commits the aggregate, audit evidence, idempotent replay snapshot, and
+outbox event in one transaction. Edition activation changes discovery state;
+it cannot mutate the Circulation-owned copy projection.
+
 ## Browser request flow
 
 ```mermaid

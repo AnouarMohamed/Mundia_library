@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Catalog API",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "description": "Authoritative catalog metadata and privacy-safe review commands and reads. Copy counts and returned-loan eligibility are versioned projections owned by Circulation."
   },
   "paths": {
@@ -232,6 +232,23 @@
         }
       }
     },
+    "/api/v1/catalog/admin/editions": {
+      "get": {
+        "operationId": "searchAdministrativeEditions",
+        "x-required-scopes": ["catalog.manage"],
+        "parameters": [
+          { "name": "query", "in": "query", "schema": { "type": "string", "maxLength": 200 } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Bounded catalog-management page including inactive editions", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogSearchResult" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/api/v1/catalog/search": {
       "get": {
         "operationId": "searchCatalog",
@@ -369,7 +386,7 @@
       "Work": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["workId", "title", "summary", "description", "genre", "rating", "authors"],
+        "required": ["workId", "title", "summary", "description", "genre", "rating", "authors", "aggregateVersion"],
         "properties": {
           "workId": { "type": "string", "format": "uuid" },
           "title": { "type": "string" },
@@ -377,13 +394,14 @@
           "description": { "type": "string" },
           "genre": { "type": "string" },
           "rating": { "type": "number", "minimum": 0, "maximum": 5 },
-          "authors": { "type": "array", "items": { "$ref": "#/components/schemas/Author" } }
+          "authors": { "type": "array", "items": { "$ref": "#/components/schemas/Author" } },
+          "aggregateVersion": { "type": "integer", "minimum": 0 }
         }
       },
       "Edition": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive"],
+        "required": ["editionId", "workId", "title", "isbn", "publisher", "publicationYear", "language", "pageCount", "totalCopies", "availableCopies", "isActive", "aggregateVersion"],
         "properties": {
           "editionId": { "type": "string", "format": "uuid" },
           "workId": { "type": "string", "format": "uuid" },
@@ -398,7 +416,8 @@
           "videoUrl": { "type": ["string", "null"], "format": "uri" },
           "totalCopies": { "type": "integer", "minimum": 0, "description": "Disposable projection from Circulation." },
           "availableCopies": { "type": "integer", "minimum": 0, "description": "Disposable projection from Circulation." },
-          "isActive": { "type": "boolean" }
+          "isActive": { "type": "boolean" },
+          "aggregateVersion": { "type": "integer", "minimum": 0 }
         }
       },
       "CatalogSearchResult": {

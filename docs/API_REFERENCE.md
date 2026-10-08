@@ -26,17 +26,25 @@ actions; if a legacy workflow is not listed here, check `lib/actions/**` and
 The current Web BFF administration surface includes:
 
 - `GET /api/v1/admin/members` and status decisions;
+- `GET /api/v1/admin/catalog/editions`, including inactive records;
+- `GET /api/v1/admin/catalog/works/{workId}`;
+- `POST|PUT /api/v1/admin/catalog/works[/{workId}]`;
+- `POST /api/v1/admin/catalog/works/{workId}/editions`;
+- `PUT /api/v1/admin/catalog/editions/{editionId}`;
+- `POST /api/v1/admin/catalog/editions/{editionId}/activation`;
 - `GET /api/v1/admin/circulation/overview`;
 - `GET /api/v1/admin/circulation/loans`;
 - `GET /api/v1/admin/circulation/reservations`;
 - `POST /api/v1/admin/circulation/loans/{loanId}/{operation}`; and
 - `POST /api/v1/admin/circulation/reservations/{reservationId}/{operation}`.
 
-Circulation list limits are bounded and use opaque keyset cursors. Admin
-commands require a valid BFF session, fresh authoritative Membership admin
-status, CSRF, and an actor-bound `Idempotency-Key`. Exact schemas and allowed
-operations live in the committed OpenAPI documents; this narrative does not
-replace them.
+Circulation list limits are bounded and use opaque keyset cursors. Catalog
+search limits are bounded and server-side; its administrative search is the
+only catalog read that includes inactive editions. Admin commands require a
+valid BFF session, fresh authoritative Membership admin status, CSRF, and an
+actor-bound `Idempotency-Key`. Updates also require a quoted strong aggregate
+version in `If-Match`. Exact schemas and allowed operations live in the
+committed OpenAPI documents; this narrative does not replace them.
 
 ## Conventions
 

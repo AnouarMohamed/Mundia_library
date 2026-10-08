@@ -102,6 +102,13 @@ in step 2:
   fail closed during delegated authorization, and every request rechecks the
   operator's fresh Membership status and role; browser state never grants a
   role or receives a service token.
+- Catalog administration now uses its own privileged token-exchange
+  registration with only `catalog.read,catalog.manage`. The BFF rechecks fresh
+  Membership administrator authority before issuing that token, validates
+  downstream identities and versions, and exposes bounded inactive-inclusive
+  search plus create, metadata-update, and activation commands. The SPA keeps
+  one idempotency key across retries, supplies strong `If-Match` versions, and
+  never accepts physical copy counts because Circulation owns inventory.
 - The browser contract is versioned at
   `services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`.
 - Dev, staging, and production GitOps overlays now deploy the Web BFF with

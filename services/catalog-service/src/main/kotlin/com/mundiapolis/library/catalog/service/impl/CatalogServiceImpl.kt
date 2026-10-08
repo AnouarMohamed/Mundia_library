@@ -31,6 +31,9 @@ class CatalogServiceImpl(
     override fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult =
         repository.search(filters.normalized())
 
+    override fun searchAdministrativeCatalog(filters: CatalogSearchFilters): CatalogSearchResult =
+        repository.search(filters.copy(includeInactive = true).normalized())
+
     override fun getDistinctGenres(): List<String> = repository.findDistinctGenres()
 
     override fun getPublishedReviews(workId: String, page: Int?, limit: Int?): CatalogReviewPage {
@@ -75,6 +78,7 @@ class CatalogServiceImpl(
             sortBy = normalizedSort,
             page = normalizedPage,
             limit = normalizedLimit,
+            includeInactive = includeInactive,
         )
     }
 

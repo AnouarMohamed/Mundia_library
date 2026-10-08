@@ -43,7 +43,11 @@ re-check the operator's authoritative approved admin role on every request.
 Account decisions require CSRF, a fresh aggregate ETag, an actor-scoped
 idempotency key, and a written audit reason. Circulation commands require CSRF,
 explicit confirmation, and a unique actor-scoped idempotency key; queue reads
-are bounded and keyset paginated.
+are bounded and keyset paginated. Catalog administration additionally requires
+the separate `catalog.read,catalog.manage` client and exposes bounded search,
+work/edition creation, edition correction, and publication activation. Retries
+reuse the same idempotency key, updates carry the displayed aggregate version,
+and inventory is never editable from the Catalog workspace.
 
 During local development, Vite proxies `/api`, `/oauth2`, and `/login` to the
 Web BFF at `http://localhost:8080`. Production must present the static assets

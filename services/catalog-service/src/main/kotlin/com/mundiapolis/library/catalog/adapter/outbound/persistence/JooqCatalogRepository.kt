@@ -45,6 +45,7 @@ class JooqCatalogRepository(
                 genre = requireNotNull(work.genre),
                 rating = requireNotNull(work.rating).toDouble(),
                 authors = findAuthors(workId),
+                aggregateVersion = requireNotNull(work.aggregateVersion),
             )
         }
 
@@ -151,7 +152,7 @@ class JooqCatalogRepository(
         }
 
     private fun searchCondition(filters: CatalogSearchFilters): Condition {
-        var condition = CATALOG_EDITION.IS_ACTIVE.isTrue
+        var condition: Condition = if (filters.includeInactive) DSL.trueCondition() else CATALOG_EDITION.IS_ACTIVE.isTrue
         filters.query?.let { query ->
             val pattern = "%${DSL.escape(query, '\\')}%"
             val contributorMatches = DSL.exists(
@@ -220,6 +221,7 @@ class JooqCatalogRepository(
             CATALOG_EDITION.COVER_COLOR,
             CATALOG_EDITION.VIDEO_URL,
             CATALOG_EDITION.IS_ACTIVE,
+            CATALOG_EDITION.AGGREGATE_VERSION,
             totalCopies,
             availableCopies,
         )
@@ -243,6 +245,7 @@ class JooqCatalogRepository(
         totalCopies = requireNotNull(record[totalCopies]),
         availableCopies = requireNotNull(record[availableCopies]),
         isActive = requireNotNull(record[CATALOG_EDITION.IS_ACTIVE]),
+        aggregateVersion = requireNotNull(record[CATALOG_EDITION.AGGREGATE_VERSION]),
     )
 
     private companion object {

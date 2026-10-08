@@ -83,6 +83,14 @@ returns, and reservation fulfilment or expiry; self-service Circulation tokens
 never receive these scopes. Every browser mutation remains CSRF-protected and
 uses an actor-scoped idempotency key.
 
+Catalog administration uses a distinct `catalog-admin-service` registration
+limited to `catalog.read,catalog.manage`. After the same fresh Membership admin
+check, the BFF exposes inactive-inclusive edition search and versioned work,
+edition, and activation commands. It validates downstream aggregate identity,
+strong ETags, replay evidence, response size, and metadata before returning a
+non-cacheable browser response. Catalog commands cannot accept or alter
+Circulation-owned copy counts.
+
 The Circulation self-service routes cover eligibility, bounded keyset-paginated
 loan and reservation history, loan request/cancel/renew, and reservation
 place/cancel. They exchange the same server-side user token for a separate

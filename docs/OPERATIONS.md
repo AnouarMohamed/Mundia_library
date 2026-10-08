@@ -143,6 +143,15 @@ Check:
 - Cache invalidation loop.
 - Too high `limit` values from clients. The API clamps limits, but logs can still show abuse patterns.
 
+### Catalog Administration Rejects a Valid Operator
+
+Check the operator's current Membership status and role first; cached browser
+claims do not grant administration. Then verify the BFF's
+`catalog-admin-service` token exchange has the `catalog-api` audience and only
+`catalog.read,catalog.manage`. A `409` means the submitted ETag is stale or the
+idempotency key was reused with different input: reload the record and retry
+with the same key only when the command body is unchanged.
+
 ### Borrow Counts Are Wrong
 
 Symptoms:

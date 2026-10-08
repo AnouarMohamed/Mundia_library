@@ -74,9 +74,11 @@ data ownership, and migration state.
 | `web-spa` | Static React user and staff interface | No server-side authority |
 | Next.js shell | Current production routes during migration | Legacy PostgreSQL schema |
 
-The new circulation desk exposes live counts and keyset-paginated loan and
-reservation queues. Administrative commands are CSRF-protected, idempotent,
-scope-restricted, and preceded by a fresh authoritative membership check.
+The new staff workspace exposes membership decisions, versioned Catalog
+metadata and publication controls, live circulation counts, and keyset-paginated
+loan and reservation queues. Administrative commands are CSRF-protected,
+idempotent, scope-restricted, audited, and preceded by a fresh authoritative
+membership check.
 
 ## Product capabilities
 

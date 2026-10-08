@@ -114,6 +114,14 @@ admin scopes to the self-service registration. Membership admin access likewise
 uses its dedicated registration and is rechecked against the authoritative
 Membership profile before the BFF calls Circulation.
 
+Catalog administration follows the same separation. `catalog-service` carries
+only `catalog.search,catalog.read,catalog.learning-resource.read`, while
+`catalog-admin-service` carries only `catalog.read,catalog.manage`. Local
+configuration may reuse `CATALOG_CLIENT_ID` and `CATALOG_CLIENT_SECRET`; use a
+distinct confidential client in protected tiers when the identity provider
+supports it. Never expose either credential through browser environment
+variables.
+
 ## Docker Compose Variables
 
 `docker-compose.yml` also reads:

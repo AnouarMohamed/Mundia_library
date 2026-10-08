@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.validation.annotation.Validated
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import java.util.UUID
 
@@ -66,6 +68,16 @@ class CatalogReadController(
             page = page,
             limit = limit,
         ),
+    )
+
+    @GetMapping("/admin/editions")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.manage')")
+    fun administrativeEditions(
+        @RequestParam(required = false) @Size(max = 200) query: String?,
+        @RequestParam(required = false) @Min(0) @Max(10_000) page: Int?,
+        @RequestParam(required = false) @Min(1) @Max(100) limit: Int?,
+    ): CatalogSearchResult = catalogService.searchAdministrativeCatalog(
+        CatalogSearchFilters(query = query, sortBy = "title", page = page, limit = limit),
     )
 
     @GetMapping("/genres")

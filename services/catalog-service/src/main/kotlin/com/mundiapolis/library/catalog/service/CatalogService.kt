@@ -11,6 +11,7 @@ interface CatalogService {
     fun getEdition(editionId: String): Edition?
     fun getEditions(editionIds: List<String>): List<Edition>
     fun searchCatalog(filters: CatalogSearchFilters): CatalogSearchResult
+    fun searchAdministrativeCatalog(filters: CatalogSearchFilters): CatalogSearchResult
     fun getDistinctGenres(): List<String>
     fun getPublishedReviews(workId: String, page: Int?, limit: Int?): CatalogReviewPage
 }

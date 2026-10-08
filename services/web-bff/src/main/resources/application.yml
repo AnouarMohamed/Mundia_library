@@ -52,6 +52,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: catalog.search,catalog.read,catalog.learning-resource.read
+          catalog-admin-service:
+            provider: institutional
+            client-id: ${CATALOG_CLIENT_ID}
+            client-secret: ${CATALOG_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: catalog.read,catalog.manage
           membership-service:
             provider: institutional
             client-id: ${MEMBERSHIP_CLIENT_ID}

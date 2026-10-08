@@ -174,6 +174,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/catalog/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchAdministrativeCatalogEditions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAdministrativeCatalogWork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/works/{workId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAdministrativeCatalogWork"];
+        put: operations["updateAdministrativeCatalogWork"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/works/{workId}/editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createAdministrativeCatalogEdition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/editions/{editionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateAdministrativeCatalogEdition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/editions/{editionId}/activation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["setAdministrativeCatalogEditionActive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/search": {
         parameters: {
             query?: never;
@@ -595,6 +691,91 @@ export interface components {
             totalCopies: number;
             availableCopies: number;
             isActive: boolean;
+            /** Format: int64 */
+            aggregateVersion: number;
+        };
+        CatalogAuthor: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            bio: string | null;
+        };
+        CatalogAuthorCommand: {
+            /** Format: uuid */
+            contributorId: string;
+            name: string;
+            bio: string | null;
+        };
+        CatalogWork: {
+            /** Format: uuid */
+            workId: string;
+            title: string;
+            summary: string;
+            description: string;
+            genre: string;
+            rating: number;
+            authors: components["schemas"]["CatalogAuthor"][];
+            /** Format: int64 */
+            aggregateVersion: number;
+        };
+        CreateCatalogWork: {
+            /** Format: uuid */
+            workId: string;
+            title: string;
+            summary: string;
+            description: string;
+            genre: string;
+            authors: components["schemas"]["CatalogAuthorCommand"][];
+            reason: string;
+        };
+        UpdateCatalogWork: {
+            title: string;
+            summary: string;
+            description: string;
+            genre: string;
+            authors: components["schemas"]["CatalogAuthorCommand"][];
+            reason: string;
+        };
+        CreateCatalogEdition: {
+            /** Format: uuid */
+            editionId: string;
+            title: string;
+            isbn: string;
+            publisher: string;
+            publicationYear: number;
+            language: string;
+            pageCount: number;
+            coverUrl: string | null;
+            coverColor: string | null;
+            videoUrl: string | null;
+            isActive: boolean;
+            reason: string;
+        };
+        UpdateCatalogEdition: {
+            title: string;
+            isbn: string;
+            publisher: string;
+            publicationYear: number;
+            language: string;
+            pageCount: number;
+            coverUrl: string | null;
+            coverColor: string | null;
+            videoUrl: string | null;
+            reason: string;
+        };
+        SetCatalogEditionActive: {
+            isActive: boolean;
+            reason: string;
+        };
+        CatalogCommand: {
+            /** @enum {string} */
+            aggregateType: "work" | "edition";
+            /** Format: uuid */
+            aggregateId: string;
+            /** Format: int64 */
+            aggregateVersion: number;
+            /** Format: date-time */
+            occurredAt: string;
         };
         LearningResourcePage: {
             resources: components["schemas"]["LearningResource"][];
@@ -845,6 +1026,30 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["ReservationCommand"];
+            };
+        };
+        /** @description Catalog command committed or its original result replayed */
+        CatalogCommandSucceeded: {
+            headers: {
+                "Cache-Control"?: "no-store";
+                ETag?: string;
+                "Idempotency-Replayed"?: "true" | "false";
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["CatalogCommand"];
+            };
+        };
+        /** @description Catalog aggregate created or its original result replayed */
+        CatalogCommandCreated: {
+            headers: {
+                "Cache-Control"?: "no-store";
+                ETag?: string;
+                "Idempotency-Replayed"?: "true" | "false";
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["CatalogCommand"];
             };
         };
     };
@@ -1194,6 +1399,209 @@ export interface operations {
                 };
                 content?: never;
             };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    searchAdministrativeCatalogEditions: {
+        parameters: {
+            query?: {
+                query?: string;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Catalog management page including inactive editions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSearch"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    createAdministrativeCatalogWork: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCatalogWork"];
+            };
+        };
+        responses: {
+            201: components["responses"]["CatalogCommandCreated"];
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    getAdministrativeCatalogWork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authoritative work metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogWork"];
+                };
+            };
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    updateAdministrativeCatalogWork: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                workId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCatalogWork"];
+            };
+        };
+        responses: {
+            200: components["responses"]["CatalogCommandSucceeded"];
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    createAdministrativeCatalogEdition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                workId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCatalogEdition"];
+            };
+        };
+        responses: {
+            201: components["responses"]["CatalogCommandCreated"];
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    updateAdministrativeCatalogEdition: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                editionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCatalogEdition"];
+            };
+        };
+        responses: {
+            200: components["responses"]["CatalogCommandSucceeded"];
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    setAdministrativeCatalogEditionActive: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": components["parameters"]["IfMatch"];
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                editionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCatalogEditionActive"];
+            };
+        };
+        responses: {
+            200: components["responses"]["CatalogCommandSucceeded"];
+            400: components["responses"]["Problem"];
+            401: components["responses"]["Problem"];
             403: components["responses"]["Problem"];
             404: components["responses"]["Problem"];
             409: components["responses"]["Problem"];

@@ -142,6 +142,7 @@ class CatalogBrowseSecurityIntegrationTest {
                         totalCopies = 1,
                         availableCopies = 1,
                         isActive = true,
+                        aggregateVersion = 0,
                     ),
                 ),
                 total = 1,
@@ -177,6 +178,7 @@ class CatalogBrowseSecurityIntegrationTest {
                     totalCopies = 1,
                     availableCopies = 1,
                     isActive = true,
+                    aggregateVersion = 0,
                 ),
             )
 
