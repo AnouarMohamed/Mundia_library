@@ -19,6 +19,66 @@
     { "name": "Operations", "description": "Authenticated operational read models" }
   ],
   "paths": {
+    "/api/v1/circulation/admin/overview": {
+      "get": {
+        "operationId": "getAdministrativeCirculationOverview",
+        "tags": ["Operations"],
+        "summary": "Read bounded circulation desk metrics",
+        "x-required-scopes": ["circulation.admin.read"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Current circulation desk metrics", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeCirculationOverview" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/admin/loans": {
+      "get": {
+        "operationId": "getAdministrativeLoanQueue",
+        "tags": ["Operations"],
+        "summary": "List a status-filtered administrative loan queue",
+        "x-required-scopes": ["circulation.admin.read"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"], "default": "REQUESTED" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Administrative loan page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeLoanPage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/circulation/admin/reservations": {
+      "get": {
+        "operationId": "getAdministrativeReservationQueue",
+        "tags": ["Operations"],
+        "summary": "List a status-filtered administrative reservation queue",
+        "x-required-scopes": ["circulation.admin.read"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"], "default": "READY" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Administrative reservation page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeReservationPage" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
     "/api/v1/circulation/status": {
       "get": {
         "operationId": "getCirculationStatus",
@@ -928,6 +988,36 @@
         "properties": {
           "memberId": { "type": "string", "format": "uuid" },
           "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/LoanHistoryItem" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        }
+      },
+      "AdministrativeCirculationOverview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requestedLoans", "activeLoans", "overdueLoans", "waitingReservations", "readyReservations"],
+        "properties": {
+          "requestedLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "activeLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "overdueLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "waitingReservations": { "type": "integer", "format": "int64", "minimum": 0 },
+          "readyReservations": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "AdministrativeLoanPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "nextCursor"],
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/LoanHistoryItem" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        }
+      },
+      "AdministrativeReservationPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "nextCursor"],
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/ReservationCommandResponse" } },
           "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
         }
       },

@@ -2,6 +2,11 @@
 
 This checklist defines what "ready to ship" means for Mundiapolis Library.
 
+Passing the legacy Vercel checklist does not mean the microservice platform is
+fully cut over. AWS/EKS readiness additionally requires the platform blockers,
+identity integration, data reconciliation, load evidence, rollback drills,
+restore testing, and independent security review described below.
+
 ## Readiness Summary
 
 The product is production-capable when:
@@ -42,6 +47,12 @@ The product is production-capable when:
 - [ ] Admin dashboard loads.
 - [ ] Admin can approve and reject account requests.
 - [ ] Admin can approve borrow requests.
+- [ ] Staff queue counts match authoritative Circulation state.
+- [ ] Loan and reservation queues remain stable across keyset pages.
+- [ ] Revoking an admin role blocks the next BFF admin request without waiting
+      for the browser session to expire.
+- [ ] Replaying an admin command with the same idempotency key returns the same
+      result and does not repeat the transition.
 - [ ] Admin can process returns.
 - [ ] Book copy counts remain accurate after approval and return.
 - [ ] Admin can create, edit, and deactivate catalog records.

@@ -7,10 +7,27 @@ This guide describes a clean local development setup for contributors and mainta
 - Node.js 24 LTS (24.17 or newer)
 - npm
 - Docker Desktop or Docker Engine
+- JDK 25 for Kotlin service work
 - GitHub CLI, optional but useful for release and PR work
 - PostgreSQL client tools, optional for direct database inspection
 
 The CI workflow uses Node.js 24. Local development should use the same major version unless you are intentionally testing runtime compatibility.
+
+## Pick the runtime you are changing
+
+The repository contains a live migration shell and its replacement. Avoid
+accidentally crossing their data boundaries.
+
+| Change | Primary path | Validation |
+| --- | --- | --- |
+| Legacy route or page | `app/`, `components/`, `lib/`, `database/` | `make web-ci-fast` or `make web-ci` |
+| Static browser experience | `web-spa/` | `make spa-ci` |
+| Kotlin BFF or domain behavior | `services/` | `make services-ci` |
+| OpenAPI boundary | owning service contract, then generated SPA types | `make contracts` and `npm run spa:generate` |
+| AWS/Kubernetes foundation | `platform/` | `make platform-ci` |
+
+Domain services own separate schemas. Do not join across them, reuse a runtime
+database credential for migrations, or add a browser-to-service shortcut.
 
 ## First-Time Setup
 

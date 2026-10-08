@@ -19,6 +19,8 @@ Daily:
 - Check error logs for new 5xx patterns.
 - Check admin dashboard loads for an admin account.
 - Check pending account and borrow request queues.
+- Check Circulation pending-loan, active-loan, overdue, waiting-reservation, and
+  ready-reservation counts for unexplained changes.
 
 Weekly:
 
@@ -323,12 +325,31 @@ Before any schema migration:
 3. Confirm due date is set.
 4. Confirm available copy count changed.
 
+In the Kotlin administration slice, use the Circulation desk route and confirm
+the edition title, member reference, request time, and intended operation in the
+confirmation panel. The confirmation intent retains one idempotency key across
+retries until it succeeds or the operator cancels it.
+
 ### Return Processing
 
 1. Find the active borrow record.
 2. Mark returned.
 3. Confirm return date and fine amount.
 4. Confirm available copy count changed.
+
+### Reservation Processing
+
+1. Process only `READY` reservations for fulfilment or expiry.
+2. Confirm the edition and member before submitting the operation.
+3. Verify the reservation leaves the ready queue and the overview count changes.
+4. If the command result is uncertain, retry with the original idempotency key;
+   do not create a second command manually.
+
+If all Circulation admin routes return 403, verify the operator remains
+`APPROVED` with `ADMIN` or `SUPER_ADMIN` role in Membership before changing
+OAuth scopes. If reads return 502/503, inspect Membership, the BFF token
+exchange, and Circulation readiness in that order. Never bypass the fresh role
+check to restore the desk.
 
 ### Overdue Fine Updates
 

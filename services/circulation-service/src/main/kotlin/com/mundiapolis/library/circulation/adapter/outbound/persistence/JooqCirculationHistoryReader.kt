@@ -70,6 +70,52 @@ class JooqCirculationHistoryReader(private val dsl: DSLContext) : CirculationHis
             .map { it.toHistoryDomain() }
     }
 
+    override fun administrativeLoans(
+        status: LoanStatus,
+        cursor: HistoryCursor?,
+        limit: Int,
+    ): List<Loan> {
+        var condition = CIRCULATION_LOAN.STATUS.eq(status.name)
+        if (cursor != null) {
+            val occurredAt = cursor.occurredAt.atOffset(java.time.ZoneOffset.UTC)
+            condition = condition.and(
+                CIRCULATION_LOAN.REQUESTED_AT.lt(occurredAt).or(
+                    CIRCULATION_LOAN.REQUESTED_AT.eq(occurredAt)
+                        .and(CIRCULATION_LOAN.ID.lt(cursor.aggregateId)),
+                ),
+            )
+        }
+        return dsl.selectFrom(CIRCULATION_LOAN)
+            .where(condition)
+            .orderBy(CIRCULATION_LOAN.REQUESTED_AT.desc(), CIRCULATION_LOAN.ID.desc())
+            .limit(limit)
+            .fetch()
+            .map { it.toHistoryDomain() }
+    }
+
+    override fun administrativeReservations(
+        status: ReservationStatus,
+        cursor: HistoryCursor?,
+        limit: Int,
+    ): List<Reservation> {
+        var condition = CIRCULATION_RESERVATION.STATUS.eq(status.name)
+        if (cursor != null) {
+            val occurredAt = cursor.occurredAt.atOffset(java.time.ZoneOffset.UTC)
+            condition = condition.and(
+                CIRCULATION_RESERVATION.PLACED_AT.lt(occurredAt).or(
+                    CIRCULATION_RESERVATION.PLACED_AT.eq(occurredAt)
+                        .and(CIRCULATION_RESERVATION.ID.lt(cursor.aggregateId)),
+                ),
+            )
+        }
+        return dsl.selectFrom(CIRCULATION_RESERVATION)
+            .where(condition)
+            .orderBy(CIRCULATION_RESERVATION.PLACED_AT.desc(), CIRCULATION_RESERVATION.ID.desc())
+            .limit(limit)
+            .fetch()
+            .map { it.toHistoryDomain() }
+    }
+
     private fun CirculationLoanRecord.toHistoryDomain(): Loan = Loan.restore(
         LoanId(requireNotNull(id)), MemberId(requireNotNull(memberId)), EditionId(requireNotNull(editionId)),
         copyId?.let(::CopyId), LoanStatus.valueOf(requireNotNull(status)),

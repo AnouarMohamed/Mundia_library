@@ -1,200 +1,247 @@
 # Architecture
 
-Mundiapolis Library is a full-stack Next.js application. The application combines server-rendered pages, server actions, route handlers, a PostgreSQL database, Redis-backed caching and rate limiting, workflow automation, image uploads, and transactional email.
+Mundiapolis Library is in a controlled strangler migration. The current Vercel
+deployment still serves the Next.js application, while new product slices are
+implemented as a static React SPA behind a Kotlin Web BFF and five
+domain-owned Kotlin/Spring services. This document distinguishes implemented
+code from future deployment state.
 
-## Runtime Overview
+## Architecture at a glance
 
-| Area             | Implementation                              | Notes                                                                                                        |
-| ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Pages            | `app/**/page.tsx`                           | App Router pages and layouts.                                                                                |
-| Student shell    | `app/(root)/layout.tsx`                     | Requires a signed-in session before rendering student pages.                                                 |
-| Admin shell      | `app/admin/layout.tsx`                      | Requires authenticated admin access and falls back to DB role lookup for stale sessions.                     |
-| Admin middleware | `middleware.ts`                             | Prefilters `/admin/*` for session-cookie presence; the server layout is the authoritative role/status guard. |
-| Auth             | `auth.ts`                                   | NextAuth v5 credentials provider, JWT sessions, lazy DB imports for Edge compatibility.                      |
-| Server actions   | `lib/actions/**`, `lib/admin/actions/**`    | Mutations and admin workflows.                                                                               |
-| API routes       | `app/api/**/route.ts`                       | JSON endpoints for catalog, borrows, admin operations, reviews, notifications, uploads, and workflows.       |
-| Database         | `database/drizzle.ts`, `database/schema.ts` | Drizzle ORM over a transaction-capable `pg` pool in every environment.                                       |
-| Cache            | `lib/cache/**`, `database/redis.ts`         | Upstash Redis plus Next.js cache tags for selected read paths.                                               |
-| Background work  | `lib/workflow.ts`                           | Upstash QStash and Workflow clients.                                                                         |
-| Email            | `lib/services/email-service.ts`             | Brevo primary provider with Resend fallback for selected email flows.                                        |
-| Uploads          | `app/api/uploads/route.ts`                  | Server-mediated, policy-bound uploads; the legacy client-signing route is retired.                           |
-| Health           | `app/api/health`, `app/api/health/live`     | Dependency-aware readiness plus a process-only liveness probe.                                               |
+```mermaid
+flowchart TB
+  User["Student / staff browser"]
 
-## Request Flow
+  subgraph Edge["Same-origin edge"]
+    WAF["TLS, WAF, rate limits"]
+    SPA["Static React SPA"]
+    BFF["Kotlin Web BFF"]
+    Legacy["Next.js migration shell"]
+  end
+
+  subgraph Identity["Identity and session boundary"]
+    OIDC["Institutional OIDC"]
+    Session[("Redis session store")]
+  end
+
+  subgraph Services["Domain services — Kotlin / Spring Boot"]
+    Membership["Membership"]
+    Catalog["Catalog"]
+    Circulation["Circulation"]
+    Digital["Digital Content"]
+    Notification["Notification"]
+  end
+
+  subgraph Data["Private managed data plane"]
+    MembershipDB[("membership")]
+    CatalogDB[("catalog")]
+    CirculationDB[("circulation")]
+    DigitalDB[("digital content")]
+    NotificationDB[("notifications")]
+    Kafka["Kafka-compatible broker"]
+  end
+
+  User -->|"HTTPS"| WAF
+  WAF --> SPA
+  WAF -->|"/api, /oauth2, /login"| BFF
+  WAF -. "uncut routes" .-> Legacy
+  BFF <--> Session
+  BFF <--> OIDC
+  BFF -->|"token exchange + exact scopes"| Membership & Catalog & Circulation & Digital & Notification
+
+  Membership --> MembershipDB
+  Catalog --> CatalogDB
+  Circulation --> CirculationDB
+  Digital --> DigitalDB
+  Notification --> NotificationDB
+  Membership & Catalog & Circulation -->|"transactional outbox"| Kafka
+  Kafka -->|"validated event + idempotent inbox"| Catalog & Notification
+```
+
+### What is authoritative today
+
+| Area | Current authority | Replacement status |
+| --- | --- | --- |
+| Production browser entry | Next.js on Vercel | SPA/BFF slices exist behind feature and cutover gates |
+| Legacy users, books, loans | Legacy PostgreSQL | Reconciliation and route-by-route migration in progress |
+| New service aggregates | Owning service PostgreSQL schema | Implemented with Flyway and jOOQ |
+| Deployment platform | Vercel plus CI-built containers | AWS/EKS foundation exists but is not deployed |
+
+This is not yet a fully cut-over microservice production system. It is a real
+microservice implementation coexisting with the legacy authority until the
+documented gates pass.
+
+## Responsibilities and ownership
+
+| Component | Owns | Must not own |
+| --- | --- | --- |
+| Web BFF | Browser session, CSRF, OAuth token exchange, downstream validation | Domain records, browser-visible access tokens |
+| Membership | Member profile, status, role, eligibility inputs, identity-evidence metadata | Loans, catalog metadata, file assets |
+| Catalog | Works, editions, contributors, search, reviews, learning-resource metadata | Physical copy truth, download authorization |
+| Circulation | Copies, loans, reservations, policy revisions, operational queues | Member identity authority, bibliographic content |
+| Digital Content | Licence evidence, quarantine, asset manifests, scan/publication state, download authorization | Catalog search, unverified file hosting |
+| Notification | Inbox, preferences, delivery attempts, provider suppression state | Source domain aggregates |
+| SPA | Presentation and accessible interaction | Secrets, OAuth tokens, authorization decisions |
+| Next.js shell | Routes not yet cut over | New service-owned schemas |
+
+Each Kotlin service has an independent Flyway migration chain and database
+credential. No service reads another service's tables. Derived state is
+versioned and recoverable from APIs or events.
+
+## Browser request flow
 
 ```mermaid
 sequenceDiagram
-  participant B as Browser
-  participant P as Next.js Page
-  participant A as Server Action
-  participant R as API Route
-  participant DB as PostgreSQL
-  participant C as Redis/Cache
-  participant W as QStash/Workflow
+  autonumber
+  participant U as Browser
+  participant B as Web BFF
+  participant R as Redis
+  participant I as OIDC issuer
+  participant M as Membership
+  participant D as Domain service
 
-  B->>P: Navigate to protected page
-  P->>P: Load session
-  P->>DB: Query server-rendered data
-  P-->>B: Render page
-
-  B->>A: Submit form or admin action
-  A->>DB: Validate and mutate
-  A->>C: Revalidate cache tags when needed
-  A->>W: Trigger background workflow when enabled
-  A-->>B: Return result or redirect
-
-  B->>R: Fetch API data
-  R->>C: Read cache or rate-limit state
-  R->>DB: Query or mutate data
-  R-->>B: JSON response
+  U->>B: Same-origin request + secure session cookie
+  B->>R: Resolve server-side session
+  alt mutation
+    U->>B: CSRF token + Idempotency-Key
+    B->>B: Validate origin, CSRF and command shape
+  end
+  B->>I: Token exchange for exact audience/scopes
+  opt administrative request
+    B->>M: Recheck operator profile and approved admin role
+    M-->>B: Authoritative role/status
+  end
+  B->>D: Bearer token + bounded request
+  D->>D: Validate issuer, audience, scope and invariant
+  D-->>B: Contract response
+  B->>B: Validate downstream response
+  B-->>U: No-store JSON response
 ```
 
-## Authentication And Authorization
+The BFF uses separate OAuth client registrations where privilege differs. The
+circulation administration registration is distinct from self-service and is
+limited to read/approve/reject/return/fulfil/expire scopes. Downstream 401/403
+responses invalidate the relevant exchanged-token cache rather than silently
+falling back.
 
-Authentication currently uses credentials sign-in through NextAuth while the
-managed OIDC migration is in progress. New passwords use bcrypt; successful
-verification of a legacy SHA-256 record rewrites it to bcrypt.
+## Circulation administration
 
-Important files:
+The current administration slice is intentionally narrow:
 
-- `auth.ts`: credentials provider, password verification, JWT session claims.
-- `lib/session.ts`: session helper used by layouts and server components.
-- `middleware.ts`: narrow admin route middleware.
-- `lib/admin/route-guard.ts`: reusable guard for admin API routes.
-- `app/(root)/layout.tsx`: redirects unauthenticated users to `/sign-in`.
-- `app/admin/layout.tsx`: requires admin role and redirects non-admin users to `/`.
+- `GET /api/v1/circulation/admin/overview` returns live operational counts.
+- `GET /api/v1/circulation/admin/loans` returns bounded, status-filtered,
+  keyset-paginated loan queues.
+- `GET /api/v1/circulation/admin/reservations` does the same for reservations.
+- Existing aggregate commands perform loan approval/rejection/return and
+  reservation fulfilment/expiry with actor-bound idempotency.
+- The BFF rechecks the operator's current Membership record before every admin
+  read or command.
+- The SPA resolves edition titles through Catalog and presents explicit
+  confirmation panels before workflow changes.
 
-Role model:
+Queue indexes follow `(status, event_time DESC, id DESC)` so stable paging does
+not degrade to offset scans as history grows.
 
-| Role    | Access                                                                                                |
-| ------- | ----------------------------------------------------------------------------------------------------- |
-| `USER`  | Student and faculty workflows: browse, borrow, renew, review, view own history.                       |
-| `ADMIN` | All user workflows plus admin dashboard, catalog, approvals, reminders, exports, and user management. |
-
-Account status model:
-
-| Status     | Meaning                                 |
-| ---------- | --------------------------------------- |
-| `PENDING`  | Account created but not approved.       |
-| `APPROVED` | Account can use the system.             |
-| `REJECTED` | Account was denied by an administrator. |
-
-## Borrow Lifecycle
-
-Borrowing is tracked in `borrow_records`.
+## Event flow and consistency
 
 ```mermaid
-stateDiagram-v2
-  [*] --> PENDING: Student requests a book
-  PENDING --> BORROWED: Admin approves
-  PENDING --> RETURNED: Request is closed without active loan
-  BORROWED --> RETURNED: Book is returned
-  BORROWED --> BORROWED: Renewal extends due date
-  RETURNED --> [*]
+sequenceDiagram
+  participant API as Owning service
+  participant DB as Service database
+  participant Relay as Outbox relay
+  participant K as Kafka
+  participant Consumer as Consumer service
+
+  API->>DB: Commit aggregate + audit + outbox atomically
+  Relay->>DB: Claim unpublished rows
+  Relay->>K: Publish versioned Protobuf event
+  K-->>Consumer: At-least-once delivery
+  Consumer->>Consumer: Validate topic, headers, schema and state
+  Consumer->>DB: Commit projection + inbox marker atomically
+  Consumer->>K: Commit offset
 ```
 
-Operational meaning:
+Delivery is at least once. Correctness comes from immutable event identity,
+aggregate versions, idempotent inboxes, and transaction boundaries—not from an
+assumption that Kafka delivers exactly once end to end. Consumers can be rebuilt
+from authoritative state and event history.
 
-- `PENDING`: request is waiting for staff action.
-- `BORROWED`: user currently has the book.
-- `RETURNED`: circulation cycle is closed.
+## Data and command invariants
 
-Availability is stored on `books.availableCopies`. Mutations that approve or return books must keep this value synchronized with `borrow_records`.
+- Copy availability changes only through Circulation transactions.
+- Loan and reservation transitions are explicit state-machine operations.
+- Administrative and high-risk commands require a unique actor-bound
+  `Idempotency-Key`; stale optimistic versions fail rather than overwrite.
+- Mutable aggregate writes commit their audit/outbox evidence atomically.
+- List APIs use bounded limits and deterministic tie-breakers.
+- Catalog metadata never grants file access. Digital Content independently
+  verifies licence, territory, scan, publication, and asset state.
+- Unclear, non-commercial-only, or copyrighted learning resources remain
+  quarantined and hidden.
 
-## Data Access Strategy
+## Security boundaries
 
-`database/drizzle.ts` uses the transaction-capable `pg` driver in every
-environment. The pool has bounded connection, statement, query, idle, and
-idle-in-transaction budgets. Hosted deployments should use a managed pooled
-PostgreSQL endpoint or PgBouncer and budget the per-process pool against the
-database connection limit.
+1. **Internet to edge:** TLS, WAF/DDoS controls, request budgets, and a single
+   canonical origin.
+2. **Browser to BFF:** `Secure`, `HttpOnly`, same-site session cookies; CSRF and
+   origin checks on mutations; no OAuth token in browser storage.
+3. **BFF to services:** audience-bound JWTs, exact scopes, bounded timeouts, and
+   strict response parsing.
+4. **Service to data plane:** private networking, workload identity, separate
+   runtime/migration credentials, TLS, and service-owned schemas.
+5. **Event boundary:** authenticated broker clients, schema validation,
+   aggregate ordering, replay-safe consumers, and privacy-minimized payloads.
+6. **Content boundary:** allowlisted HTTPS origins, canonical URLs, verified
+   licence evidence, malware state, short-lived signed delivery, and audit.
 
-## Caching Strategy
+Authorization is enforced at the service even when the edge or BFF has already
+checked it. Network placement is not treated as authorization.
 
-The catalog read path has two cache layers:
+## Resilience and scaling
 
-- Next.js `unstable_cache` with cache tags such as `books` and `recommendations`.
-- Upstash Redis stale-while-revalidate helpers in `lib/cache/redis-cache.ts`.
+- Stateless services can scale horizontally; readiness excludes unavailable
+  instances before traffic reaches them.
+- PostgreSQL pools and query limits are bounded. Production connection budgets
+  must be calculated across maximum replicas.
+- Redis state is ephemeral; authoritative domain data stays in PostgreSQL.
+- Kafka consumers use independent groups and replay-safe inboxes.
+- Queue/search endpoints are indexed and keyset paginated.
+- Kubernetes definitions include disruption budgets, topology spread,
+  autoscaling, resource limits, NetworkPolicies, and restricted pod security.
+- OpenTelemetry is the vendor-neutral telemetry boundary.
 
-Mutation paths should invalidate cache tags through `lib/cache/revalidate.ts`.
+## Deployment topology
 
-Current cache-sensitive areas:
+The target platform is AWS EKS in private subnets with managed PostgreSQL,
+Kafka, Redis, object storage, search, KMS, and Secrets Manager. Argo CD owns
+cluster state; External Secrets and workload identity provide secret delivery;
+Kyverno enforces workload policies. Migrations run as isolated PreSync jobs
+using a dedicated credential and the exact application image digest.
 
-- `GET /api/books`
-- `GET /api/books/genres`
-- `GET /api/books/recommendations`
-- Admin catalog mutations
-- Borrow mutations that affect availability
-- Recommendation refresh operations
+The code under `platform/` is a deployment foundation, not evidence of a live
+AWS environment. Regions, accounts, add-on versions, domains, image digests,
+backups, identity configuration, load results, penetration testing, and recovery
+drills remain explicit release decisions.
 
-## Rate Limiting
+## Migration and cutover rule
 
-The Node.js request-boundary middleware admits every API request and every
-mutating page request, including Server Actions, before application code runs.
-Health probes and CORS preflight are dependency-free exceptions. Fixed-window
-budgets are separated by risk: 300 reads, 120 commands, and 30 sensitive
-operations per trusted ingress identity per minute. Authentication then adds
-stricter account and IP budgets around credential verification.
+A route moves from the Next.js shell only after:
 
-`lib/ratelimit.ts` selects Upstash Redis or the atomic PostgreSQL fallback.
-Identifiers are SHA-256 pseudonyms, counters are capped at `limit + 1`, and
-protected tiers fail closed with 503 when admission state is unavailable.
-Limit exhaustion returns 429 with `RateLimit-*` and `Retry-After` metadata.
-Only development and test may bypass missing local limiter infrastructure.
+1. authoritative data is backfilled and reconciled;
+2. OpenAPI and browser behavior reach parity;
+3. security, load, and failure-mode checks pass;
+4. dashboards and alerts exist;
+5. rollback is rehearsed without dual writes; and
+6. the same tested artifact is promoted by digest.
 
-## Background Workflow And Email
+Feature flags are migration controls, not permanent architecture. Remove the
+legacy route only after the observation window succeeds.
 
-Workflow code lives in `lib/workflow.ts`. It uses Upstash QStash and Workflow for background orchestration.
+## Related decisions
 
-Email delivery exists in two forms:
-
-- `lib/services/email-service.ts`: Brevo primary, Resend fallback.
-- `lib/workflow.ts`: QStash email publishing with Resend provider.
-
-Production should decide which path owns each email class and keep sender identity aligned with the Mundiapolis Library brand.
-
-## Route Groups
-
-| Route group  | Purpose                                                      |
-| ------------ | ------------------------------------------------------------ |
-| `app/(auth)` | Sign-in and sign-up pages.                                   |
-| `app/(root)` | Authenticated student and faculty experience.                |
-| `app/admin`  | Admin circulation, catalog, automation, and user management. |
-| `app/api`    | JSON API and integration endpoints.                          |
-
-## Admin Operations Surface
-
-The admin area currently includes:
-
-- Dashboard overview: `app/admin/page.tsx`
-- Users: `app/admin/users/page.tsx`
-- Books: `app/admin/books/page.tsx`
-- Add book: `app/admin/books/new/page.tsx`
-- Edit book: `app/admin/books/[id]/edit/page.tsx`
-- Borrow requests: `app/admin/book-requests/page.tsx`
-- Renewal requests: `app/admin/renewal-requests/page.tsx`
-- Account requests: `app/admin/account-requests/page.tsx`
-- Automation: `app/admin/automation/page.tsx`
-
-## Production Deployment Shape
-
-Next.js standalone output is enabled in `next.config.mjs`:
-
-```js
-output: "standalone";
-```
-
-This supports:
-
-- Vercel deployment.
-- Docker runtime image.
-- GitHub release assets containing a standalone production bundle.
-
-## Known Architectural Risks
-
-Track these before calling the product mature at institutional scale:
-
-- Legacy salted SHA-256 password hashes are still supported for verification, but successful logins are lazily rehashed to the current bcrypt format.
-- Some workflows use multiple email abstractions. Standardize ownership before expanding notification volume.
-- Admin and student authorization should use the centralized guards in `lib/security/auth-guards.ts`; new routes must explicitly choose the correct guard.
-- `migrations/postgres` is the canonical migration path. `migrations/legacy-mysql` is archived reference only.
+- [ADR 0001 — backend platform stack](adr/0001-backend-platform-stack.md)
+- [ADR 0002 — service boundaries and data ownership](adr/0002-service-boundaries-and-data-ownership.md)
+- [ADR 0003 — static SPA and Kotlin BFF](adr/0003-static-spa-and-kotlin-bff.md)
+- [Production overhaul](PRODUCTION_OVERHAUL.md)
+- [Threat model](THREAT_MODEL.md)
+- [AWS/Kubernetes platform](../platform/README.md)

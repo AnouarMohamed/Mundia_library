@@ -8,6 +8,7 @@ import { CatalogPage } from "./pages/CatalogPage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { CatalogEditionPage } from "./pages/CatalogEditionPage";
 import { AdminMembersPage } from "./pages/AdminMembersPage";
+import { AdminCirculationPage } from "./pages/AdminCirculationPage";
 import { getAdminMembers, getSession, logout, type Session } from "./api/client";
 import logoUrl from "../../public/images/mundiapolis-logo-transparent.png";
 
@@ -84,6 +85,7 @@ export function App() {
             {circulationEnabled && <Route path="/borrowing" element={<CirculationPage />} />}
             {notificationsEnabled && <Route path="/notifications" element={<NotificationsPage />} />}
             {administrationEnabled && <Route path="/admin" element={<AdminMembersPage />} />}
+            {administrationEnabled && <Route path="/admin/circulation" element={<AdminCirculationPage />} />}
             <Route path="*" element={<Navigate replace to={defaultPath} />} />
           </Routes>
         ) : (

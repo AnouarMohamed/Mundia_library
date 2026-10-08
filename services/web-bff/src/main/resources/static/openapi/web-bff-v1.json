@@ -109,6 +109,85 @@
         }
       }
     },
+    "/api/v1/admin/circulation/overview": {
+      "get": {
+        "operationId": "getAdministrativeCirculationOverview",
+        "summary": "Read live circulation desk metrics",
+        "security": [{ "sessionCookie": [] }],
+        "responses": {
+          "200": { "description": "Current circulation desk metrics", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeCirculationOverview" } } } },
+          "401": { "description": "Browser session missing or user authorization must be renewed" },
+          "403": { "$ref": "#/components/responses/Problem" },
+          "502": { "$ref": "#/components/responses/Problem" },
+          "503": { "$ref": "#/components/responses/Problem" },
+          "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/circulation/loans": {
+      "get": {
+        "operationId": "listAdministrativeLoans",
+        "summary": "List a status-filtered circulation loan queue",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["REQUESTED", "ACTIVE", "RETURNED", "REJECTED", "CANCELLED"], "default": "REQUESTED" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Bounded administrative loan queue", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeLoanPage" } } } },
+          "400": { "$ref": "#/components/responses/Problem" }, "401": { "description": "Browser session missing or user authorization must be renewed" }, "403": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/circulation/reservations": {
+      "get": {
+        "operationId": "listAdministrativeReservations",
+        "summary": "List a status-filtered circulation reservation queue",
+        "security": [{ "sessionCookie": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["WAITING", "READY", "FULFILLED", "CANCELLED", "EXPIRED"], "default": "READY" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 } },
+          { "name": "cursor", "in": "query", "schema": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" } }
+        ],
+        "responses": {
+          "200": { "description": "Bounded administrative reservation queue", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeReservationPage" } } } },
+          "400": { "$ref": "#/components/responses/Problem" }, "401": { "description": "Browser session missing or user authorization must be renewed" }, "403": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/circulation/loans/{loanId}/{operation}": {
+      "post": {
+        "operationId": "mutateAdministrativeLoan",
+        "summary": "Approve, reject, or return a loan",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "name": "loanId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "operation", "in": "path", "required": true, "schema": { "type": "string", "enum": ["approve", "reject", "return"] } },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Loan command applied or replayed", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoanCommand" } } } },
+          "400": { "$ref": "#/components/responses/Problem" }, "401": { "description": "Browser session missing or user authorization must be renewed" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "422": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
+    "/api/v1/admin/circulation/reservations/{reservationId}/{operation}": {
+      "post": {
+        "operationId": "mutateAdministrativeReservation",
+        "summary": "Fulfil or expire a reservation",
+        "security": [{ "sessionCookie": [], "csrfHeader": [] }],
+        "parameters": [
+          { "name": "reservationId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "operation", "in": "path", "required": true, "schema": { "type": "string", "enum": ["fulfill", "expire"] } },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "description": "Reservation command applied or replayed", "headers": { "Cache-Control": { "schema": { "type": "string", "const": "no-store" } }, "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReservationCommand" } } } },
+          "400": { "$ref": "#/components/responses/Problem" }, "401": { "description": "Browser session missing or user authorization must be renewed" }, "403": { "$ref": "#/components/responses/Problem" }, "404": { "$ref": "#/components/responses/Problem" }, "409": { "$ref": "#/components/responses/Problem" }, "502": { "$ref": "#/components/responses/Problem" }, "503": { "$ref": "#/components/responses/Problem" }, "504": { "$ref": "#/components/responses/Problem" }
+        }
+      }
+    },
     "/api/v1/catalog/search": {
       "get": {
         "operationId": "searchCatalog",
@@ -901,6 +980,31 @@
           "version": { "type": "integer", "format": "int64", "minimum": 0 }
         },
         "additionalProperties": false
+      },
+      "AdministrativeCirculationOverview": {
+        "type": "object", "additionalProperties": false,
+        "required": ["requestedLoans", "activeLoans", "overdueLoans", "waitingReservations", "readyReservations"],
+        "properties": {
+          "requestedLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "activeLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "overdueLoans": { "type": "integer", "format": "int64", "minimum": 0 },
+          "waitingReservations": { "type": "integer", "format": "int64", "minimum": 0 },
+          "readyReservations": { "type": "integer", "format": "int64", "minimum": 0 }
+        }
+      },
+      "AdministrativeLoanPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "nextCursor"],
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/LoanHistoryItem" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        }
+      },
+      "AdministrativeReservationPage": {
+        "type": "object", "additionalProperties": false, "required": ["items", "nextCursor"],
+        "properties": {
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/ReservationCommand" } },
+          "nextCursor": { "type": ["string", "null"], "maxLength": 160, "pattern": "^[A-Za-z0-9_-]+$" }
+        }
       },
       "MemberLoanPage": {
         "type": "object",

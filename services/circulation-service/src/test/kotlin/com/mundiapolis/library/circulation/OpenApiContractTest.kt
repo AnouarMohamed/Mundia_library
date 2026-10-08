@@ -6,6 +6,10 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.ChangeCopyConditionR
 import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationStatusController
 import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationPolicyResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationReadController
+import com.mundiapolis.library.circulation.adapter.`in`.web.CirculationAdministrationController
+import com.mundiapolis.library.circulation.adapter.`in`.web.AdministrativeCirculationOverviewResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.AdministrativeLoanPageResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.AdministrativeReservationPageResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.FineCommandController
 import com.mundiapolis.library.circulation.adapter.`in`.web.FineCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.InventoryCommandController
@@ -124,6 +128,9 @@ class OpenApiContractTest {
         assertSchemaFields("SelfPlaceReservationRequest", SelfPlaceReservationRequest::class.java)
         assertSchemaFields("ReservationCommandResponse", ReservationCommandResponse::class.java)
         assertSchemaFields("MemberReservationPage", MemberReservationPageResponse::class.java)
+        assertSchemaFields("AdministrativeCirculationOverview", AdministrativeCirculationOverviewResponse::class.java)
+        assertSchemaFields("AdministrativeLoanPage", AdministrativeLoanPageResponse::class.java)
+        assertSchemaFields("AdministrativeReservationPage", AdministrativeReservationPageResponse::class.java)
         assertSchemaFields(
             "UpdateCirculationPolicyRequest",
             UpdateCirculationPolicyRequest::class.java,
@@ -228,6 +235,7 @@ class OpenApiContractTest {
         val CONTROLLERS = listOf(
             CirculationStatusController::class.java,
             CirculationReadController::class.java,
+            CirculationAdministrationController::class.java,
             LoanCommandController::class.java,
             FineCommandController::class.java,
             InventoryCommandController::class.java,

@@ -8,6 +8,7 @@ import {
   type AdminMember,
   type AdminMemberPage,
 } from "../api/client";
+import { AdminNavigation } from "../components/AdminNavigation";
 
 type LoadState =
   | { kind: "loading" }
@@ -92,6 +93,7 @@ export function AdminMembersPage() {
 
   return (
     <article className="admin-shell">
+      <AdminNavigation />
       <header className="admin-heading">
         <div>
           <p className="eyebrow">Library operations</p>

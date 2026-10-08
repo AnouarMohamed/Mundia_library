@@ -23,6 +23,9 @@ export type AdminMemberPage = components["schemas"]["AdminMemberPage"];
 export type AdminMember = components["schemas"]["AdminMemberSummary"];
 export type AccountStatus = components["schemas"]["AccountStatus"];
 export type MembershipCommand = components["schemas"]["MembershipCommand"];
+export type AdministrativeCirculationOverview = components["schemas"]["AdministrativeCirculationOverview"];
+export type AdministrativeLoanPage = components["schemas"]["AdministrativeLoanPage"];
+export type AdministrativeReservationPage = components["schemas"]["AdministrativeReservationPage"];
 export type CommandResult<T> = { record: T; replayed: boolean };
 export type VersionedNotificationPreference = { preference: NotificationPreference; entityTag: string };
 export type NotificationReadStatus = "ALL" | "READ" | "UNREAD";
@@ -104,6 +107,83 @@ export async function changeAdminMemberStatus(
     throw new ApiError(502);
   }
   return value;
+}
+
+export async function getAdminCirculationOverview(signal?: AbortSignal): Promise<AdministrativeCirculationOverview> {
+  const value = await requestJson("/api/v1/admin/circulation/overview", { signal });
+  if (!isAdminCirculationOverview(value)) throw new ApiError(502);
+  return value;
+}
+
+export async function getAdminLoanQueue(
+  status: LoanHistoryItem["status"],
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<AdministrativeLoanPage> {
+  if (cursor !== undefined && !isCursor(cursor)) throw new ApiError(400);
+  const query = new URLSearchParams({ status, limit: String(ADMIN_QUEUE_SIZE) });
+  if (cursor) query.set("cursor", cursor);
+  const value = await requestJson(`/api/v1/admin/circulation/loans?${query}`, { signal });
+  if (!isRecord(value) || !Array.isArray(value.items) || value.items.length > ADMIN_QUEUE_SIZE ||
+      !value.items.every((item) => isLoan(item) && item.status === status) ||
+      !isNullableCursor(value.nextCursor) || (value.nextCursor !== null && value.items.length !== ADMIN_QUEUE_SIZE) ||
+      !isDescending(value.items, (item) => item.requestedAt, (item) => item.loanId)) throw new ApiError(502);
+  return value as AdministrativeLoanPage;
+}
+
+export async function getAdminReservationQueue(
+  status: Reservation["status"],
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<AdministrativeReservationPage> {
+  if (cursor !== undefined && !isCursor(cursor)) throw new ApiError(400);
+  const query = new URLSearchParams({ status, limit: String(ADMIN_QUEUE_SIZE) });
+  if (cursor) query.set("cursor", cursor);
+  const value = await requestJson(`/api/v1/admin/circulation/reservations?${query}`, { signal });
+  if (!isRecord(value) || !Array.isArray(value.items) || value.items.length > ADMIN_QUEUE_SIZE ||
+      !value.items.every((item) => isReservation(item) && item.status === status) ||
+      !isNullableCursor(value.nextCursor) || (value.nextCursor !== null && value.items.length !== ADMIN_QUEUE_SIZE) ||
+      !isDescending(value.items, (item) => item.placedAt, (item) => item.reservationId)) throw new ApiError(502);
+  return value as AdministrativeReservationPage;
+}
+
+export async function mutateAdminLoan(
+  loanId: string,
+  operation: "approve" | "reject" | "return",
+  idempotencyKey: string,
+): Promise<LoanCommand> {
+  validateCommandIdentifiers(loanId);
+  const result = await circulationCommand<unknown>(
+    `/api/v1/admin/circulation/loans/${encodeURIComponent(loanId)}/${operation}`,
+    `admin-loan-${operation}`,
+    200,
+    undefined,
+    idempotencyKey,
+  );
+  const expected = { approve: "ACTIVE", reject: "REJECTED", return: "RETURNED" } as const;
+  if (!isLoanCommand(result.record) || result.record.loanId !== loanId || result.record.status !== expected[operation]) {
+    throw new ApiError(502);
+  }
+  return result.record;
+}
+
+export async function mutateAdminReservation(
+  reservationId: string,
+  operation: "fulfill" | "expire",
+  idempotencyKey: string,
+): Promise<Reservation> {
+  validateCommandIdentifiers(reservationId);
+  const result = await circulationCommand<unknown>(
+    `/api/v1/admin/circulation/reservations/${encodeURIComponent(reservationId)}/${operation}`,
+    `admin-reservation-${operation}`,
+    200,
+    undefined,
+    idempotencyKey,
+  );
+  const expected = { fulfill: "FULFILLED", expire: "EXPIRED" } as const;
+  if (!isReservation(result.record) || result.record.reservationId !== reservationId ||
+      result.record.status !== expected[operation]) throw new ApiError(502);
+  return result.record;
 }
 
 export async function getNotifications(
@@ -424,9 +504,13 @@ async function circulationCommand<T>(
   operation: string,
   expectedStatus: number,
   body?: Record<string, string>,
+  commandIdempotencyKey?: string,
 ): Promise<CommandResult<T>> {
   const csrf = await getCsrfToken();
-  const idempotencyKey = `spa:${operation}:${crypto.randomUUID()}`;
+  const idempotencyKey = commandIdempotencyKey ?? `spa:${operation}:${crypto.randomUUID()}`;
+  if (idempotencyKey.length < 16 || idempotencyKey.length > 128 || !/^[\x21-\x7e]+$/.test(idempotencyKey)) {
+    throw new ApiError(400);
+  }
   const response = await fetch(path, {
     method: "POST",
     credentials: "same-origin",
@@ -537,6 +621,13 @@ function isMembershipCommand(value: unknown): value is MembershipCommand {
   return isRecord(value) && isUuid(value.memberId) && isNonNegativeInteger(value.aggregateVersion) &&
     Number(value.aggregateVersion) > 0 && ["APPROVED", "REJECTED"].includes(String(value.status)) &&
     isIsoInstant(value.occurredAt) && typeof value.replayed === "boolean";
+}
+
+function isAdminCirculationOverview(value: unknown): value is AdministrativeCirculationOverview {
+  return isRecord(value) && isNonNegativeInteger(value.requestedLoans) &&
+    isNonNegativeInteger(value.activeLoans) && isNonNegativeInteger(value.overdueLoans) &&
+    Number(value.overdueLoans) <= Number(value.activeLoans) &&
+    isNonNegativeInteger(value.waitingReservations) && isNonNegativeInteger(value.readyReservations);
 }
 
 function isEditionDownloadAvailability(value: unknown): value is EditionDownloadAvailability {
@@ -813,5 +904,6 @@ const HISTORY_PAGE_SIZE = 20;
 const CATALOG_PAGE_SIZE = 20;
 const MAXIMUM_EDITION_BATCH = 50;
 const NOTIFICATION_PAGE_SIZE = 20;
+const ADMIN_QUEUE_SIZE = 25;
 const MAXIMUM_ASSET_BYTES = 1024 * 1024 * 1024;
 const DIGITAL_LICENSES = new Set(["CC-BY-4.0", "CC-BY-SA-4.0", "CC0-1.0", "PDM-1.0"]);

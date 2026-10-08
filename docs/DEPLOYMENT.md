@@ -1,6 +1,16 @@
 # Deployment
 
-Mundiapolis Library can be deployed to Vercel, Docker, or a standalone Next.js server bundle. Vercel is the current public deployment path. Docker and standalone packaging are useful for self-hosting, institutional servers, and release artifacts.
+Vercel is the current public deployment path for the Next.js migration shell.
+CI also produces OCI images for that shell, the Kotlin Web BFF, and all five
+domain services. The target AWS/EKS platform under `platform/` is reviewable
+infrastructure code, not a deployed environment. Do not describe the system as
+running on Kubernetes or AWS until the blockers and evidence in that directory
+are resolved.
+
+Deployments must preserve one public origin: static SPA paths and BFF paths
+(`/api`, `/oauth2`, and `/login`) are routed at the edge, while uncut routes may
+continue to the legacy shell during migration. A browser must never receive a
+domain-service OAuth token or address a service directly.
 
 ## Deployment Prerequisites
 

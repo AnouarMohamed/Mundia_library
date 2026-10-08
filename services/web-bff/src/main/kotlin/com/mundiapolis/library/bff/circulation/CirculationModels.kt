@@ -110,3 +110,21 @@ data class MemberReservationPageView(
     val items: List<ReservationCommandView>,
     val nextCursor: String?,
 )
+
+data class AdministrativeCirculationOverviewView(
+    val requestedLoans: Long,
+    val activeLoans: Long,
+    val overdueLoans: Long,
+    val waitingReservations: Long,
+    val readyReservations: Long,
+)
+
+data class AdministrativeLoanPageView(
+    val items: List<LoanHistoryItemView>,
+    val nextCursor: String?,
+)
+
+data class AdministrativeReservationPageView(
+    val items: List<ReservationCommandView>,
+    val nextCursor: String?,
+)

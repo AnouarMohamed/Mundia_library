@@ -1,8 +1,9 @@
 # Mundiapolis backend services
 
-This is an additive Gradle multi-project build for the strangler migration. The
-existing Next.js application remains the production entry point until a service
-passes its migration and cutover gates.
+This Gradle multi-project build contains six Kotlin/Spring applications: the
+browser-facing Web BFF plus Membership, Catalog, Circulation, Digital Content,
+and Notification domain services. The existing Next.js application remains the
+production entry point until each route passes its migration and cutover gates.
 
 ## Requirements
 
@@ -185,6 +186,13 @@ separate `circulation.eligibility.read.any` scope is required for staff reads.
 Policy reads return an ETag. Administrators install immutable revisions with
 `PUT /api/v1/circulation/policy`, an exact `If-Match` revision, an
 `Idempotency-Key`, and `circulation.policy.manage`.
+
+The circulation desk read model exposes bounded, status-filtered keyset queues
+at `GET /api/v1/circulation/admin/loans` and
+`GET /api/v1/circulation/admin/reservations`, plus live counts at
+`GET /api/v1/circulation/admin/overview`. These endpoints require the separate
+`circulation.admin.read` scope and use dedicated status/time indexes; command
+execution continues through the existing idempotent aggregate workflows.
 
 Every authenticated endpoint is also protected by a distributed,
 principal-scoped fixed-window admission layer. Read, command, and sensitive

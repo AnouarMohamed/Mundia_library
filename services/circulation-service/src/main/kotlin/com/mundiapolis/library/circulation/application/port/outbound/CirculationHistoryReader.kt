@@ -24,4 +24,16 @@ interface CirculationHistoryReader {
         cursor: HistoryCursor?,
         limit: Int,
     ): List<Reservation>
+
+    fun administrativeLoans(
+        status: LoanStatus,
+        cursor: HistoryCursor?,
+        limit: Int,
+    ): List<Loan>
+
+    fun administrativeReservations(
+        status: ReservationStatus,
+        cursor: HistoryCursor?,
+        limit: Int,
+    ): List<Reservation>
 }

@@ -73,6 +73,13 @@ spring:
             client-authentication-method: client_secret_basic
             authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
             scope: circulation.eligibility.read,circulation.loan.read,circulation.loan.request,circulation.loan.cancel,circulation.loan.renew,circulation.reservation.read,circulation.reservation.place,circulation.reservation.cancel
+          circulation-admin-service:
+            provider: institutional
+            client-id: ${CIRCULATION_CLIENT_ID}
+            client-secret: ${CIRCULATION_CLIENT_SECRET}
+            client-authentication-method: client_secret_basic
+            authorization-grant-type: urn:ietf:params:oauth:grant-type:token-exchange
+            scope: circulation.admin.read,circulation.loan.approve,circulation.loan.reject,circulation.loan.return,circulation.reservation.fulfill,circulation.reservation.expire
           notification-service:
             provider: institutional
             client-id: ${NOTIFICATION_CLIENT_ID}

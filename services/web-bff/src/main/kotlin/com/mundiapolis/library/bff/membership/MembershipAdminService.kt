@@ -17,19 +17,25 @@ interface MembershipAdminUseCase {
 
 @Service
 class MembershipAdminService(
+    private val access: MembershipAdministrativeAccess,
+    private val client: MembershipClient,
+) : MembershipAdminUseCase {
+    override fun members(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, status: AccountStatusView, limit: Int?, cursor: String?): AdminMemberPageView =
+        access.withVerifiedAdministrator(authentication, request, response) { client.membersForAdministration(it, status, limit, cursor) }
+
+    override fun changeStatus(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, memberId: UUID, expectedVersion: Long, idempotencyKey: String, command: ChangeMemberStatusView): MembershipMutationResult =
+        access.withVerifiedAdministrator(authentication, request, response) {
+            client.changeMemberStatus(it, memberId, expectedVersion, idempotencyKey, command)
+        }
+}
+
+@Service
+class MembershipAdministrativeAccess(
     private val authorizer: DelegatedClientAuthorizer,
     private val client: MembershipClient,
     private val properties: MembershipClientProperties,
-) : MembershipAdminUseCase {
-    override fun members(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, status: AccountStatusView, limit: Int?, cursor: String?): AdminMemberPageView =
-        withClient(authentication, request, response) { client.membersForAdministration(it, status, limit, cursor) }
-
-    override fun changeStatus(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, memberId: UUID, expectedVersion: Long, idempotencyKey: String, command: ChangeMemberStatusView): MembershipMutationResult =
-        withClient(authentication, request, response) {
-            client.changeMemberStatus(it, memberId, expectedVersion, idempotencyKey, command)
-        }
-
-    private fun <T> withClient(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, operation: (OAuth2AuthorizedClient) -> T): T {
+) {
+    fun <T> withVerifiedAdministrator(authentication: OAuth2AuthenticationToken, request: HttpServletRequest, response: HttpServletResponse, operation: (OAuth2AuthorizedClient) -> T): T {
         val authorizedClient = authorizer.authorize(MEMBERSHIP_ADMIN_REGISTRATION, properties.maximumDelegatedTokenLifetime, authentication, request, response)
         return try {
             val operator = client.ownProfile(authorizedClient)

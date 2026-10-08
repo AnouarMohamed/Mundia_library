@@ -1,392 +1,192 @@
 # Mundiapolis Library
 
-> Production-focused university library platform for students, faculty, and library staff at Mundiapolis University.
+> A security-focused university library platform being migrated from a Next.js monolith to a Kotlin/Spring microservice architecture.
 
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D24.17.0-brightgreen.svg)](https://nodejs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-15.5-black.svg)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![Drizzle ORM](https://img.shields.io/badge/Drizzle%20ORM-0.45-green.svg)](https://orm.drizzle.team/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-blue.svg)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-24.17%2B-339933)](https://nodejs.org/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3-7F52FF)](https://kotlinlang.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Mundiapolis Library provides an end-to-end digital library experience. It supports authenticated catalog discovery, borrow request lifecycle management, renewal workflows, book reviews, administrative approvals, circulation operations, fine calculations, overdue reminders, analytics, secure data exports, and reproducible deployment packaging.
+Mundiapolis Library supports catalog discovery, physical circulation, licensed
+learning resources, member administration, notifications, and audited staff
+operations. The repository contains both the live Next.js migration shell and
+the replacement platform: a static React SPA, a Kotlin Web BFF, five
+domain-owned Kotlin services, and an AWS/EKS GitOps foundation.
 
-The Next.js product is live while a measured strangler migration moves domain ownership into a small set of Kotlin/Spring services. The repository has strong automated quality and security gates, but the full overhaul is not general availability until the platform, institutional OIDC, cutover, load, disaster-recovery, and independent security gates in [the production overhaul plan](docs/PRODUCTION_OVERHAUL.md) are complete.
+The service platform is substantial but **not yet the production authority for
+every route**. Cutover is deliberately gated by data reconciliation, identity,
+load, rollback, disaster-recovery, and security evidence. See
+[Production Readiness](docs/PRODUCTION_READINESS.md) for the honest status.
 
----
-
-## Current Release & Live Demo
-
-- **Version**: `0.2.1`
-- **Node Baseline**: Node.js 24 LTS (`>=24.17.0 <25`)
-- **Production URL**: [https://mundialibrary.tech](https://mundialibrary.tech)
-- **Vercel fallback**: [https://mundia-library.vercel.app](https://mundia-library.vercel.app)
-- **Release Assets**: [GitHub Release v0.2.1](https://github.com/AnouarMohamed/Mundia_library/releases/tag/v0.2.1)
-
----
-
-## Table of Contents
-
-- [Product Scope & Key Features](#product-scope--key-features)
-- [Architecture & Tech Stack](#architecture--tech-stack)
-- [System Architecture Flowchart](#system-architecture-flowchart)
-- [Data Model & Domain Invariants](#data-model--domain-invariants)
-- [Quick Start Guide](#quick-start-guide)
-- [Command & Script Reference](#command--script-reference)
-- [Environment Configuration](#environment-configuration)
-- [Testing & Quality Assurance](#testing--quality-assurance)
-- [Deployment Options](#deployment-options)
-- [Kubernetes and AWS Platform](#kubernetes-and-aws-platform)
-- [Security & Governance](#security--governance)
-- [Documentation Directory](#documentation-directory)
-
----
-
-## Product Scope & Key Features
-
-### Student & Faculty Portal
-- **Catalog Discovery & Search**: Fast full-text search across titles, authors, genres, and summaries.
-- **Advanced Filtering & Sorting**: Filter by genre, availability status, publication year, and average rating; sort by rating, title, or publication date.
-- **Book Detail & Multimedia**: Detailed metadata including ISBN, page count, publisher, language, edition, and video trailers/previews.
-- **Low-Friction Borrow Requests**: Request book loans directly from catalog pages with automatic copy availability verification.
-- **Circulation History & Active Loans**: Personal account dashboard tracking active loans, due dates, renewal statuses, and loan history.
-- **Renewal Requests**: Submit renewal requests for active loans directly to library staff.
-- **Book Reviews & Ratings**: Submit star ratings and written reviews for books previously borrowed.
-- **Notification Inbox**: In-app alerts for request approvals, due date warnings, overdue notices, and account status updates.
-
-### Library Admin & Circulation Desk
-- **Operational Dashboard**: Real-time stats on total books, active borrows, pending approvals, overdue items, and circulation velocity.
-- **User Account Lifecycle Management**: Review student registrations, verify university ID card uploads, and approve/reject membership applications.
-- **Circulation Desk Operations**: One-click approval for pending borrow requests and seamless return processing.
-- **Inventory & Copy Sync**: Automatic, transaction-safe copy count management (`availableCopies` sync with active loans).
-- **Catalog Metadata Maintenance**: Add new books, edit metadata, upload cover images via ImageKit integration, and soft-delete/deactivate catalog items.
-- **Fine Policy & Automated Processing**: Configure daily fine rates, calculate overdue penalties dynamically, and track unpaid balances.
-- **Automated Reminder Workflows**: Trigger email reminders for upcoming due dates and overdue loans via Upstash QStash/Workflow and Brevo/Resend.
-- **Granular RBAC & Admin Capabilities**: Multi-layered permission system enforcing fine-grained administrative capability assignments (`admin_capability_assignments`) alongside audit logging.
-- **Data Exports & Reporting**: Export circulation history, user lists, and catalog records to CSV/JSON format.
-
----
-
-## Architecture & Tech Stack
-
-| Layer | Technology / Tool | Description |
-| :--- | :--- | :--- |
-| **Framework** | [Next.js 15](https://nextjs.org/) (App Router) | React server components, server actions, route handlers, standalone output |
-| **Frontend UI** | [React 19](https://react.dev/), [Tailwind CSS](https://tailwindcss.com/) | Radix UI primitives, Lucide React icons, customized Mundiapolis theme |
-| **Language** | [TypeScript 5](https://www.typescriptlang.org/) | Strict type checking without emit (`tsc --noEmit`) |
-| **Web/BFF authentication** | [NextAuth.js v5](https://authjs.dev/) | Current credentials path plus fail-closed managed OIDC foundation during migration |
-| **Domain services** | Kotlin 2.3, Spring Boot 4.1, JDK 25 | Bounded-context services introduced behind strangler cutover gates |
-| **Database** | [PostgreSQL 18](https://www.postgresql.org/) | Transactional authority with service-owned schemas, constraints, and reviewed migrations |
-| **ORM** | [Drizzle ORM](https://orm.drizzle.team/) & `drizzle-kit` | Type-safe query builder, declarative schema, canonical SQL migration runner |
-| **Service persistence** | jOOQ and Flyway | Generated SQL types and forward-only migrations for Kotlin services |
-| **DB Driver** | `pg` Pool | Bounded, transaction-capable PostgreSQL pool across all environments |
-| **Cache & Rate Limit** | [Upstash Redis](https://upstash.com/) | Distributed caching, rate limiting with PostgreSQL bucket fallback |
-| **Background Workflows** | [Upstash QStash & Workflow](https://upstash.com/) | Asynchronous background tasks, scheduled reminders, and workflow state engines |
-| **Domain events** | Kafka-compatible broker and Protobuf | Transactional outbox, durable inbox, replay-safe at-least-once delivery |
-| **Media Delivery** | [ImageKit](https://imagekit.io/) | Optimized book cover images and university ID card uploads |
-| **Email Service** | [Brevo](https://www.brevo.com/) & [Resend](https://resend.com/) | Primary transactional email delivery with Resend fallback |
-| **Testing** | [Vitest](https://vitest.dev/) & [Playwright](https://playwright.dev/) | Unit/integration testing and end-to-end browser automation |
-| **Linter** | [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) | Fast JavaScript/TypeScript linting with zero-warning enforcement |
-
----
-
-## System Architecture Flowchart
+## Current architecture
 
 ```mermaid
-flowchart TD
-  subgraph Client ["Client Layer"]
-    Browser["Student & Admin Web Browsers"]
+flowchart LR
+  Browser["Browser<br/>React SPA"] -->|"same-origin HTTPS<br/>secure session + CSRF"| BFF["Kotlin Web BFF<br/>Spring Boot"]
+  Browser -. "migration routes" .-> Legacy["Next.js 15<br/>legacy shell"]
+
+  subgraph Domain["Kotlin domain services"]
+    Membership["Membership"]
+    Catalog["Catalog"]
+    Circulation["Circulation"]
+    Digital["Digital Content"]
+    Notification["Notification"]
   end
 
-  subgraph Application ["Next.js 15 App Router Layer"]
-    Auth["NextAuth v5 (JWT Sessions & Middleware)"]
-    ServerActions["Server Actions (lib/actions & lib/admin/actions)"]
-    API["API Route Handlers (app/api)"]
-  end
+  BFF -->|"OAuth token exchange<br/>least-privilege scopes"| Membership
+  BFF -->|"OAuth token exchange"| Catalog
+  BFF -->|"OAuth token exchange"| Circulation
+  BFF -->|"OAuth token exchange"| Digital
+  BFF -->|"OAuth token exchange"| Notification
 
-  subgraph Services ["Strangler Service Layer"]
-    Circulation["Circulation Service\nKotlin / Spring"]
-    Membership["Membership Service\nKotlin / Spring"]
-    Catalog["Catalog Service\nKotlin / Spring"]
-    Broker["Kafka-compatible Broker"]
-  end
+  Membership --> MembershipDB[("membership DB")]
+  Catalog --> CatalogDB[("catalog DB")]
+  Circulation --> CirculationDB[("circulation DB")]
+  Digital --> DigitalDB[("digital-content DB")]
+  Notification --> NotificationDB[("notification DB")]
 
-  subgraph Storage ["Persistence & Cache Layer"]
-    DB[("Legacy PostgreSQL 18\n(Drizzle ORM + pg Pool)")]
-    CirculationDB[("Circulation PostgreSQL 18\n(jOOQ + Flyway)")]
-    Redis[("Upstash Redis\n(Cache & Rate Limiting)")]
-    DBRateLimit[("Rate Limit Buckets\n(Fallback Rate Limiter)")]
-  end
-
-  subgraph Integrations ["External Services & Automation"]
-    QStash["Upstash QStash / Workflows"]
-    ImageKit["ImageKit Storage"]
-    Email["Brevo / Resend Email API"]
-  end
-
-  Browser -->|"HTTPS Requests"| Auth
-  Auth -->|"Session Verification"| ServerActions
-  Auth -->|"Route Protection"| API
-  ServerActions -->|"Transactions"| DB
-  API -->|"Queries / Mutations"| DB
-  API -->|"Cached Reads / Rate Limit"| Redis
-  API -.->|"Fallback Rate Limit"| DBRateLimit
-  ServerActions -->|"Upload Media"| ImageKit
-  ServerActions -->|"Schedule Reminder Jobs"| QStash
-  QStash -->|"Send Due / Overdue Alerts"| Email
-  API -->|"Send Transactional Emails"| Email
-  API -.->|"single-writer cutover only"| Circulation
-  Circulation --> CirculationDB
-  Membership --> Broker
-  Broker --> Circulation
-  Catalog --> Broker
+  Membership & Catalog & Circulation -->|"transactional outbox"| Kafka["Kafka-compatible broker"]
+  Kafka -->|"idempotent inbox"| Catalog & Notification
+  BFF --> Redis[("Redis<br/>sessions + admission")]
+  Digital --> Sources["Verified official sources /<br/>private object delivery"]
 ```
 
----
+The important boundary is the Kotlin BFF: browsers never receive service
+credentials or OAuth access tokens. Each domain service owns its schema and
+contract. Cross-service state moves through explicit APIs or replay-safe events,
+not shared tables. The legacy application remains isolated while strangler
+routes are proven and cut over.
 
-## Data Model & Domain Invariants
+Read [Architecture](docs/ARCHITECTURE.md) for request flows, trust boundaries,
+data ownership, and migration state.
 
-The database schema ([database/schema.ts](database/schema.ts)) is managed via Drizzle ORM and PostgreSQL. Key entities include:
+## Service map
 
-- **`users`**: Stores credentials, status (`PENDING`, `APPROVED`, `REJECTED`), role (`USER`, `ADMIN`, `SUPER_ADMIN`), and university ID card references. `SUPER_ADMIN` is reserved for administrator and security-governance lifecycle changes.
-- **`federated_identities`**: Provisioned institutional identities for OIDC provider session bindings.
-- **`admin_capability_assignments`**: Fine-grained administrative capabilities (`fines.manage_policy`, `users.manage_status`, `bulk.execute`, etc.) with append-only grant/revocation tracking.
-- **`books`**: Book metadata, ISBN, total copies, available copies, ratings, and soft-delete toggle (`isActive`).
-- **`borrow_records`**: Tracks book loan lifecycle (`PENDING` → `BORROWED` → `RETURNED`), due dates, return dates, fines, and renewal counts.
-- **`renewal_requests`**: Extension requests submitted by students for active loans.
-- **`book_reviews`**: Verified user reviews and ratings (1–5 stars).
-- **`admin_requests`**: Role escalation requests submitted by users.
-- **`audit_logs`**: Append-only log recording high-risk administrative operations.
-- **`system_config`**: Application settings (e.g., daily fine rates).
-- **`notifications`**: In-app user notifications.
-- **`rate_limit_buckets`**: SHA-256 hashed fallback rate limit window tracking for DB-only deployments.
+| Runtime | Responsibility | Data authority |
+| --- | --- | --- |
+| `web-bff` | Browser sessions, CSRF, token exchange, response validation | Redis-backed session state only |
+| `membership-service` | Profiles, account state, eligibility, admin membership decisions | Membership PostgreSQL schema |
+| `catalog-service` | Works, editions, contributors, search, reviews, learning-resource metadata | Catalog PostgreSQL schema |
+| `circulation-service` | Copies, loans, reservations, policies, staff queues and transitions | Circulation PostgreSQL schema |
+| `digital-content-service` | Licence evidence, quarantine, asset eligibility, audited download authorization | Digital-content PostgreSQL schema |
+| `notification-service` | Inbox, preferences, delivery state, complaint suppression | Notification PostgreSQL schema |
+| `web-spa` | Static React user and staff interface | No server-side authority |
+| Next.js shell | Current production routes during migration | Legacy PostgreSQL schema |
 
-### Crucial Domain Invariants
-1. **Copy Balance Integrity**: `books.availableCopies` must always equal `totalCopies - count(active BORROWED records)`.
-2. **Borrow Lifecycle Transition**: Borrow records progress strictly `PENDING` → `BORROWED` → `RETURNED`.
-3. **Single Active Loan Rule**: A user cannot submit multiple active borrow requests for the same book simultaneously.
+The new circulation desk exposes live counts and keyset-paginated loan and
+reservation queues. Administrative commands are CSRF-protected, idempotent,
+scope-restricted, and preceded by a fresh authoritative membership check.
 
----
+## Product capabilities
 
-## Quick Start Guide
+- Searchable physical catalog with borrowing, reservations, renewals, reviews,
+  history, and availability.
+- Large legal learning-resource catalog with licence provenance and official
+  source downloads; unclear or restricted records remain quarantined.
+- Membership profiles and approval/rejection workflows with `USER`, `ADMIN`,
+  and `SUPER_ADMIN` governance roles.
+- Staff circulation queues for loan approval/rejection/return and reservation
+  fulfilment/expiry.
+- Notification inbox, preferences, email delivery controls, and suppression
+  handling.
+- Immutable OpenAPI contracts, actor-bound idempotency, optimistic concurrency,
+  append-only audit records, transactional outbox/inbox processing, and bounded
+  pagination.
 
-### Prerequisites
+## Quick start
 
-- **Node.js**: `24.17.0` or newer (LTS 24 line)
-- **Package Manager**: `npm`
-- **Database**: PostgreSQL 18 (local or Docker)
-- **Docker & Docker Compose**: Optional, for running local PostgreSQL and Adminer
+### Legacy production shell
 
-### Installation & Local Setup
+Requires Node.js 24 LTS (`24.17.0` or newer), npm, and Docker.
 
-1. **Clone the repository and install dependencies**:
-   ```bash
-   git clone https://github.com/AnouarMohamed/Mundia_library.git
-   cd Mundia_library
-   npm ci
-   ```
-
-2. **Rebuild native binary dependencies** (if platform binary warnings occur):
-   ```bash
-   npm run deps:build-native
-   ```
-
-3. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env.local
-   ```
-   *(Edit `.env.local` to fit your local setup if defaults need tweaking)*
-
-4. **Start PostgreSQL with Docker Compose**:
-   ```bash
-   docker compose up -d db
-   ```
-
-5. **Apply Database Migrations & Seed Initial Data**:
-   ```bash
-   npm run db:migrate
-   npm run seed
-   ```
-
-6. **Launch the Development Server**:
-   ```bash
-   npm run dev
-   # or with Turbopack for faster iteration:
-   npm run dev:turbo
-   ```
-
-7. **Access the Application**:
-   - **Student & Public Interface**: [http://localhost:3000](http://localhost:3000)
-   - **Adminer DB Tool**: [http://localhost:8080](http://localhost:8080) (when using Docker)
-
-### Default Local Credentials
-
-| Role | Email | Password | Access Level |
-| :--- | :--- | :--- | :--- |
-| **Student** | `test@user.com` | `12345678` | Catalog browse, request borrows, view history, request renewals, post reviews |
-| **Admin** | `test@admin.com` | `12345678` | Full administrative control, circulation desk, account approvals, fine setup, analytics |
-
----
-
-## Command & Script Reference
-
-| Command | Purpose |
-| :--- | :--- |
-| **Development & Build** | |
-| `npm run dev` | Start Next.js development server on port 3000 |
-| `npm run dev:turbo` | Start Next.js dev server with Turbopack |
-| `npm run build` | Build standalone production bundle |
-| `npm run start` | Start production server after `npm run build` |
-| `npm run deps:build-native` | Rebuild native node modules (`esbuild`, `sharp`, etc.) |
-| **Quality & Security** | |
-| `npm run lint` | Run Oxlint with zero-warning policy (`--deny-warnings`) |
-| `npm run typecheck` | Run TypeScript compiler check without emitting JS (`tsc --noEmit`) |
-| `npm run test` | Run unit and integration tests with Vitest |
-| `npm run test:e2e` | Run end-to-end browser tests with Playwright |
-| `npm run security:audit` | Execute npm vulnerability audit (low threshold) |
-| `npm run ci:quality` | Full CI quality check: audit → lint → typecheck → test → test:e2e → build |
-| `make ci-fast` | Contracts, all Kotlin service gates, and the legacy web quality gate |
-| `make ci` | Full local push-CI rehearsal: dependencies, DB invariants, services, migration tool, platform, web, and images |
-| **Database & Schema Management** | |
-| `npm run db:migrate` | Apply canonical PostgreSQL migration scripts |
-| `npm run db:generate` | Generate new migration files from Drizzle schema updates |
-| `npm run db:push` | Push schema changes directly to DB (disposable local environments only) |
-| `npm run db:studio` | Launch interactive Drizzle Studio interface |
-| `npm run seed` | Seed database with sample books and local test accounts |
-| `npm run db:migrate-csv` | Migrate book catalog data from CSV source |
-| `npm run db:verify-schema` | Verify production database schema integrity and constraints |
-| `npm run db:verify-concurrency` | Run concurrency invariant tests against borrow/copy balance logic |
-| `npm run db:perf-indexes` | Apply performance tuning indexes to PostgreSQL |
-| **Benchmarking & Operational Utility** | |
-| `npm run benchmark:api` | Benchmark critical API routes (`/api/books`, `/api/books/genres`, etc.) |
-| `npm run explain:hot-queries` | Analyze PostgreSQL EXPLAIN execution plans for hot queries |
-| `npm run loadtest:nightly` | Run stress and load testing script against API routes |
-| `npm run auth:capability` | CLI script to manage admin capability assignments |
-| `npm run auth:identity` | CLI script to manage federated OIDC identities |
-| `npm run verify-borrow` | Verify detailed borrow record consistency |
-| `npm run fix-borrow-sync` | Correct book copy counts against active borrow records |
-
----
-
-## Environment Configuration
-
-Refer to [.env.example](.env.example) for a comprehensive list of configuration parameters. Key environment variables include:
-
-```env
-# Mandatory Database & Auth Settings
-DATABASE_URL="postgres://postgres:postgres@localhost:5432/university_library"
-NEXTAUTH_SECRET="your-super-secret-key-at-least-32-chars-long"
-NEXTAUTH_URL="http://localhost:3000"
-
-# Optional Upstash Redis & Rate Limiting (Bypassed in dev if missing)
-UPSTASH_REDIS_REST_URL=""
-UPSTASH_REDIS_REST_TOKEN=""
-DISABLE_RATE_LIMIT="false"
-
-# Optional Upstash QStash & Workflows
-QSTASH_URL=""
-QSTASH_TOKEN=""
-QSTASH_CURRENT_SIGNING_KEY=""
-QSTASH_NEXT_SIGNING_KEY=""
-ENABLE_WORKFLOWS="true"
-
-# Optional Media Storage (ImageKit)
-NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=""
-NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT=""
-IMAGEKIT_PRIVATE_KEY=""
-
-# Optional Transactional Email (Brevo & Resend)
-BREVO_API_KEY=""
-RESEND_API_KEY=""
-NODEMAILER_SENDER="Mundiapolis Library <noreply@mundiapolis.ma>"
-```
-
-Detailed configuration guidelines are available in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
-
----
-
-## Testing & Quality Assurance
-
-Mundiapolis Library enforces strict automated quality gates prior to any code merging or production deployment:
-
-- **Static Analysis & Linting**: Oxlint strictly enforces code quality with a zero-warning policy.
-- **Type Safety**: TypeScript strictly validates type signatures across the entire App Router codebase.
-- **Unit & Integration Tests**: Vitest runs colocated `*.test.ts` files testing server actions, caches, API error handling, and authorization rules.
-- **End-to-End E2E Testing**: Playwright runs full browser automation tests verifying login, catalog search, borrowing, and admin workflows.
-- **Mobile Product Gate**: 360–430 px student flows, touch ergonomics, navigation safety, and route JavaScript budgets are enforced by Playwright and the production build. See [the mobile gate](docs/MOBILE_PRODUCT_GATE.md).
-- **Security Audits**: Automated `npm audit` checks dependencies against known CVE databases.
-
-To run the complete quality suite locally:
 ```bash
-npm run ci:quality
+npm ci
+cp .env.example .env.local
+docker compose up -d db
+npm run db:migrate
+npm run seed
+npm run dev
 ```
 
----
+Open `http://localhost:3000`. Local seed credentials are documented only for
+development in [Development](docs/DEVELOPMENT.md).
 
-## Deployment Options
+### Kotlin services and SPA
 
-The application supports three production deployment targets:
+Requires JDK 25 in addition to Node.js and Docker.
 
-1. **Vercel** *(Recommended)*: Zero-config deployment with native App Router support and automated preview deployments.
-2. **Docker Container**: Build and launch using the production multi-stage [Dockerfile](Dockerfile):
-   ```bash
-   docker build -t mundia-library:latest .
-   docker run -p 3000:3000 -e DATABASE_URL="..." -e NEXTAUTH_SECRET="..." mundia-library:latest
-   ```
-3. **Standalone Server Bundle**: Next.js is configured with `output: "standalone"`, producing an optimized production bundle suitable for custom Node.js servers.
+```bash
+docker compose up -d circulation-db membership-db catalog-db notification-db digital-content-db
+cd services && ./gradlew clean check
+cd ..
+npm run spa:generate
+npm run spa:test
+```
 
-Refer to [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full deployment instructions and environment verification.
+Local service startup requires a real development OIDC issuer/JWK set. Do not
+disable authentication to make an environment appear healthy. Exact variables
+and per-service commands are in [Configuration](docs/CONFIGURATION.md) and
+[Services](services/README.md).
 
----
+## Quality gates
 
-## Kubernetes and AWS Platform
+The Makefile is the supported local CI interface:
 
-The future production platform is isolated under [`platform/`](platform/README.md):
-Kubernetes desired state is in `platform/gitops/`, reusable charts are in
-`platform/helm/`, and admission policies are in `platform/policies/`. Terraform
-for EKS and managed AWS boundaries lives alongside them in
-`platform/terraform/`. There is intentionally no duplicate top-level
-`kubernetes/` tree.
+| Command | What it proves |
+| --- | --- |
+| `make ci-fast` | Contracts, all Kotlin service checks, and web lint/type/test/build gates |
+| `make ci` | Push-CI rehearsal including PostgreSQL, migration tooling, platform validation, E2E, image builds, and security scans |
+| `make services-ci` | Compile, test, and package all Kotlin services |
+| `make spa-ci` | Generate contracts, typecheck, test, and build the SPA |
+| `make platform-ci` | Validate Helm, Kubernetes, policy, and GitOps contracts |
+| `make images-scan` | Build and scan every deployable image for HIGH/CRITICAL findings |
 
-These files are reviewable infrastructure contracts, not evidence that AWS is
-currently deployed. Running Terraform would create billable resources and
-requires an explicit, reviewed environment approval.
+CI also runs CodeQL, dependency review, secret scanning, npm audit, Trivy, and
+OpenSSF Scorecard. Passing automation is necessary evidence, not a substitute
+for an external penetration test or a disaster-recovery exercise.
 
----
+## Deployment
 
-## Security & Governance
+- **Current:** the legacy shell is available at
+  [mundialibrary.tech](https://mundialibrary.tech), with the Vercel URL retained
+  only as a fallback.
+- **Images:** CI publishes the web shell, Web BFF, and five domain services to
+  GHCR after blocking gates pass.
+- **Target:** AWS with private EKS networking, managed PostgreSQL/Kafka/Redis,
+  workload identity, External Secrets, Argo CD, Kyverno, and OpenTelemetry.
+- **Status:** `platform/` is a hardened, reviewable foundation; it has not been
+  applied to an AWS account and intentionally retains explicit deployment
+  blockers.
 
-- **Authentication & Password Protection**: Passwords are saved with salted bcrypt hashes. NextAuth v5 JWT sessions govern authenticated routes.
-- **Authoritative Authorization**: `/admin` routes and actions undergo strict multi-tier server-side validation evaluating authentication status, account approval state (`APPROVED`), role (`ADMIN`), and required granular capabilities (`AdminCapability`).
-- **Distributed Rate Limiting**: Request-boundary admission protects every API route and mutating page request with separate read, command, and sensitive budgets. Credential verification adds stricter account/IP limits. Deployments without Redis use atomic, capped PostgreSQL `rate_limit_buckets`; protected tiers fail closed if admission is unavailable.
-- **Audit Logging**: Sensitive administrative actions are appended to `audit_logs` with actor details, timestamps, and target identifiers.
-- **Security Automation**: CI workflows run GitHub CodeQL analysis, secret scanning, dependency review, and OpenSSF Scorecard evaluations.
+Deploy immutable image digests, run schema migrations through isolated
+least-privilege jobs, and promote the same artifact across environments. Never
+commit secrets or place them in image layers.
 
-For security reports or vulnerabilities, see [SECURITY.md](SECURITY.md).
+See [Deployment](docs/DEPLOYMENT.md), [Platform](platform/README.md), and
+[Release Process](docs/RELEASE_PROCESS.md).
 
----
+## Documentation
 
-## Documentation Directory
+Start with the [documentation index](docs/README.md):
 
-Complete architectural, operational, and development documentation is located in the [`docs/`](docs/) directory:
+- [Architecture](docs/ARCHITECTURE.md) — services, data ownership, request and event flows.
+- [Development](docs/DEVELOPMENT.md) — workstation setup and change workflow.
+- [Configuration](docs/CONFIGURATION.md) — environment and identity contracts.
+- [API Reference](docs/API_REFERENCE.md) — legacy routes and Kotlin OpenAPI entry points.
+- [Testing and CI](docs/TESTING_AND_CI.md) — local gates and hosted workflows.
+- [Operations](docs/OPERATIONS.md) — incidents, recovery, and routine procedures.
+- [Threat Model](docs/THREAT_MODEL.md) — assets, adversaries, and mitigations.
+- [Production Overhaul](docs/PRODUCTION_OVERHAUL.md) — remaining migration plan.
 
-- **[Documentation Index](docs/README.md)**: Main landing hub for all repository documentation.
-- **[System Architecture](docs/ARCHITECTURE.md)**: Deep dive into App Router patterns, auth flow, and database design.
-- **[Environment & Configuration](docs/CONFIGURATION.md)**: Detailed configuration matrix and environment setup.
-- **[Development Guide](docs/DEVELOPMENT.md)**: Workspace setup, coding conventions, and workflow tips.
-- **[Deployment Manual](docs/DEPLOYMENT.md)**: Step-by-step production deployment guide.
-- **[Operations Runbook](docs/OPERATIONS.md)**: Admin procedures, manual interventions, and troubleshooting.
-- **[API Reference](docs/API_REFERENCE.md)**: Comprehensive documentation of REST routes and Server Actions.
-- **[Data Model Specification](docs/DATA_MODEL.md)**: Full PostgreSQL table schemas, indexes, and triggers.
-- **[Testing & CI Guide](docs/TESTING_AND_CI.md)**: Vitest, Playwright, and GitHub Actions configuration.
-- **[Release Process](docs/RELEASE_PROCESS.md)**: Versioning, changelogs, and release checklist.
-- **[Production Readiness Checklist](docs/PRODUCTION_READINESS.md)**: Final verification criteria for production releases.
-- **[Contributing Guidelines](CONTRIBUTING.md)**: Workflow rules for contributors.
-- **[Security Policy](SECURITY.md)**: Vulnerability disclosure policy.
+## Security
 
----
+Report vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
+Do not open a public issue containing credentials, personal data, exploit steps,
+or unpatched vulnerability details.
 
-## License & Repository Status
+## Licence
 
-This repository contains private application code for Mundiapolis University Library (`"private": true` in `package.json`). Licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE). Imported learning-resource metadata
+and linked content retain their own source licences; inclusion in the catalog
+does not relicense third-party material.

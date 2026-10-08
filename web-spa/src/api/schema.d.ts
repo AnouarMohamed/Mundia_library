@@ -89,6 +89,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/circulation/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read live circulation desk metrics */
+        get: operations["getAdministrativeCirculationOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/circulation/loans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a status-filtered circulation loan queue */
+        get: operations["listAdministrativeLoans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/circulation/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a status-filtered circulation reservation queue */
+        get: operations["listAdministrativeReservations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/circulation/loans/{loanId}/{operation}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve, reject, or return a loan */
+        post: operations["mutateAdministrativeLoan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/circulation/reservations/{reservationId}/{operation}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fulfil or expire a reservation */
+        post: operations["mutateAdministrativeReservation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/search": {
         parameters: {
             query?: never;
@@ -594,6 +679,26 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        AdministrativeCirculationOverview: {
+            /** Format: int64 */
+            requestedLoans: number;
+            /** Format: int64 */
+            activeLoans: number;
+            /** Format: int64 */
+            overdueLoans: number;
+            /** Format: int64 */
+            waitingReservations: number;
+            /** Format: int64 */
+            readyReservations: number;
+        };
+        AdministrativeLoanPage: {
+            items: components["schemas"]["LoanHistoryItem"][];
+            nextCursor: string | null;
+        };
+        AdministrativeReservationPage: {
+            items: components["schemas"]["ReservationCommand"][];
+            nextCursor: string | null;
+        };
         MemberLoanPage: {
             /** Format: uuid */
             memberId: string;
@@ -888,6 +993,197 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MembershipCommand"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    getAdministrativeCirculationOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current circulation desk metrics */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdministrativeCirculationOverview"];
+                };
+            };
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    listAdministrativeLoans: {
+        parameters: {
+            query?: {
+                status?: "REQUESTED" | "ACTIVE" | "RETURNED" | "REJECTED" | "CANCELLED";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded administrative loan queue */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdministrativeLoanPage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    listAdministrativeReservations: {
+        parameters: {
+            query?: {
+                status?: "WAITING" | "READY" | "FULFILLED" | "CANCELLED" | "EXPIRED";
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bounded administrative reservation queue */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdministrativeReservationPage"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    mutateAdministrativeLoan: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                loanId: string;
+                operation: "approve" | "reject" | "return";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Loan command applied or replayed */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "Idempotency-Replayed"?: "true" | "false";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoanCommand"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            /** @description Browser session missing or user authorization must be renewed */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["Problem"];
+            502: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+            504: components["responses"]["Problem"];
+        };
+    };
+    mutateAdministrativeReservation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Actor-scoped command key. Reuse with a different request is rejected. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                reservationId: string;
+                operation: "fulfill" | "expire";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reservation command applied or replayed */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "Idempotency-Replayed"?: "true" | "false";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReservationCommand"];
                 };
             };
             400: components["responses"]["Problem"];

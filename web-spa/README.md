@@ -36,10 +36,14 @@ the latest strong ETag to prevent lost updates.
 
 Enable `VITE_ENABLE_ADMINISTRATION` only after the identity provider grants
 approved administrators the `membership.members.read` and
-`membership.status.manage` delegated scopes. The route fails closed for other
-users and re-checks the operator's authoritative approved admin role on every
-request. Account decisions require CSRF, a fresh aggregate ETag, an
-actor-scoped idempotency key, and a written audit reason.
+`membership.status.manage` delegated scopes and the separate Circulation admin
+client is limited to `circulation.admin.read`, loan approve/reject/return, and
+reservation fulfil/expire scopes. The routes fail closed for other users and
+re-check the operator's authoritative approved admin role on every request.
+Account decisions require CSRF, a fresh aggregate ETag, an actor-scoped
+idempotency key, and a written audit reason. Circulation commands require CSRF,
+explicit confirmation, and a unique actor-scoped idempotency key; queue reads
+are bounded and keyset paginated.
 
 During local development, Vite proxies `/api`, `/oauth2`, and `/login` to the
 Web BFF at `http://localhost:8080`. Production must present the static assets

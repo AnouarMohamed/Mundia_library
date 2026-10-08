@@ -25,6 +25,12 @@ runs the web quality gate, and builds every production image. The fast target
 runs contracts, Kotlin services, and the web gate without provisioning or
 container builds.
 
+`make images-scan` rebuilds every deployable image and runs the pinned Trivy
+scanner with a persistent local cache, a 15-minute per-image analysis budget,
+and a blocking HIGH/CRITICAL threshold. A timeout is an infrastructure failure,
+not a clean scan; retry after confirming the vulnerability database is cached
+and investigate persistent layer-analysis failures.
+
 The web portion runs:
 
 1. `npm run lint`
@@ -47,6 +53,10 @@ silently reduce the browser suite to unauthenticated smoke tests.
 | `npm run test`                | Vitest test suite.                                                                                                    |
 | `npm run test:e2e`            | Playwright smoke and security E2E suite.                                                                              |
 | `npm run build`               | Production Next.js build.                                                                                             |
+| `make services-ci`            | Compile, test, and package the Web BFF and all five Kotlin domain services.                                           |
+| `make spa-ci`                 | Regenerate SPA types, then typecheck, test, and build the static browser artifact.                                    |
+| `make platform-ci`            | Validate Helm, Kubernetes, policy, and GitOps contracts.                                                              |
+| `make images-scan`            | Build and scan all seven deployable images with the hosted-CI severity policy.                                        |
 | `npm run benchmark:api`       | Key API route benchmark.                                                                                              |
 | `npm run loadtest:nightly`    | Heavier load test and baseline comparison.                                                                            |
 | `npm run explain:hot-queries` | Query plan diagnostics.                                                                                               |

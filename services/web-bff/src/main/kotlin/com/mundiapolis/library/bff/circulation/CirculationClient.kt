@@ -172,6 +172,109 @@ class CirculationClient(
             }
     }
 
+    fun administrativeOverview(
+        authorizedClient: OAuth2AuthorizedClient,
+    ): AdministrativeCirculationOverviewView = exchange {
+        circulationRestClient.get()
+            .uri("/api/v1/circulation/admin/overview")
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, AdministrativeCirculationOverviewView::class.java).also(::validateOverview)
+            }
+    }
+
+    fun administrativeLoans(
+        authorizedClient: OAuth2AuthorizedClient,
+        status: LoanStatusView,
+        limit: Int?,
+        cursor: String?,
+    ): AdministrativeLoanPageView = exchange {
+        val pageSize = validatePageRequest(limit, cursor)
+        circulationRestClient.get()
+            .uri(historyUri("/api/v1/circulation/admin/loans", status.name, limit, cursor))
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, AdministrativeLoanPageView::class.java).also {
+                    if (it.items.size > pageSize || it.items.any { loan -> loan.status != status || !loan.hasValidLifecycle() } ||
+                        !it.items.isStrictlyOrderedBy { loan -> loan.requestedAt to loan.loanId } ||
+                        !validNextCursor(it.nextCursor)) {
+                        throw CirculationProtocolException()
+                    }
+                }
+            }
+    }
+
+    fun administrativeReservations(
+        authorizedClient: OAuth2AuthorizedClient,
+        status: ReservationStatusView,
+        limit: Int?,
+        cursor: String?,
+    ): AdministrativeReservationPageView = exchange {
+        val pageSize = validatePageRequest(limit, cursor)
+        circulationRestClient.get()
+            .uri(historyUri("/api/v1/circulation/admin/reservations", status.name, limit, cursor))
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                decode(response, AdministrativeReservationPageView::class.java).also {
+                    if (it.items.size > pageSize || it.items.any { reservation -> reservation.status != status || !reservation.hasValidLifecycle() } ||
+                        !it.items.isStrictlyOrderedBy { reservation -> reservation.placedAt to reservation.reservationId } ||
+                        !validNextCursor(it.nextCursor)) {
+                        throw CirculationProtocolException()
+                    }
+                }
+            }
+    }
+
+    fun mutateAdministrativeLoan(
+        authorizedClient: OAuth2AuthorizedClient,
+        loanId: java.util.UUID,
+        operation: String,
+        idempotencyKey: String,
+    ): LoanMutationResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        if (operation !in ADMIN_LOAN_OPERATIONS) throw CirculationInvalidRequestException()
+        circulationRestClient.post()
+            .uri("/api/v1/circulation/loans/{loanId}/{operation}", loanId, operation)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                val replayed = response.headers.getFirst(IDEMPOTENCY_REPLAYED)?.let(::strictBoolean)
+                    ?: throw CirculationProtocolException()
+                val loan = decode(response, LoanCommandView::class.java)
+                if (loan.loanId != loanId || loan.status != ADMIN_LOAN_RESULTS.getValue(operation)) {
+                    throw CirculationProtocolException()
+                }
+                LoanMutationResult(loan, replayed)
+            }
+    }
+
+    fun mutateAdministrativeReservation(
+        authorizedClient: OAuth2AuthorizedClient,
+        reservationId: java.util.UUID,
+        operation: String,
+        idempotencyKey: String,
+    ): ReservationCommandResult = exchange {
+        validateIdempotencyKey(idempotencyKey)
+        if (operation !in ADMIN_RESERVATION_OPERATIONS) throw CirculationInvalidRequestException()
+        circulationRestClient.post()
+            .uri("/api/v1/circulation/reservations/{reservationId}/{operation}", reservationId, operation)
+            .header(HttpHeaders.AUTHORIZATION, bearer(authorizedClient))
+            .header(IDEMPOTENCY_KEY, idempotencyKey)
+            .exchange { _, response ->
+                handleStatus(response.statusCode.value())
+                reservationResult(response) { reservation ->
+                    if (reservation.reservationId != reservationId ||
+                        reservation.status != ADMIN_RESERVATION_RESULTS.getValue(operation)) {
+                        throw CirculationProtocolException()
+                    }
+                }
+            }
+    }
+
     private fun reservationResult(
         response: org.springframework.http.client.ClientHttpResponse,
         validator: (ReservationCommandView) -> Unit,
@@ -232,6 +335,19 @@ class CirculationClient(
             view.sourceVersion < 0 ||
             (view.reasonCode != null && !REASON_CODE.matches(view.reasonCode)) ||
             (view.status == EligibilityStatusView.ELIGIBLE) != (view.reasonCode == null)
+        ) {
+            throw CirculationProtocolException()
+        }
+    }
+
+    private fun validateOverview(view: AdministrativeCirculationOverviewView) {
+        if (listOf(
+                view.requestedLoans,
+                view.activeLoans,
+                view.overdueLoans,
+                view.waitingReservations,
+                view.readyReservations,
+            ).any { it < 0 } || view.overdueLoans > view.activeLoans
         ) {
             throw CirculationProtocolException()
         }
@@ -452,6 +568,17 @@ class CirculationClient(
         val RETRYABLE_STATUSES = setOf(429, 502, 503, 504)
         val REASON_CODE = Regex("^[A-Z][A-Z0-9_]{0,63}$")
         val CURSOR = Regex("^[A-Za-z0-9_-]{1,160}$")
+        val ADMIN_LOAN_OPERATIONS = setOf("approve", "reject", "return")
+        val ADMIN_LOAN_RESULTS = mapOf(
+            "approve" to LoanStatusView.ACTIVE,
+            "reject" to LoanStatusView.REJECTED,
+            "return" to LoanStatusView.RETURNED,
+        )
+        val ADMIN_RESERVATION_OPERATIONS = setOf("fulfill", "expire")
+        val ADMIN_RESERVATION_RESULTS = mapOf(
+            "fulfill" to ReservationStatusView.FULFILLED,
+            "expire" to ReservationStatusView.EXPIRED,
+        )
     }
 }
 

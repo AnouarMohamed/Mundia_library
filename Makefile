@@ -162,6 +162,7 @@ images-scan: images ## Match the blocking hosted Trivy scan for every deployable
 			--volume /var/run/docker.sock:/var/run/docker.sock \
 			--volume "$(TRIVY_CACHE_VOLUME):/root/.cache/trivy" \
 			$(TRIVY_IMAGE) image \
+			--timeout 15m \
 			--pkg-types os,library \
 			--severity CRITICAL,HIGH \
 			--exit-code 1 \

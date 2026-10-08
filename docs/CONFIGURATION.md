@@ -88,6 +88,32 @@ user through the privileged CLI described in
 Encrypted BFF sessions have an eight-hour absolute maximum, and institutional
 sessions are rechecked against their opaque live binding on protected access.
 
+### Kotlin Web BFF service clients
+
+The replacement Web BFF uses token exchange and separate registrations for
+self-service and privileged operations. Configure the service base URLs,
+audiences, and confidential client credentials through the secret manager; do
+not expose them through `VITE_*` or `NEXT_PUBLIC_*` variables.
+
+Circulation administration uses the `circulation-admin-service` registration,
+separate from `circulation-service`, with exactly these scopes:
+
+```text
+circulation.admin.read
+circulation.loan.approve
+circulation.loan.reject
+circulation.loan.return
+circulation.reservation.fulfill
+circulation.reservation.expire
+```
+
+The identity provider may use a distinct client ID/secret for this registration
+in protected environments even though local configuration accepts the shared
+`CIRCULATION_CLIENT_ID` and `CIRCULATION_CLIENT_SECRET` variables. Never add
+admin scopes to the self-service registration. Membership admin access likewise
+uses its dedicated registration and is rechecked against the authoritative
+Membership profile before the BFF calls Circulation.
+
 ## Docker Compose Variables
 
 `docker-compose.yml` also reads:

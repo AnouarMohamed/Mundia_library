@@ -1,6 +1,42 @@
 # API Reference
 
-This reference covers route handlers under `app/api`. Many product mutations are implemented as server actions instead of public JSON endpoints. If a workflow is not listed here, check `lib/actions/**` and `lib/admin/actions/**`.
+The repository currently has two API surfaces:
+
+1. legacy Next.js handlers under `app/api`, documented in this file; and
+2. immutable Kotlin service and Web BFF contracts under
+   `services/*/src/main/resources/static/openapi/`.
+
+The browser-facing replacement API is the same-origin Web BFF contract at
+`services/web-bff/src/main/resources/static/openapi/web-bff-v1.json`. Browsers
+must not call domain services directly. Many legacy mutations remain server
+actions; if a legacy workflow is not listed here, check `lib/actions/**` and
+`lib/admin/actions/**`.
+
+## Kotlin API entry points
+
+| Contract | Responsibility |
+| --- | --- |
+| `web-bff-v1.json` | Session-bound browser API, CSRF and idempotent mutations |
+| `membership-v1.json` | Member profile, eligibility, evidence metadata, and administration |
+| `catalog-v1.json` | Catalog search, works, editions, reviews, and learning-resource metadata |
+| `circulation-v1.json` | Copies, loans, reservations, policies, history, and staff queues |
+| `digital-content-v1.json` | Rights-aware availability and audited download authorization |
+| `notification-v1.json` | Inbox, preferences, delivery administration, and provider events |
+
+The current Web BFF administration surface includes:
+
+- `GET /api/v1/admin/members` and status decisions;
+- `GET /api/v1/admin/circulation/overview`;
+- `GET /api/v1/admin/circulation/loans`;
+- `GET /api/v1/admin/circulation/reservations`;
+- `POST /api/v1/admin/circulation/loans/{loanId}/{operation}`; and
+- `POST /api/v1/admin/circulation/reservations/{reservationId}/{operation}`.
+
+Circulation list limits are bounded and use opaque keyset cursors. Admin
+commands require a valid BFF session, fresh authoritative Membership admin
+status, CSRF, and an actor-bound `Idempotency-Key`. Exact schemas and allowed
+operations live in the committed OpenAPI documents; this narrative does not
+replace them.
 
 ## Conventions
 

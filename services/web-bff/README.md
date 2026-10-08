@@ -75,9 +75,13 @@ token must be issued only to approved administrators and is limited to the
 same `membership-api` audience plus `membership.profile.read`,
 `membership.members.read`, and `membership.status.manage`. Every administrative
 request re-reads the operator's authoritative profile and requires an approved
-`ADMIN` or `SUPER_ADMIN` before the BFF reads or mutates another account. The
-BFF exposes a bounded member queue and forwards status decisions with CSRF,
-exact `If-Match`, and idempotency protections.
+`ADMIN` or `SUPER_ADMIN`. The BFF exposes a bounded member queue and forwards
+status decisions with CSRF, exact `If-Match`, and idempotency protections.
+Circulation administration additionally exchanges a distinct
+`circulation-admin-service` token limited to queue reads, loan decisions and
+returns, and reservation fulfilment or expiry; self-service Circulation tokens
+never receive these scopes. Every browser mutation remains CSRF-protected and
+uses an actor-scoped idempotency key.
 
 The Circulation self-service routes cover eligibility, bounded keyset-paginated
 loan and reservation history, loan request/cancel/renew, and reservation

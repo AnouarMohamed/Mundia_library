@@ -3,7 +3,7 @@ package com.mundiapolis.library.bff
 import com.mundiapolis.library.bff.config.MembershipClientProperties
 import com.mundiapolis.library.bff.membership.AccountStatusView
 import com.mundiapolis.library.bff.membership.MemberProfileView
-import com.mundiapolis.library.bff.membership.MembershipAdminService
+import com.mundiapolis.library.bff.membership.MembershipAdministrativeAccess
 import com.mundiapolis.library.bff.membership.MembershipClient
 import com.mundiapolis.library.bff.membership.MembershipDelegationRejectedException
 import com.mundiapolis.library.bff.membership.MembershipRoleView
@@ -27,7 +27,7 @@ class MembershipAdminServiceTest {
     fun `administration rechecks authoritative approved role and evicts rejected delegation`() {
         val authorizer = mock(DelegatedClientAuthorizer::class.java)
         val client = mock(MembershipClient::class.java)
-        val service = MembershipAdminService(authorizer, client, properties())
+        val access = MembershipAdministrativeAccess(authorizer, client, properties())
         val authentication = mock(OAuth2AuthenticationToken::class.java)
         val request = MockHttpServletRequest()
         val response = MockHttpServletResponse()
@@ -55,7 +55,7 @@ class MembershipAdminServiceTest {
         )
 
         assertThatThrownBy {
-            service.members(authentication, request, response, AccountStatusView.PENDING, 25, null)
+            access.withVerifiedAdministrator(authentication, request, response) { error("not reached") }
         }.isInstanceOf(MembershipDelegationRejectedException::class.java)
 
         verify(authorizer).invalidate("membership-admin-service", authentication, request, response)
