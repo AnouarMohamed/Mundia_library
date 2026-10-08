@@ -2,7 +2,7 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :circulation-service:dependencies --write-locks
-at.yawk.lz4:lz4-java:1.10.1=compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
+at.yawk.lz4:lz4-java:1.11.4=compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
 biz.aQute.bnd:biz.aQute.bnd.annotation:7.1.0=compileClasspath,testCompileClasspath
 ch.qos.logback:logback-classic:1.5.38=compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath
 ch.qos.logback:logback-core:1.5.38=compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath

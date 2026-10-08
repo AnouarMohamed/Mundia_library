@@ -322,6 +322,44 @@ or reviews, private media URLs, oversized records, and mismatched review counts
 before any target batch is sent. The 128 KiB service boundary is respected with
 a 120 KiB client-side ceiling.
 
+### Legacy membership backfill
+
+The Membership importer moves profile, role, account status, and an eligibility
+snapshot in deterministic batches of at most 100. It explicitly selects only
+the required legacy columns, so password hashes and login history never enter
+the migration process. Legacy university-card locators are reduced to SHA-256
+digests and quarantined as `UNVERIFIED_LEGACY_REFERENCE`; they are not copied
+into verified evidence storage.
+
+Run against an isolated PostgreSQL 18 restore on literal loopback. Dry-run
+first, using fresh paths in a current-user-owned `0700` evidence directory:
+
+```bash
+npm run backfill:membership:kotlin -- \
+  --source-url-file /secure/legacy-membership-url \
+  --expect-database legacy_library \
+  --evidence-file /secure/membership-plan.json
+```
+
+The dry-run evidence contains only counts, digests, import IDs, and field names;
+it contains no member IDs, email addresses, document references, or credentials.
+Resolve every finding before apply. The planner blocks empty data, invalid or
+duplicate identity fields, duplicate evidence references, missing approved
+administrators, invalid eligibility counts, and oversized requests.
+
+For apply, set `MEMBERSHIP_SERVICE_URL` and a short-lived
+`MEMBERSHIP_IMPORT_BEARER_TOKEN` with only `membership.import`, then append
+`--apply` and write to a new evidence path. Every PUT is followed by a GET of
+the immutable receipt; any mismatch fails the run. The legacy schema has no fine
+payment ledger, so any positive historical loan fine is conservatively imported
+as unpaid and must be reviewed before cutover. Revoke the token after sign-off.
+
+This backfill deliberately emits no live eligibility event. Before Membership
+becomes authoritative, separately bootstrap the Circulation eligibility
+projection, compare exact member/version/count evidence, run shadow parity, and
+retain a tested rollback path. Do not infer that a successful import is a
+production cutover.
+
 Do:
 
 - Take a backup first.

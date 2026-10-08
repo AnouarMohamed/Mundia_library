@@ -1,9 +1,12 @@
 package com.mundiapolis.library.membership
 
 import com.mundiapolis.library.membership.adapter.`in`.web.ChangeAccountStatusRequest
+import com.mundiapolis.library.membership.adapter.`in`.web.LegacyMembershipImportItemRequest
+import com.mundiapolis.library.membership.adapter.`in`.web.LegacyMembershipImportRequest
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandController
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandResponse
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipReadController
+import com.mundiapolis.library.membership.dto.LegacyMembershipImportResult
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
 import com.mundiapolis.library.membership.dto.AdminMemberPage
 import com.mundiapolis.library.membership.dto.AdminMemberSummary
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.JsonNode
@@ -44,7 +48,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.0.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.1.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -57,6 +61,9 @@ class OpenApiContractTest {
         assertSchemaFields("IdentityEvidenceRef", IdentityEvidenceRef::class.java)
         assertSchemaFields("ChangeAccountStatusRequest", ChangeAccountStatusRequest::class.java)
         assertSchemaFields("MembershipCommandResponse", MembershipCommandResponse::class.java)
+        assertSchemaFields("LegacyMembershipImportRequest", LegacyMembershipImportRequest::class.java)
+        assertSchemaFields("LegacyMembershipImportItemRequest", LegacyMembershipImportItemRequest::class.java)
+        assertSchemaFields("LegacyMembershipImportResult", LegacyMembershipImportResult::class.java)
     }
 
     private fun assertSchemaFields(schemaName: String, model: Class<*>) {
@@ -101,15 +108,26 @@ class OpenApiContractTest {
         val commandBasePath = requireNotNull(
             MembershipCommandController::class.java.getAnnotation(RequestMapping::class.java),
         ).value.single()
-        val commands = MembershipCommandController::class.java.declaredMethods.mapNotNull { method ->
+        val posts = MembershipCommandController::class.java.declaredMethods.mapNotNull { method ->
             val mapping = method.getAnnotation(PostMapping::class.java) ?: return@mapNotNull null
-            val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java))
-            val scopes = SCOPE_PATTERN.findAll(authorization.value)
-                .map { match -> match.groupValues[1] }
-                .toSet()
-            Route("post", commandBasePath + mapping.value.single()) to scopes
+            Route("post", commandBasePath + mapping.value.single()) to requiredScopes(method)
         }
-        return (reads + commands).toMap()
+        val puts = MembershipCommandController::class.java.declaredMethods.mapNotNull { method ->
+            val mapping = method.getAnnotation(PutMapping::class.java) ?: return@mapNotNull null
+            Route("put", commandBasePath + mapping.value.single()) to requiredScopes(method)
+        }
+        val commandReads = MembershipCommandController::class.java.declaredMethods.mapNotNull { method ->
+            val mapping = method.getAnnotation(GetMapping::class.java) ?: return@mapNotNull null
+            Route("get", commandBasePath + mapping.value.single()) to requiredScopes(method)
+        }
+        return (reads + posts + puts + commandReads).toMap()
+    }
+
+    private fun requiredScopes(method: java.lang.reflect.Method): Set<String> {
+        val authorization = requireNotNull(method.getAnnotation(PreAuthorize::class.java))
+        return SCOPE_PATTERN.findAll(authorization.value)
+            .map { match -> match.groupValues[1] }
+            .toSet()
     }
 
     private data class Route(val method: String, val path: String)

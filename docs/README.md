@@ -74,3 +74,9 @@ Physical Catalog migration is implemented as a guarded Kotlin service import
 plus a dry-run-first operator tool. It is not a claim that production data has
 already been migrated: the remaining evidence and cutover gates are tracked in
 the production-overhaul plan and operations runbook.
+
+Membership now has the same dry-run-first, exact-reconciliation boundary for
+profiles and eligibility snapshots. Passwords are excluded, unverified legacy
+identity references are digest-only quarantine records, and historical imports
+emit no live events. Private evidence transfer, projection bootstrap, shadow
+parity, and production sign-off remain explicit gates.

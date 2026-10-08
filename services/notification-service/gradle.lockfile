@@ -2,7 +2,7 @@
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
 # To regenerate this file, run: ./gradlew :notification-service:dependencies --write-locks
-at.yawk.lz4:lz4-java:1.10.1=compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
+at.yawk.lz4:lz4-java:1.11.4=compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileProtoPath,testRuntimeClasspath
 aws.sdk.kotlin:aws-config-jvm:1.8.31=compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath
 aws.sdk.kotlin:aws-config:1.8.31=compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath
 aws.sdk.kotlin:aws-core-jvm:1.8.31=compileClasspath,compileProtoPath,productionRuntimeClasspath,runtimeClasspath,testCompileClasspath,testCompileProtoPath,testRuntimeClasspath

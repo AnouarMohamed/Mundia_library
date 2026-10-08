@@ -133,6 +133,18 @@ The legacy database URL is not accepted from the environment. Pass a private
 `0600` loopback URL file and the expected restored database name to
 `npm run backfill:catalog:kotlin`; see the operations runbook.
 
+Membership backfill uses a separate least-privilege machine identity:
+
+| Variable | Purpose |
+| --- | --- |
+| `MEMBERSHIP_SERVICE_URL` | HTTPS origin of the private Membership service used only during apply. |
+| `MEMBERSHIP_IMPORT_BEARER_TOKEN` | Short-lived token with only `membership.import`; never commit, print, or place it in evidence. |
+
+The Membership runner also rejects an ambient source URL. Pass its isolated
+PostgreSQL 18 restore through a current-user-owned `0600` file. Both variables
+above are unnecessary for the default dry run and must be removed after the
+reconciliation window.
+
 ## Docker Compose Variables
 
 `docker-compose.yml` also reads:

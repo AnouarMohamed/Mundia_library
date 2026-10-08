@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Membership API",
-    "version": "1.0.0",
-    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata, and versioned account-status commands.",
+    "version": "1.1.0",
+    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata, versioned account-status commands, and reconciled legacy imports.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [
@@ -194,6 +194,65 @@
           "409": { "$ref": "#/components/responses/Conflict" }
         }
       }
+    },
+    "/api/v1/members/legacy-imports/{importId}": {
+      "get": {
+        "operationId": "getLegacyMembershipImport",
+        "summary": "Read an immutable legacy membership import receipt",
+        "description": "Returns the durable reconciliation receipt for an exact import identifier. Member data and quarantined evidence references are not returned.",
+        "x-required-scopes": ["membership.import"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ImportId" }],
+        "responses": {
+          "200": {
+            "description": "Legacy membership import receipt",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LegacyMembershipImportResult" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "importLegacyMembershipBatch",
+        "summary": "Import one deterministic legacy membership batch",
+        "description": "Creates or exactly reconciles a bounded member batch and quarantines each unverified legacy evidence reference as a SHA-256 digest. The same import identifier is replayable only by the same actor with the same manifest.",
+        "x-required-scopes": ["membership.import"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ImportId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LegacyMembershipImportRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch imported or exact prior receipt replayed",
+            "headers": {
+              "Idempotency-Replayed": {
+                "schema": { "type": "string", "enum": ["true", "false"] }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LegacyMembershipImportResult" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "description": "The import body exceeds the bounded migration envelope" }
+        }
+      }
     }
   },
   "components": {
@@ -207,6 +266,12 @@
     "parameters": {
       "MemberId": {
         "name": "memberId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ImportId": {
+        "name": "importId",
         "in": "path",
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
@@ -348,6 +413,76 @@
           "aggregateVersion": { "type": "integer", "minimum": 1 },
           "status": { "$ref": "#/components/schemas/AccountStatus" },
           "occurredAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
+        }
+      },
+      "LegacyMembershipImportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceRevision", "items"],
+        "properties": {
+          "sourceRevision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": { "$ref": "#/components/schemas/LegacyMembershipImportItemRequest" }
+          }
+        }
+      },
+      "LegacyMembershipImportItemRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memberId",
+          "email",
+          "fullName",
+          "universityId",
+          "status",
+          "role",
+          "maxActiveLoans",
+          "currentActiveLoans",
+          "hasUnpaidOverdueFines",
+          "createdAt",
+          "updatedAt",
+          "evidenceReferenceSha256",
+          "contentSha256"
+        ],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "email": { "type": "string", "format": "email", "maxLength": 320 },
+          "fullName": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "universityId": { "type": "integer", "minimum": 1 },
+          "status": { "$ref": "#/components/schemas/AccountStatus" },
+          "role": { "$ref": "#/components/schemas/MembershipRole" },
+          "maxActiveLoans": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "currentActiveLoans": { "type": "integer", "minimum": 0, "maximum": 100 },
+          "hasUnpaidOverdueFines": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "evidenceReferenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      },
+      "LegacyMembershipImportResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "importId",
+          "sourceRevision",
+          "manifestSha256",
+          "memberCount",
+          "quarantinedEvidenceCount",
+          "completedAt",
+          "replayed"
+        ],
+        "properties": {
+          "importId": { "type": "string", "format": "uuid" },
+          "sourceRevision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "memberCount": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "quarantinedEvidenceCount": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "completedAt": { "type": "string", "format": "date-time" },
           "replayed": { "type": "boolean" }
         }
       },

@@ -17,7 +17,7 @@ actions; if a legacy workflow is not listed here, check `lib/actions/**` and
 | Contract | Responsibility |
 | --- | --- |
 | `web-bff-v1.json` | Session-bound browser API, CSRF and idempotent mutations |
-| `membership-v1.json` | Member profile, eligibility, evidence metadata, and administration |
+| `membership-v1.json` | Member profile, eligibility, evidence metadata, administration, and migration receipts |
 | `catalog-v1.json` | Catalog search, works, editions, reviews, and learning-resource metadata |
 | `circulation-v1.json` | Copies, loans, reservations, policies, history, and staff queues |
 | `digital-content-v1.json` | Rights-aware availability and audited download authorization |
@@ -52,6 +52,14 @@ scope. The PUT atomically imports a maximum of ten legacy works with editions,
 contributors, and reviews; the GET returns the immutable reconciliation
 receipt. These routes are for controlled migration jobs, never browsers, and
 historical imports intentionally do not publish live domain events.
+
+Membership exposes the equivalent machine-only `PUT|GET
+/api/v1/members/legacy-imports/{importId}` boundary under the isolated
+`membership.import` scope. Each PUT accepts at most 100 members, writes an
+actor-bound immutable receipt, and stores only a digest of each unverified
+legacy identity-document reference in quarantine. It never accepts passwords
+or treats historical documents as verified evidence. Historical imports do not
+emit live eligibility events; projection bootstrap is a separate cutover gate.
 
 ## Conventions
 

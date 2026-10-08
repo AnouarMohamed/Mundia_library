@@ -244,8 +244,15 @@ The schema is installed from
 `membership-service/src/main/resources/db/migration`. Runtime Flyway remains
 disabled by default, so production deployment must apply the reviewed migration
 with its dedicated migration role before starting this service. Membership
-writes, outbox publication, legacy backfill, and BFF cutover remain later Phase
-4 gates; the Next.js application is still authoritative for those paths.
+status writes and crash-recoverable outbox publication are implemented. The
+legacy import boundary is `PUT|GET
+/api/v1/members/legacy-imports/{importId}` with `membership.import`; batches are
+limited to 100 members and exactly replayable by the same actor and manifest.
+The importer stores no password and quarantines only the SHA-256 digest of each
+unverified legacy evidence reference. Historical import emits neither audit nor
+live eligibility events. Private evidence transfer, Circulation projection
+bootstrap, shadow comparison, and BFF cutover remain Phase 4 gates; the Next.js
+application is still authoritative until those gates pass.
 
 ## Catalog read API
 

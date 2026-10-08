@@ -29,6 +29,8 @@ class MembershipCommandConflictException(message: String) : RuntimeException(mes
 
 class MembershipCommandNotFoundException : RuntimeException("Member does not exist")
 
+class LegacyMembershipImportNotFoundException : RuntimeException("Legacy membership import does not exist")
+
 class MembershipIdempotencyConflictException :
     RuntimeException("Idempotency key was already used for different membership input")
 

@@ -114,8 +114,10 @@ are implemented in the repository:
   and target Secret names.
 
 This checkpoint is not general availability. Reservation and dynamic-policy
-capabilities are implemented and their invariant/replay suites pass, but the
-Phase 2 backfill/reconciliation exit evidence is not yet signed off. The
+capabilities are implemented and their invariant/replay suites pass. Catalog
+and Membership now have bounded, idempotent backfill mechanisms with immutable
+reconciliation receipts, but no production snapshot has been applied or signed
+off. The Phase 2 backfill/reconciliation exit evidence is not yet complete. The
 platform/IdP, remaining domain extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.
@@ -291,7 +293,7 @@ operators demonstrate rollback. Dual-writing inventory is forbidden.
 - Replace BFF database imports with service contracts.
 - Migrate identity documents to private object storage and apply retention.
 
-Implementation checkpoint (2026-09-28): Membership has a PostgreSQL-backed read
+Implementation checkpoint (2026-10-08): Membership has a PostgreSQL-backed read
 slice for authoritative profiles, fail-closed eligibility, and privacy-safe
 identity-evidence metadata. Membership now owns version-checked, actor-bound,
 idempotent account-status changes; state, privacy-minimized audit evidence, and
@@ -305,8 +307,14 @@ retries, poison-event blocking, retention cleanup, and lag/blocked readiness
 and metrics. The Kotlin BFF now routes the authenticated self-profile read
 through RFC 8693 token exchange, a fixed `/me` service route, strict
 audience/scope/claim binding, bounded network clients, and fail-closed response
-validation. Broker provisioning, remaining profile and eligibility writes,
-backfill, other BFF routes, and production cutover remain pending.
+validation. A dry-run-first legacy importer now transfers only allowlisted
+profile, role, status, and eligibility fields; passwords are never selected,
+unverified card references become digest-only quarantine entries, and exact
+actor-bound receipts make batches safely replayable. Historical imports do not
+fabricate audit entries or live events. Production snapshot execution, private
+evidence verification/transfer, Circulation eligibility projection bootstrap,
+shadow parity, broker provisioning, remaining profile and eligibility writes,
+other BFF routes, and production cutover remain pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member

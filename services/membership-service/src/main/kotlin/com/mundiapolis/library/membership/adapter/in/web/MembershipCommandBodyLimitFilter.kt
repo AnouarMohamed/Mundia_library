@@ -27,12 +27,17 @@ class MembershipCommandBodyLimitFilter : OncePerRequestFilter() {
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        if (request.contentLengthLong > MAX_COMMAND_BODY_BYTES) {
+        val maximum = if (request.requestURI.startsWith(LEGACY_IMPORT_PREFIX)) {
+            MAX_IMPORT_BODY_BYTES
+        } else {
+            MAX_COMMAND_BODY_BYTES
+        }
+        if (request.contentLengthLong > maximum) {
             writePayloadTooLarge(response)
             return
         }
-        val body = request.inputStream.readNBytes(MAX_COMMAND_BODY_BYTES + 1)
-        if (body.size > MAX_COMMAND_BODY_BYTES) {
+        val body = request.inputStream.readNBytes(maximum + 1)
+        if (body.size > maximum) {
             writePayloadTooLarge(response)
             return
         }
@@ -44,7 +49,7 @@ class MembershipCommandBodyLimitFilter : OncePerRequestFilter() {
         response.characterEncoding = StandardCharsets.UTF_8.name()
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
         response.writer.write(
-            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"Membership command body exceeds 4096 bytes","code":"payload_too_large"}""",
+            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"Membership command body exceeds its bounded limit","code":"payload_too_large"}""",
         )
     }
 
@@ -77,7 +82,9 @@ class MembershipCommandBodyLimitFilter : OncePerRequestFilter() {
 
     private companion object {
         const val MEMBERSHIP_API_PREFIX = "/api/v1/members/"
+        const val LEGACY_IMPORT_PREFIX = "/api/v1/members/legacy-imports/"
         const val MAX_COMMAND_BODY_BYTES = 4 * 1024
+        const val MAX_IMPORT_BODY_BYTES = 128 * 1024
         val BODY_METHODS = setOf("POST", "PUT", "PATCH")
     }
 }

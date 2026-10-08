@@ -8,6 +8,7 @@ import com.mundiapolis.library.membership.adapter.outbound.persistence.jooq.gene
 import com.mundiapolis.library.membership.dto.MembershipBrokerAcknowledgement
 import com.mundiapolis.library.membership.service.MembershipOutboxStore
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -22,6 +23,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -31,6 +33,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.OffsetDateTime
 import java.time.Instant
 import java.time.ZoneOffset
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.UUID
 
 @SpringBootTest
@@ -48,6 +53,8 @@ class MembershipServiceIntegrationTest {
 
     @BeforeEach
     fun seedMembership() {
+        dsl.deleteFrom(DSL.table(DSL.name("membership_legacy_import"))).execute()
+        dsl.deleteFrom(DSL.table(DSL.name("membership_legacy_evidence_quarantine"))).execute()
         dsl.deleteFrom(MEMBERSHIP_OUTBOX_EVENT).execute()
         dsl.deleteFrom(MEMBERSHIP_AUDIT_ENTRY).execute()
         dsl.deleteFrom(MEMBERSHIP_COMMAND_IDEMPOTENCY).execute()
@@ -385,6 +392,108 @@ class MembershipServiceIntegrationTest {
     }
 
     @Test
+    fun `legacy import is exact replayable scoped and quarantines unverified evidence`() {
+        val importId = UUID.fromString("80000000-0000-5000-8000-000000000008")
+        val memberId = UUID.fromString("90000000-0000-4000-8000-000000000009")
+        val sourceRevision = "b".repeat(64)
+        val evidenceDigest = "c".repeat(64)
+        val createdAt = Instant.parse("2025-09-01T10:15:30Z")
+        val updatedAt = Instant.parse("2026-09-01T10:15:30Z")
+        val contentSha256 = legacyContentSha256(
+            memberId,
+            "imported@example.test",
+            "Imported Member",
+            998877,
+            "APPROVED",
+            "USER",
+            5,
+            2,
+            true,
+            createdAt,
+            updatedAt,
+            evidenceDigest,
+        )
+        val body = """
+            {
+              "sourceRevision":"$sourceRevision",
+              "items":[{
+                "memberId":"$memberId",
+                "email":"imported@example.test",
+                "fullName":"Imported Member",
+                "universityId":998877,
+                "status":"APPROVED",
+                "role":"USER",
+                "maxActiveLoans":5,
+                "currentActiveLoans":2,
+                "hasUnpaidOverdueFines":true,
+                "createdAt":"$createdAt",
+                "updatedAt":"$updatedAt",
+                "evidenceReferenceSha256":"$evidenceDigest",
+                "contentSha256":"$contentSha256"
+              }]
+            }
+        """.trimIndent()
+        val request = put("/api/v1/members/legacy-imports/$importId")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body)
+            .with(importJwt("membership-importer"))
+
+        mockMvc.perform(request)
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.memberCount").value(1))
+            .andExpect(jsonPath("$.quarantinedEvidenceCount").value(1))
+            .andExpect(jsonPath("$.replayed").value(false))
+
+        mockMvc.perform(
+            put("/api/v1/members/legacy-imports/$importId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(importJwt("membership-importer")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        mockMvc.perform(
+            get("/api/v1/members/legacy-imports/$importId")
+                .with(importJwt("membership-importer")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.sourceRevision").value(sourceRevision))
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        mockMvc.perform(
+            put("/api/v1/members/legacy-imports/$importId")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(importJwt("different-importer")),
+        ).andExpect(status().isConflict)
+        mockMvc.perform(
+            put("/api/v1/members/legacy-imports/${UUID.randomUUID()}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body)
+                .with(jwt()),
+        ).andExpect(status().isForbidden)
+
+        val imported = dsl.selectFrom(MEMBERSHIP_MEMBER)
+            .where(MEMBERSHIP_MEMBER.MEMBER_ID.eq(memberId))
+            .fetchOne()!!
+        assertThat(imported.email).isEqualTo("imported@example.test")
+        assertThat(imported.aggregateVersion).isZero()
+        val quarantine = DSL.table(DSL.name("membership_legacy_evidence_quarantine"))
+        assertThat(dsl.fetchCount(quarantine)).isEqualTo(1)
+        assertThat(
+            dsl.select(DSL.field(DSL.name("reference_sha256"), String::class.java))
+                .from(quarantine)
+                .fetchOne(0, String::class.java)
+                ?.trim(),
+        ).isEqualTo(evidenceDigest)
+        assertThat(dsl.fetchCount(MEMBERSHIP_AUDIT_ENTRY)).isZero()
+        assertThat(dsl.fetchCount(MEMBERSHIP_OUTBOX_EVENT)).isZero()
+    }
+
+    @Test
     fun `health probes remain public`() {
         mockMvc.perform(get("/actuator/health/liveness"))
             .andExpect(status().isOk)
@@ -430,6 +539,41 @@ class MembershipServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(STATUS_MANAGE_SCOPE))
 
+    private fun importJwt(subject: String) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject(subject)
+                .claim("azp", "migration-operator")
+        }
+        .authorities(SimpleGrantedAuthority(IMPORT_SCOPE))
+
+    private fun legacyContentSha256(
+        memberId: UUID,
+        email: String,
+        fullName: String,
+        universityId: Int,
+        status: String,
+        role: String,
+        maximumLoans: Int,
+        activeLoans: Int,
+        hasUnpaidFines: Boolean,
+        createdAt: Instant,
+        updatedAt: Instant,
+        evidenceDigest: String,
+    ): String {
+        val canonical = buildString {
+            append("membership-legacy-item-v1")
+            listOf(
+                memberId.toString(), email, fullName, universityId.toString(), status, role,
+                maximumLoans.toString(), activeLoans.toString(), hasUnpaidFines.toString(),
+                createdAt.toEpochMilli().toString(), updatedAt.toEpochMilli().toString(), evidenceDigest,
+            ).forEach { value -> append('\u001f').append(value.length).append(':').append(value) }
+        }
+        return HexFormat.of().formatHex(
+            MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(StandardCharsets.UTF_8)),
+        )
+    }
+
     private companion object {
         val APPROVED_MEMBER_ID: UUID = UUID.fromString("10000000-0000-0000-0000-000000000001")
         val LIMITED_MEMBER_ID: UUID = UUID.fromString("20000000-0000-0000-0000-000000000002")
@@ -446,6 +590,7 @@ class MembershipServiceIntegrationTest {
         const val EVIDENCE_SCOPE = "SCOPE_membership.identity-evidence.read"
         const val STATUS_MANAGE_SCOPE = "SCOPE_membership.status.manage"
         const val MEMBERS_READ_SCOPE = "SCOPE_membership.members.read"
+        const val IMPORT_SCOPE = "SCOPE_membership.import"
 
         @Container
         @JvmStatic
