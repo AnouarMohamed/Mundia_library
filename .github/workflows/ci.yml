@@ -181,8 +181,8 @@ jobs:
           ENABLE_WORKFLOWS: "false"
         run: npm run build
 
-      - name: Package verified static SPA
-        run: npm run spa:package
+      - name: Build, test, and package verified static SPA
+        run: npm run spa:release
 
       - name: Upload immutable SPA deployment artifact
         if: >-
