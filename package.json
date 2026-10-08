@@ -63,6 +63,7 @@
     "import:learning-resources:arxiv": "tsx scripts/import-arxiv.ts",
     "import:learning-resources:internet-archive": "tsx scripts/import-internet-archive.ts",
     "backfill:learning-resources:kotlin": "tsx scripts/backfill-kotlin-learning-resources.ts",
+    "backfill:catalog:kotlin": "tsx scripts/backfill-kotlin-physical-catalog.ts",
     "check-all-books": "tsx scripts/check-all-books.ts",
     "fix-coding-interview": "tsx scripts/fix-coding-interview.ts"
   },

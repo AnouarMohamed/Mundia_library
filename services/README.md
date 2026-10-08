@@ -109,6 +109,21 @@ check for every batch and never logs the token. Keep the current production
 read path until the full verified dataset is reconciled, then cut the frontend
 over separately.
 
+## Physical catalog migration boundary
+
+Historical works, editions, contributors, and published reviews enter Catalog
+through `PUT /api/v1/catalog/legacy-imports/{importId}` with the machine-only
+`catalog.import` scope. Batches contain at most ten works and 1,000 reviews and
+remain below the command-body limit. Each batch is atomic, actor-bound, and
+exactly replayable; `GET` on the same URI returns its immutable receipt.
+Historical imports do not emit live outbox events. Ratings are rebuilt from the
+imported reviews so aggregate state cannot claim reviews that are absent.
+
+The operator runner requires an isolated loopback PostgreSQL 18 restore and a
+private source-URL file; it is dry-run-first and blocks the entire plan on any
+preflight finding. Production cutover remains gated on reviewed reconciliation,
+so the presence of this endpoint does not make Catalog the production writer.
+
 ## Digital content availability API
 
 Digital Content owns downloadable-file rights, immutable digests, private

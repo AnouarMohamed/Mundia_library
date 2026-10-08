@@ -69,3 +69,8 @@ The product owns catalog discovery, learning-resource provenance, physical
 circulation, member lifecycle, reviews, notifications, and staff operations. It
 does not currently own payment processing, the university identity provider,
 physical shelf/barcode reconciliation, or multi-tenant institution management.
+
+Physical Catalog migration is implemented as a guarded Kotlin service import
+plus a dry-run-first operator tool. It is not a claim that production data has
+already been migrated: the remaining evidence and cutover gates are tracked in
+the production-overhaul plan and operations runbook.

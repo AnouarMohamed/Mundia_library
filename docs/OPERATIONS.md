@@ -288,6 +288,40 @@ Actions:
 
 ## Data Repair Guidelines
 
+### Legacy physical catalog backfill
+
+The Catalog migration importer moves works, editions, contributors, and
+published legacy reviews as one bounded historical unit. It derives each work's
+rating from those reviews, writes no live outbox event, and records an immutable,
+actor-bound receipt for exact replay and reconciliation.
+
+Run it only against an isolated PostgreSQL 18 restore on literal loopback. Put
+the source URL in a current-user-owned `0600` file; ambient `DATABASE_URL` is
+deliberately ignored. Dry-run first:
+
+```bash
+npm run backfill:catalog:kotlin -- \
+  --source-url-file /secure/legacy-catalog-url \
+  --expect-database legacy_library \
+  --evidence-file /secure/catalog-plan.json
+```
+
+Resolve every reported finding before applying. For apply, obtain a temporary
+machine token whose only application scope is `catalog.import`, set
+`CATALOG_SERVICE_URL` and `CATALOG_IMPORT_BEARER_TOKEN` in the operator process,
+then add `--apply`. Store the new evidence in a current-user-owned `0700`
+directory under a fresh path: artifact creation is exclusive and will not
+overwrite prior evidence. Dry-run evidence contains counts and findings, never
+review text or member IDs. A successful run requires
+every PUT receipt to match the subsequent GET receipt exactly. Re-running the
+same batches is safe; changing the actor or payload for an existing import ID is
+rejected. Revoke the temporary client/token after sign-off.
+
+The planner blocks empty snapshots, invalid UUIDs and metadata, duplicate ISBNs
+or reviews, private media URLs, oversized records, and mismatched review counts
+before any target batch is sent. The 128 KiB service boundary is respected with
+a 120 KiB client-side ceiling.
+
 Do:
 
 - Take a backup first.

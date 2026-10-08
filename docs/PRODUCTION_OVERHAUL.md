@@ -327,6 +327,15 @@ and privacy-minimized audit/outbox events retain neither member IDs nor review
 text. Membership backfill/reconciliation, retention/deletion automation, BFF
 routing, and production cutover are not complete, so the Phase 4 exit gate
 remains open.
+Catalog now also has a bounded, actor-bound legacy backfill path for works,
+editions, contributors, and reviews. It validates the complete source snapshot
+before writes, derives aggregate ratings from imported reviews, commits each
+batch atomically without fabricating live events, and retains immutable receipts
+for exact replay and read-after-write reconciliation. The runner accepts only a
+private URL file for an isolated loopback PostgreSQL 18 restore. The mechanism
+and tests are complete; a reviewed production snapshot, signed reconciliation
+evidence, soak, rollback rehearsal, and final single-writer cutover are still
+required.
 Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one

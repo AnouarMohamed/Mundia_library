@@ -55,10 +55,13 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
+import java.util.HexFormat
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
@@ -89,6 +92,7 @@ class CatalogServiceIntegrationTest {
 
     @BeforeEach
     fun seedCatalog() {
+        dsl.deleteFrom(org.jooq.impl.DSL.table("catalog_legacy_import")).execute()
         dsl.deleteFrom(org.jooq.impl.DSL.table("catalog_learning_resource_import")).execute()
         dsl.deleteFrom(org.jooq.impl.DSL.table("catalog_learning_resource")).execute()
         dsl.deleteFrom(CATALOG_OUTBOX_EVENT).execute()
@@ -167,6 +171,79 @@ class CatalogServiceIntegrationTest {
             status = "HIDDEN",
             createdAt = NOW,
         )
+    }
+
+    @Test
+    fun `legacy catalog import is complete actor-bound and exactly replayable`() {
+        val importId = UUID.randomUUID()
+        val workId = UUID.randomUUID()
+        val editionId = UUID.randomUUID()
+        val contributorId = UUID.randomUUID()
+        val reviewId = UUID.randomUUID()
+        val memberId = UUID.randomUUID()
+        val createdAt = Instant.parse("2025-04-01T09:00:00Z")
+        val updatedAt = Instant.parse("2025-04-02T09:00:00Z")
+        val values = listOf(
+            "catalog-legacy-item-v1", workId.toString(), editionId.toString(), contributorId.toString(),
+            "Reliable Systems", "Ada Engineer", "A concise summary", "A complete description",
+            "Engineering", "5.0", "1", "9780000000999", "Open Faculty Press", "2025", "English", "320",
+            "https://example.edu/covers/reliable.jpg", "#123ABC", "", "true",
+            createdAt.toEpochMilli().toString(), updatedAt.toEpochMilli().toString(), reviewId.toString(),
+            memberId.toString(), "5", "Excellent systems guidance.", createdAt.toEpochMilli().toString(),
+            updatedAt.toEpochMilli().toString(),
+        )
+        val contentHash = sha256(values.first() + values.drop(1).joinToString("") { "\u001f${it.length}:$it" })
+        val body = """
+            {
+              "sourceRevision": "${"a".repeat(64)}",
+              "items": [{
+                "workId": "$workId", "editionId": "$editionId", "contributorId": "$contributorId",
+                "title": "Reliable Systems", "author": "Ada Engineer", "summary": "A concise summary",
+                "description": "A complete description", "genre": "Engineering", "rating": 5.0,
+                "ratingCount": 1, "isbn": "9780000000999", "publisher": "Open Faculty Press",
+                "publicationYear": 2025, "language": "English", "pageCount": 320,
+                "coverUrl": "https://example.edu/covers/reliable.jpg", "coverColor": "#123ABC",
+                "videoUrl": null, "isActive": true, "createdAt": "$createdAt", "updatedAt": "$updatedAt",
+                "reviews": [{"reviewId": "$reviewId", "memberId": "$memberId", "rating": 5,
+                  "content": "Excellent systems guidance.", "createdAt": "$createdAt", "updatedAt": "$updatedAt"}],
+                "contentSha256": "$contentHash"
+              }]
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            put("/api/v1/catalog/legacy-imports/$importId")
+                .with(legacyImportScope("catalog-migrator"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        )
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.workCount").value(1))
+            .andExpect(jsonPath("$.reviewCount").value(1))
+
+        mockMvc.perform(
+            put("/api/v1/catalog/legacy-imports/$importId")
+                .with(legacyImportScope("catalog-migrator"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        ).andExpect(status().isOk).andExpect(header().string("Idempotency-Replayed", "true"))
+
+        mockMvc.perform(get("/api/v1/catalog/legacy-imports/$importId").with(legacyImportScope("auditor")))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.reviewCount").value(1))
+            .andExpect(jsonPath("$.manifestSha256").isString)
+
+        assertEquals(1, dsl.fetchCount(CATALOG_REVIEW, CATALOG_REVIEW.REVIEW_ID.eq(reviewId)))
+        assertEquals(0, dsl.fetchCount(CATALOG_OUTBOX_EVENT))
+        assertEquals(0, dsl.fetchCount(CATALOG_AUDIT_ENTRY))
+
+        mockMvc.perform(
+            put("/api/v1/catalog/legacy-imports/$importId")
+                .with(legacyImportScope("different-migrator"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body),
+        ).andExpect(status().isConflict)
     }
 
     @Test
@@ -1406,6 +1483,18 @@ class CatalogServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(LEARNING_RESOURCE_IMPORT_SCOPE))
 
+    private fun legacyImportScope(subject: String) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject(subject)
+                .claim("azp", "catalog-migrator")
+        }
+        .authorities(SimpleGrantedAuthority(LEGACY_IMPORT_SCOPE))
+
+    private fun sha256(value: String): String = HexFormat.of().formatHex(
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8)),
+    )
+
     private fun learningResourceImportBody(resourceId: UUID): String = """
         {
           "sourceName": "University Open Press",
@@ -1467,6 +1556,7 @@ class CatalogServiceIntegrationTest {
         const val REVIEW_WRITE_SCOPE = "SCOPE_catalog.review.write"
         const val LEARNING_RESOURCE_READ_SCOPE = "SCOPE_catalog.learning-resource.read"
         const val LEARNING_RESOURCE_IMPORT_SCOPE = "SCOPE_catalog.learning-resource.import"
+        const val LEGACY_IMPORT_SCOPE = "SCOPE_catalog.import"
 
         @Container
         @JvmStatic

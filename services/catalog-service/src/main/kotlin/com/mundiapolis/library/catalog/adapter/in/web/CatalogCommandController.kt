@@ -15,7 +15,12 @@ import com.mundiapolis.library.catalog.service.CatalogCommandService
 import com.mundiapolis.library.catalog.dto.LearningResourceImportCommand
 import com.mundiapolis.library.catalog.dto.LearningResourceImportItem
 import com.mundiapolis.library.catalog.dto.LearningResourceImportResult
+import com.mundiapolis.library.catalog.dto.LegacyCatalogImportCommand
+import com.mundiapolis.library.catalog.dto.LegacyCatalogImportItem
+import com.mundiapolis.library.catalog.dto.LegacyCatalogReviewImportItem
+import com.mundiapolis.library.catalog.dto.LegacyCatalogImportResult
 import com.mundiapolis.library.catalog.service.LearningResourceService
+import com.mundiapolis.library.catalog.service.LegacyCatalogImportService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -39,6 +44,7 @@ class CatalogCommandController(
     private val commandService: CatalogCommandService,
     private val principalResolver: CatalogCommandPrincipalResolver,
     private val learningResources: LearningResourceService,
+    private val legacyCatalogImports: LegacyCatalogImportService,
 ) {
     @PostMapping("/works")
     @PreAuthorize("hasAuthority('SCOPE_catalog.manage')")
@@ -267,6 +273,46 @@ class CatalogCommandController(
     fun learningResourceImport(@PathVariable importId: UUID): LearningResourceImportResult =
         learningResources.importEvidence(importId)
 
+    @PutMapping("/legacy-imports/{importId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.import')")
+    fun importLegacyCatalog(
+        authentication: JwtAuthenticationToken,
+        @PathVariable importId: UUID,
+        @RequestBody request: LegacyCatalogImportRequest,
+    ): ResponseEntity<LegacyCatalogImportResult> {
+        val result = legacyCatalogImports.importBatch(
+            LegacyCatalogImportCommand(
+                importId,
+                request.sourceRevision,
+                request.items.map { item ->
+                    LegacyCatalogImportItem(
+                        item.workId, item.editionId, item.contributorId, item.title, item.author,
+                        item.summary, item.description, item.genre, item.rating, item.ratingCount,
+                        item.isbn, item.publisher, item.publicationYear, item.language,
+                        item.pageCount, item.coverUrl, item.coverColor, item.videoUrl, item.isActive,
+                        item.createdAt, item.updatedAt,
+                        item.reviews.map { review ->
+                            LegacyCatalogReviewImportItem(
+                                review.reviewId, review.memberId, review.rating, review.content,
+                                review.createdAt, review.updatedAt,
+                            )
+                        },
+                        item.contentSha256,
+                    )
+                },
+                principalResolver.ownerFingerprint(authentication),
+            ),
+        )
+        return ResponseEntity.ok()
+            .header(IDEMPOTENCY_REPLAYED_HEADER, result.replayed.toString())
+            .body(result)
+    }
+
+    @GetMapping("/legacy-imports/{importId}")
+    @PreAuthorize("hasAuthority('SCOPE_catalog.import')")
+    fun legacyCatalogImport(@PathVariable importId: UUID): LegacyCatalogImportResult =
+        legacyCatalogImports.importEvidence(importId)
+
     private fun created(
         execution: CatalogCommandExecution,
         location: String,
@@ -388,6 +434,46 @@ data class LearningResourceImportItemRequest(
     val accessMode: String,
     val readUrl: String?,
     val contentSha256: String,
+)
+
+data class LegacyCatalogImportRequest(
+    val sourceRevision: String,
+    val items: List<LegacyCatalogImportItemRequest>,
+)
+
+data class LegacyCatalogImportItemRequest(
+    val workId: UUID,
+    val editionId: UUID,
+    val contributorId: UUID,
+    val title: String,
+    val author: String,
+    val summary: String,
+    val description: String,
+    val genre: String,
+    val rating: Double,
+    val ratingCount: Int,
+    val isbn: String,
+    val publisher: String,
+    val publicationYear: Int,
+    val language: String,
+    val pageCount: Int,
+    val coverUrl: String?,
+    val coverColor: String?,
+    val videoUrl: String?,
+    val isActive: Boolean,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val reviews: List<LegacyCatalogReviewImportItemRequest>,
+    val contentSha256: String,
+)
+
+data class LegacyCatalogReviewImportItemRequest(
+    val reviewId: UUID,
+    val memberId: UUID,
+    val rating: Int,
+    val content: String,
+    val createdAt: Instant,
+    val updatedAt: Instant,
 )
 
 data class CatalogCommandResponse(

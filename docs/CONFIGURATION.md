@@ -122,6 +122,17 @@ distinct confidential client in protected tiers when the identity provider
 supports it. Never expose either credential through browser environment
 variables.
 
+Catalog backfill credentials are operator-only and temporary:
+
+| Variable | Purpose |
+| --- | --- |
+| `CATALOG_SERVICE_URL` | HTTPS origin of the private Catalog service used by the migration runner. |
+| `CATALOG_IMPORT_BEARER_TOKEN` | Short-lived machine token with only `catalog.import`; never commit or print it. |
+
+The legacy database URL is not accepted from the environment. Pass a private
+`0600` loopback URL file and the expected restored database name to
+`npm run backfill:catalog:kotlin`; see the operations runbook.
+
 ## Docker Compose Variables
 
 `docker-compose.yml` also reads:

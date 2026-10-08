@@ -46,6 +46,13 @@ actor-bound `Idempotency-Key`. Updates also require a quoted strong aggregate
 version in `If-Match`. Exact schemas and allowed operations live in the
 committed OpenAPI documents; this narrative does not replace them.
 
+Catalog also exposes machine-only `PUT|GET
+/api/v1/catalog/legacy-imports/{importId}` under the isolated `catalog.import`
+scope. The PUT atomically imports a maximum of ten legacy works with editions,
+contributors, and reviews; the GET returns the immutable reconciliation
+receipt. These routes are for controlled migration jobs, never browsers, and
+historical imports intentionally do not publish live domain events.
+
 ## Conventions
 
 Base URL:
