@@ -45,6 +45,7 @@ import { FIELD_NAMES, FIELD_TYPES, FIELD_PLACEHOLDERS } from "@/constants";
 import FileUpload from "@/components/FileUpload";
 import { showToast } from "@/lib/toast";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 /**
  * Props for the AuthForm component.
@@ -85,6 +86,9 @@ const AuthForm = <T extends FieldValues>({
 }: Props<T>) => {
   const router = useRouter();
   const isSignIn = type === "SIGN_IN";
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => setIsHydrated(true), []);
 
   /**
    * Initialize the form with Zod resolver.
@@ -141,7 +145,11 @@ const AuthForm = <T extends FieldValues>({
 
       {/* Main Form Section */}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <form
+          method="post"
+          onSubmit={form.handleSubmit(handleSubmit)}
+          className="space-y-4"
+        >
           {/* Dynamic Field Mapping */}
           {Object.keys(defaultValues).map((field) => (
             <FormField
@@ -212,7 +220,7 @@ const AuthForm = <T extends FieldValues>({
           <Button
             type="submit"
             className="!mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--mundia-navy)] px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-[var(--mundia-navy-strong)]"
-            disabled={isSubmitting}
+            disabled={!isHydrated || isSubmitting}
           >
             {isSubmitting
               ? isSignIn

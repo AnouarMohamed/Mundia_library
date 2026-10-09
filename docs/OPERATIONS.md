@@ -379,10 +379,29 @@ Membership takes a short share lock while persisting the immutable snapshot, so
 pages cannot mix aggregate versions. The export intentionally contains no
 name, email, identity evidence, or raw loan/fine counts.
 
-The remaining implementation gate is the Kotlin operator that verifies every
-item digest and source manifest, converts pages into bounded Circulation
-batches, and records secret-free dry-run/apply evidence. Until it exists, do
-not manually bridge the two APIs. At production cutover, freeze Membership
+Use the Kotlin operator to verify every item digest and source manifest,
+convert pages into deterministic bounded Circulation batches, and record
+secret-free evidence. Tokens are read only from the environment. Prepare a new
+owner-only evidence directory, then run dry-run first:
+
+```bash
+install -d -m 0700 /secure/mundia-cutover
+export MEMBERSHIP_SERVICE_URL=https://membership.internal.example
+export MEMBERSHIP_SNAPSHOT_BEARER_TOKEN='<short-lived-token>'
+snapshot_id="$(uuidgen)"
+make eligibility-bootstrap ELIGIBILITY_BOOTSTRAP_ARGS="--snapshot-id ${snapshot_id} --evidence-file /secure/mundia-cutover/eligibility-dry-run.json"
+```
+
+Resolve and review every finding. For apply, use a fresh evidence path, set the
+private Circulation origin and its separately audience-bound token, and append
+`--apply`. The tool refuses existing evidence files, redirects, non-HTTPS
+origins, oversized responses, invalid pages/digests/manifests, and mismatched
+PUT/GET receipts. `--allow-loopback-http` exists only for isolated local drills.
+If an apply run is interrupted between batches, rerun it with the same snapshot
+ID: deterministic batch IDs safely reconcile completed receipts before the
+operator continues. Use a new evidence path because evidence is immutable.
+
+At production cutover, freeze Membership
 eligibility writes or pause the consumer at a recorded offset, create one
 snapshot, apply and verify every receipt, resume consumption at the recorded
 boundary, and require the first later event for each changed member to be

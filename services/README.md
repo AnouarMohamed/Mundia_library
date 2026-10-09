@@ -472,6 +472,13 @@ stores immutable privacy-minimal facts, and binds creation and reads to the
 same actor. Kotlin operator automation, production reconciliation, shadow
 parity, and rollback evidence remain required.
 
+The operator is implemented in `eligibility-bootstrap-operator` and packaged as
+a non-deployable Kotlin CLI. It verifies the entire Membership manifest before
+any target mutation, derives stable batch IDs, checks every Circulation receipt,
+and writes `0600` evidence containing no bearer token or member identifier. Run
+it through `make eligibility-bootstrap`; see `docs/OPERATIONS.md` for the
+dry-run/apply sequence. Its presence is not production cutover evidence.
+
 ## Scheduled loan reminders
 
 When `LOAN_REMINDER_ENABLED=true`, Circulation scans bounded batches of active

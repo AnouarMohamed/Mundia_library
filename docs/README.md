@@ -85,5 +85,5 @@ actor-bound eligibility projection bootstrap receiver without inventing Kafka
 history. Membership also provides a consistent, immutable, privacy-minimal
 snapshot source with bounded keyset pages and compatible item digests.
 Provisioning and exercising the actual private storage/scanner pipeline,
-building the Kotlin snapshot-to-bootstrap operator, running shadow
-parity, and production sign-off remain explicit gates.
+running the implemented Kotlin snapshot-to-bootstrap operator against frozen
+production data, shadow parity, and production sign-off remain explicit gates.

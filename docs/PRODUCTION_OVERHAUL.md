@@ -323,8 +323,11 @@ The actual private bucket/scanner pipeline and lifecycle evidence are not
 provisioned by this repository. Membership now also creates actor-bound,
 immutable, privacy-minimal eligibility snapshots under a table-consistent
 source revision and serves bounded keyset pages with Circulation-compatible
-content digests. Production snapshot execution, production evidence transfer,
-the Kotlin bootstrap operator, shadow parity, broker provisioning, remaining
+content digests. A Kotlin dry-run-first operator verifies the complete source
+manifest, derives deterministic bounded Circulation batches, reconciles every
+PUT with its stored receipt, and writes owner-only evidence without credentials
+or member identifiers. Production snapshot execution, production evidence
+transfer, shadow parity, broker provisioning, remaining
 profile and eligibility writes, other BFF routes, and production cutover remain
 pending.
 Catalog now has a separate PostgreSQL-backed read

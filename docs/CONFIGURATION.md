@@ -153,6 +153,16 @@ grant either scope to browsers or administrators, or place bearer tokens in
 command history or reconciliation evidence. These credentials are only for the
 freeze/reconciliation window and are not normal runtime dependencies.
 
+The Kotlin operator reads these environment variables; tokens are deliberately
+not accepted as command-line arguments:
+
+| Variable | Purpose |
+| --- | --- |
+| `MEMBERSHIP_SERVICE_URL` | Private HTTPS Membership origin. |
+| `MEMBERSHIP_SNAPSHOT_BEARER_TOKEN` | Short-lived Membership-audience token with only `membership.eligibility.snapshot`. |
+| `CIRCULATION_SERVICE_URL` | Private HTTPS Circulation origin; required only with `--apply`. |
+| `CIRCULATION_BOOTSTRAP_BEARER_TOKEN` | Short-lived Circulation-audience token with only `circulation.eligibility.bootstrap`; required only with `--apply`. |
+
 Identity-evidence transfer uses a different short-lived machine identity with
 only `membership.identity-evidence.transfer`. Do not grant that scope to the
 browser BFF, the membership importer, or normal administrators. The external

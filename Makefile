@@ -14,7 +14,7 @@ GRADLE := ./gradlew
 TRIVY_IMAGE := aquasec/trivy:0.72.0
 TRIVY_CACHE_VOLUME := mundia-library-trivy-cache
 
-.PHONY: help toolchain bootstrap contracts database-ci spa-ci spa-release web-ci-fast web-ci services-ci migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
+.PHONY: help toolchain bootstrap contracts database-ci spa-ci spa-release web-ci-fast web-ci services-ci eligibility-bootstrap migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
 
 WEB_CI_ENV := \
 	APP_ENV=development \
@@ -88,6 +88,12 @@ web-ci: toolchain ## Run every legacy web gate against the prepared CI database
 services-ci: toolchain contracts ## Compile, test, and package all Kotlin services
 	@cd services && $(GRADLE) clean check bootJar --no-daemon --no-parallel
 
+eligibility-bootstrap: toolchain ## Run the dry-run-first Kotlin eligibility cutover operator
+	@test -n "$(ELIGIBILITY_BOOTSTRAP_ARGS)" || \
+		{ echo "ELIGIBILITY_BOOTSTRAP_ARGS is required" >&2; exit 2; }
+	@cd services && $(GRADLE) :eligibility-bootstrap-operator:bootRun \
+		--args="$(ELIGIBILITY_BOOTSTRAP_ARGS)" --no-daemon
+
 migration-tool-ci: toolchain ## Rehearse the circulation migration tool against PostgreSQL 18
 	@docker compose up -d --wait db
 	@case "$(MIGRATION_DATABASE_NAME)" in \
@@ -139,6 +145,7 @@ security-fs: toolchain ## Match the blocking hosted dependency, IaC, and secret 
 		--skip-dirs services/catalog-service/build \
 		--skip-dirs services/circulation-service/build \
 		--skip-dirs services/digital-content-service/build \
+		--skip-dirs services/eligibility-bootstrap-operator/build \
 		--skip-dirs services/membership-service/build \
 		--skip-dirs services/notification-service/build \
 		--skip-dirs services/web-bff/build \
