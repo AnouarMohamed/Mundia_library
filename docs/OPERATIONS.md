@@ -433,6 +433,7 @@ Before the staging rehearsal, run the deterministic boundary drill:
 ```bash
 make eligibility-replay-drill
 make eligibility-broker-replay-drill
+make membership-event-pipeline-drill
 ```
 
 The drill uses PostgreSQL plus the production Protobuf decoder, Kafka consumer,
@@ -454,6 +455,14 @@ CI retains its JUnit report under a commit-bound backend verification artifact.
 The isolated broker uses explicit local plaintext transport; staging and
 production remain fail-closed on authenticated TLS. Record equivalent managed
 broker settings and approvals during the controlled staging rehearsal.
+
+The pipeline drill runs both service boundaries. Membership must atomically
+commit the authoritative status transition, privacy-minimal audit evidence, and
+outbox row; its production encoder and idempotent producer must persist the
+broker acknowledgement. Circulation must then accept that exact versioned
+contract under the offset-recovery drill. This composition catches producer/
+consumer schema and delivery regressions without creating a shared runtime or
+database between the services.
 
 ### Legacy identity-evidence transfer
 

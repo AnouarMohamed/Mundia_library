@@ -470,6 +470,15 @@ committed offset, observes the fail-closed gap, resets the inactive group, and
 requires database/inbox parity plus the exact final broker offset after restart.
 CI uploads the resulting JUnit evidence under the tested commit SHA.
 
+`make membership-event-pipeline-drill` composes that consumer proof with the
+Membership producer boundary. The Membership half executes a real versioned
+status command, verifies its member update, audit row, and outbox record commit
+together, then delivers that claimed row through the production Protobuf
+encoder and idempotent Kafka publisher. It requires the acknowledgement's
+topic, partition, and offset to be persisted before an idempotent command replay
+proves no duplicate outbox event exists. The Circulation half then verifies the
+same immutable contract through restart and offset recovery into PostgreSQL.
+
 For cutover from a reconciled Membership snapshot, Circulation exposes
 `PUT|GET /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}`
 only to a machine identity carrying `circulation.eligibility.bootstrap`. Each

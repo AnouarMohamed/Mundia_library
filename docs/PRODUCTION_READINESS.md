@@ -105,6 +105,8 @@ The product is production-capable when:
 - [ ] `make eligibility-replay-drill` succeeds.
 - [ ] `make eligibility-broker-replay-drill` succeeds and its commit-bound CI
       artifact is retained.
+- [ ] `make membership-event-pipeline-drill` proves the transactional Membership
+      outbox and Circulation projection boundaries against real Kafka.
 - [ ] The managed broker topic has reviewed partitioning, authenticated TLS,
       ACLs, uncompacted ordered history, and sufficient retention.
 - [ ] The staging rehearsal records the topic, partition, starting and final

@@ -327,6 +327,7 @@ For the two eligibility cutover boundary proofs in isolation:
 ```bash
 make eligibility-replay-drill
 make eligibility-broker-replay-drill
+make membership-event-pipeline-drill
 ```
 
 ## Branch protection baseline
