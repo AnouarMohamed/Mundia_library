@@ -463,9 +463,14 @@ source version plus an immutable actor-bound receipt or rolls back completely.
 It uses the consumer's per-member advisory lock, creates no synthetic event or
 inbox record, rejects conflicting projection state, and makes the next real
 Kafka event at version `N+1` valid after bootstrap version `N`. The endpoint is
-the receiver, not a completed cutover: the Membership snapshot exporter,
-operator automation, production reconciliation, shadow parity, and rollback
-evidence remain required.
+the receiver, not a completed cutover. Membership provides the matching source
+at `PUT|GET /api/v1/members/eligibility-snapshots/{snapshotId}` plus bounded
+item pages at
+`GET /api/v1/members/eligibility-snapshots/{snapshotId}/items`, isolated by
+`membership.eligibility.snapshot`. It captures one table-consistent revision,
+stores immutable privacy-minimal facts, and binds creation and reads to the
+same actor. Kotlin operator automation, production reconciliation, shadow
+parity, and rollback evidence remain required.
 
 ## Scheduled loan reminders
 

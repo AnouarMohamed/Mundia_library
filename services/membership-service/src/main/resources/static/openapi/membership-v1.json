@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mundiapolis Membership API",
-    "version": "1.2.0",
-    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, privacy-safe identity-evidence metadata and verified transfer receipts, versioned account-status commands, and reconciled legacy imports.",
+    "version": "1.3.0",
+    "description": "Authoritative version 1 contract for member profiles, borrowing eligibility, immutable privacy-minimal eligibility snapshots, privacy-safe identity-evidence metadata and verified transfer receipts, versioned account-status commands, and reconciled legacy imports.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [
@@ -255,6 +255,70 @@
         }
       }
     },
+    "/api/v1/members/eligibility-snapshots/{snapshotId}": {
+      "get": {
+        "operationId": "getEligibilitySnapshotReceipt",
+        "summary": "Read an immutable eligibility snapshot receipt",
+        "description": "Returns reconciliation metadata only and is visible exclusively to the actor that created the snapshot.",
+        "x-required-scopes": ["membership.eligibility.snapshot"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SnapshotId" }],
+        "responses": {
+          "200": {
+            "description": "Eligibility snapshot receipt",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EligibilitySnapshotReceipt" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "createEligibilitySnapshot",
+        "summary": "Create an immutable eligibility projection snapshot",
+        "description": "Captures a consistent, privacy-minimal projection of authoritative membership eligibility. The same identifier is replayable only by the same actor.",
+        "x-required-scopes": ["membership.eligibility.snapshot"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/SnapshotId" }],
+        "responses": {
+          "200": {
+            "description": "Snapshot created or exact prior receipt replayed",
+            "headers": {
+              "Idempotency-Replayed": { "schema": { "type": "string", "enum": ["true", "false"] } }
+            },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EligibilitySnapshotReceipt" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/members/eligibility-snapshots/{snapshotId}/items": {
+      "get": {
+        "operationId": "listEligibilitySnapshotItems",
+        "summary": "Read a keyset page from an immutable eligibility snapshot",
+        "description": "Returns member identifiers and projection facts only; names, email addresses, evidence, and loan counts are excluded.",
+        "x-required-scopes": ["membership.eligibility.snapshot"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/SnapshotId" },
+          { "name": "afterMemberId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligibility snapshot page",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EligibilitySnapshotPage" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/members/legacy-imports/{importId}": {
       "get": {
         "operationId": "getLegacyMembershipImport",
@@ -342,6 +406,12 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "SnapshotId": {
+        "name": "snapshotId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "IfMatch": {
         "name": "If-Match",
         "in": "header",
@@ -356,6 +426,42 @@
       }
     },
     "schemas": {
+      "EligibilitySnapshotItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "status", "reasonCode", "sourceVersion", "sourceOccurredAt", "contentSha256"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["ELIGIBLE", "INELIGIBLE", "SUSPENDED"] },
+          "reasonCode": { "type": ["string", "null"], "enum": ["ACCOUNT_NOT_APPROVED", "ACTIVE_LOAN_LIMIT_REACHED", "UNPAID_OVERDUE_FINES", null] },
+          "sourceVersion": { "type": "integer", "minimum": 0 },
+          "sourceOccurredAt": { "type": "string", "format": "date-time" },
+          "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      },
+      "EligibilitySnapshotReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["snapshotId", "sourceRevision", "manifestSha256", "memberCount", "createdAt", "replayed"],
+        "properties": {
+          "snapshotId": { "type": "string", "format": "uuid" },
+          "sourceRevision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "manifestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "memberCount": { "type": "integer", "minimum": 1, "maximum": 10000 },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
+        }
+      },
+      "EligibilitySnapshotPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["snapshotId", "items", "nextAfterMemberId"],
+        "properties": {
+          "snapshotId": { "type": "string", "format": "uuid" },
+          "items": { "type": "array", "maxItems": 100, "items": { "$ref": "#/components/schemas/EligibilitySnapshotItem" } },
+          "nextAfterMemberId": { "type": ["string", "null"], "format": "uuid" }
+        }
+      },
       "AdminMemberPage": {
         "type": "object",
         "additionalProperties": false,

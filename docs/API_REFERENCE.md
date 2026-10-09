@@ -61,6 +61,16 @@ legacy identity-document reference in quarantine. It never accepts passwords
 or treats historical documents as verified evidence. Historical imports do not
 emit live eligibility events; projection bootstrap is a separate cutover gate.
 
+Membership exposes immutable projection snapshots at machine-only `PUT|GET
+/api/v1/members/eligibility-snapshots/{snapshotId}` and paged items at `GET
+/api/v1/members/eligibility-snapshots/{snapshotId}/items` under
+`membership.eligibility.snapshot`. Snapshot creation takes a short table share
+lock so every page belongs to one consistent source revision. Output is limited
+to member UUID, eligibility status/reason, aggregate version, source time, and
+content digest; profile fields, evidence, and loan counts are never exported.
+Snapshot IDs and reads are bound to the creating actor, pages are capped at
+100, and a snapshot is capped at 10,000 members.
+
 Circulation exposes that guarded projection boundary at machine-only `PUT|GET
 /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}` under
 `circulation.eligibility.bootstrap`. A PUT accepts at most 100 integrity-hashed

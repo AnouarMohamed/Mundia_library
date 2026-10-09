@@ -145,13 +145,13 @@ PostgreSQL 18 restore through a current-user-owned `0600` file. Both variables
 above are unnecessary for the default dry run and must be removed after the
 reconciliation window.
 
-Circulation projection bootstrap requires a third, separate temporary machine
-identity with only `circulation.eligibility.bootstrap`. Do not reuse the
-Membership importer token, grant browser or administrator clients this scope,
-or place its bearer token in command history or reconciliation evidence. The
-planned snapshot operator will use the private Circulation origin and this
-short-lived credential only during the freeze/reconciliation window; neither is
-a normal runtime dependency.
+Circulation projection bootstrap requires a temporary operator identity with
+exactly `membership.eligibility.snapshot` for the source API and
+`circulation.eligibility.bootstrap` for the target API. Use audience-restricted
+tokens for the respective services; never reuse the Membership importer token,
+grant either scope to browsers or administrators, or place bearer tokens in
+command history or reconciliation evidence. These credentials are only for the
+freeze/reconciliation window and are not normal runtime dependencies.
 
 Identity-evidence transfer uses a different short-lived machine identity with
 only `membership.identity-evidence.transfer`. Do not grant that scope to the

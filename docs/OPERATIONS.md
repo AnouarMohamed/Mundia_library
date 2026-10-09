@@ -372,14 +372,22 @@ safe replay; changing the actor or manifest for a used bootstrap ID is a
 conflict. Read the receipt back with GET and compare it exactly before signing
 off.
 
-Do not invoke this endpoint ad hoc in production. The Membership snapshot
-exporter and privacy-safe operator that calculate the canonical digests are the
-next implementation gate. Once available, freeze Membership eligibility writes
-or pause the consumer at a recorded offset, export one consistent snapshot,
-apply and verify every receipt, resume consumption at the recorded boundary,
-and require the first later event for each changed member to be version `N+1`
-after snapshot version `N`. Then run shadow parity and the rollback drill. The
-endpoint being present is not evidence that these production steps occurred.
+Do not invoke this endpoint ad hoc in production. Create the source snapshot
+with `PUT /api/v1/members/eligibility-snapshots/{snapshotId}`, then read its
+actor-bound receipt and bounded keyset pages from the corresponding GET routes.
+Membership takes a short share lock while persisting the immutable snapshot, so
+pages cannot mix aggregate versions. The export intentionally contains no
+name, email, identity evidence, or raw loan/fine counts.
+
+The remaining implementation gate is the Kotlin operator that verifies every
+item digest and source manifest, converts pages into bounded Circulation
+batches, and records secret-free dry-run/apply evidence. Until it exists, do
+not manually bridge the two APIs. At production cutover, freeze Membership
+eligibility writes or pause the consumer at a recorded offset, create one
+snapshot, apply and verify every receipt, resume consumption at the recorded
+boundary, and require the first later event for each changed member to be
+version `N+1` after snapshot version `N`. Then run shadow parity and the
+rollback drill. Endpoint presence is not evidence these steps occurred.
 
 ### Legacy identity-evidence transfer
 

@@ -320,10 +320,13 @@ quarantined digest with an opaque private-object key, normalized-media digest,
 scanner-attestation digest, retention deadline, and immutable actor-bound
 receipt. Read APIs and receipts expose none of the storage or source locators.
 The actual private bucket/scanner pipeline and lifecycle evidence are not
-provisioned by this repository. Production snapshot execution, production
-evidence transfer, the Membership snapshot exporter/bootstrap operator, shadow
-parity, broker provisioning, remaining profile and eligibility writes,
-other BFF routes, and production cutover remain pending.
+provisioned by this repository. Membership now also creates actor-bound,
+immutable, privacy-minimal eligibility snapshots under a table-consistent
+source revision and serves bounded keyset pages with Circulation-compatible
+content digests. Production snapshot execution, production evidence transfer,
+the Kotlin bootstrap operator, shadow parity, broker provisioning, remaining
+profile and eligibility writes, other BFF routes, and production cutover remain
+pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe
 published reviews, and SQL search/pagination. Review reads exclude member

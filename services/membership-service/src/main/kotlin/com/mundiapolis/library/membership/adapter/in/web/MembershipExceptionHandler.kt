@@ -8,6 +8,8 @@ import com.mundiapolis.library.membership.dto.MembershipIdempotencyConflictExcep
 import com.mundiapolis.library.membership.dto.MembershipIdempotencyIncompleteException
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportNotFoundException
 import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferNotFoundException
+import com.mundiapolis.library.membership.dto.EligibilitySnapshotConflictException
+import com.mundiapolis.library.membership.dto.EligibilitySnapshotNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -28,6 +30,7 @@ class MembershipExceptionHandler {
         MembershipCommandNotFoundException::class,
         LegacyMembershipImportNotFoundException::class,
         IdentityEvidenceTransferNotFoundException::class,
+        EligibilitySnapshotNotFoundException::class,
     )
     fun notFound(exception: RuntimeException): ProblemDetail =
         problem(HttpStatus.NOT_FOUND, "membership_command_target_not_found", exception.message)
@@ -36,6 +39,7 @@ class MembershipExceptionHandler {
         MembershipCommandConflictException::class,
         MembershipIdempotencyConflictException::class,
         MembershipIdempotencyIncompleteException::class,
+        EligibilitySnapshotConflictException::class,
     )
     fun conflict(exception: RuntimeException): ProblemDetail =
         problem(HttpStatus.CONFLICT, "membership_command_conflict", exception.message)

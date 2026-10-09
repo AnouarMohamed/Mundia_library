@@ -7,6 +7,7 @@ import com.mundiapolis.library.membership.adapter.`in`.web.IdentityEvidenceTrans
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandController
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipCommandResponse
 import com.mundiapolis.library.membership.adapter.`in`.web.MembershipReadController
+import com.mundiapolis.library.membership.adapter.`in`.web.MembershipEligibilitySnapshotController
 import com.mundiapolis.library.membership.dto.LegacyMembershipImportResult
 import com.mundiapolis.library.membership.dto.IdentityEvidenceTransferResult
 import com.mundiapolis.library.membership.dto.IdentityEvidenceRef
@@ -14,6 +15,9 @@ import com.mundiapolis.library.membership.dto.AdminMemberPage
 import com.mundiapolis.library.membership.dto.AdminMemberSummary
 import com.mundiapolis.library.membership.dto.MemberEligibility
 import com.mundiapolis.library.membership.dto.MemberProfile
+import com.mundiapolis.library.membership.dto.EligibilitySnapshotItem
+import com.mundiapolis.library.membership.dto.EligibilitySnapshotPage
+import com.mundiapolis.library.membership.dto.EligibilitySnapshotReceipt
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
@@ -50,7 +54,7 @@ class OpenApiContractTest {
     @Test
     fun `published routes and scopes match the controller exactly`() {
         assertThat(contract["openapi"].stringValue()).isEqualTo("3.1.0")
-        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.2.0")
+        assertThat(contract["info"]["version"].stringValue()).isEqualTo("1.3.0")
         assertThat(contractOperations()).isEqualTo(controllerOperations())
     }
 
@@ -68,6 +72,9 @@ class OpenApiContractTest {
         assertSchemaFields("LegacyMembershipImportResult", LegacyMembershipImportResult::class.java)
         assertSchemaFields("IdentityEvidenceTransferRequest", IdentityEvidenceTransferRequest::class.java)
         assertSchemaFields("IdentityEvidenceTransferResult", IdentityEvidenceTransferResult::class.java)
+        assertSchemaFields("EligibilitySnapshotItem", EligibilitySnapshotItem::class.java)
+        assertSchemaFields("EligibilitySnapshotPage", EligibilitySnapshotPage::class.java)
+        assertSchemaFields("EligibilitySnapshotReceipt", EligibilitySnapshotReceipt::class.java)
     }
 
     private fun assertSchemaFields(schemaName: String, model: Class<*>) {
@@ -124,7 +131,18 @@ class OpenApiContractTest {
             val mapping = method.getAnnotation(GetMapping::class.java) ?: return@mapNotNull null
             Route("get", commandBasePath + mapping.value.single()) to requiredScopes(method)
         }
-        return (reads + posts + puts + commandReads).toMap()
+        val snapshotBasePath = requireNotNull(
+            MembershipEligibilitySnapshotController::class.java.getAnnotation(RequestMapping::class.java),
+        ).value.single()
+        val snapshotReads = MembershipEligibilitySnapshotController::class.java.declaredMethods.mapNotNull { method ->
+            val mapping = method.getAnnotation(GetMapping::class.java) ?: return@mapNotNull null
+            Route("get", snapshotBasePath + mapping.value.single()) to requiredScopes(method)
+        }
+        val snapshotPuts = MembershipEligibilitySnapshotController::class.java.declaredMethods.mapNotNull { method ->
+            val mapping = method.getAnnotation(PutMapping::class.java) ?: return@mapNotNull null
+            Route("put", snapshotBasePath + mapping.value.single()) to requiredScopes(method)
+        }
+        return (reads + posts + puts + commandReads + snapshotReads + snapshotPuts).toMap()
     }
 
     private fun requiredScopes(method: java.lang.reflect.Method): Set<String> {

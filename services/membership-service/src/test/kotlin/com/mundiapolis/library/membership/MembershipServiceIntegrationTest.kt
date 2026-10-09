@@ -10,6 +10,9 @@ import com.mundiapolis.library.membership.service.MembershipOutboxStore
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hamcrest.Matchers.matchesPattern
+import org.jooq.exception.DataAccessException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -53,6 +56,15 @@ class MembershipServiceIntegrationTest {
 
     @BeforeEach
     fun seedMembership() {
+        dsl.execute("ALTER TABLE membership_eligibility_snapshot_item DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE membership_eligibility_snapshot DISABLE TRIGGER USER")
+        try {
+            dsl.deleteFrom(DSL.table(DSL.name("membership_eligibility_snapshot_item"))).execute()
+            dsl.deleteFrom(DSL.table(DSL.name("membership_eligibility_snapshot"))).execute()
+        } finally {
+            dsl.execute("ALTER TABLE membership_eligibility_snapshot_item ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE membership_eligibility_snapshot ENABLE TRIGGER USER")
+        }
         dsl.execute("ALTER TABLE membership_identity_evidence_transfer DISABLE TRIGGER USER")
         dsl.deleteFrom(DSL.table(DSL.name("membership_identity_evidence_transfer"))).execute()
         dsl.execute("ALTER TABLE membership_identity_evidence_transfer ENABLE TRIGGER USER")
@@ -605,6 +617,87 @@ class MembershipServiceIntegrationTest {
             .andExpect(status().isOk)
     }
 
+    @Test
+    fun `eligibility snapshot is actor bound immutable privacy minimal and keyset paginated`() {
+        val snapshotId = UUID.fromString("80000000-0000-0000-0000-000000000008")
+        val request = put("/api/v1/members/eligibility-snapshots/$snapshotId")
+            .with(snapshotJwt("snapshot-operator"))
+
+        mockMvc.perform(request)
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "false"))
+            .andExpect(jsonPath("$.snapshotId").value(snapshotId.toString()))
+            .andExpect(jsonPath("$.memberCount").value(4))
+            .andExpect(jsonPath("$.sourceRevision").value(matchesPattern("[a-f0-9]{64}")))
+            .andExpect(jsonPath("$.manifestSha256").value(matchesPattern("[a-f0-9]{64}")))
+
+        mockMvc.perform(request)
+            .andExpect(status().isOk)
+            .andExpect(header().string("Idempotency-Replayed", "true"))
+            .andExpect(jsonPath("$.replayed").value(true))
+
+        val firstPage = mockMvc.perform(
+            get("/api/v1/members/eligibility-snapshots/$snapshotId/items")
+                .param("limit", "2")
+                .with(snapshotJwt("snapshot-operator")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].memberId").value(APPROVED_MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.items[0].status").value("ELIGIBLE"))
+            .andExpect(jsonPath("$.items[0].reasonCode").doesNotExist())
+            .andExpect(jsonPath("$.items[0].contentSha256").value(matchesPattern("[a-f0-9]{64}")))
+            .andExpect(jsonPath("$.items[1].status").value("INELIGIBLE"))
+            .andExpect(jsonPath("$.items[1].reasonCode").value("ACTIVE_LOAN_LIMIT_REACHED"))
+            .andExpect(jsonPath("$.nextAfterMemberId").value(LIMITED_MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.items[0].email").doesNotExist())
+            .andExpect(jsonPath("$.items[0].fullName").doesNotExist())
+            .andReturn()
+        val cursor = tools.jackson.databind.ObjectMapper()
+            .readTree(firstPage.response.contentAsByteArray)["nextAfterMemberId"].stringValue()
+
+        mockMvc.perform(
+            get("/api/v1/members/eligibility-snapshots/$snapshotId/items")
+                .param("limit", "2")
+                .param("afterMemberId", cursor)
+                .with(snapshotJwt("snapshot-operator")),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].memberId").value(PENDING_MEMBER_ID.toString()))
+            .andExpect(jsonPath("$.items[0].reasonCode").value("ACCOUNT_NOT_APPROVED"))
+            .andExpect(jsonPath("$.nextAfterMemberId").doesNotExist())
+
+        mockMvc.perform(
+            get("/api/v1/members/eligibility-snapshots/$snapshotId")
+                .with(snapshotJwt("different-operator")),
+        ).andExpect(status().isNotFound)
+        mockMvc.perform(
+            put("/api/v1/members/eligibility-snapshots/$snapshotId")
+                .with(snapshotJwt("different-operator")),
+        ).andExpect(status().isConflict)
+        mockMvc.perform(
+            get("/api/v1/members/eligibility-snapshots/$snapshotId/items")
+                .param("limit", "101")
+                .with(snapshotJwt("snapshot-operator")),
+        ).andExpect(status().isBadRequest)
+        mockMvc.perform(
+            get("/api/v1/members/eligibility-snapshots/$snapshotId/items").with(jwt()),
+        ).andExpect(status().isForbidden)
+
+        assertThatThrownBy {
+            dsl.update(DSL.table(DSL.name("membership_eligibility_snapshot")))
+                .set(DSL.field(DSL.name("member_count"), Int::class.java), 3)
+                .where(DSL.field(DSL.name("snapshot_id"), UUID::class.java).eq(snapshotId))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+        assertThatThrownBy {
+            dsl.deleteFrom(DSL.table(DSL.name("membership_eligibility_snapshot_item")))
+                .where(DSL.field(DSL.name("snapshot_id"), UUID::class.java).eq(snapshotId))
+                .execute()
+        }.isInstanceOf(DataAccessException::class.java)
+    }
+
     private fun insertMember(
         memberId: UUID,
         status: String,
@@ -658,6 +751,14 @@ class MembershipServiceIntegrationTest {
         }
         .authorities(SimpleGrantedAuthority(EVIDENCE_TRANSFER_SCOPE))
 
+    private fun snapshotJwt(subject: String) = jwt()
+        .jwt {
+            it.issuer("https://issuer.example.test")
+                .subject(subject)
+                .claim("azp", "eligibility-snapshot-operator")
+        }
+        .authorities(SimpleGrantedAuthority(ELIGIBILITY_SNAPSHOT_SCOPE))
+
     private fun legacyContentSha256(
         memberId: UUID,
         email: String,
@@ -703,6 +804,7 @@ class MembershipServiceIntegrationTest {
         const val MEMBERS_READ_SCOPE = "SCOPE_membership.members.read"
         const val IMPORT_SCOPE = "SCOPE_membership.import"
         const val EVIDENCE_TRANSFER_SCOPE = "SCOPE_membership.identity-evidence.transfer"
+        const val ELIGIBILITY_SNAPSHOT_SCOPE = "SCOPE_membership.eligibility.snapshot"
 
         @Container
         @JvmStatic
