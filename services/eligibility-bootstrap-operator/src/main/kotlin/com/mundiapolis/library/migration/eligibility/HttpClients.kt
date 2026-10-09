@@ -52,17 +52,19 @@ class HttpMembershipSnapshotClient(
 
 class HttpCirculationBootstrapClient(
     baseUrl: String,
-    token: String,
+    bootstrapToken: String,
+    parityToken: String,
     allowLoopbackHttp: Boolean,
     private val transport: BoundedJsonTransport,
 ) : CirculationBootstrapClient {
     private val origin = validateOrigin(baseUrl, allowLoopbackHttp)
-    private val bearer = validateToken(token)
+    private val bootstrapBearer = validateToken(bootstrapToken)
+    private val parityBearer = validateToken(parityToken)
 
     override fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt = transport.exchange(
         origin.resolve("/api/v1/circulation/membership-eligibility-bootstrap/$bootstrapId"),
         "PUT",
-        bearer,
+        bootstrapBearer,
         request,
         BootstrapReceipt::class.java,
     )
@@ -70,9 +72,17 @@ class HttpCirculationBootstrapClient(
     override fun receipt(bootstrapId: UUID): BootstrapReceipt = transport.exchange(
         origin.resolve("/api/v1/circulation/membership-eligibility-bootstrap/$bootstrapId"),
         "GET",
-        bearer,
+        bootstrapBearer,
         body = null,
         BootstrapReceipt::class.java,
+    )
+
+    override fun eligibility(memberId: UUID): ProjectedEligibility = transport.exchange(
+        origin.resolve("/api/v1/circulation/members/$memberId/eligibility"),
+        "GET",
+        parityBearer,
+        body = null,
+        ProjectedEligibility::class.java,
     )
 }
 

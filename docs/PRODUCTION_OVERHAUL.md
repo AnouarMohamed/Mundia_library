@@ -325,9 +325,10 @@ immutable, privacy-minimal eligibility snapshots under a table-consistent
 source revision and serves bounded keyset pages with Circulation-compatible
 content digests. A Kotlin dry-run-first operator verifies the complete source
 manifest, derives deterministic bounded Circulation batches, reconciles every
-PUT with its stored receipt, and writes owner-only evidence without credentials
-or member identifiers. Production snapshot execution, production evidence
-transfer, shadow parity, broker provisioning, remaining
+PUT with its stored receipt, and uses a separate least-privilege read token to
+prove exact post-bootstrap projection parity before writing owner-only evidence
+without credentials or member identifiers. Production snapshot execution,
+production evidence transfer, soak-window shadow parity, broker provisioning, remaining
 profile and eligibility writes, other BFF routes, and production cutover remain
 pending.
 Catalog now has a separate PostgreSQL-backed read

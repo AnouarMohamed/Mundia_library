@@ -394,7 +394,11 @@ make eligibility-bootstrap ELIGIBILITY_BOOTSTRAP_ARGS="--snapshot-id ${snapshot_
 
 Resolve and review every finding. For apply, use a fresh evidence path, set the
 private Circulation origin and its separately audience-bound token, and append
-`--apply`. The tool refuses existing evidence files, redirects, non-HTTPS
+`--apply`. Provide a second short-lived token with only
+`circulation.eligibility.read.any` as `CIRCULATION_PARITY_BEARER_TOKEN`; the
+operator reads every resulting projection and requires exact status, reason,
+source version, timestamp, count, and revision parity before it writes evidence.
+The tool refuses existing evidence files, redirects, non-HTTPS
 origins, oversized responses, invalid pages/digests/manifests, and mismatched
 PUT/GET receipts. `--allow-loopback-http` exists only for isolated local drills.
 If an apply run is interrupted between batches, rerun it with the same snapshot
@@ -405,8 +409,9 @@ At production cutover, freeze Membership
 eligibility writes or pause the consumer at a recorded offset, create one
 snapshot, apply and verify every receipt, resume consumption at the recorded
 boundary, and require the first later event for each changed member to be
-version `N+1` after snapshot version `N`. Then run shadow parity and the
-rollback drill. Endpoint presence is not evidence these steps occurred.
+version `N+1` after snapshot version `N`. The operator's immediate exact parity
+check does not replace soak-window shadow parity or the rollback drill. Endpoint
+presence is not evidence these steps occurred.
 
 ### Legacy identity-evidence transfer
 

@@ -45,6 +45,7 @@ class EvidenceWriterTest {
         memberCount = 1,
         batchSize = 100,
         batches = emptyList(),
+        parity = null,
         generatedAt = Instant.parse("2026-10-09T00:00:00Z"),
     )
 }

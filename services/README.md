@@ -469,13 +469,15 @@ item pages at
 `GET /api/v1/members/eligibility-snapshots/{snapshotId}/items`, isolated by
 `membership.eligibility.snapshot`. It captures one table-consistent revision,
 stores immutable privacy-minimal facts, and binds creation and reads to the
-same actor. Kotlin operator automation, production reconciliation, shadow
-parity, and rollback evidence remain required.
+same actor. Production execution, soak-window shadow parity, and rollback
+evidence remain required.
 
 The operator is implemented in `eligibility-bootstrap-operator` and packaged as
 a non-deployable Kotlin CLI. It verifies the entire Membership manifest before
 any target mutation, derives stable batch IDs, checks every Circulation receipt,
-and writes `0600` evidence containing no bearer token or member identifier. Run
+then reads every target projection through a separate least-privilege token and
+requires exact source parity. It writes `0600` evidence containing no bearer
+token or member identifier. Run
 it through `make eligibility-bootstrap`; see `docs/OPERATIONS.md` for the
 dry-run/apply sequence. Its presence is not production cutover evidence.
 

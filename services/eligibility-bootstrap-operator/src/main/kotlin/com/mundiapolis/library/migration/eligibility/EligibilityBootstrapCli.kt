@@ -24,6 +24,7 @@ fun main(arguments: Array<String>) {
             HttpCirculationBootstrapClient(
                 requiredEnvironment("CIRCULATION_SERVICE_URL"),
                 requiredEnvironment("CIRCULATION_BOOTSTRAP_BEARER_TOKEN"),
+                requiredEnvironment("CIRCULATION_PARITY_BEARER_TOKEN"),
                 options.allowLoopbackHttp,
                 transport,
             )

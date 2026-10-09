@@ -162,6 +162,7 @@ not accepted as command-line arguments:
 | `MEMBERSHIP_SNAPSHOT_BEARER_TOKEN` | Short-lived Membership-audience token with only `membership.eligibility.snapshot`. |
 | `CIRCULATION_SERVICE_URL` | Private HTTPS Circulation origin; required only with `--apply`. |
 | `CIRCULATION_BOOTSTRAP_BEARER_TOKEN` | Short-lived Circulation-audience token with only `circulation.eligibility.bootstrap`; required only with `--apply`. |
+| `CIRCULATION_PARITY_BEARER_TOKEN` | Separate short-lived Circulation-audience token with only `circulation.eligibility.read.any`; required only with `--apply` for exact post-bootstrap reads. |
 
 Identity-evidence transfer uses a different short-lived machine identity with
 only `membership.identity-evidence.transfer`. Do not grant that scope to the

@@ -38,10 +38,12 @@ class EligibilityBootstrapOperatorTest {
         )
 
         assertThat(evidence.mode).isEqualTo("APPLY")
+        assertThat(evidence.schemaVersion).isEqualTo(2)
         assertThat(evidence.memberCount).isEqualTo(205)
         assertThat(evidence.batches).hasSize(3)
         assertThat(evidence.batches.map { it.memberCount }).containsExactly(100, 100, 5)
         assertThat(evidence.batches).allMatch { it.applied && it.replayed == false }
+        assertThat(evidence.parity).isEqualTo(ParityEvidence(205, fixture.sourceRevision))
         assertThat(target.requests.keys).containsExactlyElementsOf(
             (0..2).map { EligibilityIntegrity.bootstrapId(SNAPSHOT_ID, it) },
         )
@@ -58,6 +60,7 @@ class EligibilityBootstrapOperatorTest {
         assertThat(evidence.mode).isEqualTo("DRY_RUN")
         assertThat(evidence.batches).hasSize(2)
         assertThat(evidence.batches).allMatch { !it.applied && it.replayed == null }
+        assertThat(evidence.parity).isNull()
     }
 
     @Test
@@ -73,6 +76,19 @@ class EligibilityBootstrapOperatorTest {
         }.isInstanceOf(OperatorValidationException::class.java)
             .hasMessage("Snapshot item digest is invalid")
         assertThat(target.requests).isEmpty()
+    }
+
+    @Test
+    fun `apply fails closed when the post-bootstrap projection differs`() {
+        val fixture = Fixture(memberCount = 2)
+        val target = RecordingCirculationClient().apply { corruptMemberId = fixture.items.last().memberId }
+
+        assertThatThrownBy {
+            EligibilityBootstrapOperator(fixture.source, target, CLOCK).execute(
+                OperatorCommand(SNAPSHOT_ID, batchSize = 100, apply = true),
+            )
+        }.isInstanceOf(OperatorValidationException::class.java)
+            .hasMessage("Circulation eligibility projection differs from the source snapshot")
     }
 
     @Test
@@ -121,6 +137,7 @@ class EligibilityBootstrapOperatorTest {
             )
             raw.copy(contentSha256 = EligibilityIntegrity.itemHash(raw))
         }.toMutableList()
+        val sourceRevision: String = EligibilityIntegrity.sourceRevision(items)
         val source = FakeMembershipClient(items)
     }
 
@@ -151,6 +168,7 @@ class EligibilityBootstrapOperatorTest {
     private class RecordingCirculationClient : CirculationBootstrapClient {
         val requests = linkedMapOf<UUID, BootstrapRequest>()
         var receiptReads = 0
+        var corruptMemberId: UUID? = null
 
         override fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt {
             requests[bootstrapId] = request
@@ -160,6 +178,17 @@ class EligibilityBootstrapOperatorTest {
         override fun receipt(bootstrapId: UUID): BootstrapReceipt {
             receiptReads += 1
             return result(bootstrapId, requireNotNull(requests[bootstrapId]), replayed = true)
+        }
+
+        override fun eligibility(memberId: UUID): ProjectedEligibility {
+            val item = requests.values.asSequence().flatMap { it.items }.single { it.memberId == memberId }
+            return ProjectedEligibility(
+                item.memberId,
+                if (item.memberId == corruptMemberId) EligibilityStatus.SUSPENDED else item.status,
+                if (item.memberId == corruptMemberId) "SECURITY_HOLD" else item.reasonCode,
+                item.sourceVersion,
+                item.sourceOccurredAt,
+            )
         }
 
         private fun result(bootstrapId: UUID, request: BootstrapRequest, replayed: Boolean) = BootstrapReceipt(

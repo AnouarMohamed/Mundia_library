@@ -40,6 +40,7 @@ class EligibilityBootstrapOperator(
                 applyBatch(index, bootstrapId, receipt.sourceRevision, batch, expectedManifest)
             }
         }
+        val parity = if (command.apply) verifyTargetParity(items, receipt.sourceRevision) else null
         return OperatorEvidence(
             mode = if (command.apply) "APPLY" else "DRY_RUN",
             snapshotId = command.snapshotId,
@@ -48,8 +49,34 @@ class EligibilityBootstrapOperator(
             memberCount = receipt.memberCount,
             batchSize = command.batchSize,
             batches = batches,
+            parity = parity,
             generatedAt = clock.instant(),
         )
+    }
+
+    private fun verifyTargetParity(items: List<SnapshotItem>, sourceRevision: String): ParityEvidence {
+        val target = requireNotNull(circulation)
+        val observed = items.map { expected ->
+            val projection = target.eligibility(expected.memberId)
+            val unsigned = SnapshotItem(
+                projection.memberId,
+                projection.status,
+                projection.reasonCode,
+                projection.sourceVersion,
+                projection.sourceOccurredAt,
+                "",
+            )
+            val actual = unsigned.copy(contentSha256 = EligibilityIntegrity.itemHash(unsigned))
+            if (actual != expected) {
+                throw OperatorValidationException("Circulation eligibility projection differs from the source snapshot")
+            }
+            actual
+        }
+        val observedRevision = EligibilityIntegrity.sourceRevision(observed)
+        if (observedRevision != sourceRevision) {
+            throw OperatorValidationException("Circulation eligibility projection revision is invalid")
+        }
+        return ParityEvidence(observed.size, observedRevision)
     }
 
     private fun readAll(command: OperatorCommand, receipt: SnapshotReceipt): List<SnapshotItem> {

@@ -47,6 +47,14 @@ data class BootstrapReceipt(
     val replayed: Boolean,
 )
 
+data class ProjectedEligibility(
+    val memberId: UUID,
+    val status: EligibilityStatus,
+    val reasonCode: String?,
+    val sourceVersion: Long,
+    val sourceOccurredAt: Instant,
+)
+
 data class BatchEvidence(
     val batchIndex: Int,
     val bootstrapId: UUID,
@@ -56,8 +64,13 @@ data class BatchEvidence(
     val replayed: Boolean?,
 )
 
+data class ParityEvidence(
+    val verifiedMemberCount: Int,
+    val sourceRevision: String,
+)
+
 data class OperatorEvidence(
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val mode: String,
     val snapshotId: UUID,
     val sourceRevision: String,
@@ -65,6 +78,7 @@ data class OperatorEvidence(
     val memberCount: Int,
     val batchSize: Int,
     val batches: List<BatchEvidence>,
+    val parity: ParityEvidence?,
     val generatedAt: Instant,
 )
 
@@ -86,6 +100,8 @@ interface CirculationBootstrapClient {
     fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt
 
     fun receipt(bootstrapId: UUID): BootstrapReceipt
+
+    fun eligibility(memberId: UUID): ProjectedEligibility
 }
 
 class OperatorValidationException(message: String) : RuntimeException(message)
