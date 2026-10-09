@@ -1583,10 +1583,13 @@ class CirculationPhase2IntegrationTest {
         val recoveryConsumer = eligibilityKafkaConsumer(recoveryKafka)
         recoveryConsumer.start()
         awaitCondition {
-            dsl.select(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION)
+            val sourceVersion = dsl.select(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION)
                 .from(CIRCULATION_MEMBER_ELIGIBILITY)
                 .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
-                .fetchSingle(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION) == 9L
+                .fetchSingle(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION)
+            sourceVersion == 9L &&
+                recoveryKafka.commitCount == 2 &&
+                recoveryKafka.lastCommittedOffset == 2L
         }
         recoveryConsumer.stop()
 
