@@ -90,6 +90,7 @@ The product is production-capable when:
 
 ### Build And Runtime
 
+- [ ] `make ci` succeeds with the supported Node.js 24 and JDK 25 toolchains.
 - [ ] `npm ci` succeeds.
 - [ ] `npm run lint` succeeds.
 - [ ] `npm run typecheck` succeeds.
@@ -98,6 +99,20 @@ The product is production-capable when:
 - [ ] Docker build succeeds if Docker deployment is in scope.
 - [ ] Production deployment serves the expected commit.
 - [ ] App logs are accessible.
+
+### Event Broker And Cutover
+
+- [ ] `make eligibility-replay-drill` succeeds.
+- [ ] `make eligibility-broker-replay-drill` succeeds and its commit-bound CI
+      artifact is retained.
+- [ ] The managed broker topic has reviewed partitioning, authenticated TLS,
+      ACLs, uncompacted ordered history, and sufficient retention.
+- [ ] The staging rehearsal records the topic, partition, starting and final
+      offsets, consumer group, reset authority, parity result, and approver.
+- [ ] Gap recovery is rehearsed only with the consumer stopped; production
+      events are never fabricated, skipped, or reordered.
+- [ ] The Membership snapshot, Circulation bootstrap receipts, soak parity,
+      first `N+1` event, and migration-identity revocation evidence agree.
 
 ### API Performance
 
@@ -186,6 +201,8 @@ Track these remaining items as production maturity work:
 - Add visual regression coverage for main pages.
 - Add stricter package artifact generation script.
 - Confirm backup and restore drill with actual production provider.
+- Rehearse the eligibility cutover against the selected managed staging broker
+  and retain provider configuration, offset, parity, and approval evidence.
 
 ## Definition Of Done For Production Features
 

@@ -26,18 +26,35 @@ Triggers:
 
 Jobs:
 
+- `platform`
+  - Validates Helm, GitOps, admission-policy, and Terraform contracts
 - `quality`
-  - Installs dependencies with lockfile
-  - Runs lint
-  - Runs strict TypeScript typecheck
-  - Runs production build with CI-safe environment values
+  - Audits the complete npm graph
+  - Runs lint, strict typechecking, unit tests, browser security/mobile tests,
+    the legacy production build, and the checksummed static-SPA release build
+- `circulation-migration-tool`
+  - Rehearses the reviewed migration runner against PostgreSQL 18
+- `migration`
+  - Applies the canonical legacy schema and verifies seed, concurrency, and
+    distributed rate-limit invariants
+- `backend-services`
+  - Compiles, tests, and packages every Kotlin service on JDK 25
+  - Runs isolated PostgreSQL/Kafka integration suites, including eligibility
+    cutover offset recovery, and retains commit-bound JUnit evidence
 - `docker`
-  - Builds the production Docker image
+  - Builds all seven deployable images
   - Uses Buildx and GitHub Actions cache for speed
+- `publish-containers`
+  - After every blocking job succeeds on `main` or a release tag, publishes
+    immutable multi-architecture GHCR images with SBOM/provenance evidence
 
 Required checks recommendation:
 
-- `Quality (Lint, Typecheck, Build)`
+- `Platform Contract`
+- `Quality (Lint, Typecheck, Test, E2E, Build)`
+- `Circulation Migration Tool (PostgreSQL 18)`
+- `Fresh Database Migration`
+- `Backend Services (JDK 25)`
 - `Docker Image Build`
 
 ### 2) CodeQL Security Scan
@@ -299,13 +316,17 @@ Purpose:
 
 ## Local parity commands
 
-Run these commands before pushing if you want parity with CI quality checks:
+Run the repository CI mirror before pushing:
 
 ```bash
-npm ci
-npm run lint
-npm run typecheck
-npm run build
+make ci
+```
+
+For the two eligibility cutover boundary proofs in isolation:
+
+```bash
+make eligibility-replay-drill
+make eligibility-broker-replay-drill
 ```
 
 ## Branch protection baseline

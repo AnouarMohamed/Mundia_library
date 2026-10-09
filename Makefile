@@ -14,7 +14,7 @@ GRADLE := ./gradlew
 TRIVY_IMAGE := aquasec/trivy:0.72.0
 TRIVY_CACHE_VOLUME := mundia-library-trivy-cache
 
-.PHONY: help toolchain bootstrap contracts database-ci spa-ci spa-release web-ci-fast web-ci services-ci eligibility-bootstrap eligibility-replay-drill migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
+.PHONY: help toolchain bootstrap contracts database-ci spa-ci spa-release web-ci-fast web-ci services-ci eligibility-bootstrap eligibility-replay-drill eligibility-broker-replay-drill migration-tool-ci platform-ci images security-fs images-scan security-ci ci-fast ci
 
 WEB_CI_ENV := \
 	APP_ENV=development \
@@ -97,6 +97,10 @@ eligibility-bootstrap: toolchain ## Run the dry-run-first Kotlin eligibility cut
 eligibility-replay-drill: toolchain ## Rehearse fail-closed Kafka gap recovery against PostgreSQL
 	@cd services && $(GRADLE) :circulation-service:test --no-daemon \
 		--tests '*CirculationPhase2IntegrationTest.membership eligibility cutover rejects gaps then replays the exact Kafka boundary'
+
+eligibility-broker-replay-drill: toolchain ## Rehearse eligibility offset recovery through a real Kafka broker
+	@cd services && $(GRADLE) :circulation-service:test --no-daemon \
+		--tests '*MembershipEligibilityKafkaBrokerReplayIntegrationTest'
 
 migration-tool-ci: toolchain ## Rehearse the circulation migration tool against PostgreSQL 18
 	@docker compose up -d --wait db

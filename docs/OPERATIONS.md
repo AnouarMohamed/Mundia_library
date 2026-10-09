@@ -432,6 +432,7 @@ Before the staging rehearsal, run the deterministic boundary drill:
 
 ```bash
 make eligibility-replay-drill
+make eligibility-broker-replay-drill
 ```
 
 The drill uses PostgreSQL plus the production Protobuf decoder, Kafka consumer,
@@ -443,6 +444,16 @@ report with the release evidence. This does not replace a controlled staging
 broker rehearsal: record its topic, partition, starting offset, retention,
 consumer-group state, final offset, exact parity result, and approver. Never
 manufacture events or perform this failure drill against the production topic.
+
+The broker drill provisions an isolated Kafka topic with one ordered partition,
+delete retention, and a 30-day retention window. It writes `N+1` and `N+2`,
+deliberately positions the consumer group at `N+2`, proves the service halts
+without advancing the committed offset, resets the stopped group to `N+1`, and
+proves a fresh production consumer reaches exact database and offset parity.
+CI retains its JUnit report under a commit-bound backend verification artifact.
+The isolated broker uses explicit local plaintext transport; staging and
+production remain fail-closed on authenticated TLS. Record equivalent managed
+broker settings and approvals during the controlled staging rehearsal.
 
 ### Legacy identity-evidence transfer
 

@@ -355,6 +355,17 @@ jobs:
         # startup health check while Kotlin compilation is saturating the host.
         run: ./gradlew clean check bootJar --no-daemon --no-parallel
 
+      - name: Upload backend verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: backend-verification-${{ github.sha }}
+          path: |
+            services/*/build/test-results/test/*.xml
+            services/*/build/reports/tests/test
+          if-no-files-found: error
+          retention-days: 30
+
   docker:
     name: Docker Image Build
     if: github.event_name == 'push'

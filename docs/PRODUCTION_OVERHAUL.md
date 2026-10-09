@@ -367,6 +367,10 @@ The automated `make eligibility-replay-drill` gate now proves the bootstrapped
 recovery, and ordered replay through the real Circulation persistence path.
 Production-shaped broker retention, offset, and approval evidence remains an
 open release gate.
+An isolated real-broker companion gate now verifies topic retention, committed
+group offsets, restart behavior, and exact projection recovery through
+`make eligibility-broker-replay-drill`; CI retains its commit-bound report.
+Managed staging broker configuration and human approval evidence remain open.
 Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one

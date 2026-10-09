@@ -463,6 +463,13 @@ and commits each offset only after its database transaction. This is repeatable
 CI/staging evidence; the approved environment must still retain its broker
 offset, retention, and operator sign-off artifacts.
 
+`make eligibility-broker-replay-drill` adds an isolated real Kafka broker to
+that proof. It validates the topic's ordered single-partition and 30-day delete
+retention contract, starts the real consumer from a deliberately incorrect
+committed offset, observes the fail-closed gap, resets the inactive group, and
+requires database/inbox parity plus the exact final broker offset after restart.
+CI uploads the resulting JUnit evidence under the tested commit SHA.
+
 For cutover from a reconciled Membership snapshot, Circulation exposes
 `PUT|GET /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}`
 only to a machine identity carrying `circulation.eligibility.bootstrap`. Each
