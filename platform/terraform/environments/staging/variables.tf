@@ -46,3 +46,19 @@ variable "configuration" {
     })
   })
 }
+
+variable "managed_kafka" {
+  description = "Paid staging MSK rehearsal capacity. Keep disabled until cost and change approval."
+  type = object({
+    enabled                  = bool
+    kafka_version            = string
+    broker_instance_type     = string
+    broker_count             = number
+    broker_volume_gib        = number
+    replication_factor       = number
+    minimum_in_sync_replicas = number
+    at_rest_kms_key_arn      = string
+    log_kms_key_arn          = string
+    scram_secret_arns        = set(string)
+  })
+}

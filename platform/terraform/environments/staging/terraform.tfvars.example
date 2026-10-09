@@ -40,3 +40,22 @@ configuration = {
     ]
   }
 }
+
+# Amazon MSK has no always-free tier. Keep this false until a reviewed plan,
+# explicit cost approval, and a scheduled staging rehearsal are in place.
+managed_kafka = {
+  enabled                  = false
+  kafka_version            = "REPLACE_APPROVED_MSK_KAFKA_VERSION"
+  broker_instance_type     = "kafka.REPLACE_CAPACITY_TESTED_INSTANCE_TYPE"
+  broker_count             = 3
+  broker_volume_gib        = 100
+  replication_factor       = 3
+  minimum_in_sync_replicas = 2
+  at_rest_kms_key_arn      = "arn:aws:kms:REPLACE_REGION:REPLACE_ACCOUNT:key/REPLACE_MSK_KMS_KEY_ID"
+  log_kms_key_arn          = "arn:aws:kms:REPLACE_REGION:REPLACE_ACCOUNT:key/REPLACE_LOG_KMS_KEY_ID"
+  scram_secret_arns = [
+    "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:AmazonMSK_mundia-staging-membership-producer",
+    "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:AmazonMSK_mundia-staging-circulation-consumer",
+    "arn:aws:secretsmanager:REPLACE_REGION:REPLACE_ACCOUNT:secret:AmazonMSK_mundia-staging-operations-admin"
+  ]
+}

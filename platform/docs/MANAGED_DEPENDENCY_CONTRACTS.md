@@ -38,6 +38,22 @@ Production requires TLS hostname/CA validation, broker authentication, schema
 compatibility policy, replay/quarantine procedures, per-tenant abuse limits,
 and capacity evidence at the 5× burst target.
 
+The staging root contains an opt-in Amazon MSK rehearsal module. It accepts
+only private subnets, approved client security groups, customer-managed KMS key
+ARNs, and pre-created `AmazonMSK_` Secrets Manager ARNs. It never generates or
+stores SCRAM usernames or passwords. The cluster rejects plaintext and
+unauthenticated clients, disables automatic topic creation and unclean leader
+election, requires multi-replica acknowledgement, and retains encrypted broker
+logs. Membership producer, Circulation consumer, and operations identities use
+separate SCRAM secrets and broker ACLs.
+
+MSK is a paid dependency and has no always-free tier. The example keeps
+`managed_kafka.enabled = false`; enabling or applying it requires an approved
+cost estimate and change window. Terraform creates the broker boundary, not
+topics or ACLs. The controlled rehearsal must create the reviewed one-partition
+eligibility topic and least-privilege ACLs through the separately authenticated
+operations path, then retain their broker-native descriptions as evidence.
+
 ## Redis
 
 Redis is ephemeral. The secret contains a private TLS URL and credentials. It
@@ -90,4 +106,3 @@ telemetry secret contains the complete authorization header value. The OTel
 gateway removes authorization, cookie, end-user, and SQL-statement attributes
 before export. Security still needs to approve attribute allowlists, sampling,
 retention, residency, and backend access.
-

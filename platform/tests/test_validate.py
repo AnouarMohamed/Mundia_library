@@ -60,6 +60,32 @@ class PlatformValidationTest(unittest.TestCase):
     def test_workload_git_cannot_manage_platform_secret_or_rbac_boundaries(self) -> None:
         self.assertEqual([], VALIDATION.validate_gitops_boundaries())
 
+    def test_paid_staging_kafka_is_explicitly_opt_in(self) -> None:
+        example = (
+            PLATFORM_ROOT
+            / "terraform"
+            / "environments"
+            / "staging"
+            / "terraform.tfvars.example"
+        ).read_text(encoding="utf-8")
+        self.assertIn("managed_kafka = {", example)
+        self.assertRegex(example, r"(?m)^\s*enabled\s+= false$")
+        self.assertNotIn("sasl.jaas.config", example)
+
+    def test_managed_kafka_contract_keeps_secrets_out_of_terraform(self) -> None:
+        module = PLATFORM_ROOT / "terraform" / "modules" / "aws-msk"
+        main = (module / "main.tf").read_text(encoding="utf-8")
+        variables = (module / "variables.tf").read_text(encoding="utf-8")
+        outputs = (module / "outputs.tf").read_text(encoding="utf-8")
+        self.assertIn("aws_msk_scram_secret_association", main)
+        self.assertIn("secret_arn_list", main)
+        self.assertRegex(
+            outputs,
+            r'(?s)output "bootstrap_brokers_sasl_scram".*?sensitive\s+= true',
+        )
+        self.assertNotRegex(main, r'(?m)^\s*(username|password)\s*=')
+        self.assertNotRegex(variables, r'(?m)^variable "(username|password)"')
+
     def test_suffixed_helm_resource_names_remain_valid_at_maximum_fullname(self) -> None:
         result = subprocess.run(
             [

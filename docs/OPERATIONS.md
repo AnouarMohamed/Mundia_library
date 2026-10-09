@@ -464,6 +464,40 @@ contract under the offset-recovery drill. This composition catches producer/
 consumer schema and delivery regressions without creating a shared runtime or
 database between the services.
 
+### Managed staging Kafka rehearsal
+
+Amazon MSK is not an always-free service. Do not change the staging example's
+`managed_kafka.enabled` value or apply its Terraform until the projected broker,
+storage, log, NAT, and data-transfer cost has explicit approval. A plan is not
+permission to apply.
+
+The staging module provisions private TLS-only brokers with SCRAM, customer-
+managed encryption, encrypted retained logs, and an ingress allowlist bound to
+the EKS security group. Supply only pre-created `AmazonMSK_` secret ARNs; never
+put SCRAM material in tfvars, a Terraform output, a command line, or evidence.
+Use distinct Membership producer, Circulation consumer, and operations admin
+identities. Through the operations identity, create
+`mundia.membership.events.v1` with one partition, delete retention of at least
+30 days, replication factor three, and minimum in-sync replicas two. Disable
+automatic topic creation and grant only:
+
+- Membership producer: describe/write on the exact topic;
+- Circulation consumer: describe/read on the exact topic and read on
+  `mundia-circulation-membership-v1` only;
+- operations: the bounded topic/ACL/consumer-group actions required for the
+  scheduled rehearsal, using a short-lived credential.
+
+With the consumer stopped, capture the topic description, retention, starting
+offset and committed group offset. Start Membership and require its production
+outbox to publish `N+1`; start Circulation and require projection/inbox parity
+at `N+1` plus a committed offset exactly one beyond that record. Restart the
+consumer and prove no duplicate projection mutation. Record cluster ARN, topic,
+partition, configuration revision, start/final offsets, group, service image
+digests, parity result, timestamps, operator, approver and linked log evidence.
+Do not record bootstrap endpoints, usernames, passwords, JAAS configuration,
+tokens, or secret ARNs. The production-readiness gate remains open until this
+real managed-broker evidence is reviewed.
+
 ### Legacy identity-evidence transfer
 
 Never copy a legacy card reference directly into Membership. Resolve it only

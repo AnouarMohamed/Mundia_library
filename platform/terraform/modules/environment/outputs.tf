@@ -22,7 +22,10 @@ output "external_secrets_role_arn" {
   value = module.external_secrets_identity.role_arn
 }
 
+output "cluster_security_group_id" {
+  value = module.cluster.cluster_security_group_id
+}
+
 output "dependency_endpoints" {
   value = module.dependencies.endpoints
 }
-

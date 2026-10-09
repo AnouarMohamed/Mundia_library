@@ -853,6 +853,17 @@ def validate_terraform_contract() -> list[str]:
             "map_public_ip_on_launch = false",
             "aws_vpc_endpoint",
         ],
+        "terraform/modules/aws-msk/main.tf": [
+            'client_broker = "TLS"',
+            "in_cluster    = true",
+            "scram = true",
+            "unauthenticated = false",
+            "auto.create.topics.enable=false",
+            "unclean.leader.election.enable=false",
+            "aws_msk_scram_secret_association",
+            "aws_vpc_security_group_ingress_rule",
+            "skip_destroy      = true",
+        ],
         "terraform/modules/environment/main.tf": [
             "production_invariants",
             'var.environment == "dev" || !var.endpoint_public_access',
@@ -868,6 +879,10 @@ def validate_terraform_contract() -> list[str]:
             'viewer_protocol_policy     = "redirect-to-https"',
             'minimum_protocol_version = "TLSv1.2_2021"',
             'web_acl_id          = var.web_acl_arn',
+        ],
+        "terraform/environments/staging/main.tf": [
+            "var.managed_kafka.enabled ? 1 : 0",
+            "module.environment.cluster_security_group_id",
         ],
     }
     for relative, fragments in required_fragments.items():
