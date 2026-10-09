@@ -28,26 +28,31 @@ class CommandRequestBodyLimitFilter : OncePerRequestFilter() {
         response: HttpServletResponse,
         filterChain: FilterChain,
     ) {
-        if (request.contentLengthLong > MAX_COMMAND_BODY_BYTES) {
-            writePayloadTooLarge(response)
+        val maximum = if (request.requestURI.startsWith(ELIGIBILITY_BOOTSTRAP_PREFIX)) {
+            MAX_BOOTSTRAP_BODY_BYTES
+        } else {
+            MAX_COMMAND_BODY_BYTES
+        }
+        if (request.contentLengthLong > maximum) {
+            writePayloadTooLarge(response, maximum)
             return
         }
 
-        val body = request.inputStream.readNBytes(MAX_COMMAND_BODY_BYTES + 1)
-        if (body.size > MAX_COMMAND_BODY_BYTES) {
-            writePayloadTooLarge(response)
+        val body = request.inputStream.readNBytes(maximum + 1)
+        if (body.size > maximum) {
+            writePayloadTooLarge(response, maximum)
             return
         }
 
         filterChain.doFilter(CachedBodyRequest(request, body), response)
     }
 
-    private fun writePayloadTooLarge(response: HttpServletResponse) {
+    private fun writePayloadTooLarge(response: HttpServletResponse, maximum: Int) {
         response.status = HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE
         response.characterEncoding = StandardCharsets.UTF_8.name()
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
         response.writer.write(
-            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"Command request body exceeds 16384 bytes","code":"payload_too_large"}""",
+            """{"type":"urn:mundia:error:payload_too_large","title":"Payload Too Large","status":413,"detail":"Command request body exceeds $maximum bytes","code":"payload_too_large"}""",
         )
     }
 
@@ -86,7 +91,10 @@ class CommandRequestBodyLimitFilter : OncePerRequestFilter() {
 
     private companion object {
         const val CIRCULATION_API_PREFIX = "/api/v1/circulation/"
+        const val ELIGIBILITY_BOOTSTRAP_PREFIX =
+            "/api/v1/circulation/membership-eligibility-bootstrap/"
         const val MAX_COMMAND_BODY_BYTES = 16 * 1024
+        const val MAX_BOOTSTRAP_BODY_BYTES = 128 * 1024
         val BODY_METHODS = setOf("POST", "PUT", "PATCH")
     }
 }

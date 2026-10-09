@@ -455,6 +455,18 @@ skip an eligibility version gap because doing so could authorize borrowing from
 an incomplete state. Production enablement therefore requires a tested
 Membership snapshot/full-replay procedure and broker-retention evidence.
 
+For cutover from a reconciled Membership snapshot, Circulation exposes
+`PUT|GET /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}`
+only to a machine identity carrying `circulation.eligibility.bootstrap`. Each
+PUT is bounded to 100 integrity-hashed records and either installs every exact
+source version plus an immutable actor-bound receipt or rolls back completely.
+It uses the consumer's per-member advisory lock, creates no synthetic event or
+inbox record, rejects conflicting projection state, and makes the next real
+Kafka event at version `N+1` valid after bootstrap version `N`. The endpoint is
+the receiver, not a completed cutover: the Membership snapshot exporter,
+operator automation, production reconciliation, shadow parity, and rollback
+evidence remain required.
+
 ## Scheduled loan reminders
 
 When `LOAN_REMINDER_ENABLED=true`, Circulation scans bounded batches of active

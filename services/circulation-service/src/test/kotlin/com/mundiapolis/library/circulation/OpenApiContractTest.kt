@@ -19,6 +19,9 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.LoanCommandResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.LoanHistoryItemResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.MemberLoanPageResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.MemberEligibilityResponse
+import com.mundiapolis.library.circulation.adapter.`in`.web.MembershipEligibilityBootstrapController
+import com.mundiapolis.library.circulation.adapter.`in`.web.MembershipEligibilityBootstrapItemRequest
+import com.mundiapolis.library.circulation.adapter.`in`.web.MembershipEligibilityBootstrapRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.MemberReservationPageResponse
 import com.mundiapolis.library.circulation.adapter.`in`.web.PlaceReservationRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.PolicyCommandController
@@ -32,6 +35,7 @@ import com.mundiapolis.library.circulation.adapter.`in`.web.SelfRequestLoanReque
 import com.mundiapolis.library.circulation.adapter.`in`.web.SelfPlaceReservationRequest
 import com.mundiapolis.library.circulation.adapter.`in`.web.UpdateCirculationPolicyRequest
 import com.mundiapolis.library.circulation.application.port.inbound.CirculationStatus
+import com.mundiapolis.library.circulation.application.model.MembershipEligibilityBootstrapResult
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
@@ -74,7 +78,7 @@ class OpenApiContractTest {
     }
 
     @Test
-    fun `every command publishes the actor scoped idempotency contract`() {
+    fun `every command publishes its replay safety contract`() {
         val commandOperations = contractOperations().keys.filter { it.method in setOf("post", "put") }
 
         assertThat(commandOperations).isNotEmpty()
@@ -84,9 +88,14 @@ class OpenApiContractTest {
             val parameterReferences = (0 until parameters.size()).map { index ->
                 parameters[index]["\$ref"]?.stringValue()
             }
+            val replayParameter = if (route.path == ELIGIBILITY_BOOTSTRAP_ROUTE) {
+                "#/components/parameters/BootstrapId"
+            } else {
+                "#/components/parameters/IdempotencyKey"
+            }
             assertThat(parameterReferences)
                 .describedAs("%s %s parameters", route.method.uppercase(), route.path)
-                .contains("#/components/parameters/IdempotencyKey")
+                .contains(replayParameter)
 
             val responseReferences = operation["responses"].propertyNames().map { status ->
                 operation["responses"][status]["\$ref"]?.stringValue()
@@ -102,7 +111,8 @@ class OpenApiContractTest {
                         reference == "#/components/responses/InventoryCommandSucceeded" ||
                         reference == "#/components/responses/ReservationCreated" ||
                         reference == "#/components/responses/ReservationCommandSucceeded" ||
-                        reference == "#/components/responses/PolicyUpdated"
+                        reference == "#/components/responses/PolicyUpdated" ||
+                        reference == "#/components/responses/EligibilityBootstrapSucceeded"
                 }
         }
 
@@ -119,6 +129,18 @@ class OpenApiContractTest {
         assertSchemaFields("CirculationStatus", CirculationStatus::class.java)
         assertSchemaFields("CirculationPolicyResponse", CirculationPolicyResponse::class.java)
         assertSchemaFields("MemberEligibilityResponse", MemberEligibilityResponse::class.java)
+        assertSchemaFields(
+            "MembershipEligibilityBootstrapRequest",
+            MembershipEligibilityBootstrapRequest::class.java,
+        )
+        assertSchemaFields(
+            "MembershipEligibilityBootstrapItemRequest",
+            MembershipEligibilityBootstrapItemRequest::class.java,
+        )
+        assertSchemaFields(
+            "MembershipEligibilityBootstrapResult",
+            MembershipEligibilityBootstrapResult::class.java,
+        )
         assertSchemaFields("RequestLoanRequest", RequestLoanRequest::class.java)
         assertSchemaFields("SelfRequestLoanRequest", SelfRequestLoanRequest::class.java)
         assertSchemaFields("LoanCommandResponse", LoanCommandResponse::class.java)
@@ -241,7 +263,10 @@ class OpenApiContractTest {
             InventoryCommandController::class.java,
             ReservationCommandController::class.java,
             PolicyCommandController::class.java,
+            MembershipEligibilityBootstrapController::class.java,
         )
+        const val ELIGIBILITY_BOOTSTRAP_ROUTE =
+            "/api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}"
         val SUPPORTED_HTTP_METHODS = setOf("get", "post", "put", "patch", "delete")
         val SCOPE_PATTERN = Regex("SCOPE_([a-z0-9.-]+)")
     }

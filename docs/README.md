@@ -80,6 +80,8 @@ profiles and eligibility snapshots. Passwords are excluded, unverified legacy
 identity references are digest-only quarantine records, and historical imports
 emit no live events. The verified-transfer registration boundary is now
 implemented with private-key redaction, scanner-attestation digests, retention,
-and immutable reconciliation receipts. Provisioning and exercising the actual
-private storage/scanner pipeline, projection bootstrap, shadow parity, and
-production sign-off remain explicit gates.
+and immutable reconciliation receipts. Circulation now provides the atomic,
+actor-bound eligibility projection bootstrap receiver without inventing Kafka
+history. Provisioning and exercising the actual private storage/scanner
+pipeline, building the Membership snapshot exporter/operator, running shadow
+parity, and production sign-off remain explicit gates.

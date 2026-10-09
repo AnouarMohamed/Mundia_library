@@ -360,6 +360,27 @@ projection, compare exact member/version/count evidence, run shadow parity, and
 retain a tested rollback path. Do not infer that a successful import is a
 production cutover.
 
+The Circulation-side atomic boundary is available at
+`PUT /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}`. Each
+bounded request carries the source revision and at most 100 snapshots with the
+exact Membership aggregate version, occurrence time, and canonical item digest.
+The service takes the same per-member advisory lock as the Kafka consumer,
+reconciles existing rows exactly, and commits the whole batch plus its immutable
+actor-bound receipt or nothing. It deliberately writes no consumer-inbox row
+and fabricates no domain event. Repeating the exact PUT with the same actor is a
+safe replay; changing the actor or manifest for a used bootstrap ID is a
+conflict. Read the receipt back with GET and compare it exactly before signing
+off.
+
+Do not invoke this endpoint ad hoc in production. The Membership snapshot
+exporter and privacy-safe operator that calculate the canonical digests are the
+next implementation gate. Once available, freeze Membership eligibility writes
+or pause the consumer at a recorded offset, export one consistent snapshot,
+apply and verify every receipt, resume consumption at the recorded boundary,
+and require the first later event for each changed member to be version `N+1`
+after snapshot version `N`. Then run shadow parity and the rollback drill. The
+endpoint being present is not evidence that these production steps occurred.
+
 ### Legacy identity-evidence transfer
 
 Never copy a legacy card reference directly into Membership. Resolve it only

@@ -480,6 +480,12 @@ const TARGET_PHASE2_COLUMNS = [
   "circulation_member_eligibility.source_version:bigint:true",
   "circulation_member_eligibility.status:character varying(32):true",
   "circulation_member_eligibility.updated_at:timestamp with time zone:true",
+  "circulation_membership_eligibility_bootstrap.actor_fingerprint:character(64):true",
+  "circulation_membership_eligibility_bootstrap.bootstrap_id:uuid:true",
+  "circulation_membership_eligibility_bootstrap.completed_at:timestamp with time zone:true",
+  "circulation_membership_eligibility_bootstrap.manifest_sha256:character(64):true",
+  "circulation_membership_eligibility_bootstrap.member_count:integer:true",
+  "circulation_membership_eligibility_bootstrap.source_revision:character(64):true",
   "outbox_event.aggregate_id:uuid:true",
   "outbox_event.aggregate_type:character varying(100):true",
   "outbox_event.aggregate_version:bigint:true",
@@ -594,6 +600,11 @@ const REQUIRED_TARGET_CONSTRAINTS = new Set([
   "ck_circulation_member_eligibility_reason_shape",
   "ck_circulation_member_eligibility_source_version",
   "ck_circulation_member_eligibility_timestamps",
+  "circulation_membership_eligibility_bootstrap_pkey",
+  "ck_circulation_eligibility_bootstrap_source_revision",
+  "ck_circulation_eligibility_bootstrap_manifest",
+  "ck_circulation_eligibility_bootstrap_actor",
+  "ck_circulation_eligibility_bootstrap_member_count",
 ]);
 const TARGET_FLYWAY_CHECKSUMS = [
   1_823_238_944,
@@ -612,6 +623,7 @@ const TARGET_FLYWAY_CHECKSUMS = [
   1_275_141_948,
   330_978_745,
   508_119_477,
+  1_465_597_687,
 ] as const;
 
 async function verifyTargetSchema(client: Client): Promise<void> {
@@ -643,7 +655,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     )
   ) {
     throw new Error(
-      "Target Flyway history must contain the exact reviewed checksums for successful versions 1 through 16",
+      `Target Flyway history must contain the exact reviewed checksums for successful versions 1 through ${TARGET_FLYWAY_CHECKSUMS.length}`,
     );
   }
 
@@ -677,6 +689,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_fine_ledger_entry",
       "circulation_consumer_inbox",
       "circulation_member_eligibility",
+      "circulation_membership_eligibility_bootstrap",
       "circulation_policy_current",
       "circulation_policy_idempotency",
       "circulation_policy_revision",
@@ -724,6 +737,7 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "circulation_fine_ledger_entry",
       "circulation_consumer_inbox",
       "circulation_member_eligibility",
+      "circulation_membership_eligibility_bootstrap",
       "circulation_policy_current",
       "circulation_policy_idempotency",
       "circulation_policy_revision",
@@ -775,6 +789,8 @@ async function verifyTargetSchema(client: Client): Promise<void> {
       "trg_circulation_consumer_inbox_no_truncate",
       "trg_circulation_member_eligibility_guard_update_or_delete",
       "trg_circulation_member_eligibility_no_truncate",
+      "trg_circulation_eligibility_bootstrap_no_update_or_delete",
+      "trg_circulation_eligibility_bootstrap_no_truncate",
       "trg_circulation_policy_revision_no_update_delete",
       "trg_circulation_policy_revision_no_truncate",
     ],
@@ -823,6 +839,14 @@ async function verifyTargetSchema(client: Client): Promise<void> {
     [
       "trg_circulation_member_eligibility_no_truncate",
       "reject_circulation_member_eligibility_truncate",
+    ],
+    [
+      "trg_circulation_eligibility_bootstrap_no_update_or_delete",
+      "reject_circulation_eligibility_bootstrap_mutation",
+    ],
+    [
+      "trg_circulation_eligibility_bootstrap_no_truncate",
+      "reject_circulation_eligibility_bootstrap_mutation",
     ],
     [
       "trg_circulation_policy_revision_no_update_delete",

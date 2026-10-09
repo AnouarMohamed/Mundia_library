@@ -116,8 +116,11 @@ are implemented in the repository:
 This checkpoint is not general availability. Reservation and dynamic-policy
 capabilities are implemented and their invariant/replay suites pass. Catalog
 and Membership now have bounded, idempotent backfill mechanisms with immutable
-reconciliation receipts, but no production snapshot has been applied or signed
-off. The Phase 2 backfill/reconciliation exit evidence is not yet complete. The
+reconciliation receipts. Circulation also has an atomic, actor-bound
+eligibility-projection bootstrap boundary that preserves source versions and
+interoperates with the ordered Kafka consumer without fabricating history. No
+production snapshot has been applied or signed off. The Phase 2
+backfill/reconciliation exit evidence is not yet complete. The
 platform/IdP, remaining domain extractions, data
 backfill/cutover, production load and failure tests, independent penetration
 test, restore/DR exercise, and operational sign-off remain mandatory.
@@ -318,8 +321,8 @@ scanner-attestation digest, retention deadline, and immutable actor-bound
 receipt. Read APIs and receipts expose none of the storage or source locators.
 The actual private bucket/scanner pipeline and lifecycle evidence are not
 provisioned by this repository. Production snapshot execution, production
-evidence transfer, Circulation eligibility projection bootstrap,
-shadow parity, broker provisioning, remaining profile and eligibility writes,
+evidence transfer, the Membership snapshot exporter/bootstrap operator, shadow
+parity, broker provisioning, remaining profile and eligibility writes,
 other BFF routes, and production cutover remain pending.
 Catalog now has a separate PostgreSQL-backed read
 slice for works, editions, contributors, media references, privacy-safe

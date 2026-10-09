@@ -106,12 +106,17 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.RequestPostProcessor
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.Duration
 import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
+import java.util.HexFormat
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -217,6 +222,7 @@ class CirculationPhase2IntegrationTest {
         dsl.execute("ALTER TABLE circulation_inventory_audit_entry DISABLE TRIGGER USER")
         dsl.execute("ALTER TABLE circulation_consumer_inbox DISABLE TRIGGER USER")
         dsl.execute("ALTER TABLE circulation_member_eligibility DISABLE TRIGGER USER")
+        dsl.execute("ALTER TABLE circulation_membership_eligibility_bootstrap DISABLE TRIGGER USER")
         try {
             dsl.execute(
                 """
@@ -225,6 +231,7 @@ class CirculationPhase2IntegrationTest {
                     circulation_fine,
                     circulation_inventory_audit_entry,
                     circulation_consumer_inbox,
+                    circulation_membership_eligibility_bootstrap,
                     circulation_member_eligibility,
                     circulation_reservation_idempotency,
                     circulation_reservation,
@@ -243,6 +250,7 @@ class CirculationPhase2IntegrationTest {
             dsl.execute("ALTER TABLE circulation_inventory_audit_entry ENABLE TRIGGER USER")
             dsl.execute("ALTER TABLE circulation_consumer_inbox ENABLE TRIGGER USER")
             dsl.execute("ALTER TABLE circulation_member_eligibility ENABLE TRIGGER USER")
+            dsl.execute("ALTER TABLE circulation_membership_eligibility_bootstrap ENABLE TRIGGER USER")
         }
         dsl.execute("ALTER TABLE circulation_policy_revision DISABLE TRIGGER USER")
         try {
@@ -1448,6 +1456,116 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
+    fun `membership eligibility bootstrap is atomic actor bound and continues with Kafka versions`() {
+        val bootstrapId = UUID.randomUUID()
+        val memberId = MemberId(UUID.randomUUID())
+        val sourceOccurredAt = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MILLIS)
+        val sourceRevision = "a".repeat(64)
+        val item = eligibilityBootstrapItem(
+            memberId = memberId,
+            status = MemberEligibilityStatus.ELIGIBLE,
+            sourceVersion = 7,
+            sourceOccurredAt = sourceOccurredAt,
+        )
+        val request = mapOf("sourceRevision" to sourceRevision, "items" to listOf(item))
+
+        mockMvc.put("$ELIGIBILITY_BOOTSTRAP_PATH/$bootstrapId") {
+            with(jwtFor("eligibility-bootstrapper", ELIGIBILITY_BOOTSTRAP_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "false") }
+            jsonPath("$.bootstrapId") { value(bootstrapId.toString()) }
+            jsonPath("$.sourceRevision") { value(sourceRevision) }
+            jsonPath("$.memberCount") { value(1) }
+            jsonPath("$.replayed") { value(false) }
+        }
+
+        val projection = dsl.selectFrom(CIRCULATION_MEMBER_ELIGIBILITY)
+            .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+            .fetchSingle()
+        assertThat(projection.status).isEqualTo("ELIGIBLE")
+        assertThat(projection.sourceVersion).isEqualTo(7)
+        assertThat(projection.sourceOccurredAt.toInstant()).isEqualTo(sourceOccurredAt)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isZero()
+
+        mockMvc.put("$ELIGIBILITY_BOOTSTRAP_PATH/$bootstrapId") {
+            with(jwtFor("eligibility-bootstrapper", ELIGIBILITY_BOOTSTRAP_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andExpect {
+            status { isOk() }
+            header { string(IDEMPOTENCY_REPLAYED_HEADER, "true") }
+            jsonPath("$.replayed") { value(true) }
+        }
+        mockMvc.get("$ELIGIBILITY_BOOTSTRAP_PATH/$bootstrapId") {
+            with(jwtFor("eligibility-bootstrapper", ELIGIBILITY_BOOTSTRAP_SCOPE))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.replayed") { value(true) }
+        }
+        mockMvc.put("$ELIGIBILITY_BOOTSTRAP_PATH/$bootstrapId") {
+            with(jwtFor("different-bootstrapper", ELIGIBILITY_BOOTSTRAP_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("eligibility_bootstrap_conflict") }
+        }
+
+        val nextEvent = eligibilityEvent(
+            memberId = memberId,
+            aggregateVersion = 8,
+            status = MemberEligibilityStatus.SUSPENDED,
+            reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
+        )
+        assertThat(applyMembershipEligibility.apply(nextEvent).disposition)
+            .isEqualTo(EligibilityEventDisposition.APPLIED)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isOne()
+
+        val absentMember = MemberId(UUID.randomUUID())
+        val conflictingBootstrapId = UUID.randomUUID()
+        val conflictingRequest = mapOf(
+            "sourceRevision" to "b".repeat(64),
+            "items" to listOf(
+                eligibilityBootstrapItem(
+                    memberId = absentMember,
+                    status = MemberEligibilityStatus.ELIGIBLE,
+                    sourceVersion = 0,
+                    sourceOccurredAt = sourceOccurredAt,
+                ),
+                eligibilityBootstrapItem(
+                    memberId = memberId,
+                    status = MemberEligibilityStatus.ELIGIBLE,
+                    sourceVersion = 8,
+                    sourceOccurredAt = sourceOccurredAt,
+                ),
+            ),
+        )
+        mockMvc.put("$ELIGIBILITY_BOOTSTRAP_PATH/$conflictingBootstrapId") {
+            with(jwtFor("eligibility-bootstrapper", ELIGIBILITY_BOOTSTRAP_SCOPE))
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(conflictingRequest)
+        }.andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("eligibility_bootstrap_conflict") }
+        }
+        assertThat(
+            dsl.fetchExists(
+                CIRCULATION_MEMBER_ELIGIBILITY,
+                CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(absentMember.value),
+            ),
+        ).isFalse()
+        assertThat(
+            dsl.fetchExists(
+                org.jooq.impl.DSL.table("circulation_membership_eligibility_bootstrap"),
+                org.jooq.impl.DSL.field("bootstrap_id", UUID::class.java).eq(conflictingBootstrapId),
+            ),
+        ).isFalse()
+    }
+
+    @Test
     fun `loan decisions fail closed while suspended members can still return books`() {
         val missingMember = MemberId(UUID.randomUUID())
         val editionId = EditionId(UUID.randomUUID())
@@ -2291,6 +2409,39 @@ class CirculationPhase2IntegrationTest {
         occurredAt = Instant.now(),
     )
 
+    private fun eligibilityBootstrapItem(
+        memberId: MemberId,
+        status: MemberEligibilityStatus,
+        sourceVersion: Long,
+        sourceOccurredAt: Instant,
+        reasonCode: EligibilityReasonCode? = null,
+    ): Map<String, Any?> {
+        val canonical = buildString {
+            append("circulation-membership-eligibility-item-v1")
+            bootstrapField(memberId.value.toString())
+            bootstrapField(status.name)
+            bootstrapField(reasonCode?.value ?: "<null>")
+            bootstrapField(sourceVersion.toString())
+            bootstrapField(sourceOccurredAt.toString())
+        }
+        val contentSha256 = HexFormat.of().formatHex(
+            MessageDigest.getInstance("SHA-256")
+                .digest(canonical.toByteArray(StandardCharsets.UTF_8)),
+        )
+        return mapOf(
+            "memberId" to memberId.value,
+            "status" to status,
+            "reasonCode" to reasonCode?.value,
+            "sourceVersion" to sourceVersion,
+            "sourceOccurredAt" to sourceOccurredAt,
+            "contentSha256" to contentSha256,
+        )
+    }
+
+    private fun StringBuilder.bootstrapField(value: String) {
+        append('\u001f').append(value.length).append(':').append(value)
+    }
+
     private fun jwtFor(
         subject: String,
         authority: String,
@@ -2369,6 +2520,8 @@ class CirculationPhase2IntegrationTest {
         const val COPIES_PATH = "/api/v1/circulation/copies"
         const val POLICY_PATH = "/api/v1/circulation/policy"
         const val MEMBERS_PATH = "/api/v1/circulation/members"
+        const val ELIGIBILITY_BOOTSTRAP_PATH =
+            "/api/v1/circulation/membership-eligibility-bootstrap"
         const val RESERVATIONS_PATH = "/api/v1/circulation/reservations"
         const val IDEMPOTENCY_HEADER = "Idempotency-Key"
         const val IDEMPOTENCY_REPLAYED_HEADER = "Idempotency-Replayed"
@@ -2385,6 +2538,7 @@ class CirculationPhase2IntegrationTest {
         const val POLICY_READ_SCOPE = "SCOPE_circulation.policy.read"
         const val ELIGIBILITY_READ_SCOPE = "SCOPE_circulation.eligibility.read"
         const val ELIGIBILITY_READ_ANY_SCOPE = "SCOPE_circulation.eligibility.read.any"
+        const val ELIGIBILITY_BOOTSTRAP_SCOPE = "SCOPE_circulation.eligibility.bootstrap"
         const val REGISTER_INVENTORY_SCOPE = "SCOPE_circulation.inventory.register"
         const val CONDITION_INVENTORY_SCOPE =
             "SCOPE_circulation.inventory.condition.update"

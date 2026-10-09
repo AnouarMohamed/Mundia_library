@@ -61,6 +61,15 @@ legacy identity-document reference in quarantine. It never accepts passwords
 or treats historical documents as verified evidence. Historical imports do not
 emit live eligibility events; projection bootstrap is a separate cutover gate.
 
+Circulation exposes that guarded projection boundary at machine-only `PUT|GET
+/api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}` under
+`circulation.eligibility.bootstrap`. A PUT accepts at most 100 integrity-hashed
+eligibility snapshots, installs their exact Membership aggregate versions in
+one transaction, and writes an immutable receipt bound to the manifest and
+authenticated actor. It creates no synthetic Kafka or inbox history. A
+subsequent Membership event must therefore use the next aggregate version.
+Conflicting existing projections fail the entire batch closed.
+
 Verified legacy evidence is registered separately through machine-only
 `PUT|GET /api/v1/members/identity-evidence-transfers/{transferId}` with
 `membership.identity-evidence.transfer`. The command accepts only the exact

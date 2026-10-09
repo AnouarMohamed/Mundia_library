@@ -3,7 +3,7 @@
   "info": {
     "title": "Mundiapolis Circulation API",
     "version": "1.0.0",
-    "description": "Authoritative version 1 command and operational-read contract for the circulation bounded context. All commands require an actor-scoped Idempotency-Key.",
+    "description": "Authoritative version 1 command and operational-read contract for the circulation bounded context. Lifecycle commands use actor-scoped idempotency keys; reconciliation uses immutable actor-bound bootstrap receipts.",
     "license": { "name": "MIT", "identifier": "MIT" }
   },
   "servers": [
@@ -182,6 +182,47 @@
           "429": { "$ref": "#/components/responses/TooManyRequests" },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" },
           "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}": {
+      "get": {
+        "operationId": "getMembershipEligibilityBootstrapReceipt",
+        "tags": ["Membership"],
+        "summary": "Read an immutable eligibility bootstrap receipt",
+        "x-required-scopes": ["circulation.eligibility.bootstrap"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/BootstrapId" }],
+        "responses": {
+          "200": { "description": "Actor-bound bootstrap receipt", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MembershipEligibilityBootstrapResult" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
+      "put": {
+        "operationId": "bootstrapMembershipEligibilityProjection",
+        "tags": ["Membership"],
+        "summary": "Atomically reconcile a bounded eligibility snapshot",
+        "description": "Installs exact source versions without fabricating Kafka history. The bootstrap UUID, manifest, and authenticated actor are permanently bound by an immutable receipt.",
+        "x-required-scopes": ["circulation.eligibility.bootstrap"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/BootstrapId" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MembershipEligibilityBootstrapRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/EligibilityBootstrapSucceeded" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "429": { "$ref": "#/components/responses/TooManyRequests" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
     },
@@ -782,6 +823,13 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "BootstrapId": {
+        "name": "bootstrapId",
+        "in": "path",
+        "required": true,
+        "description": "Operator-generated UUID permanently bound to one source manifest and actor.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "ReservationId": {
         "name": "reservationId",
         "in": "path",
@@ -871,6 +919,11 @@
         },
         "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CirculationPolicyResponse" } } }
       },
+      "EligibilityBootstrapSucceeded": {
+        "description": "Eligibility snapshot committed atomically or its exact actor-bound receipt replayed",
+        "headers": { "Idempotency-Replayed": { "$ref": "#/components/headers/IdempotencyReplayed" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MembershipEligibilityBootstrapResult" } } }
+      },
       "BadRequest": {
         "description": "Malformed request or invalid command input",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
@@ -910,6 +963,10 @@
             "schema": { "type": "integer", "format": "int64", "minimum": 1 }
           }
         },
+        "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "The bounded command payload exceeds the endpoint limit",
         "content": { "application/problem+json": { "schema": { "$ref": "#/components/schemas/Problem" } } }
       }
     },
@@ -962,6 +1019,41 @@
           "reasonCode": { "type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
           "sourceVersion": { "type": "integer", "format": "int64", "minimum": 0 },
           "sourceOccurredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "MembershipEligibilityBootstrapRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sourceRevision", "items"],
+        "properties": {
+          "sourceRevision": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "items": { "type": "array", "minItems": 1, "maxItems": 100, "items": { "$ref": "#/components/schemas/MembershipEligibilityBootstrapItemRequest" } }
+        }
+      },
+      "MembershipEligibilityBootstrapItemRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["memberId", "status", "reasonCode", "sourceVersion", "sourceOccurredAt", "contentSha256"],
+        "properties": {
+          "memberId": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["ELIGIBLE", "INELIGIBLE", "SUSPENDED"] },
+          "reasonCode": { "type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+          "sourceVersion": { "type": "integer", "format": "int64", "minimum": 0 },
+          "sourceOccurredAt": { "type": "string", "format": "date-time" },
+          "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      },
+      "MembershipEligibilityBootstrapResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bootstrapId", "sourceRevision", "manifestSha256", "memberCount", "completedAt", "replayed"],
+        "properties": {
+          "bootstrapId": { "type": "string", "format": "uuid" },
+          "sourceRevision": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "manifestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "memberCount": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "completedAt": { "type": "string", "format": "date-time" },
+          "replayed": { "type": "boolean" }
         }
       },
       "RequestLoanRequest": {

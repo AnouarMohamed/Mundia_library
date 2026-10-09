@@ -31,6 +31,9 @@ import com.mundiapolis.library.circulation.application.model.MemberEligibilityNo
 import com.mundiapolis.library.circulation.application.model.MemberEligibilityUnavailableException
 import com.mundiapolis.library.circulation.application.model.MemberNotEligibleException
 import com.mundiapolis.library.circulation.application.model.MissingMembershipClaimException
+import com.mundiapolis.library.circulation.application.model.InvalidMembershipEligibilityBootstrapException
+import com.mundiapolis.library.circulation.application.model.MembershipEligibilityBootstrapConflictException
+import com.mundiapolis.library.circulation.application.model.MembershipEligibilityBootstrapNotFoundException
 import com.mundiapolis.library.circulation.application.model.NoAvailableCopyException
 import com.mundiapolis.library.circulation.application.model.OpenLoanAlreadyExistsException
 import com.mundiapolis.library.circulation.application.model.RenewalLimitReachedException
@@ -54,6 +57,18 @@ import java.net.URI
 
 @RestControllerAdvice
 class CirculationExceptionHandler {
+    @ExceptionHandler(InvalidMembershipEligibilityBootstrapException::class)
+    fun invalidEligibilityBootstrap(exception: InvalidMembershipEligibilityBootstrapException): ProblemDetail =
+        problem(HttpStatus.BAD_REQUEST, "invalid_eligibility_bootstrap", exception.message)
+
+    @ExceptionHandler(MembershipEligibilityBootstrapNotFoundException::class)
+    fun eligibilityBootstrapNotFound(exception: MembershipEligibilityBootstrapNotFoundException): ProblemDetail =
+        problem(HttpStatus.NOT_FOUND, "eligibility_bootstrap_not_found", exception.message)
+
+    @ExceptionHandler(MembershipEligibilityBootstrapConflictException::class)
+    fun eligibilityBootstrapConflict(exception: MembershipEligibilityBootstrapConflictException): ProblemDetail =
+        problem(HttpStatus.CONFLICT, "eligibility_bootstrap_conflict", exception.message)
+
     @ExceptionHandler(InvalidHistoryQueryException::class)
     fun invalidHistoryQuery(exception: InvalidHistoryQueryException): ProblemDetail =
         problem(HttpStatus.BAD_REQUEST, "invalid_history_query", exception.message)
