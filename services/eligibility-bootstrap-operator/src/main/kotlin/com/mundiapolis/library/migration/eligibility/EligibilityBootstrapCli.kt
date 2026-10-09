@@ -20,10 +20,24 @@ fun main(arguments: Array<String>) {
             options.allowLoopbackHttp,
             transport,
         )
-        val circulation = if (options.apply) {
+        val circulationUrl = if (options.mode != OperatorMode.DRY_RUN) {
+            requiredEnvironment("CIRCULATION_SERVICE_URL")
+        } else {
+            null
+        }
+        val circulationBootstrap = if (options.mode == OperatorMode.APPLY) {
             HttpCirculationBootstrapClient(
-                requiredEnvironment("CIRCULATION_SERVICE_URL"),
+                requireNotNull(circulationUrl),
                 requiredEnvironment("CIRCULATION_BOOTSTRAP_BEARER_TOKEN"),
+                options.allowLoopbackHttp,
+                transport,
+            )
+        } else {
+            null
+        }
+        val circulationParity = if (options.mode != OperatorMode.DRY_RUN) {
+            HttpCirculationParityClient(
+                requireNotNull(circulationUrl),
                 requiredEnvironment("CIRCULATION_PARITY_BEARER_TOKEN"),
                 options.allowLoopbackHttp,
                 transport,
@@ -31,8 +45,13 @@ fun main(arguments: Array<String>) {
         } else {
             null
         }
-        val evidence = EligibilityBootstrapOperator(membership, circulation, Clock.systemUTC()).execute(
-            OperatorCommand(options.snapshotId, options.batchSize, options.apply),
+        val evidence = EligibilityBootstrapOperator(
+            membership,
+            circulationBootstrap,
+            circulationParity,
+            Clock.systemUTC(),
+        ).execute(
+            OperatorCommand(options.snapshotId, options.batchSize, options.parityConcurrency, options.mode),
         )
         EvidenceWriter(mapper).write(options.evidenceFile, evidence)
         println(
@@ -49,7 +68,8 @@ data class CliOptions(
     val snapshotId: UUID,
     val evidenceFile: Path,
     val batchSize: Int,
-    val apply: Boolean,
+    val parityConcurrency: Int,
+    val mode: OperatorMode,
     val allowLoopbackHttp: Boolean,
 ) {
     companion object {
@@ -57,7 +77,8 @@ data class CliOptions(
             var snapshotId: UUID? = null
             var evidenceFile: Path? = null
             var batchSize = 100
-            var apply = false
+            var parityConcurrency = 8
+            var mode = OperatorMode.DRY_RUN
             var allowLoopbackHttp = false
             var index = 0
             while (index < arguments.size) {
@@ -66,7 +87,10 @@ data class CliOptions(
                     "--evidence-file" -> evidenceFile = Path.of(value(arguments, ++index, argument))
                     "--batch-size" -> batchSize = value(arguments, ++index, argument).toIntOrNull()
                         ?: throw OperatorValidationException("--batch-size must be an integer")
-                    "--apply" -> apply = true
+                    "--parity-concurrency" -> parityConcurrency = value(arguments, ++index, argument).toIntOrNull()
+                        ?: throw OperatorValidationException("--parity-concurrency must be an integer")
+                    "--apply" -> mode = selectMode(mode, OperatorMode.APPLY)
+                    "--verify-parity" -> mode = selectMode(mode, OperatorMode.PARITY)
                     "--allow-loopback-http" -> allowLoopbackHttp = true
                     else -> throw OperatorValidationException("Unknown argument: $argument")
                 }
@@ -76,9 +100,17 @@ data class CliOptions(
                 snapshotId ?: throw OperatorValidationException("--snapshot-id is required"),
                 evidenceFile ?: throw OperatorValidationException("--evidence-file is required"),
                 batchSize,
-                apply,
+                parityConcurrency,
+                mode,
                 allowLoopbackHttp,
             )
+        }
+
+        private fun selectMode(current: OperatorMode, requested: OperatorMode): OperatorMode {
+            if (current != OperatorMode.DRY_RUN) {
+                throw OperatorValidationException("--apply and --verify-parity are mutually exclusive")
+            }
+            return requested
         }
 
         private fun value(arguments: Array<String>, index: Int, option: String): String =

@@ -145,13 +145,14 @@ PostgreSQL 18 restore through a current-user-owned `0600` file. Both variables
 above are unnecessary for the default dry run and must be removed after the
 reconciliation window.
 
-Circulation projection bootstrap requires a temporary operator identity with
-exactly `membership.eligibility.snapshot` for the source API and
-`circulation.eligibility.bootstrap` for the target API. Use audience-restricted
-tokens for the respective services; never reuse the Membership importer token,
-grant either scope to browsers or administrators, or place bearer tokens in
+Circulation projection bootstrap uses three temporary, audience-restricted
+credentials: `membership.eligibility.snapshot` for the source API,
+`circulation.eligibility.bootstrap` for mutation, and a separate
+`circulation.eligibility.read.any` identity for parity. Never reuse the
+Membership importer token, combine the Circulation mutation and read scopes,
+grant these scopes to browsers or administrators, or place bearer tokens in
 command history or reconciliation evidence. These credentials are only for the
-freeze/reconciliation window and are not normal runtime dependencies.
+reconciliation and soak windows and are not normal runtime dependencies.
 
 The Kotlin operator reads these environment variables; tokens are deliberately
 not accepted as command-line arguments:
@@ -160,9 +161,9 @@ not accepted as command-line arguments:
 | --- | --- |
 | `MEMBERSHIP_SERVICE_URL` | Private HTTPS Membership origin. |
 | `MEMBERSHIP_SNAPSHOT_BEARER_TOKEN` | Short-lived Membership-audience token with only `membership.eligibility.snapshot`. |
-| `CIRCULATION_SERVICE_URL` | Private HTTPS Circulation origin; required only with `--apply`. |
+| `CIRCULATION_SERVICE_URL` | Private HTTPS Circulation origin; required with `--apply` or `--verify-parity`. |
 | `CIRCULATION_BOOTSTRAP_BEARER_TOKEN` | Short-lived Circulation-audience token with only `circulation.eligibility.bootstrap`; required only with `--apply`. |
-| `CIRCULATION_PARITY_BEARER_TOKEN` | Separate short-lived Circulation-audience token with only `circulation.eligibility.read.any`; required only with `--apply` for exact post-bootstrap reads. |
+| `CIRCULATION_PARITY_BEARER_TOKEN` | Separate short-lived Circulation-audience token with only `circulation.eligibility.read.any`; required with `--apply` or `--verify-parity`. |
 
 Identity-evidence transfer uses a different short-lived machine identity with
 only `membership.identity-evidence.transfer`. Do not grant that scope to the

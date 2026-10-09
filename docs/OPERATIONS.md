@@ -405,6 +405,21 @@ If an apply run is interrupted between batches, rerun it with the same snapshot
 ID: deterministic batch IDs safely reconcile completed receipts before the
 operator continues. Use a new evidence path because evidence is immutable.
 
+During the soak window, run target-read-only parity checks with fresh snapshot
+IDs and evidence paths. Each run persists an immutable Membership source
+snapshot, but `--verify-parity` never constructs a Circulation bootstrap client
+and therefore neither reads nor requires the bootstrap credential. It performs
+bounded concurrent target reads (default 8; configurable from 1 through 16):
+
+```bash
+snapshot_id="$(uuidgen)"
+make eligibility-bootstrap ELIGIBILITY_BOOTSTRAP_ARGS="--snapshot-id ${snapshot_id} --verify-parity --parity-concurrency 8 --evidence-file /secure/mundia-cutover/parity-${snapshot_id}.json"
+```
+
+Run this from the controlled operations environment at the approved interval,
+alert on any non-zero exit, and retain every immutable evidence file. A single
+successful parity run is not a soak window and does not authorize cutover.
+
 At production cutover, freeze Membership
 eligibility writes or pause the consumer at a recorded offset, create one
 snapshot, apply and verify every receipt, resume consumption at the recorded

@@ -44,6 +44,7 @@ class EvidenceWriterTest {
         sourceManifestSha256 = "b".repeat(64),
         memberCount = 1,
         batchSize = 100,
+        parityConcurrency = 8,
         batches = emptyList(),
         parity = null,
         generatedAt = Instant.parse("2026-10-09T00:00:00Z"),

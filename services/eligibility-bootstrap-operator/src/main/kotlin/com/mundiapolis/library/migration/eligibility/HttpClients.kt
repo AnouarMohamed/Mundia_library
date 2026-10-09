@@ -53,13 +53,11 @@ class HttpMembershipSnapshotClient(
 class HttpCirculationBootstrapClient(
     baseUrl: String,
     bootstrapToken: String,
-    parityToken: String,
     allowLoopbackHttp: Boolean,
     private val transport: BoundedJsonTransport,
 ) : CirculationBootstrapClient {
     private val origin = validateOrigin(baseUrl, allowLoopbackHttp)
     private val bootstrapBearer = validateToken(bootstrapToken)
-    private val parityBearer = validateToken(parityToken)
 
     override fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt = transport.exchange(
         origin.resolve("/api/v1/circulation/membership-eligibility-bootstrap/$bootstrapId"),
@@ -76,6 +74,16 @@ class HttpCirculationBootstrapClient(
         body = null,
         BootstrapReceipt::class.java,
     )
+}
+
+class HttpCirculationParityClient(
+    baseUrl: String,
+    parityToken: String,
+    allowLoopbackHttp: Boolean,
+    private val transport: BoundedJsonTransport,
+) : CirculationParityClient {
+    private val origin = validateOrigin(baseUrl, allowLoopbackHttp)
+    private val parityBearer = validateToken(parityToken)
 
     override fun eligibility(memberId: UUID): ProjectedEligibility = transport.exchange(
         origin.resolve("/api/v1/circulation/members/$memberId/eligibility"),

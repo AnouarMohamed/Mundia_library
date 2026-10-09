@@ -327,7 +327,9 @@ content digests. A Kotlin dry-run-first operator verifies the complete source
 manifest, derives deterministic bounded Circulation batches, reconciles every
 PUT with its stored receipt, and uses a separate least-privilege read token to
 prove exact post-bootstrap projection parity before writing owner-only evidence
-without credentials or member identifiers. Production snapshot execution,
+without credentials or member identifiers. Its separate target-read-only
+parity mode supports repeated bounded-concurrency soak checks without bootstrap
+authority while retaining each immutable source snapshot. Production snapshot execution,
 production evidence transfer, soak-window shadow parity, broker provisioning, remaining
 profile and eligibility writes, other BFF routes, and production cutover remain
 pending.

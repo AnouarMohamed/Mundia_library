@@ -7,6 +7,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import tools.jackson.databind.json.JsonMapper
 
 class EligibilityBootstrapOperatorTest {
@@ -33,12 +34,12 @@ class EligibilityBootstrapOperatorTest {
     fun `apply verifies the source and reconciles deterministic bounded batches`() {
         val fixture = Fixture(memberCount = 205)
         val target = RecordingCirculationClient()
-        val evidence = EligibilityBootstrapOperator(fixture.source, target, CLOCK).execute(
-            OperatorCommand(SNAPSHOT_ID, batchSize = 100, apply = true),
+        val evidence = EligibilityBootstrapOperator(fixture.source, target, target, CLOCK).execute(
+            OperatorCommand(SNAPSHOT_ID, batchSize = 100, parityConcurrency = 8, mode = OperatorMode.APPLY),
         )
 
         assertThat(evidence.mode).isEqualTo("APPLY")
-        assertThat(evidence.schemaVersion).isEqualTo(2)
+        assertThat(evidence.schemaVersion).isEqualTo(3)
         assertThat(evidence.memberCount).isEqualTo(205)
         assertThat(evidence.batches).hasSize(3)
         assertThat(evidence.batches.map { it.memberCount }).containsExactly(100, 100, 5)
@@ -53,8 +54,8 @@ class EligibilityBootstrapOperatorTest {
     @Test
     fun `dry run verifies every digest without contacting circulation`() {
         val fixture = Fixture(memberCount = 4)
-        val evidence = EligibilityBootstrapOperator(fixture.source, null, CLOCK).execute(
-            OperatorCommand(SNAPSHOT_ID, batchSize = 2, apply = false),
+        val evidence = EligibilityBootstrapOperator(fixture.source, null, null, CLOCK).execute(
+            OperatorCommand(SNAPSHOT_ID, batchSize = 2, parityConcurrency = 8, mode = OperatorMode.DRY_RUN),
         )
 
         assertThat(evidence.mode).isEqualTo("DRY_RUN")
@@ -70,8 +71,8 @@ class EligibilityBootstrapOperatorTest {
         val target = RecordingCirculationClient()
 
         assertThatThrownBy {
-            EligibilityBootstrapOperator(fixture.source, target, CLOCK).execute(
-                OperatorCommand(SNAPSHOT_ID, batchSize = 100, apply = true),
+            EligibilityBootstrapOperator(fixture.source, target, target, CLOCK).execute(
+                OperatorCommand(SNAPSHOT_ID, batchSize = 100, parityConcurrency = 8, mode = OperatorMode.APPLY),
             )
         }.isInstanceOf(OperatorValidationException::class.java)
             .hasMessage("Snapshot item digest is invalid")
@@ -84,11 +85,27 @@ class EligibilityBootstrapOperatorTest {
         val target = RecordingCirculationClient().apply { corruptMemberId = fixture.items.last().memberId }
 
         assertThatThrownBy {
-            EligibilityBootstrapOperator(fixture.source, target, CLOCK).execute(
-                OperatorCommand(SNAPSHOT_ID, batchSize = 100, apply = true),
+            EligibilityBootstrapOperator(fixture.source, target, target, CLOCK).execute(
+                OperatorCommand(SNAPSHOT_ID, batchSize = 100, parityConcurrency = 8, mode = OperatorMode.APPLY),
             )
         }.isInstanceOf(OperatorValidationException::class.java)
             .hasMessage("Circulation eligibility projection differs from the source snapshot")
+    }
+
+    @Test
+    fun `parity mode verifies an existing projection without bootstrap authority or mutation`() {
+        val fixture = Fixture(memberCount = 17)
+        val target = RecordingCirculationClient().apply { seed(fixture.items) }
+
+        val evidence = EligibilityBootstrapOperator(fixture.source, null, target, CLOCK).execute(
+            OperatorCommand(SNAPSHOT_ID, batchSize = 10, parityConcurrency = 4, mode = OperatorMode.PARITY),
+        )
+
+        assertThat(evidence.mode).isEqualTo("PARITY")
+        assertThat(evidence.parityConcurrency).isEqualTo(4)
+        assertThat(evidence.parity).isEqualTo(ParityEvidence(17, fixture.sourceRevision))
+        assertThat(evidence.batches).allMatch { !it.applied && it.replayed == null }
+        assertThat(target.bootstrapCalls).isZero()
     }
 
     @Test
@@ -98,11 +115,35 @@ class EligibilityBootstrapOperatorTest {
                 "--snapshot-id", SNAPSHOT_ID.toString(),
                 "--evidence-file", "/secure/evidence.json",
                 "--batch-size", "25",
+                "--parity-concurrency", "4",
                 "--apply",
             ),
         )
         assertThat(parsed.batchSize).isEqualTo(25)
-        assertThat(parsed.apply).isTrue()
+        assertThat(parsed.parityConcurrency).isEqualTo(4)
+        assertThat(parsed.mode).isEqualTo(OperatorMode.APPLY)
+
+        assertThat(
+            CliOptions.parse(
+                arrayOf(
+                    "--snapshot-id", SNAPSHOT_ID.toString(),
+                    "--evidence-file", "/secure/parity.json",
+                    "--verify-parity",
+                ),
+            ).mode,
+        ).isEqualTo(OperatorMode.PARITY)
+
+        assertThatThrownBy {
+            CliOptions.parse(
+                arrayOf(
+                    "--snapshot-id", SNAPSHOT_ID.toString(),
+                    "--evidence-file", "/secure/evidence.json",
+                    "--apply",
+                    "--verify-parity",
+                ),
+            )
+        }.isInstanceOf(OperatorValidationException::class.java)
+            .hasMessage("--apply and --verify-parity are mutually exclusive")
 
         assertThatThrownBy { CliOptions.parse(arrayOf("--token", "must-not-be-an-argument")) }
             .isInstanceOf(OperatorValidationException::class.java)
@@ -165,13 +206,21 @@ class EligibilityBootstrapOperatorTest {
         }
     }
 
-    private class RecordingCirculationClient : CirculationBootstrapClient {
+    private class RecordingCirculationClient : CirculationBootstrapClient, CirculationParityClient {
         val requests = linkedMapOf<UUID, BootstrapRequest>()
+        private val projections = ConcurrentHashMap<UUID, SnapshotItem>()
         var receiptReads = 0
+        var bootstrapCalls = 0
         var corruptMemberId: UUID? = null
 
+        fun seed(items: List<SnapshotItem>) {
+            items.forEach { projections[it.memberId] = it }
+        }
+
         override fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt {
+            bootstrapCalls += 1
             requests[bootstrapId] = request
+            seed(request.items)
             return result(bootstrapId, request, replayed = false)
         }
 
@@ -181,7 +230,7 @@ class EligibilityBootstrapOperatorTest {
         }
 
         override fun eligibility(memberId: UUID): ProjectedEligibility {
-            val item = requests.values.asSequence().flatMap { it.items }.single { it.memberId == memberId }
+            val item = requireNotNull(projections[memberId])
             return ProjectedEligibility(
                 item.memberId,
                 if (item.memberId == corruptMemberId) EligibilityStatus.SUSPENDED else item.status,

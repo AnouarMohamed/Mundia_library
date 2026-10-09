@@ -70,13 +70,14 @@ data class ParityEvidence(
 )
 
 data class OperatorEvidence(
-    val schemaVersion: Int = 2,
+    val schemaVersion: Int = 3,
     val mode: String,
     val snapshotId: UUID,
     val sourceRevision: String,
     val sourceManifestSha256: String,
     val memberCount: Int,
     val batchSize: Int,
+    val parityConcurrency: Int,
     val batches: List<BatchEvidence>,
     val parity: ParityEvidence?,
     val generatedAt: Instant,
@@ -85,8 +86,15 @@ data class OperatorEvidence(
 data class OperatorCommand(
     val snapshotId: UUID,
     val batchSize: Int,
-    val apply: Boolean,
+    val parityConcurrency: Int,
+    val mode: OperatorMode,
 )
+
+enum class OperatorMode {
+    DRY_RUN,
+    APPLY,
+    PARITY,
+}
 
 interface MembershipSnapshotClient {
     fun create(snapshotId: UUID): SnapshotReceipt
@@ -100,7 +108,9 @@ interface CirculationBootstrapClient {
     fun bootstrap(bootstrapId: UUID, request: BootstrapRequest): BootstrapReceipt
 
     fun receipt(bootstrapId: UUID): BootstrapReceipt
+}
 
+interface CirculationParityClient {
     fun eligibility(memberId: UUID): ProjectedEligibility
 }
 

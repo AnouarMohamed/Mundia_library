@@ -479,7 +479,10 @@ then reads every target projection through a separate least-privilege token and
 requires exact source parity. It writes `0600` evidence containing no bearer
 token or member identifier. Run
 it through `make eligibility-bootstrap`; see `docs/OPERATIONS.md` for the
-dry-run/apply sequence. Its presence is not production cutover evidence.
+dry-run/apply sequence. The same CLI provides a target-read-only
+`--verify-parity` mode for repeated soak-window evidence without bootstrap
+authority. Its
+presence is not production cutover evidence.
 
 ## Scheduled loan reminders
 

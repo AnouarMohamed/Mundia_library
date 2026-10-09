@@ -1,18 +1,30 @@
 package com.mundiapolis.library.migration.eligibility
 
 import java.time.Clock
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class EligibilityBootstrapOperator(
     private val membership: MembershipSnapshotClient,
-    private val circulation: CirculationBootstrapClient?,
+    private val circulationBootstrap: CirculationBootstrapClient?,
+    private val circulationParity: CirculationParityClient?,
     private val clock: Clock,
 ) {
     fun execute(command: OperatorCommand): OperatorEvidence {
         if (command.batchSize !in 1..MAX_BATCH_SIZE) {
             throw OperatorValidationException("Batch size must be between 1 and $MAX_BATCH_SIZE")
         }
-        if (command.apply && circulation == null) {
-            throw OperatorValidationException("Circulation client is required in apply mode")
+        if (command.parityConcurrency !in 1..MAX_PARITY_CONCURRENCY) {
+            throw OperatorValidationException(
+                "Parity concurrency must be between 1 and $MAX_PARITY_CONCURRENCY",
+            )
+        }
+        if (command.mode == OperatorMode.APPLY && circulationBootstrap == null) {
+            throw OperatorValidationException("Circulation bootstrap client is required in apply mode")
+        }
+        if (command.mode != OperatorMode.DRY_RUN && circulationParity == null) {
+            throw OperatorValidationException("Circulation parity client is required outside dry-run mode")
         }
 
         val created = membership.create(command.snapshotId)
@@ -34,49 +46,78 @@ class EligibilityBootstrapOperator(
                 receipt.sourceRevision,
                 batch,
             )
-            if (!command.apply) {
+            if (command.mode != OperatorMode.APPLY) {
                 BatchEvidence(index, bootstrapId, batch.size, expectedManifest, applied = false, replayed = null)
             } else {
                 applyBatch(index, bootstrapId, receipt.sourceRevision, batch, expectedManifest)
             }
         }
-        val parity = if (command.apply) verifyTargetParity(items, receipt.sourceRevision) else null
+        val parity = if (command.mode == OperatorMode.DRY_RUN) {
+            null
+        } else {
+            verifyTargetParity(items, receipt.sourceRevision, command.parityConcurrency)
+        }
         return OperatorEvidence(
-            mode = if (command.apply) "APPLY" else "DRY_RUN",
+            mode = command.mode.name,
             snapshotId = command.snapshotId,
             sourceRevision = receipt.sourceRevision,
             sourceManifestSha256 = receipt.manifestSha256,
             memberCount = receipt.memberCount,
             batchSize = command.batchSize,
+            parityConcurrency = command.parityConcurrency,
             batches = batches,
             parity = parity,
             generatedAt = clock.instant(),
         )
     }
 
-    private fun verifyTargetParity(items: List<SnapshotItem>, sourceRevision: String): ParityEvidence {
-        val target = requireNotNull(circulation)
-        val observed = items.map { expected ->
-            val projection = target.eligibility(expected.memberId)
-            val unsigned = SnapshotItem(
-                projection.memberId,
-                projection.status,
-                projection.reasonCode,
-                projection.sourceVersion,
-                projection.sourceOccurredAt,
-                "",
-            )
-            val actual = unsigned.copy(contentSha256 = EligibilityIntegrity.itemHash(unsigned))
-            if (actual != expected) {
-                throw OperatorValidationException("Circulation eligibility projection differs from the source snapshot")
-            }
-            actual
+    private fun verifyTargetParity(
+        items: List<SnapshotItem>,
+        sourceRevision: String,
+        concurrency: Int,
+    ): ParityEvidence {
+        val target = requireNotNull(circulationParity)
+        val executor = Executors.newFixedThreadPool(concurrency)
+        val observed = try {
+            items.map { expected ->
+                executor.submit<SnapshotItem> { verifyProjection(target, expected) }
+            }.map(::await)
+        } finally {
+            executor.shutdownNow()
         }
         val observedRevision = EligibilityIntegrity.sourceRevision(observed)
         if (observedRevision != sourceRevision) {
             throw OperatorValidationException("Circulation eligibility projection revision is invalid")
         }
         return ParityEvidence(observed.size, observedRevision)
+    }
+
+    private fun verifyProjection(target: CirculationParityClient, expected: SnapshotItem): SnapshotItem {
+        val projection = target.eligibility(expected.memberId)
+        val unsigned = SnapshotItem(
+            projection.memberId,
+            projection.status,
+            projection.reasonCode,
+            projection.sourceVersion,
+            projection.sourceOccurredAt,
+            "",
+        )
+        val actual = unsigned.copy(contentSha256 = EligibilityIntegrity.itemHash(unsigned))
+        if (actual != expected) {
+            throw OperatorValidationException("Circulation eligibility projection differs from the source snapshot")
+        }
+        return actual
+    }
+
+    private fun <T> await(future: Future<T>): T = try {
+        future.get()
+    } catch (failure: InterruptedException) {
+        Thread.currentThread().interrupt()
+        throw OperatorValidationException("Parity verification was interrupted")
+    } catch (failure: ExecutionException) {
+        val cause = failure.cause
+        if (cause is RuntimeException) throw cause
+        throw OperatorValidationException("Parity verification failed")
     }
 
     private fun readAll(command: OperatorCommand, receipt: SnapshotReceipt): List<SnapshotItem> {
@@ -126,7 +167,7 @@ class EligibilityBootstrapOperator(
         items: List<SnapshotItem>,
         expectedManifest: String,
     ): BatchEvidence {
-        val target = requireNotNull(circulation)
+        val target = requireNotNull(circulationBootstrap)
         val applied = target.bootstrap(bootstrapId, BootstrapRequest(sourceRevision, items))
         val stored = target.receipt(bootstrapId)
         requireSameBootstrap(applied, stored)
@@ -155,5 +196,6 @@ class EligibilityBootstrapOperator(
         const val MAX_BATCH_SIZE = 100
         const val MAX_PAGE_SIZE = 100
         const val MAX_SNAPSHOT_MEMBERS = 10_000
+        const val MAX_PARITY_CONCURRENCY = 16
     }
 }
