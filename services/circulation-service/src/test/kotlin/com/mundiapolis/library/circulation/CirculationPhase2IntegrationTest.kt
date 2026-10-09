@@ -1,5 +1,9 @@
 package com.mundiapolis.library.circulation
 
+import com.google.protobuf.Timestamp
+import com.mundiapolis.library.circulation.adapter.`in`.events.MembershipConsumerFailure
+import com.mundiapolis.library.circulation.adapter.`in`.events.MembershipEligibilityKafkaConsumer
+import com.mundiapolis.library.circulation.adapter.`in`.events.MembershipEligibilityRecordDecoder
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_COPY
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_CONSUMER_INBOX
 import com.mundiapolis.library.circulation.adapter.outbound.persistence.jooq.generated.Tables.CIRCULATION_FINE
@@ -69,6 +73,7 @@ import com.mundiapolis.library.circulation.application.port.outbound.OutboxDeliv
 import com.mundiapolis.library.circulation.application.port.outbound.RateLimitStore
 import com.mundiapolis.library.circulation.application.service.ReservationExpiryService
 import com.mundiapolis.library.circulation.application.service.LoanReminderService
+import com.mundiapolis.library.circulation.config.MembershipEligibilityConsumerProperties
 import com.mundiapolis.library.circulation.domain.model.EditionId
 import com.mundiapolis.library.circulation.domain.model.EligibilityReasonCode
 import com.mundiapolis.library.circulation.domain.model.BranchId
@@ -84,6 +89,13 @@ import com.mundiapolis.library.circulation.domain.model.MemberEligibilityStatus
 import com.mundiapolis.library.circulation.domain.model.ReservationStatus
 import com.mundiapolis.library.circulation.domain.model.InventoryReason
 import com.mundiapolis.library.circulation.domain.model.ShelfLocation
+import com.mundiapolis.library.membership.contract.v1.MemberEligibilityChanged
+import com.mundiapolis.library.membership.contract.v1.MemberEligibilityStatus as ContractEligibilityStatus
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.clients.consumer.MockConsumer
+import org.apache.kafka.clients.consumer.OffsetAndMetadata
+import org.apache.kafka.common.TopicPartition
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.flywaydb.core.Flyway
@@ -121,6 +133,8 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import javax.sql.DataSource
 import tools.jackson.databind.ObjectMapper
 
@@ -1456,7 +1470,7 @@ class CirculationPhase2IntegrationTest {
     }
 
     @Test
-    fun `membership eligibility bootstrap is atomic actor bound and continues with Kafka versions`() {
+    fun `membership eligibility cutover rejects gaps then replays the exact Kafka boundary`() {
         val bootstrapId = UUID.randomUUID()
         val memberId = MemberId(UUID.randomUUID())
         val sourceOccurredAt = Instant.now().minusSeconds(30).truncatedTo(ChronoUnit.MILLIS)
@@ -1514,15 +1528,77 @@ class CirculationPhase2IntegrationTest {
             jsonPath("$.code") { value("eligibility_bootstrap_conflict") }
         }
 
-        val nextEvent = eligibilityEvent(
-            memberId = memberId,
-            aggregateVersion = 8,
-            status = MemberEligibilityStatus.SUSPENDED,
-            reasonCode = EligibilityReasonCode.parse("ACCOUNT_SUSPENDED"),
-        )
-        assertThat(applyMembershipEligibility.apply(nextEvent).disposition)
-            .isEqualTo(EligibilityEventDisposition.APPLIED)
-        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isOne()
+        val partition = TopicPartition(ELIGIBILITY_TOPIC, 0)
+        val gapKafka = RecordingEligibilityMockConsumer()
+        gapKafka.schedulePollTask {
+            gapKafka.rebalance(listOf(partition))
+            gapKafka.updateBeginningOffsets(mapOf(partition to 0L))
+            gapKafka.addRecord(
+                eligibilityKafkaRecord(
+                    memberId = memberId,
+                    aggregateVersion = 9,
+                    offset = 0,
+                ),
+            )
+        }
+        val gapConsumer = eligibilityKafkaConsumer(gapKafka)
+        gapConsumer.start()
+        awaitCondition {
+            gapConsumer.healthSnapshot(Instant.now()).failure ==
+                MembershipConsumerFailure.EVENT_GAP
+        }
+        gapConsumer.stop()
+
+        assertThat(gapKafka.commitCount).isZero()
+        assertThat(gapKafka.lastCommittedOffset).isEqualTo(-1)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isZero()
+        assertThat(
+            dsl.select(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION)
+                .from(CIRCULATION_MEMBER_ELIGIBILITY)
+                .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+                .fetchSingle(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION),
+        ).isEqualTo(7)
+
+        val recoveryKafka = RecordingEligibilityMockConsumer()
+        recoveryKafka.schedulePollTask {
+            recoveryKafka.rebalance(listOf(partition))
+            recoveryKafka.updateBeginningOffsets(mapOf(partition to 0L))
+            recoveryKafka.addRecord(
+                eligibilityKafkaRecord(
+                    memberId = memberId,
+                    aggregateVersion = 8,
+                    status = ContractEligibilityStatus.MEMBER_ELIGIBILITY_STATUS_SUSPENDED,
+                    reasonCode = "ACCOUNT_SUSPENDED",
+                    offset = 0,
+                ),
+            )
+            recoveryKafka.addRecord(
+                eligibilityKafkaRecord(
+                    memberId = memberId,
+                    aggregateVersion = 9,
+                    offset = 1,
+                ),
+            )
+        }
+        val recoveryConsumer = eligibilityKafkaConsumer(recoveryKafka)
+        recoveryConsumer.start()
+        awaitCondition {
+            dsl.select(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION)
+                .from(CIRCULATION_MEMBER_ELIGIBILITY)
+                .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+                .fetchSingle(CIRCULATION_MEMBER_ELIGIBILITY.SOURCE_VERSION) == 9L
+        }
+        recoveryConsumer.stop()
+
+        assertThat(recoveryKafka.commitCount).isEqualTo(2)
+        assertThat(recoveryKafka.lastCommittedOffset).isEqualTo(2)
+        assertThat(dsl.fetchCount(CIRCULATION_CONSUMER_INBOX)).isEqualTo(2)
+        val recovered = dsl.selectFrom(CIRCULATION_MEMBER_ELIGIBILITY)
+            .where(CIRCULATION_MEMBER_ELIGIBILITY.MEMBER_ID.eq(memberId.value))
+            .fetchSingle()
+        assertThat(recovered.status).isEqualTo("ELIGIBLE")
+        assertThat(recovered.reasonCode).isNull()
+        assertThat(recovered.sourceVersion).isEqualTo(9)
 
         val absentMember = MemberId(UUID.randomUUID())
         val conflictingBootstrapId = UUID.randomUUID()
@@ -2442,6 +2518,126 @@ class CirculationPhase2IntegrationTest {
         append('\u001f').append(value.length).append(':').append(value)
     }
 
+    private fun eligibilityKafkaConsumer(
+        kafka: MockConsumer<String, ByteArray>,
+    ): MembershipEligibilityKafkaConsumer {
+        val properties = eligibilityConsumerProperties()
+        return MembershipEligibilityKafkaConsumer(
+            consumer = kafka,
+            decoder = MembershipEligibilityRecordDecoder(properties),
+            applyEligibilityEvent = applyMembershipEligibility,
+            timeProvider = com.mundiapolis.library.circulation.application.port.outbound.TimeProvider(
+                Instant::now,
+            ),
+            properties = properties,
+            meterRegistry = SimpleMeterRegistry(),
+        )
+    }
+
+    private fun eligibilityKafkaRecord(
+        memberId: MemberId,
+        aggregateVersion: Long,
+        status: ContractEligibilityStatus =
+            ContractEligibilityStatus.MEMBER_ELIGIBILITY_STATUS_ELIGIBLE,
+        reasonCode: String? = null,
+        offset: Long,
+    ): ConsumerRecord<String, ByteArray> {
+        val eventId = UUID.randomUUID()
+        val occurredAt = Instant.now().minusSeconds(1)
+        val message = MemberEligibilityChanged.newBuilder()
+            .setEventId(eventId.toString())
+            .setEventType(MembershipEligibilityEvent.EVENT_TYPE)
+            .setEventVersion(MembershipEligibilityEvent.EVENT_VERSION)
+            .setMemberId(memberId.value.toString())
+            .setAggregateVersion(aggregateVersion)
+            .setStatus(status)
+            .setOccurredAt(
+                Timestamp.newBuilder()
+                    .setSeconds(occurredAt.epochSecond)
+                    .setNanos(occurredAt.nano)
+                    .build(),
+            )
+            .apply { reasonCode?.let(::setReasonCode) }
+            .build()
+        return ConsumerRecord(
+            ELIGIBILITY_TOPIC,
+            0,
+            offset,
+            memberId.value.toString(),
+            message.toByteArray(),
+        ).also { record ->
+            record.headers()
+                .add("content-type", "application/x-protobuf".toByteArray(StandardCharsets.UTF_8))
+                .add("event-id", eventId.toString().toByteArray(StandardCharsets.UTF_8))
+                .add("event-type", MembershipEligibilityEvent.EVENT_TYPE.toByteArray(StandardCharsets.UTF_8))
+                .add("event-version", MembershipEligibilityEvent.EVENT_VERSION.toString().toByteArray(StandardCharsets.UTF_8))
+                .add("schema-subject", ELIGIBILITY_SCHEMA_SUBJECT.toByteArray(StandardCharsets.UTF_8))
+                .add("schema-version", "1".toByteArray(StandardCharsets.UTF_8))
+        }
+    }
+
+    private fun eligibilityConsumerProperties(): MembershipEligibilityConsumerProperties =
+        MembershipEligibilityConsumerProperties(
+            enabled = true,
+            instanceId = "eligibility-cutover-replay-test",
+            groupId = "circulation-eligibility-cutover-replay-v1",
+            topic = ELIGIBILITY_TOPIC,
+            schemaSubject = ELIGIBILITY_SCHEMA_SUBJECT,
+            schemaVersion = 1,
+            pollTimeout = Duration.ofMillis(100),
+            commitTimeout = Duration.ofSeconds(1),
+            retryBackoff = Duration.ofMillis(10),
+            startupGracePeriod = Duration.ofSeconds(1),
+            maximumPollSilence = Duration.ofSeconds(1),
+            maximumPollRecords = 10,
+            maximumEventBytes = 4_096,
+            kafka = MembershipEligibilityConsumerProperties.KafkaProperties(
+                bootstrapServers = listOf("127.0.0.1:9092"),
+                securityProtocol = "PLAINTEXT",
+                allowInsecureTransport = true,
+                saslMechanism = null,
+                saslJaasConfig = null,
+                truststoreLocation = null,
+                truststorePassword = null,
+                keystoreLocation = null,
+                keystorePassword = null,
+                keyPassword = null,
+                requestTimeout = Duration.ofSeconds(1),
+                sessionTimeout = Duration.ofSeconds(6),
+                heartbeatInterval = Duration.ofSeconds(1),
+            ),
+        )
+
+    private fun awaitCondition(condition: () -> Boolean) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (!condition()) {
+            if (System.nanoTime() >= deadline) {
+                throw AssertionError("Condition did not become true before timeout")
+            }
+            TimeUnit.MILLISECONDS.sleep(10)
+        }
+    }
+
+    private class RecordingEligibilityMockConsumer : MockConsumer<String, ByteArray>("earliest") {
+        private val commits = AtomicInteger()
+        private val committedOffset = AtomicLong(-1)
+
+        val commitCount: Int
+            get() = commits.get()
+
+        val lastCommittedOffset: Long
+            get() = committedOffset.get()
+
+        override fun commitSync(
+            offsets: Map<TopicPartition, OffsetAndMetadata>,
+            timeout: Duration,
+        ) {
+            commits.incrementAndGet()
+            offsets.values.singleOrNull()?.offset()?.let(committedOffset::set)
+            super.commitSync(offsets, timeout)
+        }
+    }
+
     private fun jwtFor(
         subject: String,
         authority: String,
@@ -2545,6 +2741,9 @@ class CirculationPhase2IntegrationTest {
         const val CONCURRENT_COMMANDS = 100
         const val TEST_ISSUER = "https://issuer.example.test"
         const val TEST_CLIENT_ID = "circulation-phase2-integration-test"
+        const val ELIGIBILITY_TOPIC = "mundia.membership.events.v1"
+        const val ELIGIBILITY_SCHEMA_SUBJECT =
+            "mundia.membership.v1.MemberEligibilityChanged"
 
         @Container
         @JvmStatic

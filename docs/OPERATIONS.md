@@ -428,6 +428,22 @@ version `N+1` after snapshot version `N`. The operator's immediate exact parity
 check does not replace soak-window shadow parity or the rollback drill. Endpoint
 presence is not evidence these steps occurred.
 
+Before the staging rehearsal, run the deterministic boundary drill:
+
+```bash
+make eligibility-replay-drill
+```
+
+The drill uses PostgreSQL plus the production Protobuf decoder, Kafka consumer,
+and eligibility transaction. It first presents `N+2` after a bootstrapped `N`
+and requires a fatal `EVENT_GAP`, no offset commit, no inbox row, and no
+projection mutation. A fresh consumer then replays the same boundary as `N+1`,
+`N+2` and requires ordered database updates and offset commits. Retain the test
+report with the release evidence. This does not replace a controlled staging
+broker rehearsal: record its topic, partition, starting offset, retention,
+consumer-group state, final offset, exact parity result, and approver. Never
+manufacture events or perform this failure drill against the production topic.
+
 ### Legacy identity-evidence transfer
 
 Never copy a legacy card reference directly into Membership. Resolve it only

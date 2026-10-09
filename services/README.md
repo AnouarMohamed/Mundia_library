@@ -455,6 +455,14 @@ skip an eligibility version gap because doing so could authorize borrowing from
 an incomplete state. Production enablement therefore requires a tested
 Membership snapshot/full-replay procedure and broker-retention evidence.
 
+`make eligibility-replay-drill` exercises the cutover boundary against
+PostgreSQL through the production decoder, consumer, and application service.
+It proves that a bootstrap at version `N` rejects `N+2` without a Kafka offset
+commit or projection mutation, then accepts replayed `N+1` followed by `N+2`
+and commits each offset only after its database transaction. This is repeatable
+CI/staging evidence; the approved environment must still retain its broker
+offset, retention, and operator sign-off artifacts.
+
 For cutover from a reconciled Membership snapshot, Circulation exposes
 `PUT|GET /api/v1/circulation/membership-eligibility-bootstrap/{bootstrapId}`
 only to a machine identity carrying `circulation.eligibility.bootstrap`. Each

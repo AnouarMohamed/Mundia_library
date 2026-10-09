@@ -362,6 +362,11 @@ private URL file for an isolated loopback PostgreSQL 18 restore. The mechanism
 and tests are complete; a reviewed production snapshot, signed reconciliation
 evidence, soak, rollback rehearsal, and final single-writer cutover are still
 required.
+The automated `make eligibility-replay-drill` gate now proves the bootstrapped
+`N` to Kafka `N+1` boundary, fail-closed gap handling, uncommitted-offset
+recovery, and ordered replay through the real Circulation persistence path.
+Production-shaped broker retention, offset, and approval evidence remains an
+open release gate.
 Catalog create, metadata-update, and edition-activation commands
 now share an actor-bound idempotency foundation: aggregate state, exact replay
 response, append-only audit, and a versioned outbox event commit in one
