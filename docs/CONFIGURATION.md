@@ -419,8 +419,12 @@ resource type, protected key shape, timestamp, object version, ETag, and result.
 It deletes a message only after the receipt and state transition commit.
 `NO_THREATS_FOUND` is the only result that becomes `CLEAN`; every other accepted
 result becomes `REJECTED`, and malformed/conflicting events redrive rather than
-fail open. Promotion to the delivery prefix is intentionally a separate,
-still-pending command.
+fail open. A clean result also creates a durable promotion job in the same
+transaction. Claims are lease-fenced, and completion requires exact checksum,
+size, media type, source object version, and ETag evidence before publication.
+The AWS S3 copy worker remains disabled and unimplemented until its least-
+privilege object-storage policy and lifecycle infrastructure land; database
+state alone never claims that bytes were promoted.
 
 ## Secrets Handling
 

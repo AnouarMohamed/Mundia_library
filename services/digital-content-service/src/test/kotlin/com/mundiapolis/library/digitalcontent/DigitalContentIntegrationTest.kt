@@ -3,6 +3,7 @@ package com.mundiapolis.library.digitalcontent
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_ASSET
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_INGESTION
+import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_PROMOTION_JOB
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_SCAN_RECEIPT
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_EXTERNAL_RESOURCE
 import com.mundiapolis.library.digitalcontent.adapter.outbound.persistence.jooq.generated.Tables.DIGITAL_CONTENT_EXTERNAL_AUTHORIZATION_AUDIT
@@ -12,6 +13,9 @@ import com.mundiapolis.library.digitalcontent.service.SignedUpload
 import com.mundiapolis.library.digitalcontent.service.MalwareScanEvent
 import com.mundiapolis.library.digitalcontent.service.MalwareScanResult
 import com.mundiapolis.library.digitalcontent.service.MalwareScanService
+import com.mundiapolis.library.digitalcontent.service.PromotedObject
+import com.mundiapolis.library.digitalcontent.service.PromotionLeaseLostException
+import com.mundiapolis.library.digitalcontent.service.PromotionStore
 import com.mundiapolis.library.digitalcontent.service.SignedDownload
 import org.jooq.DSLContext
 import org.junit.jupiter.api.BeforeEach
@@ -39,6 +43,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.time.OffsetDateTime
 import java.time.Instant
+import java.time.Duration
 import java.time.ZoneOffset
 import java.util.UUID
 
@@ -56,12 +61,16 @@ class DigitalContentIntegrationTest {
     @Autowired
     private lateinit var malwareScanService: MalwareScanService
 
+    @Autowired
+    private lateinit var promotionStore: PromotionStore
+
     @BeforeEach
     fun seedAssets() {
         dsl.deleteFrom(DIGITAL_CONTENT_EXTERNAL_AUTHORIZATION_AUDIT).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_EXTERNAL_RESOURCE).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_DOWNLOAD_AUTHORIZATION_AUDIT).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_SCAN_RECEIPT).execute()
+        dsl.deleteFrom(DIGITAL_CONTENT_PROMOTION_JOB).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_INGESTION).execute()
         dsl.deleteFrom(DIGITAL_CONTENT_ASSET).execute()
         insertAsset(
@@ -338,6 +347,12 @@ class DigitalContentIntegrationTest {
         )
         org.junit.jupiter.api.Assertions.assertEquals("CLEAN", malwareScanService.apply(event).state)
         org.junit.jupiter.api.Assertions.assertTrue(malwareScanService.apply(event).replayed)
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "PENDING",
+            dsl.select(DIGITAL_CONTENT_PROMOTION_JOB.STATE)
+                .from(DIGITAL_CONTENT_PROMOTION_JOB)
+                .fetchSingle(DIGITAL_CONTENT_PROMOTION_JOB.STATE),
+        )
 
         val adverse = event.copy(
             eventId = UUID.fromString("14000000-0000-0000-0000-000000000002"),
@@ -352,6 +367,106 @@ class DigitalContentIntegrationTest {
                 .fetchSingle(DIGITAL_CONTENT_INGESTION.STATE),
         )
         org.junit.jupiter.api.Assertions.assertEquals(2, dsl.fetchCount(DIGITAL_CONTENT_SCAN_RECEIPT))
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "CANCELLED",
+            dsl.select(DIGITAL_CONTENT_PROMOTION_JOB.STATE)
+                .from(DIGITAL_CONTENT_PROMOTION_JOB)
+                .fetchSingle(DIGITAL_CONTENT_PROMOTION_JOB.STATE),
+        )
+    }
+
+    @Test
+    fun `clean ingestion promotes through a lease fenced exact object receipt`() {
+        val body = INGESTION_BODY
+            .replace(AVAILABLE_EDITION_ID.toString(), PROMOTION_EDITION_ID.toString())
+        mockMvc.perform(
+            put("/api/v1/digital-content/ingestions/$PROMOTION_INGESTION_ID")
+                .with(ingestionScope())
+                .contentType("application/json")
+                .content(body),
+        ).andExpect(status().isCreated)
+        val key = dsl.select(DIGITAL_CONTENT_INGESTION.QUARANTINE_OBJECT_KEY)
+            .from(DIGITAL_CONTENT_INGESTION)
+            .where(DIGITAL_CONTENT_INGESTION.INGESTION_ID.eq(PROMOTION_INGESTION_ID))
+            .fetchSingle(DIGITAL_CONTENT_INGESTION.QUARANTINE_OBJECT_KEY)
+        val cleanEvent = MalwareScanEvent(
+            eventId = PROMOTION_SCAN_EVENT_ID,
+            objectKey = requireNotNull(key),
+            objectVersionId = "source-version-1",
+            objectEtag = "source-etag-1",
+            result = MalwareScanResult.NO_THREATS_FOUND,
+            eventAt = Instant.now().minusSeconds(1),
+            payloadDigest = "d".repeat(64),
+        )
+        malwareScanService.apply(cleanEvent)
+
+        val claim = requireNotNull(promotionStore.claim(Instant.now(), Duration.ofMinutes(2)))
+        org.junit.jupiter.api.Assertions.assertEquals(PROMOTION_INGESTION_ID, claim.ingestionId)
+        org.junit.jupiter.api.Assertions.assertEquals(1, claim.attempt)
+        org.junit.jupiter.api.Assertions.assertThrows(PromotionLeaseLostException::class.java) {
+            promotionStore.complete(
+                claim.copy(leaseToken = UUID.randomUUID()),
+                PromotedObject(
+                    objectVersionId = "destination-version-1",
+                    objectEtag = "destination-etag-1",
+                    checksumSha256 = DIGEST,
+                    sizeBytes = 4096L,
+                    mediaType = "application/pdf",
+                ),
+                Instant.now(),
+            )
+        }
+        promotionStore.complete(
+            claim,
+            PromotedObject(
+                objectVersionId = "destination-version-1",
+                objectEtag = "destination-etag-1",
+                checksumSha256 = DIGEST,
+                sizeBytes = 4096L,
+                mediaType = "application/pdf",
+            ),
+            Instant.now(),
+        )
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+            "PROMOTED",
+            dsl.select(DIGITAL_CONTENT_INGESTION.STATE)
+                .from(DIGITAL_CONTENT_INGESTION)
+                .where(DIGITAL_CONTENT_INGESTION.INGESTION_ID.eq(PROMOTION_INGESTION_ID))
+                .fetchSingle(DIGITAL_CONTENT_INGESTION.STATE),
+        )
+        val job = dsl.selectFrom(DIGITAL_CONTENT_PROMOTION_JOB).fetchSingle()
+        org.junit.jupiter.api.Assertions.assertEquals("COMPLETED", job.state)
+        org.junit.jupiter.api.Assertions.assertEquals(DIGEST, job.promotedChecksumSha256)
+
+        mockMvc.perform(
+            get("/api/v1/digital-content/editions/$PROMOTION_EDITION_ID/availability")
+                .with(readScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.downloadable").value(true))
+            .andExpect(jsonPath("$.formats[0].assetId").value(PROMOTION_INGESTION_ID.toString()))
+
+        val adverseResult = malwareScanService.apply(
+            cleanEvent.copy(
+                eventId = PROMOTION_ADVERSE_SCAN_EVENT_ID,
+                result = MalwareScanResult.THREATS_FOUND,
+                payloadDigest = "e".repeat(64),
+            ),
+        )
+        org.junit.jupiter.api.Assertions.assertEquals("REJECTED", adverseResult.state)
+        val withdrawn = dsl.selectFrom(DIGITAL_CONTENT_ASSET)
+            .where(DIGITAL_CONTENT_ASSET.ASSET_ID.eq(PROMOTION_INGESTION_ID))
+            .fetchSingle()
+        org.junit.jupiter.api.Assertions.assertEquals("REVOKED", withdrawn.rightsStatus)
+        org.junit.jupiter.api.Assertions.assertEquals("INFECTED", withdrawn.malwareScanStatus)
+        org.junit.jupiter.api.Assertions.assertEquals("WITHDRAWN", withdrawn.publicationStatus)
+        mockMvc.perform(
+            get("/api/v1/digital-content/editions/$PROMOTION_EDITION_ID/availability")
+                .with(readScope()),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.downloadable").value(false))
     }
 
     private fun insertAsset(
@@ -465,6 +580,10 @@ class DigitalContentIntegrationTest {
         val BLOCKED_ASSET_ID: UUID = UUID.fromString("12000000-0000-0000-0000-000000000002")
         val INGESTION_ID: UUID = UUID.fromString("13000000-0000-0000-0000-000000000001")
         val SCAN_EVENT_ID: UUID = UUID.fromString("14000000-0000-0000-0000-000000000001")
+        val PROMOTION_INGESTION_ID: UUID = UUID.fromString("13000000-0000-0000-0000-000000000002")
+        val PROMOTION_SCAN_EVENT_ID: UUID = UUID.fromString("14000000-0000-0000-0000-000000000003")
+        val PROMOTION_ADVERSE_SCAN_EVENT_ID: UUID = UUID.fromString("14000000-0000-0000-0000-000000000004")
+        val PROMOTION_EDITION_ID: UUID = UUID.fromString("11000000-0000-0000-0000-000000000005")
         val EXTERNAL_RESOURCE_ID: UUID = UUID.fromString("15000000-0000-0000-0000-000000000001")
         val NOW: OffsetDateTime = OffsetDateTime.of(2026, 10, 4, 12, 0, 0, 0, ZoneOffset.UTC)
         const val DIGEST = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

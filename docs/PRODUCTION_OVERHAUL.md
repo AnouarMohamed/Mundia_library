@@ -486,10 +486,15 @@ grants bound to exact size, media type, SHA-256 checksum, expected account, and
 KMS key. A production-shaped SQS consumer strictly validates GuardDuty
 EventBridge results, commits idempotency receipts and immutable object-version
 evidence atomically, acknowledges only after commit, and treats every result
-except `NO_THREATS_FOUND` as rejection. Safe object promotion, lifecycle/IaC,
-the hosted-asset SPA download path, and the core OpenSearch projection remain
-pending; verified external-resource downloads already use the BFF authorization
-path without proxying third-party bytes.
+except `NO_THREATS_FOUND` as rejection. A clean verdict now atomically creates a
+deterministic, durable promotion job. Promotion claims use expiring fenced
+leases, bounded retry state, exact source object version/ETag evidence, and an
+exact destination checksum/size/media receipt before the asset and ingestion
+become published. A later adverse verdict cancels uncompleted work and withdraws
+an already-published asset. The S3 copy worker, quarantine lifecycle/IaC, and
+hosted-asset SPA download path remain pending; verified external-resource
+downloads already use the BFF authorization path without proxying third-party
+bytes.
 
 Discovery checkpoint (2026-10-10): the service boundary and complete delegated
 implementation contract are accepted, but no `discovery-service` module,

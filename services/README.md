@@ -30,6 +30,13 @@ compilation. Integration tests start isolated
 PostgreSQL containers and verify that Flyway, the persistence adapters, HTTP
 authorization, and published contracts work together.
 
+Digital Content also owns a durable quarantine-promotion state machine. A clean
+scan creates a deterministic job atomically; lease-fenced completion publishes
+an asset only after exact object evidence is supplied, while later adverse scan
+results cancel pending work or withdraw the published asset. The actual S3 copy
+adapter and storage lifecycle infrastructure are the next milestone and must
+not be inferred from the database state machine alone.
+
 The packaged application defaults `spring.flyway.enabled` to `false`.
 `bootRun` explicitly opts into Flyway for the single-role local database; this
 local convenience is not part of the container runtime contract.
