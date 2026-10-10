@@ -15,7 +15,7 @@ This document specifies the authoritative rules, safety checks, and step-by-step
 | **Membership & Identity** | Next.js Drizzle ORM remains production-routed for `users`; Membership has secured reads and a non-routed idempotent account-status command with atomic audit/outbox evidence, while remaining writes, event delivery, backfill, BFF routing, retention automation, and cutover remain pending | Serviced exclusively by `Membership Service` via [contracts/membership.ts](../lib/services/contracts/membership.ts) | AST scan for direct `users` table queries |
 | **Authentication** | Dual NextAuth Credentials + OIDC PKCE | Managed OIDC PKCE exclusively; legacy SHA-256 / bcrypt password verification retired | NextAuth config audit (`auth.ts`) |
 | **Notification Delivery** | Direct Brevo / QStash email sending from Next.js | Outbox-driven `Notification Service` (implementation in progress) via [contracts/notification.ts](../lib/services/contracts/notification.ts) | Outbox event delivery audit |
-| **Search & Recommendations** | PostgreSQL ILIKE queries & local DB joins | OpenSearch `Discovery Service` (implementation in progress) via [contracts/discovery.ts](../lib/services/contracts/discovery.ts) | Read latency SLO monitoring |
+| **Search & Recommendations** | PostgreSQL ILIKE queries and local DB joins | Accepted but unimplemented OpenSearch `Discovery Service`; build against the [authoritative handoff](SEARCH_DISCOVERY_SERVICE.md), not the migration-era [TypeScript sketch](../lib/services/contracts/discovery.ts) | Snapshot/replay parity, relevance evaluation, shadow traffic, latency SLO and rollback rehearsal |
 
 ---
 

@@ -2,9 +2,10 @@
 
 Mundiapolis Library is in a controlled strangler migration. The current Vercel
 deployment still serves the Next.js application, while new product slices are
-implemented as a static React SPA behind a Kotlin Web BFF and five
-domain-owned Kotlin/Spring services. This document distinguishes implemented
-code from future deployment state.
+implemented as a static React SPA behind a Kotlin Web BFF and five implemented
+domain-owned Kotlin/Spring services. A sixth Search and Discovery boundary is
+accepted and reserved but intentionally not implemented. This document
+distinguishes implemented code from future deployment state.
 
 ## Architecture at a glance
 
@@ -30,6 +31,7 @@ flowchart TB
     Circulation["Circulation"]
     Digital["Digital Content"]
     Notification["Notification"]
+    Discovery["Discovery (planned)"]
   end
 
   subgraph Data["Private managed data plane"]
@@ -38,7 +40,9 @@ flowchart TB
     CirculationDB[("circulation")]
     DigitalDB[("digital content")]
     NotificationDB[("notifications")]
+    DiscoveryDB[("discovery control (planned)")]
     Kafka["Kafka-compatible broker"]
+    Search[("OpenSearch (planned)")]
   end
 
   User -->|"HTTPS"| WAF
@@ -48,14 +52,18 @@ flowchart TB
   BFF <--> Session
   BFF <--> OIDC
   BFF -->|"token exchange + exact scopes"| Membership & Catalog & Circulation & Digital & Notification
+  BFF -. "future discovery.search token" .-> Discovery
 
   Membership --> MembershipDB
   Catalog --> CatalogDB
   Circulation --> CirculationDB
   Digital --> DigitalDB
   Notification --> NotificationDB
+  Discovery -.-> DiscoveryDB
+  Discovery -.-> Search
   Membership & Catalog & Circulation -->|"transactional outbox"| Kafka
   Kafka -->|"validated event + idempotent inbox"| Catalog & Notification
+  Kafka -. "privacy-minimized projections" .-> Discovery
 ```
 
 ### What is authoritative today
@@ -77,10 +85,11 @@ documented gates pass.
 | --- | --- | --- |
 | Web BFF | Browser session, CSRF, OAuth token exchange, downstream validation | Domain records, browser-visible access tokens |
 | Membership | Member profile, status, role, eligibility inputs, identity-evidence metadata | Loans, catalog metadata, file assets |
-| Catalog | Works, editions, contributors, search, reviews, learning-resource metadata | Physical copy truth, download authorization |
+| Catalog | Works, editions, contributors, reviews, learning-resource metadata; temporary PostgreSQL search | Physical copy truth, download authorization, final search ranking/index |
 | Circulation | Copies, loans, reservations, policy revisions, operational queues | Member identity authority, bibliographic content |
 | Digital Content | Licence evidence, quarantine, asset manifests, scan/publication state, download authorization | Catalog search, unverified file hosting |
 | Notification | Inbox, preferences, delivery attempts, provider suppression state | Source domain aggregates |
+| Discovery (planned) | Disposable search projections, OpenSearch mappings, ranking, facets, suggestions, reindex control | Source aggregates, member behavior, borrowing/download authorization |
 | SPA | Presentation and accessible interaction | Secrets, OAuth tokens, authorization decisions |
 | Next.js shell | Routes not yet cut over | New service-owned schemas |
 
@@ -173,6 +182,12 @@ aggregate versions, idempotent inboxes, and transaction boundaries—not from an
 assumption that Kafka delivers exactly once end to end. Consumers can be rebuilt
 from authoritative state and event history.
 
+Discovery is an accepted future boundary, not deployed code. Catalog remains
+the search provider until Discovery passes the snapshot/replay, shadow,
+relevance, security, performance, and rollback gates in the
+[implementation handoff](SEARCH_DISCOVERY_SERVICE.md). Discovery must not read
+service databases or the member-bearing Circulation topic.
+
 ## Data and command invariants
 
 - Copy availability changes only through Circulation transactions.
@@ -249,6 +264,8 @@ legacy route only after the observation window succeeds.
 - [ADR 0001 — backend platform stack](adr/0001-backend-platform-stack.md)
 - [ADR 0002 — service boundaries and data ownership](adr/0002-service-boundaries-and-data-ownership.md)
 - [ADR 0003 — static SPA and Kotlin BFF](adr/0003-static-spa-and-kotlin-bff.md)
+- [ADR 0004 — Search and Discovery boundary](adr/0004-search-and-discovery-service.md)
+- [Search and Discovery implementation handoff](SEARCH_DISCOVERY_SERVICE.md)
 - [Production overhaul](PRODUCTION_OVERHAUL.md)
 - [Threat model](THREAT_MODEL.md)
 - [AWS/Kubernetes platform](../platform/README.md)

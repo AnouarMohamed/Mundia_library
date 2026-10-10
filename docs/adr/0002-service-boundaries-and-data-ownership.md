@@ -16,6 +16,10 @@ The initial service boundaries are:
   manifests, quarantine/scan state, and download authorization.
 - Discovery: disposable search, availability, and recommendation projections.
 
+Discovery is reserved but unimplemented. ADR 0004 narrows its first release to
+non-personalized search and defines the privacy-minimized integration boundary;
+recommendations require a later privacy/design gate.
+
 Authentication credentials, MFA, and sessions belong to the managed identity
 provider. Audit records are exported to a dedicated append-only archive.
 

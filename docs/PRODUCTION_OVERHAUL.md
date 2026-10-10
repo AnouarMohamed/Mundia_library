@@ -36,7 +36,10 @@ The detailed decisions are in
 [ADR 0001](./adr/0001-backend-platform-stack.md) and
 [ADR 0002](./adr/0002-service-boundaries-and-data-ownership.md), with the
 final web tier superseded by
-[ADR 0003](./adr/0003-static-spa-and-kotlin-bff.md).
+[ADR 0003](./adr/0003-static-spa-and-kotlin-bff.md). The accepted but
+unimplemented Discovery boundary is specified by
+[ADR 0004](./adr/0004-search-and-discovery-service.md) and its
+[delegated implementation handoff](./SEARCH_DISCOVERY_SERVICE.md).
 
 ## Implemented checkpoint
 
@@ -391,7 +394,9 @@ retention/deletion workflows pass.
 - Send notification intents through the circulation/catalog outboxes.
 - Add provider-specific workers with retry, deduplication, DLQ, suppression,
   preference, and delivery observability.
-- Build OpenSearch projections for catalog, availability, and recommendations.
+- Build the accepted Search and Discovery boundary exactly as specified in the
+  delegated handoff. Core non-personalized search precedes suggestions and any
+  separately reviewed recommendation capability.
 - Make every read model disposable and rebuildable from events/snapshots.
 - After notification operational controls and the core search projection are
   complete, add a rights-aware engineering collection ingestion slice. Seed
@@ -485,6 +490,11 @@ except `NO_THREATS_FOUND` as rejection. Safe object promotion, lifecycle/IaC,
 the hosted-asset SPA download path, and the core OpenSearch projection remain
 pending; verified external-resource downloads already use the BFF authorization
 path without proxying third-party bytes.
+
+Discovery checkpoint (2026-10-10): the service boundary and complete delegated
+implementation contract are accepted, but no `discovery-service` module,
+OpenSearch domain, consumer, index, BFF route, or production deployment exists.
+The documentation reserves the boundary; it is not implementation evidence.
 
 While the full Kotlin Digital Content boundary is being completed, the Vercel
 application provides a deliberately narrow learning-resource catalog. It stores

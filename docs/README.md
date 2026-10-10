@@ -16,6 +16,7 @@ shell and the Kotlin microservice platform being cut over route by route.
 | Review security | [Threat Model](THREAT_MODEL.md) | [Security Verification](SECURITY_VERIFICATION.md), [Security Policy](../SECURITY.md) |
 | Change the mobile UI | [Mobile Product Gate](MOBILE_PRODUCT_GATE.md) | [Web SPA](../web-spa/README.md) |
 | Continue the migration | [Production Overhaul](PRODUCTION_OVERHAUL.md) | [Web Migration](WEB_MIGRATION.md), [Phase 6 Decommissioning](PHASE6_DECOMMISSIONING.md) |
+| Build the planned search service | [Search and Discovery handoff](SEARCH_DISCOVERY_SERVICE.md) | [ADR 0004](adr/0004-search-and-discovery-service.md), [Threat Model](THREAT_MODEL.md) |
 
 ## Canonical references
 
@@ -31,6 +32,7 @@ shell and the Kotlin microservice platform being cut over route by route.
 | [Operations](OPERATIONS.md) | Health checks, incidents, backups, and administrative operations |
 | [Production Readiness](PRODUCTION_READINESS.md) | Evidence required before a production claim |
 | [Release Process](RELEASE_PROCESS.md) | Versioning, artifacts, and release controls |
+| [Search and Discovery handoff](SEARCH_DISCOVERY_SERVICE.md) | Delegated contract for the accepted, unimplemented Discovery boundary |
 
 Service-specific contracts live beside their code:
 

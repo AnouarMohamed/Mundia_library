@@ -5,6 +5,14 @@ browser-facing Web BFF plus Membership, Catalog, Circulation, Digital Content,
 and Notification domain services. The existing Next.js application remains the
 production entry point until each route passes its migration and cutover gates.
 
+Search and Discovery is an accepted next service boundary, but it is not one of
+these six applications and no implementation has started. Its reserved module,
+contracts, data ownership, security model, delivery milestones, and definition
+of done are specified in
+[the Search and Discovery implementation handoff](../docs/SEARCH_DISCOVERY_SERVICE.md).
+The future implementer must follow that handoff rather than reading another
+service's database or extending an existing service with search ownership.
+
 ## Requirements
 
 - JDK 25
