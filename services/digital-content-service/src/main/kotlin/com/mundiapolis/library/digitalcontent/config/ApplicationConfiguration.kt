@@ -1,24 +1,29 @@
 package com.mundiapolis.library.digitalcontent.config
 
-import com.mundiapolis.library.digitalcontent.service.DigitalAssetReader
-import com.mundiapolis.library.digitalcontent.service.CloudFrontDownloadUrlSigner
-import com.mundiapolis.library.digitalcontent.service.DisabledDownloadUrlSigner
-import com.mundiapolis.library.digitalcontent.service.DigitalContentService
-import com.mundiapolis.library.digitalcontent.service.DownloadUrlSigner
-import com.mundiapolis.library.digitalcontent.service.DisabledQuarantineUploadAuthorizer
-import com.mundiapolis.library.digitalcontent.service.IngestionService
-import com.mundiapolis.library.digitalcontent.service.IngestionStore
-import com.mundiapolis.library.digitalcontent.service.QuarantineUploadAuthorizer
-import com.mundiapolis.library.digitalcontent.service.S3QuarantineUploadAuthorizer
 import aws.sdk.kotlin.services.s3.S3Client
 import aws.sdk.kotlin.services.sqs.SqsClient
+import com.mundiapolis.library.digitalcontent.adapter.`in`.promotion.AssetPromotionWorker
 import com.mundiapolis.library.digitalcontent.adapter.`in`.scan.AwsSqsMalwareScanQueue
 import com.mundiapolis.library.digitalcontent.adapter.`in`.scan.GuardDutyScanDecoder
 import com.mundiapolis.library.digitalcontent.adapter.`in`.scan.MalwareScanSqsConsumer
-import com.mundiapolis.library.digitalcontent.service.MalwareScanService
-import com.mundiapolis.library.digitalcontent.service.MalwareScanStore
+import com.mundiapolis.library.digitalcontent.service.AssetPromotionService
+import com.mundiapolis.library.digitalcontent.service.AwsS3PromotionObjectStore
+import com.mundiapolis.library.digitalcontent.service.CloudFrontDownloadUrlSigner
+import com.mundiapolis.library.digitalcontent.service.DigitalAssetReader
+import com.mundiapolis.library.digitalcontent.service.DigitalContentService
+import com.mundiapolis.library.digitalcontent.service.DisabledDownloadUrlSigner
+import com.mundiapolis.library.digitalcontent.service.DisabledQuarantineUploadAuthorizer
 import com.mundiapolis.library.digitalcontent.service.ExternalResourceService
 import com.mundiapolis.library.digitalcontent.service.ExternalResourceStore
+import com.mundiapolis.library.digitalcontent.service.IngestionService
+import com.mundiapolis.library.digitalcontent.service.IngestionStore
+import com.mundiapolis.library.digitalcontent.service.MalwareScanService
+import com.mundiapolis.library.digitalcontent.service.MalwareScanStore
+import com.mundiapolis.library.digitalcontent.service.PromotionObjectStore
+import com.mundiapolis.library.digitalcontent.service.PromotionStore
+import com.mundiapolis.library.digitalcontent.service.QuarantineUploadAuthorizer
+import com.mundiapolis.library.digitalcontent.service.S3ObjectPromoter
+import com.mundiapolis.library.digitalcontent.service.S3QuarantineUploadAuthorizer
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.health.contributor.Health
@@ -137,6 +142,63 @@ class ApplicationConfiguration {
         health.withDetail("enabled", true)
             .withDetail("consecutiveFailures", snapshot.consecutiveFailures)
             .withDetail("lastSuccessfulPoll", snapshot.lastSuccessfulPoll?.toString() ?: "never")
+            .build()
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.promotion", name = ["enabled"], havingValue = "true")
+    fun promotionObjectStore(
+        client: S3Client,
+        ingestion: IngestionProperties,
+    ): PromotionObjectStore = AwsS3PromotionObjectStore(client, ingestion)
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.promotion", name = ["enabled"], havingValue = "true")
+    fun assetPromotionService(
+        store: PromotionStore,
+        objectStore: PromotionObjectStore,
+        ingestion: IngestionProperties,
+        promotion: PromotionProperties,
+        clock: Clock,
+    ): AssetPromotionService {
+        require(ingestion.enabled) { "asset promotion requires quarantine ingestion to be enabled" }
+        return AssetPromotionService(
+            store = store,
+            promoter = S3ObjectPromoter(objectStore, ingestion.kmsKeyId),
+            clock = clock,
+            leaseDuration = promotion.leaseDuration,
+            maximumAttempts = promotion.maximumAttempts,
+            initialBackoff = promotion.initialBackoff,
+            maximumBackoff = promotion.maximumBackoff,
+        )
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.promotion", name = ["enabled"], havingValue = "true")
+    fun assetPromotionWorker(
+        service: AssetPromotionService,
+        promotion: PromotionProperties,
+        clock: Clock,
+        registry: MeterRegistry,
+    ) = AssetPromotionWorker(service, promotion, clock, registry)
+
+    @Bean
+    fun assetPromotionHealthIndicator(
+        worker: ObjectProvider<AssetPromotionWorker>,
+        properties: PromotionProperties,
+        clock: Clock,
+    ): HealthIndicator = HealthIndicator {
+        if (!properties.enabled) return@HealthIndicator Health.up().withDetail("enabled", false).build()
+        val snapshot = worker.ifAvailable?.healthSnapshot(clock.instant())
+            ?: return@HealthIndicator Health.down().withDetail("enabled", true).build()
+        val health = when {
+            snapshot.ready -> Health.up()
+            snapshot.starting -> Health.outOfService()
+            else -> Health.down()
+        }
+        health.withDetail("enabled", true)
+            .withDetail("consecutiveFailures", snapshot.consecutiveFailures)
+            .withDetail("lastSuccessfulCycle", snapshot.lastSuccessfulCycle?.toString() ?: "never")
             .build()
     }
 }

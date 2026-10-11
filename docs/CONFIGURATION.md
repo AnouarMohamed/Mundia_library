@@ -422,9 +422,26 @@ result becomes `REJECTED`, and malformed/conflicting events redrive rather than
 fail open. A clean result also creates a durable promotion job in the same
 transaction. Claims are lease-fenced, and completion requires exact checksum,
 size, media type, source object version, and ETag evidence before publication.
-The AWS S3 copy worker remains disabled and unimplemented until its least-
-privilege object-storage policy and lifecycle infrastructure land; database
-state alone never claims that bytes were promoted.
+
+The S3 promotion worker is separately disabled by default. Enable
+`DIGITAL_CONTENT_PROMOTION_ENABLED=true` only after the same-account bucket has
+versioning, private access enforcement, the configured KMS key, and reviewed
+quarantine lifecycle rules. Optional bounded controls use the
+`DIGITAL_CONTENT_PROMOTION_*` variables documented in `application.yml`. The
+pod identity needs `s3:GetObjectVersion` on the exact quarantine prefix,
+`s3:GetObject` and `s3:PutObject` on `digital-content/`, plus only the KMS
+decrypt/encrypt/data-key permissions required for that bucket and key. It does
+not need delete, bucket-policy, ACL, public-access, or KMS administration
+permissions.
+
+Each attempt first validates an existing deterministic destination, making an
+ambiguous prior copy recoverable. Otherwise it copies the exact scanned source
+version with source ETag and create-only destination conditions, replaces
+metadata with the reviewed SHA-256 value, requires SSE-KMS, then performs an
+independent `HeadObject` checksum, size, media-type, KMS-key, metadata, version,
+and ETag verification. Only that receipt can publish the database asset. The
+private bucket, lifecycle, GuardDuty plan, queue, and IAM Terraform remain a
+deployment gate; enabling code alone does not provision or authorize AWS.
 
 ## Secrets Handling
 

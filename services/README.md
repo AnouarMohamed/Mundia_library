@@ -34,8 +34,12 @@ Digital Content also owns a durable quarantine-promotion state machine. A clean
 scan creates a deterministic job atomically; lease-fenced completion publishes
 an asset only after exact object evidence is supplied, while later adverse scan
 results cancel pending work or withdraw the published asset. The actual S3 copy
-adapter and storage lifecycle infrastructure are the next milestone and must
-not be inferred from the database state machine alone.
+worker is implemented but disabled by default. It validates a deterministic
+existing destination or copies the exact scanned version with conditional
+requests and independently verifies checksum, size, media type, KMS key, object
+version, ETag, and metadata before completing the lease. Private bucket,
+lifecycle, GuardDuty, queue, and least-privilege IAM infrastructure remain a
+deployment gate and must not be inferred from application code alone.
 
 The packaged application defaults `spring.flyway.enabled` to `false`.
 `bootRun` explicitly opts into Flyway for the single-role local database; this

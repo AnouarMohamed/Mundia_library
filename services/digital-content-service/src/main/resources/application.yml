@@ -64,6 +64,16 @@ app:
     startup-grace-period: ${DIGITAL_CONTENT_SCAN_STARTUP_GRACE_PERIOD:PT1M}
     retry-backoff: ${DIGITAL_CONTENT_SCAN_RETRY_BACKOFF:PT1S}
     maximum-consecutive-failures: ${DIGITAL_CONTENT_SCAN_MAXIMUM_CONSECUTIVE_FAILURES:5}
+  promotion:
+    enabled: ${DIGITAL_CONTENT_PROMOTION_ENABLED:false}
+    poll-interval: ${DIGITAL_CONTENT_PROMOTION_POLL_INTERVAL:PT1S}
+    lease-duration: ${DIGITAL_CONTENT_PROMOTION_LEASE_DURATION:PT2M}
+    maximum-attempts: ${DIGITAL_CONTENT_PROMOTION_MAXIMUM_ATTEMPTS:5}
+    initial-backoff: ${DIGITAL_CONTENT_PROMOTION_INITIAL_BACKOFF:PT5S}
+    maximum-backoff: ${DIGITAL_CONTENT_PROMOTION_MAXIMUM_BACKOFF:PT5M}
+    maximum-poll-silence: ${DIGITAL_CONTENT_PROMOTION_MAXIMUM_POLL_SILENCE:PT30S}
+    startup-grace-period: ${DIGITAL_CONTENT_PROMOTION_STARTUP_GRACE_PERIOD:PT1M}
+    maximum-consecutive-failures: ${DIGITAL_CONTENT_PROMOTION_MAXIMUM_CONSECUTIVE_FAILURES:5}
   download:
     cloudfront:
       enabled: ${DOWNLOAD_SIGNING_ENABLED:false}
@@ -89,7 +99,7 @@ management:
       show-details: never
       group:
         readiness:
-          include: readinessState,db,malwareScan
+          include: readinessState,db,malwareScan,assetPromotion
   health:
     livenessstate:
       enabled: true

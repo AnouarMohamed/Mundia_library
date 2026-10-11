@@ -491,10 +491,14 @@ deterministic, durable promotion job. Promotion claims use expiring fenced
 leases, bounded retry state, exact source object version/ETag evidence, and an
 exact destination checksum/size/media receipt before the asset and ingestion
 become published. A later adverse verdict cancels uncompleted work and withdraws
-an already-published asset. The S3 copy worker, quarantine lifecycle/IaC, and
-hosted-asset SPA download path remain pending; verified external-resource
-downloads already use the BFF authorization path without proxying third-party
-bytes.
+an already-published asset. The disabled-by-default S3 worker now recovers
+ambiguous attempts by validating the deterministic destination, otherwise
+copies the exact scanned source version under source-ETag and create-only
+conditions, requires the configured KMS key, and independently verifies the
+destination before submitting completion evidence. Quarantine lifecycle/IaC
+and the hosted-asset SPA download path remain pending; verified external-
+resource downloads already use the BFF authorization path without proxying
+third-party bytes.
 
 Discovery checkpoint (2026-10-10): the service boundary and complete delegated
 implementation contract are accepted, but no `discovery-service` module,
