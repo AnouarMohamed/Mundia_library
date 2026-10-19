@@ -114,7 +114,7 @@ jobs:
           exit-code: "0"
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: container-sbom-${{ matrix.name }}
           path: trivy-${{ matrix.name }}-sbom.cdx.json
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload Trivy SARIF
         if: ${{ always() && hashFiles(format('trivy-{0}-results.sarif', matrix.name)) != '' }}
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         with:
           sarif_file: trivy-${{ matrix.name }}-results.sarif
 
