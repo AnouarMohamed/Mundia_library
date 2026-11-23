@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
 
       - name: Audit GitHub Actions
-        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
           inputs: .github/workflows
           version: 1.28.0
@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload Trivy SARIF
         if: ${{ always() && hashFiles('trivy-repository-results.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
         with:
           sarif_file: trivy-repository-results.sarif
 
